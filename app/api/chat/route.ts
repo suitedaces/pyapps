@@ -25,9 +25,15 @@ const tools: Anthropic.Messages.Tool[] = [
 ];
 
 export async function POST(request: NextRequest) {
-  const { messages, csvContent, csvFileName } = await request.json();
-
   try {
+    const { messages, csvContent, csvFileName } = await request.json();
+
+    console.log('Received messages:', JSON.stringify(messages, null, 2));
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      throw new Error('Invalid or empty messages array');
+    }
+
     const stream = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20240620",
       max_tokens: 4000,
@@ -37,15 +43,23 @@ export async function POST(request: NextRequest) {
       stream: true,
     });
 
+    let fullResponse = '';
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          if (chunk.type === 'content_block_delta') {
-            controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
+        try {
+          for await (const chunk of stream) {
+            if (chunk.type === 'content_block_delta' && 'text' in chunk.delta) {
+              fullResponse += chunk.delta.text;
+              controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
+            }
           }
+          controller.enqueue(encoder.encode(JSON.stringify({ type: 'full_response', content: fullResponse }) + '\n'));
+          controller.close();
+        } catch (error) {
+          console.error('Error in stream processing:', error);
+          controller.error(error);
         }
-        controller.close();
       },
     });
 
@@ -57,8 +71,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error in chat:', error);
-    return new Response(JSON.stringify({ error: 'An error occurred' }), {
+    console.error('Error in chat API:', error);
+    return new Response(JSON.stringify({ error: 'An error occurred', details: error instanceof Error ? error.message : 'Unknown error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

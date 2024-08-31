@@ -10,19 +10,21 @@ export function Chat({
   input,
   handleInputChange,
   handleSubmit,
-  isLoading
+  isLoading,
+  streamingMessage
 }: {
   messages: Message[];
   input: string;
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
+  streamingMessage: string;
 }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, streamingMessage]);
 
   return (
     <div className="flex flex-col h-[600px] border rounded-lg">
@@ -39,6 +41,18 @@ export function Chat({
             </div>
           </div>
         ))}
+        {streamingMessage && (
+          <div className="flex justify-start mb-4">
+            <div className="flex flex-row items-start">
+              <Avatar className="w-8 h-8">
+                <AvatarFallback>A</AvatarFallback>
+              </Avatar>
+              <div className="mx-2 p-3 rounded-lg bg-green-600">
+                {streamingMessage}
+              </div>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </ScrollArea>
       <form onSubmit={handleSubmit} className="p-4 border-t">
