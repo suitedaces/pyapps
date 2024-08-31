@@ -12,6 +12,24 @@ export function useChat() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [codeInterpreter, setCodeInterpreter] = useState<CodeInterpreter | null>(null);
 
+  useEffect(() => {
+    async function createInterpreter() {
+      try {
+        const interpreter = await CodeInterpreter.create({ apiKey: "e2b_d05766c8269872cc3e43114a87eca0b66ebc784a"});
+        setCodeInterpreter(interpreter);
+      } catch (error) {
+        console.error('Error creating CodeInterpreter:', error);
+      }
+    }
+    createInterpreter();
+
+    return () => {
+      if (codeInterpreter) {
+        codeInterpreter.close();
+      }
+    };
+  }, []);
+
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
   }, []);
@@ -36,24 +54,32 @@ export function useChat() {
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      let done = false;
       let accumulatedResponse = '';
 
-      while (!done) {
-        const { value, done: doneReading } = await reader!.read();
-        done = doneReading;
-        const chunkValue = decoder.decode(value);
-        accumulatedResponse += chunkValue;
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
 
-        // Append the chunk to the last assistant message or create a new one
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1];
-          if (lastMessage.role === 'assistant') {
-            return [...prev.slice(0, -1), { ...lastMessage, content: lastMessage.content + chunkValue }];
-          } else {
-            return [...prev, { role: 'assistant', content: chunkValue }];
+        for (const line of lines) {
+          try {
+            const parsedChunk = JSON.parse(line);
+            if (parsedChunk.type === 'content_block_delta') {
+              accumulatedResponse += parsedChunk.delta.text;
+              setMessages(prev => {
+                const lastMessage = prev[prev.length - 1];
+                if (lastMessage.role === 'assistant') {
+                  return [...prev.slice(0, -1), { ...lastMessage, content: lastMessage.content + parsedChunk.delta.text }];
+                } else {
+                  return [...prev, { role: 'assistant', content: parsedChunk.delta.text }];
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error parsing chunk:', error);
           }
-        });
+        }
       }
 
       // Check for Streamlit code in the accumulated response
@@ -85,26 +111,25 @@ export function useChat() {
     setCsvFileName(fileName);
 
     try {
-      if (!codeInterpreter) {
-        const interpreter = await CodeInterpreter.create();
-        setCodeInterpreter(interpreter);
-      }
-      const fileBlob = new Blob([content], { type: 'text/csv' });
-      await codeInterpreter?.filesystem.write('/app/data.csv', content);
+      if (codeInterpreter) {
+        await codeInterpreter.filesystem.write('/app/data.csv', content);
 
-      const dfHead = await codeInterpreter?.notebook.execCell(`
+        const dfHead = await codeInterpreter.notebook.execCell(`
 import pandas as pd
 df = pd.read_csv('/app/data.csv')
 print(df.head().to_string())
-      `);
+        `);
 
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'user',
-          content: `I've uploaded a CSV file named "${fileName}". Here are the first 5 rows of the data:\n\n${dfHead?.logs.stdout || 'Error: Unable to read file content'}`
-        }
-      ]);
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'user',
+            content: `I've uploaded a CSV file named "${fileName}". Here are the first 5 rows of the data:\n\n${dfHead.logs.stdout}`
+          }
+        ]);
+      } else {
+        console.error('CodeInterpreter not initialized');
+      }
     } catch (error) {
       console.error('Error in file upload:', error);
       setMessages(prev => [
@@ -115,14 +140,6 @@ print(df.head().to_string())
         }
       ]);
     }
-  }, [codeInterpreter]);
-
-  useEffect(() => {
-    return () => {
-      if (codeInterpreter) {
-        codeInterpreter.close();
-      }
-    };
   }, [codeInterpreter]);
 
   return {
