@@ -5,24 +5,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a data analyst specialized in CSV analysis and Streamlit app creation. When provided with CSV data, analyze it and generate appropriate Streamlit code for visualization and analysis. Use the execute_python tool to run Python code in a Jupyter notebook cell.`;
-
-const tools: Anthropic.Messages.Tool[] = [
-  {
-    name: 'execute_python',
-    description: 'Execute python code in a Jupyter notebook cell and returns any result, stdout, stderr, display_data, and error.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        code: {
-          type: 'string',
-          description: 'The python code to execute in a single cell.'
-        }
-      },
-      required: ['code']
-    }
-  }
-];
+const SYSTEM_PROMPT = `You are a data analyst specialized in CSV analysis and Streamlit app creation. When provided with CSV data, analyze it and generate appropriate Streamlit code for visualization and analysis.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +22,6 @@ export async function POST(request: NextRequest) {
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
       messages: messages,
-      tools: tools,
       stream: true,
     });
 

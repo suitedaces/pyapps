@@ -11,6 +11,7 @@ export function useChat() {
   const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null);
   const [generatedCode, setGeneratedCode] = useState('');
   const [codeInterpreter, setCodeInterpreter] = useState<CodeInterpreter | null>(null);
+  const [streamingMessage, setStreamingMessage] = useState('');
 
   useEffect(() => {
     async function createInterpreter() {
@@ -34,6 +35,23 @@ export function useChat() {
     setInput(e.target.value);
   }, []);
 
+  const extractCodeFromResponse = (response: string) => {
+    console.log("Extracting code from response:", response);
+    const codeBlocks = response.match(/```python\n([\s\S]*?)```/g);
+    console.log("Found code blocks:", codeBlocks);
+    if (codeBlocks && codeBlocks.length > 0) {
+      // Get the last code block
+      const lastCodeBlock = codeBlocks[codeBlocks.length - 1];
+      // Remove the backticks and 'python' from the code block
+      const extractedCode = lastCodeBlock.replace(/```python\n|```/g, '').trim();
+      console.log("Extracted code:", extractedCode);
+      return extractedCode;
+    }
+    console.log("No code blocks found");
+    return '';
+  };
+
+
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -42,6 +60,8 @@ export function useChat() {
     const newUserMessage: Message = { role: 'user', content: input };
     setMessages(prev => [...prev, newUserMessage]);
     setInput('');
+    setStreamingMessage('');
+    setGeneratedCode('');
 
     try {
       // Prepare messages for API, ensuring alternation
@@ -53,6 +73,8 @@ export function useChat() {
         }
         return acc;
       }, []);
+
+      console.log("Sending messages to API:", apiMessages);
 
       // Add the new user message
       apiMessages.push(newUserMessage);
@@ -80,14 +102,11 @@ export function useChat() {
             const parsedChunk = JSON.parse(line);
             if (parsedChunk.type === 'content_block_delta') {
               accumulatedResponse += parsedChunk.delta.text;
-              setMessages(prev => {
-                const lastMessage = prev[prev.length - 1];
-                if (lastMessage.role === 'assistant') {
-                  return [...prev.slice(0, -1), { ...lastMessage, content: lastMessage.content + parsedChunk.delta.text }];
-                } else {
-                  return [...prev, { role: 'assistant', content: parsedChunk.delta.text }];
-                }
-              });
+              setStreamingMessage(prev => prev + parsedChunk.delta.text);
+            } else if (parsedChunk.type === 'full_response') {
+              const extractedCode = extractCodeFromResponse(parsedChunk.content);
+              console.log("Setting generated code:", extractedCode);
+              setGeneratedCode(extractedCode);
             }
           } catch (error) {
             console.error('Error parsing chunk:', error);
@@ -95,20 +114,14 @@ export function useChat() {
         }
       }
 
-      // Check for Streamlit code in the accumulated response
-      if (accumulatedResponse.includes('Here\'s the Streamlit code')) {
-        const codeStart = accumulatedResponse.indexOf('```python') + 10;
-        const codeEnd = accumulatedResponse.lastIndexOf('```');
-        const code = accumulatedResponse.slice(codeStart, codeEnd).trim();
-        setGeneratedCode(code);
-        if (codeInterpreter) {
-          const exec = await codeInterpreter.notebook.execCell(code);
-          if (exec.error) {
-            console.error('Error executing Streamlit code:', exec.error);
-          } else {
-            console.log('Streamlit code executed successfully');
-            // Note: We can't set the Streamlit URL here as we don't have a method to get it
-          }
+      setMessages(prev => [...prev, { role: 'assistant', content: accumulatedResponse }]);
+
+      if (codeInterpreter && generatedCode) {
+        const exec = await codeInterpreter.notebook.execCell(generatedCode);
+        if (exec.error) {
+          console.error('Error executing Streamlit code:', exec.error);
+        } else {
+          console.log('Streamlit code executed successfully');
         }
       }
     } catch (error) {
@@ -116,9 +129,9 @@ export function useChat() {
       setMessages(prev => [...prev, { role: 'assistant', content: 'An error occurred. Please try again.' }]);
     } finally {
       setIsLoading(false);
+      setStreamingMessage('');
     }
   }, [input, messages, csvContent, csvFileName, codeInterpreter]);
-
   const handleFileUpload = useCallback(async (content: string, fileName: string) => {
     setCsvContent(content);
     setCsvFileName(fileName);
@@ -219,5 +232,6 @@ print(df.head().to_string())
     csvFileName,
     streamlitUrl,
     generatedCode,
+    streamingMessage
   };
 }

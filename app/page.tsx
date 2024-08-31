@@ -20,6 +20,7 @@ export default function Home() {
     csvFileName,
     streamlitUrl,
     generatedCode,
+    streamingMessage,
   } = useChat();
 
   return (
@@ -35,6 +36,7 @@ export default function Home() {
               handleInputChange={handleInputChange}
               handleSubmit={handleSubmit}
               isLoading={isLoading}
+              streamingMessage={streamingMessage}
             />
           </div>
           <div>
