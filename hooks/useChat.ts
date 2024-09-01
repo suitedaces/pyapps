@@ -12,6 +12,7 @@ export function useChat() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [codeInterpreter, setCodeInterpreter] = useState<CodeInterpreter | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
+  const [streamingCode, setStreamingCode] = useState('');
 
   useEffect(() => {
     async function createInterpreter() {
@@ -35,22 +36,29 @@ export function useChat() {
     setInput(e.target.value);
   }, []);
 
-  const extractCodeFromResponse = (response: string) => {
-    console.log("Extracting code from response:", response);
-    const codeBlocks = response.match(/```python\n([\s\S]*?)```/g);
-    console.log("Found code blocks:", codeBlocks);
-    if (codeBlocks && codeBlocks.length > 0) {
-      // Get the last code block
-      const lastCodeBlock = codeBlocks[codeBlocks.length - 1];
-      // Remove the backticks and 'python' from the code block
-      const extractedCode = lastCodeBlock.replace(/```python\n|```/g, '').trim();
-      console.log("Extracted code:", extractedCode);
-      return extractedCode;
-    }
-    console.log("No code blocks found");
-    return '';
-  };
+  const prepareMessages = (messages: Message[], newMessage: Message): Message[] => {
+    const preparedMessages: Message[] = [];
+    let lastRole: 'user' | 'assistant' | null = null;
 
+    for (const message of [...messages, newMessage]) {
+      if (message.content.trim()) {
+        if (message.role !== lastRole) {
+          preparedMessages.push(message);
+          lastRole = message.role;
+        } else {
+          // If the role is the same as the last one, combine the messages
+          preparedMessages[preparedMessages.length - 1].content += '\n' + message.content;
+        }
+      }
+    }
+
+    // Ensure the messages alternate correctly
+    if (preparedMessages.length > 1 && preparedMessages[0].role === 'assistant') {
+      preparedMessages.shift();
+    }
+
+    return preparedMessages;
+  };
 
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -64,35 +72,29 @@ export function useChat() {
     setGeneratedCode('');
 
     try {
-      // Prepare messages for API, ensuring alternation
-      const apiMessages = messages.reduce((acc: Message[], message: Message, index: number) => {
-        if (index === 0 || message.role !== acc[acc.length - 1].role) {
-          acc.push(message);
-        } else {
-          acc[acc.length - 1].content += '\n' + message.content;
-        }
-        return acc;
-      }, []);
-
-      console.log("Sending messages to API:", apiMessages);
-
-      // Add the new user message
-      apiMessages.push(newUserMessage);
+      const preparedMessages = prepareMessages(messages, newUserMessage);
+      console.log("Sending messages to API:", JSON.stringify(preparedMessages, null, 2));
 
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, csvContent, csvFileName }),
+        body: JSON.stringify({ messages: preparedMessages, csvContent, csvFileName }),
       });
 
-      if (!response.ok) throw new Error('Failed to fetch from chat API');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Failed to get response reader');
+      }
+
       const decoder = new TextDecoder();
       let accumulatedResponse = '';
 
       while (true) {
-        const { done, value } = await reader!.read();
+        const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n').filter(line => line.trim() !== '');
@@ -100,13 +102,11 @@ export function useChat() {
         for (const line of lines) {
           try {
             const parsedChunk = JSON.parse(line);
-            if (parsedChunk.type === 'content_block_delta') {
+            if (parsedChunk.type === 'content_block_delta' && parsedChunk.delta.type === 'text_delta') {
               accumulatedResponse += parsedChunk.delta.text;
               setStreamingMessage(prev => prev + parsedChunk.delta.text);
-            } else if (parsedChunk.type === 'full_response') {
-              const extractedCode = extractCodeFromResponse(parsedChunk.content);
-              console.log("Setting generated code:", extractedCode);
-              setGeneratedCode(extractedCode);
+            } else if (parsedChunk.type === 'generated_code') {
+              setGeneratedCode(parsedChunk.content);
             }
           } catch (error) {
             console.error('Error parsing chunk:', error);
@@ -132,19 +132,16 @@ export function useChat() {
       setStreamingMessage('');
     }
   }, [input, messages, csvContent, csvFileName, codeInterpreter]);
+
   const handleFileUpload = useCallback(async (content: string, fileName: string) => {
     setCsvContent(content);
     setCsvFileName(fileName);
 
     try {
       if (codeInterpreter) {
-        // Ensure the directory exists
         await codeInterpreter.filesystem.makeDir('/app');
-
-        // Write the file
         await codeInterpreter.filesystem.write('/app/data.csv', content);
 
-        // Read and display the first few rows
         const dfHead = await codeInterpreter.notebook.execCell(`
 import pandas as pd
 df = pd.read_csv('/app/data.csv')
@@ -161,12 +158,11 @@ print(df.head().to_string())
   
         setMessages(prev => [...prev, newMessage]);
   
-        // Send the new message to the API
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            messages: [...messages, newMessage],
+            messages: prepareMessages(messages, newMessage),
             csvContent, 
             csvFileName 
           }),
@@ -175,7 +171,7 @@ print(df.head().to_string())
         if (!response.ok) {
           throw new Error('Failed to send CSV upload message to chat API');
         }
-        // After sending the message to the API
+
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let accumulatedResponse = '';
@@ -185,29 +181,22 @@ print(df.head().to_string())
           if (done) break;
           const chunk = decoder.decode(value);
           const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
+  
           for (const line of lines) {
             try {
               const parsedChunk = JSON.parse(line);
-              if (parsedChunk.type === 'content_block_delta') {
+              if (parsedChunk.type === 'content_block_delta' && parsedChunk.delta.type === 'text_delta') {
                 accumulatedResponse += parsedChunk.delta.text;
-                setMessages(prev => {
-                  const lastMessage = prev[prev.length - 1];
-                  if (lastMessage.role === 'assistant') {
-                    return [...prev.slice(0, -1), { ...lastMessage, content: lastMessage.content + parsedChunk.delta.text }];
-                  } else {
-                    return [...prev, { role: 'assistant', content: parsedChunk.delta.text }];
-                  }
-                });
-              } else if (parsedChunk.type === 'full_response') {
+                setStreamingMessage(prev => prev + parsedChunk.delta.partial_json);
+              } else if (parsedChunk.type === 'generated_code') {
+                setGeneratedCode(parsedChunk.content);
+                setStreamingCode(parsedChunk.content); // Add this line
               }
             } catch (error) {
               console.error('Error parsing chunk:', error);
             }
           }
         }
-      } else {
-        throw new Error('CodeInterpreter not initialized');
       }
     } catch (error) {
       console.error('Error in file upload:', error);
@@ -219,7 +208,7 @@ print(df.head().to_string())
         }
       ]);
     }
-  }, [codeInterpreter]);
+  }, [codeInterpreter, messages]);
 
   return {
     messages,
@@ -232,6 +221,7 @@ print(df.head().to_string())
     csvFileName,
     streamlitUrl,
     generatedCode,
-    streamingMessage
+    streamingMessage,
+    streamingCode
   };
 }

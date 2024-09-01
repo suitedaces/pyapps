@@ -5,24 +5,83 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a data analyst specialized in CSV analysis and Streamlit app creation. When provided with CSV data, analyze it and generate appropriate Streamlit code for visualization and analysis.`;
+const SYSTEM_PROMPT = `You are a data analyst and Python developer specializing in CSV data analysis and Streamlit app development. 
+                        Your job is to analyze CSV data and generate Python code for visualization and analysis in Streamlit. For each task, 
+                        provide natural language instructions that describe the desired code functionality and pass these instructions to the 'generate_code' tool. 
+                        Ensure the instructions are clear, concise, and effectively convey the user's requirements for the Streamlit application.`.replace('\n', ' ');
+
+const tools: Anthropic.Messages.Tool[] = [
+  {
+    name: "generate_code",
+    description: "Generates Python (streamlit) code based on a given query",
+    
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Explain the requirements for the streamlit code you want to generate",
+        },
+      },
+      required: ["query"],
+    },
+  },
+];
+
+async function generateCode(query: string): Promise<string> {
+  // Check if the query is non-empty and has meaningful content
+  if (!query || !query.trim()) {
+    throw new Error('Query cannot be empty or just whitespace.');
+  }
+
+  // Log the query for debugging purposes
+  console.log('Sending query to LLM:', query);
+
+  try {
+    // Make the API call to the LLM
+    const response = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 2000,
+      system: "You are a Python code generation assistant. Generate code based on the given query. Only respond with the code, no explanations.",
+      messages: [{ role: "user", content: query }],
+    });
+
+
+    if (Array.isArray(response.content) && response.content.length > 0) {
+      // Check if the response contains text type
+      return response.content[0].type === 'text' ? response.content[0].text : '';
+    } else {
+      console.error('Unexpected response format:', response);
+      throw new Error('Unexpected response format from code generation API');
+    }
+  } catch (error) {
+    console.error('Error generating code:', error);
+    throw new Error('Failed to generate code. Please check the query and try again.');
+  }
+}
+
 
 export async function POST(request: NextRequest) {
   try {
     const { messages, csvContent, csvFileName } = await request.json();
 
-    console.log('Received messages:', JSON.stringify(messages, null, 2));
-
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new Error('Invalid or empty messages array');
     }
 
-    const stream = await anthropic.messages.create({
+    const validatedMessages = messages.filter(msg => msg.role && msg.content && msg.content.trim() !== '');
+
+    if (validatedMessages.length === 0) {
+      throw new Error('No valid messages found');
+    }
+
+    const stream = await anthropic.messages.stream({
       model: "claude-3-5-sonnet-20240620",
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
-      messages: messages,
-      stream: true,
+      messages: validatedMessages,
+      tool_choice: { type: 'auto' },
+      tools: tools,
     });
 
     let fullResponse = '';
@@ -31,7 +90,29 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            if (chunk.type === 'content_block_delta' && 'text' in chunk.delta) {
+            console.log('Received chunk:', chunk);  // Log every chunk
+            if (chunk.type === 'content_block_start' && chunk.content_block.type === 'tool_use') {
+              const toolUse = chunk.content_block;
+              console.log('Tool use detected:', toolUse);
+              if (toolUse.name === 'generate_code') {
+                console.log('Generating code...');
+                const query = (toolUse.input as { query: string }).query;
+                if (!query) {
+                  console.error('No query provided for code generation');
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'error',
+                    content: 'No query provided for code generation'
+                  }) + '\n'));
+                } else {
+                  console.log('Generating code for query:', query);
+                  const generatedCode = await generateCode(query);
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'generated_code',
+                    content: generatedCode
+                  }) + '\n'));
+                }
+              }
+            } else if (chunk.type === 'content_block_delta' && chunk.delta && chunk.delta.type === 'text_delta') {
               fullResponse += chunk.delta.text;
               controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
             }

@@ -21,6 +21,7 @@ export default function Home() {
     streamlitUrl,
     generatedCode,
     streamingMessage,
+    streamingCode,
   } = useChat();
 
   return (
@@ -49,7 +50,7 @@ export default function Home() {
                 <StreamlitPreview url={streamlitUrl} />
               </TabsContent>
               <TabsContent value="code">
-                <CodeView code={generatedCode} />
+                <CodeView code={streamingCode || generatedCode} />
               </TabsContent>
             </Tabs>
           </div>
