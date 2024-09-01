@@ -88,31 +88,46 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
+        let partialJsonInput = ''; // Buffer to accumulate input JSON
+    
         try {
           for await (const chunk of stream) {
             console.log('Received chunk:', chunk);  // Log every chunk
-            if (chunk.type === 'content_block_start' && chunk.content_block.type === 'tool_use') {
-              const toolUse = chunk.content_block;
-              console.log('Tool use detected:', toolUse);
-              if (toolUse.name === 'generate_code') {
-                console.log('Generating code...');
-                const query = (toolUse.input as { query: string }).query;
-                if (!query) {
+    
+            if (chunk.type === 'content_block_delta' && chunk.delta.type === 'input_json_delta') {
+              // Accumulate partial JSON input
+              partialJsonInput += chunk.delta.partial_json;
+            }
+    
+            if (chunk.type === 'content_block_stop' && partialJsonInput) {
+              // Process the complete JSON input
+              try {
+                const parsedInput = JSON.parse(partialJsonInput);
+                if (parsedInput.query) {
+                  console.log('Generating code for query:', parsedInput.query);
+                  const generatedCode = await generateCode(parsedInput.query);
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'generated_code',
+                    content: generatedCode
+                  }) + '\n'));
+                } else {
                   console.error('No query provided for code generation');
                   controller.enqueue(encoder.encode(JSON.stringify({
                     type: 'error',
                     content: 'No query provided for code generation'
                   }) + '\n'));
-                } else {
-                  console.log('Generating code for query:', query);
-                  const generatedCode = await generateCode(query);
-                  controller.enqueue(encoder.encode(JSON.stringify({
-                    type: 'generated_code',
-                    content: generatedCode
-                  }) + '\n'));
                 }
+              } catch (error) {
+                console.error('Error parsing JSON input:', error);
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'error',
+                  content: 'Error parsing input JSON'
+                }) + '\n'));
               }
-            } else if (chunk.type === 'content_block_delta' && chunk.delta && chunk.delta.type === 'text_delta') {
+              // Reset the buffer after processing
+              partialJsonInput = '';
+            } else if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+              // Handle text delta as before
               fullResponse += chunk.delta.text;
               controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
             }
@@ -125,7 +140,7 @@ export async function POST(request: NextRequest) {
         }
       },
     });
-
+    
     return new Response(readableStream, {
       headers: {
         'Content-Type': 'text/event-stream',
