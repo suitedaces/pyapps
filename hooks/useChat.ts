@@ -187,7 +187,7 @@ print(df.head().to_string())
               const parsedChunk = JSON.parse(line);
               if (parsedChunk.type === 'content_block_delta' && parsedChunk.delta.type === 'text_delta') {
                 accumulatedResponse += parsedChunk.delta.text;
-                setStreamingMessage(prev => prev + parsedChunk.delta.partial_json);
+                setStreamingMessage(prev => prev + parsedChunk.delta.text);
               } else if (parsedChunk.type === 'generated_code') {
                 setGeneratedCode(parsedChunk.content);
                 setStreamingCode(parsedChunk.content); // Add this line
