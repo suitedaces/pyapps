@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
                 const parsedInput = JSON.parse(partialJsonInput);
                 if (parsedInput.query) {
                   console.log('Generating code for query:', parsedInput.query);
-                  const generatedCode = await generateCode(parsedInput.query);
+                  const generatedCode = (await generateCode(parsedInput.query)).replace(/^```python\n?|\n?```$/g, '');
                   controller.enqueue(encoder.encode(JSON.stringify({
                     type: 'generated_code',
                     content: generatedCode
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         }
       },
     });
-    
+
     return new Response(readableStream, {
       headers: {
         'Content-Type': 'text/event-stream',

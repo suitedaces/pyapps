@@ -117,7 +117,7 @@ export function useChat() {
       setMessages(prev => [...prev, { role: 'assistant', content: accumulatedResponse }]);
 
       if (codeInterpreter && generatedCode) {
-        const exec = await codeInterpreter.notebook.execCell(generatedCode);
+        const exec = await codeInterpreter.(generatedCode);
         if (exec.error) {
           console.error('Error executing Streamlit code:', exec.error);
         } else {
