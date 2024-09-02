@@ -8,7 +8,7 @@ export function Navbar() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="font-bold text-xl"></Link>
+            <Link href="/" className="font-bold text-xl">Grunty 🧐</Link>
           </div>
           <div>
             <Button variant="outline" onClick={() => window.open('https://github.com/yourusername/your-repo', '_blank')}>
