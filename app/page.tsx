@@ -44,7 +44,7 @@ export default function Home() {
             <Tabs defaultValue="preview" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="preview">Streamlit Preview</TabsTrigger>
-                <TabsTrigger value="code">Generated Code</TabsTrigger>
+                  <TabsTrigger value="code">Generated Code</TabsTrigger>
               </TabsList>
               <TabsContent value="preview">
                 <StreamlitPreview url={streamlitUrl} />

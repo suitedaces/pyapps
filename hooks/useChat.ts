@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Message } from '@/lib/types'
-import { CodeInterpreter } from '@e2b/code-interpreter'
+import { Sandbox } from 'e2b'
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -10,21 +10,25 @@ export function useChat() {
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null);
   const [generatedCode, setGeneratedCode] = useState('');
-  const [codeInterpreter, setCodeInterpreter] = useState<CodeInterpreter | null>(null);
+  const [codeInterpreter, setCodeInterpreter] = useState<Sandbox | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [streamingCode, setStreamingCode] = useState('');
 
   useEffect(() => {
     async function createInterpreter() {
       try {
-        const interpreter = await CodeInterpreter.create({ apiKey: "e2b_d05766c8269872cc3e43114a87eca0b66ebc784a"});
+        const interpreter = await Sandbox.create({
+          apiKey: "e2b_d05766c8269872cc3e43114a87eca0b66ebc784a",
+          template: "streamlit-sandbox-me"
+        });
+        interpreter.filesystem.makeDir('/app');
         setCodeInterpreter(interpreter);
       } catch (error) {
         console.error('Error creating CodeInterpreter:', error);
       }
     }
     createInterpreter();
-
+  
     return () => {
       if (codeInterpreter) {
         codeInterpreter.close();
@@ -46,13 +50,11 @@ export function useChat() {
           preparedMessages.push(message);
           lastRole = message.role;
         } else {
-          // If the role is the same as the last one, combine the messages
           preparedMessages[preparedMessages.length - 1].content += '\n' + message.content;
         }
       }
     }
 
-    // Ensure the messages alternate correctly
     if (preparedMessages.length > 1 && preparedMessages[0].role === 'assistant') {
       preparedMessages.shift();
     }
@@ -63,42 +65,43 @@ export function useChat() {
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return;
-
+  
     setIsLoading(true);
     const newUserMessage: Message = { role: 'user', content: input };
     setMessages(prev => [...prev, newUserMessage]);
     setInput('');
     setStreamingMessage('');
     setGeneratedCode('');
-
+  
     try {
       const preparedMessages = prepareMessages(messages, newUserMessage);
       console.log("Sending messages to API:", JSON.stringify(preparedMessages, null, 2));
-
+  
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: preparedMessages, csvContent, csvFileName }),
       });
-
+  
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+  
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('Failed to get response reader');
       }
-
+  
       const decoder = new TextDecoder();
       let accumulatedResponse = '';
-
+      let accumulatedCode = '';
+  
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
+  
         for (const line of lines) {
           try {
             const parsedChunk = JSON.parse(line);
@@ -106,23 +109,40 @@ export function useChat() {
               accumulatedResponse += parsedChunk.delta.text;
               setStreamingMessage(prev => prev + parsedChunk.delta.text);
             } else if (parsedChunk.type === 'generated_code') {
-              setGeneratedCode(parsedChunk.content);
+              accumulatedCode += parsedChunk.content;
+              setStreamingCode(prev => prev + parsedChunk.content);
             }
           } catch (error) {
             console.error('Error parsing chunk:', error);
           }
         }
       }
-
+  
       setMessages(prev => [...prev, { role: 'assistant', content: accumulatedResponse }]);
-
-      if (codeInterpreter && generatedCode) {
-        const exec = await codeInterpreter.(generatedCode);
-        if (exec.error) {
-          console.error('Error executing Streamlit code:', exec.error);
-        } else {
-          console.log('Streamlit code executed successfully');
+      setGeneratedCode(accumulatedCode);
+  
+      console.log('Generated Code:', accumulatedCode);
+  
+      if (codeInterpreter && accumulatedCode) {
+        try {
+          await codeInterpreter.filesystem.write('/app/app.py', accumulatedCode);
+          console.log('Streamlit code written to file');
+  
+          const process = await codeInterpreter.process.start({
+            cmd: "streamlit run /app/app.py",
+            onStdout: console.log,
+            onStderr: console.error,
+          });
+          console.log('Streamlit process started');
+  
+          const url = codeInterpreter.getHostname(8501);
+          console.log('Streamlit URL:', url);
+          setStreamlitUrl('https://' + (url));
+        } catch (error) {
+          console.error('Error running Streamlit app:', error);
         }
+      } else {
+        console.error(`CodeInterpreter or generated code not available {codeInterpreter: ${!!codeInterpreter}, generatedCode length: ${accumulatedCode.length}}`);
       }
     } catch (error) {
       console.error('Error in chat:', error);
@@ -133,83 +153,41 @@ export function useChat() {
     }
   }, [input, messages, csvContent, csvFileName, codeInterpreter]);
 
-  const handleFileUpload = useCallback(async (content: string, fileName: string) => {
-    setCsvContent(content);
-    setCsvFileName(fileName);
 
-    try {
-      if (codeInterpreter) {
-        await codeInterpreter.filesystem.makeDir('/app');
-        await codeInterpreter.filesystem.write('/app/data.csv', content);
+const handleFileUpload = useCallback(async (content: string, fileName: string) => {
+  setCsvContent(content);
+  setCsvFileName(fileName);
 
-        const dfHead = await codeInterpreter.notebook.execCell(`
-import pandas as pd
-df = pd.read_csv('/app/data.csv')
-print(df.head().to_string())
-        `);
-        if (dfHead.error) {
-          throw dfHead.error;
-        }
+  try {
+    if (codeInterpreter) {
+      const uploadedPath = await codeInterpreter.filesystem.write(`/app/${fileName}`, content);
+      console.log('File uploaded to:', uploadedPath);
 
-        const newMessage = {
-          role: 'user' as const,
-          content: `I've uploaded a CSV file named "${fileName}". Here are the first 5 rows of the data:\n\n${dfHead.logs.stdout}`
-        };
-  
-        setMessages(prev => [...prev, newMessage]);
-  
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            messages: prepareMessages(messages, newMessage),
-            csvContent, 
-            csvFileName 
-          }),
-        });
-  
-        if (!response.ok) {
-          throw new Error('Failed to send CSV upload message to chat API');
-        }
+      console.log(`CSV file uploaded successfully to /app/${fileName}`)
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let accumulatedResponse = '';
+      const newMessage = {
+        role: 'user' as const,
+        content: `I've uploaded a CSV file named "/app/${fileName}". Can you analyze it and create a Streamlit app to visualize the data?`
+      };
 
-        while (true) {
-          const { done, value } = await reader!.read();
-          if (done) break;
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter(line => line.trim() !== '');
-  
-          for (const line of lines) {
-            try {
-              const parsedChunk = JSON.parse(line);
-              if (parsedChunk.type === 'content_block_delta' && parsedChunk.delta.type === 'text_delta') {
-                accumulatedResponse += parsedChunk.delta.text;
-                setStreamingMessage(prev => prev + parsedChunk.delta.text);
-              } else if (parsedChunk.type === 'generated_code') {
-                setGeneratedCode(parsedChunk.content);
-                setStreamingCode(parsedChunk.content); // Add this line
-              }
-            } catch (error) {
-              console.error('Error parsing chunk:', error);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error in file upload:', error);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`
-        }
-      ]);
+      setMessages(prev => [...prev, newMessage]);
+
+      // Trigger the chat process to generate Streamlit code
+      await handleSubmit({ preventDefault: () => {} } as React.FormEvent<HTMLFormElement>);
+    } else {
+      console.error('CodeInterpreter not available for file upload');
     }
-  }, [codeInterpreter, messages]);
-
+  } catch (error) {
+    console.error('Error in file upload:', error);
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`
+      }
+    ]);
+  }
+}, [codeInterpreter, handleSubmit]);
   return {
     messages,
     input,

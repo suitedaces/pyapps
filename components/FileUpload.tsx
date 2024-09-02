@@ -25,10 +25,7 @@ export function FileUpload({ onUpload }: { onUpload: (content: string, fileName:
       'text/csv': ['.csv']
     },
     maxSize: 10 * 1024 * 1024, // 10MB
-    multiple: false,
-    onDragEnter: () => {},
-    onDragLeave: () => {},
-    onDragOver: () => {}
+    multiple: false
   })
 
   return (

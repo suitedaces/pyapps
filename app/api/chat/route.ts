@@ -5,22 +5,20 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a data analyst and Python developer specializing in CSV data analysis and Streamlit app development. 
-                        Your job is to analyze CSV data and generate Python code for visualization and analysis in Streamlit. For each task, 
-                        provide natural language instructions that describe the desired code functionality and pass these instructions to the 'generate_code' tool. 
-                        Ensure the instructions are clear, concise, and effectively convey the user's requirements for the Streamlit application.`.replace('\n', ' ');
+const SYSTEM_PROMPT = `You are a data analyst and Python developer specializing in Streamlit app development. 
+Your job is to analyze CSV data and generate Python code for visualization and analysis using Streamlit. 
+Ensure the generated code is a complete, runnable Streamlit application.`.replace('\n', ' ');
 
-const tools: Anthropic.Messages.Tool[] = [
+const tools = [
   {
     name: "generate_code",
-    description: "Generates Python (streamlit) code based on a given query",
-    
+    description: "Generates Python (Streamlit) code based on a given query",
     input_schema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         query: {
           type: "string",
-          description: "Explain the requirements for the streamlit code you want to generate",
+          description: "Explain the requirements for the Streamlit code you want to generate",
         },
       },
       required: ["query"],
@@ -29,26 +27,21 @@ const tools: Anthropic.Messages.Tool[] = [
 ];
 
 async function generateCode(query: string): Promise<string> {
-  // Check if the query is non-empty and has meaningful content
   if (!query || !query.trim()) {
     throw new Error('Query cannot be empty or just whitespace.');
   }
 
-  // Log the query for debugging purposes
   console.log('Sending query to LLM:', query);
 
   try {
-    // Make the API call to the LLM
     const response = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20240620",
       max_tokens: 2000,
-      system: "You are a Python code generation assistant. Generate code based on the given query. Only respond with the code, no explanations.",
+      system: "You are a Python code generation assistant specializing in Streamlit apps. Generate a complete, runnable Streamlit app based on the given query. Only respond with the code, no explanations.",
       messages: [{ role: "user", content: query }],
     });
 
-
     if (Array.isArray(response.content) && response.content.length > 0) {
-      // Check if the response contains text type
       return response.content[0].type === 'text' ? response.content[0].text : '';
     } else {
       console.error('Unexpected response format:', response);
@@ -59,7 +52,6 @@ async function generateCode(query: string): Promise<string> {
     throw new Error('Failed to generate code. Please check the query and try again.');
   }
 }
-
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,24 +80,22 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
-        let partialJsonInput = ''; // Buffer to accumulate input JSON
+        let partialJsonInput = '';
     
         try {
           for await (const chunk of stream) {
-            console.log('Received chunk:', chunk);  // Log every chunk
+            console.log('Received chunk:', chunk);
     
             if (chunk.type === 'content_block_delta' && chunk.delta.type === 'input_json_delta') {
-              // Accumulate partial JSON input
               partialJsonInput += chunk.delta.partial_json;
             }
     
             if (chunk.type === 'content_block_stop' && partialJsonInput) {
-              // Process the complete JSON input
               try {
                 const parsedInput = JSON.parse(partialJsonInput);
                 if (parsedInput.query) {
                   console.log('Generating code for query:', parsedInput.query);
-                  const generatedCode = (await generateCode(parsedInput.query)).replace(/^```python\n?|\n?```$/g, '');
+                  const generatedCode = await generateCode(parsedInput.query);
                   controller.enqueue(encoder.encode(JSON.stringify({
                     type: 'generated_code',
                     content: generatedCode
@@ -124,10 +114,8 @@ export async function POST(request: NextRequest) {
                   content: 'Error parsing input JSON'
                 }) + '\n'));
               }
-              // Reset the buffer after processing
               partialJsonInput = '';
             } else if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-              // Handle text delta as before
               fullResponse += chunk.delta.text;
               controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
             }

@@ -35,7 +35,7 @@ export function Chat({
               <Avatar className="w-8 h-8">
                 <AvatarFallback>{message.role === 'user' ? 'U' : 'A'}</AvatarFallback>
               </Avatar>
-              <div className={`mx-2 p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-green-600'}`}>
+              <div className={`mx-2 p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-green-600 text-white'}`}>
                 {message.content}
               </div>
             </div>
@@ -47,7 +47,7 @@ export function Chat({
               <Avatar className="w-8 h-8">
                 <AvatarFallback>A</AvatarFallback>
               </Avatar>
-              <div className="mx-2 p-3 rounded-lg bg-green-600">
+              <div className="mx-2 p-3 rounded-lg bg-green-600 text-white">
                 {streamingMessage}
               </div>
             </div>
