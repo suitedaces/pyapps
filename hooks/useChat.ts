@@ -154,40 +154,103 @@ export function useChat() {
   }, [input, messages, csvContent, csvFileName, codeInterpreter]);
 
 
-const handleFileUpload = useCallback(async (content: string, fileName: string) => {
-  setCsvContent(content);
-  setCsvFileName(fileName);
-
-  try {
-    if (codeInterpreter) {
-      const uploadedPath = await codeInterpreter.filesystem.write(`/app/${fileName}`, content);
-      console.log('File uploaded to:', uploadedPath);
-
-      console.log(`CSV file uploaded successfully to /app/${fileName}`)
-
-      const newMessage = {
-        role: 'user' as const,
-        content: `I've uploaded a CSV file named "/app/${fileName}". Can you analyze it and create a Streamlit app to visualize the data?`
-      };
-
-      setMessages(prev => [...prev, newMessage]);
-
-      // Trigger the chat process to generate Streamlit code
-      await handleSubmit({ preventDefault: () => {} } as React.FormEvent<HTMLFormElement>);
-    } else {
-      console.error('CodeInterpreter not available for file upload');
-    }
-  } catch (error) {
-    console.error('Error in file upload:', error);
-    setMessages(prev => [
-      ...prev,
-      {
-        role: 'assistant',
-        content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`
+  const handleFileUpload = useCallback(async (content: string, fileName: string) => {
+    setCsvContent(content);
+    setCsvFileName(fileName);
+  
+    try {
+      // Display the first 5 rows of the CSV file
+      const firstFiveRows = content.split('\n').slice(0, 6).join('\n');
+      console.log('First 5 rows of the CSV:', firstFiveRows);
+  
+      if (codeInterpreter) {
+        const uploadedPath = await codeInterpreter.filesystem.write(`/app/${fileName}`, content);
+        console.log('File uploaded to:', uploadedPath);
+  
+        console.log(`CSV file uploaded successfully to /app/${fileName}`);
+  
+        const newMessage = {
+          role: 'user' as const,
+          content: `I've uploaded a CSV file named "/app/${fileName}" (use it exactly like that). Here are the first 5 rows:\n\n${firstFiveRows}\n\nCan you analyze it and create a Streamlit app to visualize the data?`
+        };
+  
+        setMessages(prev => [...prev, newMessage]);
+  
+        // Trigger the AI response immediately
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName }),
+        });
+  
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+  
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('Failed to get response reader');
+        }
+  
+        const decoder = new TextDecoder();
+        let accumulatedResponse = '';
+        let accumulatedCode = '';
+  
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n').filter(line => line.trim() !== '');
+  
+          for (const line of lines) {
+            try {
+              const parsedChunk = JSON.parse(line);
+              if (parsedChunk.type === 'content_block_delta' && parsedChunk.delta.type === 'text_delta') {
+                accumulatedResponse += parsedChunk.delta.text;
+                setStreamingMessage(prev => prev + parsedChunk.delta.text);
+              } else if (parsedChunk.type === 'generated_code') {
+                accumulatedCode += parsedChunk.content;
+                setStreamingCode(prev => prev + parsedChunk.content);
+              }
+            } catch (error) {
+              console.error('Error parsing chunk:', error);
+            }
+          }
+        }
+  
+        setMessages(prev => [...prev, { role: 'assistant', content: accumulatedResponse }]);
+        setGeneratedCode(accumulatedCode);
+  
+        if (accumulatedCode) {
+          await codeInterpreter.filesystem.write('/app/app.py', accumulatedCode);
+          console.log('Streamlit code written to file');
+  
+          const process = await codeInterpreter.process.start({
+            cmd: "streamlit run /app/app.py",
+            onStdout: console.log,
+            onStderr: console.error,
+          });
+          console.log('Streamlit process started');
+  
+          const url = codeInterpreter.getHostname(8501);
+          console.log('Streamlit URL:', url);
+          setStreamlitUrl('https://' + url);
+        }
+      } else {
+        console.error('CodeInterpreter not available for file upload');
       }
-    ]);
-  }
-}, [codeInterpreter, handleSubmit]);
+    } catch (error) {
+      console.error('Error in file upload:', error);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`
+        }
+      ]);
+    }
+  }, [codeInterpreter]);
+
   return {
     messages,
     input,
