@@ -19,7 +19,7 @@ const tools = [
       properties: {
         query: {
           type: "string",
-          description: "Explain the requirements for the Streamlit code you want to generate. Include details about the data, and the EXACT column headers.",
+          description: "Explain the requirements for the Streamlit code you want to generate. Include details about the data, and the EXACT column headers verbatim. Keep an eye about the column headers.",
         },
       },
       required: ["query"],

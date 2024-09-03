@@ -1,18 +1,18 @@
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
-import { GithubIcon } from 'lucide-react'
+import { Github } from 'lucide-react'
 
 export function Navbar() {
   return (
-    <nav className="border-b">
+    <nav className="border-b border-gray-700 bg-gray-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="font-bold text-xl">Grunty 🧐</Link>
+            <Link href="/" className="font-bold text-xl text-white">Grunty 🧐</Link>
           </div>
           <div>
-            <Button variant="outline" onClick={() => window.open('https://github.com/yourusername/your-repo', '_blank')}>
-              <GithubIcon className="mr-2 h-4 w-4" />
+            <Button variant="outline" onClick={() => window.open('https://github.com/yourusername/your-repo', '_blank')} className="text-white border-gray-600 hover:bg-gray-800">
+              <Github className="mr-2 h-4 w-4" />
               Star on GitHub
             </Button>
           </div>

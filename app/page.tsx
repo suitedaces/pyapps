@@ -1,12 +1,13 @@
-'use client'
+"use client"
 
 import { Chat } from '@/components/Chat'
-import { FileUpload } from '@/components/FileUpload'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { Navbar } from '@/components/NavBar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CodeView } from '@/components/CodeView'
 import { useChat } from '@/hooks/useChat'
+import { Button } from '@/components/ui/button'
+import { Loader2 } from 'lucide-react'
 
 export default function Home() {
   const {
@@ -21,39 +22,44 @@ export default function Home() {
     streamlitUrl,
     generatedCode,
     streamingMessage,
-    streamingCode,
   } = useChat();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       <Navbar />
-      <main className="flex-grow container mx-auto py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <FileUpload onUpload={handleFileUpload} />
-            <Chat
-              messages={messages}
-              input={input}
-              handleInputChange={handleInputChange}
-              handleSubmit={handleSubmit}
-              isLoading={isLoading}
-              streamingMessage={streamingMessage}
-            />
-          </div>
-          <div>
-            <Tabs defaultValue="preview" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="preview">App</TabsTrigger>
-                  <TabsTrigger value="code">Code</TabsTrigger>
-              </TabsList>
-              <TabsContent value="preview">
-                <StreamlitPreview url={streamlitUrl} />
-              </TabsContent>
-              <TabsContent value="code">
-                <CodeView code={streamingCode || generatedCode} />
-              </TabsContent>
-            </Tabs>
-          </div>
+      <main className="flex-grow flex flex-col lg:flex-row overflow-hidden">
+        <div className="w-full lg:w-1/2 p-4 flex flex-col h-[calc(100vh-4rem)]">
+          <Chat
+            messages={messages}
+            input={input}
+            handleInputChange={handleInputChange}
+            handleSubmit={handleSubmit}
+            isLoading={isLoading}
+            streamingMessage={streamingMessage}
+            handleFileUpload={handleFileUpload}
+          />
+        </div>
+        <div className="w-full lg:w-1/2 p-4 flex flex-col h-[calc(100vh-4rem)]">
+          <Tabs defaultValue="preview" className="flex-grow flex flex-col">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="preview">App</TabsTrigger>
+              <TabsTrigger value="code">Code</TabsTrigger>
+            </TabsList>
+            <TabsContent value="preview" className="flex-grow">
+              <StreamlitPreview url={streamlitUrl} />
+            </TabsContent>
+            <TabsContent value="code" className="flex-grow">
+              <CodeView code={streamingMessage || generatedCode} />
+            </TabsContent>
+          </Tabs>
+          {isLoading && (
+            <div className="flex justify-center mt-2">
+              <Button disabled>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </Button>
+            </div>
+          )}
         </div>
       </main>
     </div>

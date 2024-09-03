@@ -29,16 +29,16 @@ export function FileUpload({ onUpload }: { onUpload: (content: string, fileName:
   })
 
   return (
-    <Card>
+    <Card className="bg-gray-800 border-gray-700">
       <CardContent>
-        <div {...getRootProps()} className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400">
+        <div {...getRootProps()} className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-gray-500 transition-colors">
           <input {...getInputProps()} accept=".csv" />
           {isDragActive ? (
-            <p>Drop the CSV file here ...</p>
+            <p className="text-blue-400">Drop the CSV file here ...</p>
           ) : (
             <div>
               <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <p className="mt-1">Drag &apos;n&apos; drop a CSV file here, or click to select a file</p>
+              <p className="mt-2 text-sm text-gray-300">Drag &apos;n&apos; drop a CSV file here, or click to select a file</p>
             </div>
           )}
         </div>
