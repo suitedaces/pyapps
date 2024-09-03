@@ -133,37 +133,44 @@ export function useChat() {
   const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
     setIsLoading(true);
     setStreamingMessage('');
-
+  
     try {
       const preparedMessages = prepareMessages(messages, newMessage);
       console.log("Sending messages to API:", JSON.stringify(preparedMessages, null, 2));
-
+  
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: preparedMessages, csvContent, csvFileName }),
       });
-
+  
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+  
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('Failed to get response reader');
       }
-
+  
       const { accumulatedResponse, accumulatedCode } = await processStream(reader);
-
-      setMessages(prev => [...prev, newMessage, { role: 'assistant', content: accumulatedResponse }]);
+  
+      // Check if the last message is already the user message we're processing
+      setMessages(prev => {
+        if (prev[prev.length - 1].content !== newMessage.content) {
+          return [...prev, newMessage, { role: 'assistant', content: accumulatedResponse }];
+        } else {
+          return [...prev, { role: 'assistant', content: accumulatedResponse }];
+        }
+      });
       setGeneratedCode(accumulatedCode);
-
+  
       if (accumulatedCode && codeInterpreter) {
         await updateStreamlitApp(accumulatedCode);
       }
     } catch (error) {
       console.error('Error in chat operation:', error);
-      setMessages(prev => [...prev, newMessage, { role: 'assistant', content: 'An error occurred. Please try again.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'An error occurred. Please try again.' }]);
     } finally {
       setIsLoading(false);
       setStreamingMessage('');
@@ -173,11 +180,11 @@ export function useChat() {
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return;
-
+  
     const newUserMessage: Message = { role: 'user', content: input };
     setMessages(prev => [...prev, newUserMessage]);
     setInput('');
-
+  
     await handleChatOperation(newUserMessage, '/api/chat');
   }, [input, handleChatOperation]);
 
@@ -186,10 +193,10 @@ export function useChat() {
     
     const headers = lines[0].split(',').map(header => `"${header}"`);
     console.log('Column names:', headers);
-
+  
     const dataRows = lines.slice(1).map(line => line.split(','));
     console.log('First 5 data rows:', dataRows.slice(0, 5));
-
+  
     setCsvContent(content);
     setCsvFileName(fileName);
   
@@ -201,16 +208,20 @@ export function useChat() {
         const newMessage: Message = {
           role: 'user',
           content: `I've uploaded a CSV file named "/app/${fileName}" (use it exactly like that). Here's the structure:
-
-Column names (enclosed in quotes to show spaces):
-${headers.join(', ')}
-
-First 5 data rows:
-${dataRows.slice(0, 5).map(row => row.join(', ')).join('\n')}
-
-Can you analyze it and create a Streamlit app to visualize the data? When reading the CSV in your code, make sure to use the exact column names as they appear in the file.`
+  
+  Column names (enclosed in quotes to show spaces):
+  ${headers.join(', ')}
+  
+  First 5 data rows:
+  ${dataRows.slice(0, 5).map(row => row.join(', ')).join('\n')}
+  
+  Can you analyze it and create a Streamlit app to visualize the data? When reading the CSV in your code, make sure to use the exact column names as they appear in the file.`
         };
   
+        // Add the user message to the state immediately
+        setMessages(prev => [...prev, newMessage]);
+  
+        // Then proceed with the chat operation
         await handleChatOperation(newMessage, '/api/chat');
       } else {
         throw new Error('CodeInterpreter not available for file upload');
