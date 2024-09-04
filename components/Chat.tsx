@@ -86,7 +86,6 @@ export function Chat({
                   customStyle={{
                     margin: 0,
                     padding: '1rem',
-                    background: 'transparent',
                   }}
                   {...props}
                 >
