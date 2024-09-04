@@ -3,9 +3,12 @@ import { Message } from '@/lib/types';
 import { Sandbox } from 'e2b';
 
 type StreamChunk = {
-  type: 'content_block_delta' | 'generated_code' | 'full_response';
+  type: 'content_block_delta' | 'generated_code' | 'full_response' | 'tool_use';
   delta?: { type: 'text_delta'; text: string };
   content?: string;
+  id?: string;
+  name?: string;
+  input?: any;
 };
 
 export function useChat() {
@@ -78,6 +81,8 @@ export function useChat() {
       } else if (parsedChunk.type === 'generated_code' && parsedChunk.content) {
         accumulatedCode += parsedChunk.content;
         setGeneratedCode(prev => prev + parsedChunk.content);
+      } else if (parsedChunk.type === 'tool_use') {
+        handleToolUse(parsedChunk);
       }
     } catch (error) {
       console.error('Error parsing chunk:', error);
@@ -105,6 +110,45 @@ export function useChat() {
 
     return { accumulatedResponse, accumulatedCode };
   }, [processStreamChunk]);
+
+  const handleToolUse = useCallback(async (toolUseBlock: StreamChunk) => {
+    if (toolUseBlock.name === 'generate_code' && toolUseBlock.input?.query && toolUseBlock.id) {
+      await sendToolResult(toolUseBlock.id, toolUseBlock.input.query);
+    }
+  }, []);
+  
+  const sendToolResult = useCallback(async (toolUseId: string, query: string) => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          ...messages,
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: toolUseId,
+                content: query
+              }
+            ]
+          }
+        ],
+        csvContent,
+        csvFileName
+      })
+    });
+  
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+  
+    const reader = response.body?.getReader();
+    if (reader) {
+      await processStream(reader);
+    }
+  }, [messages, csvContent, csvFileName, processStream]);
 
   const updateStreamlitApp = useCallback(async (code: string) => {
     if (codeInterpreter && code) {
@@ -155,7 +199,6 @@ export function useChat() {
   
       const { accumulatedResponse, accumulatedCode } = await processStream(reader);
   
-      // Check if the last message is already the user message we're processing
       setMessages(prev => {
         if (prev[prev.length - 1].content !== newMessage.content) {
           return [...prev, newMessage, { role: 'assistant', content: accumulatedResponse }];
@@ -218,10 +261,8 @@ export function useChat() {
   Can you analyze it and create a Streamlit app to visualize the data? When reading the CSV in your code, make sure to use the exact column names as they appear in the file.`
         };
   
-        // Add the user message to the state immediately
         setMessages(prev => [...prev, newMessage]);
   
-        // Then proceed with the chat operation
         await handleChatOperation(newMessage, '/api/chat');
       } else {
         throw new Error('CodeInterpreter not available for file upload');

@@ -9,15 +9,6 @@ import ReactMarkdown from 'react-markdown'
 import { CodeProps } from 'react-markdown/lib/ast-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import './streaming-gradient.css'
-
-const BACKGROUND_COLOR = 'bg-gray-900'
-const TEXT_COLOR = 'text-gray-100'
-const INPUT_BG_COLOR = 'bg-gray-800'
-const BUTTON_BG_COLOR = 'bg-blue-600'
-const BUTTON_HOVER_COLOR = 'hover:bg-blue-700'
-const CODE_BG_COLOR = 'bg-[#1e2a4a]'
-const CODE_HEADER_BG_COLOR = 'bg-[#2c3e50]'
 
 export function Chat({
   messages,
@@ -72,21 +63,19 @@ export function Chat({
           const codeString = String(children).replace(/\n$/, '')
           
           if (inline) {
-            // Render inline code
             return (
-              <code className="px-1 py-0.5 rounded-md bg-gray-800 text-sm font-mono" {...props}>
+              <code className="px-1 py-0.5 rounded-md bg-muted text-muted-foreground text-sm font-mono" {...props}>
                 {codeString}
               </code>
             )
           }
           
-          // Render block code
           return (
-            <div className={`rounded-xl overflow-hidden ${CODE_BG_COLOR} my-4 shadow-lg max-w-full`}>
-              <div className={`flex items-center justify-between px-4 py-2 ${CODE_HEADER_BG_COLOR}`}>
+            <div className="rounded-xl overflow-hidden bg-muted my-4 shadow-lg w-full">
+              <div className="flex items-center justify-between px-4 py-2 bg-accent">
                 <div className="flex items-center">
-                  <Code className="w-5 h-5 mr-2 text-blue-400" />
-                  <span className="text-sm font-medium text-gray-200">{lang.toUpperCase() || 'Code'}</span>
+                  <Code className="w-5 h-5 mr-2 text-accent-foreground" />
+                  <span className="text-sm font-medium text-accent-foreground">{lang.toUpperCase() || 'Code'}</span>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -106,27 +95,36 @@ export function Chat({
               </div>
             </div>
           )
-        }
+        },
+        p: ({children}) => <p className="mb-2">{children}</p>,
+        h1: ({children}) => <h1 className="text-2xl font-bold mb-3">{children}</h1>,
+        h2: ({children}) => <h2 className="text-xl font-bold mb-2">{children}</h2>,
+        h3: ({children}) => <h3 className="text-lg font-bold mb-2">{children}</h3>,
+        ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+        ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+        li: ({children}) => <li className="mb-1">{children}</li>,
+        blockquote: ({children}) => <blockquote className="border-l-4 border-accent pl-4 italic mb-2">{children}</blockquote>,
       }}
+      className="prose prose-invert max-w-none"
     >
       {content}
     </ReactMarkdown>
   );
 
   return (
-    <div className={`flex flex-col h-full border border-gray-700 rounded-lg ${BACKGROUND_COLOR} ${TEXT_COLOR}`}>
+    <div className="flex flex-col h-full border border-border rounded-lg bg-background text-foreground">
       <ScrollArea className="flex-grow p-4 space-y-4" onScroll={handleScroll}>
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-            <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-full w-full`}>
+            <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
               <Avatar className="w-8 h-8 flex-shrink-0">
                 <AvatarFallback>{message.role === 'user' ? 'U' : 'A'}</AvatarFallback>
               </Avatar>
               <div className={`mx-2 p-4 rounded-3xl ${
                 message.role === 'assistant' 
-                  ? 'bg-blue-700'
-                  : 'bg-gray-700'
-              } break-words overflow-hidden max-w-[calc(100%-3rem)] overflow-wrap-break-word`}>
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground'
+              } break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg`}>
                 {renderMessage(message.content)}
               </div>
             </div>
@@ -134,11 +132,15 @@ export function Chat({
         ))}
         {streamingMessage && (
           <div className="flex justify-start mb-4">
-            <div className="flex flex-row items-start max-w-full w-full">
+            <div className="flex flex-row items-start max-w-[80%]">
               <Avatar className="w-8 h-8 flex-shrink-0">
                 <AvatarFallback>A</AvatarFallback>
               </Avatar>
-              <div className="mx-2 p-4 rounded-3xl streaming-gradient break-words overflow-hidden max-w-[calc(100%-3rem)] overflow-wrap-break-word">
+              <div className="mx-2 p-4 rounded-3xl bg-primary text-primary-foreground break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg">
+                <div className="animate-pulse mb-2">
+                  <div className="h-2 bg-primary-foreground/30 rounded w-3/4"></div>
+                  <div className="h-2 bg-primary-foreground/30 rounded w-1/2 mt-2"></div>
+                </div>
                 {renderMessage(streamingMessage)}
               </div>
             </div>
@@ -149,12 +151,12 @@ export function Chat({
       {!isAtBottom && (
         <Button
           onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
-          className={`absolute bottom-20 right-8 ${BUTTON_BG_COLOR} ${BUTTON_HOVER_COLOR} rounded-full p-2`}
+          className="absolute bottom-20 right-8 bg-accent hover:bg-accent-foreground text-accent-foreground hover:text-accent rounded-full p-2 shadow-lg transition-all duration-300 ease-in-out"
         >
           ↓
         </Button>
       )}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-700">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-border">
         <div className="flex space-x-2">
           <div className="relative flex-grow">
             <Input
@@ -162,12 +164,12 @@ export function Chat({
               onChange={handleInputChange}
               placeholder="Type your message..."
               disabled={isLoading}
-              className={`pr-10 ${INPUT_BG_COLOR} ${TEXT_COLOR} placeholder-gray-400 border-gray-600`}
+              className="pr-10 bg-input text-foreground placeholder-muted-foreground border-input focus:ring-2 focus:ring-accent transition-all duration-300 ease-in-out"
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-accent transition-colors duration-300 ease-in-out"
             >
               <Paperclip className="h-5 w-5" />
             </button>
@@ -179,7 +181,11 @@ export function Chat({
               className="hidden"
             />
           </div>
-          <Button type="submit" disabled={isLoading} className={`${BUTTON_BG_COLOR} ${BUTTON_HOVER_COLOR}`}>
+          <Button 
+            type="submit" 
+            disabled={isLoading} 
+            className="bg-accent hover:bg-accent-foreground text-accent-foreground hover:text-accent transition-all duration-300 ease-in-out"
+          >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
