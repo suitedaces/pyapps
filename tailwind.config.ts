@@ -57,15 +57,19 @@ module.exports = {
         sm: "calc(var(--radius, 12px) - 4px)",
       },
       keyframes: {
-        "gradient-x": {
-          "0%, 100%": { "background-position": "0% 50%" },
-          "50%": { "background-position": "100% 50%" },
-        },
+        'gradient-x': {
+          '0%, 100%': {
+            'background-size': '200% 200%',
+            'background-position': 'left center'
+          },
+          '50%': {
+            'background-size': '200% 200%',
+            'background-position': 'right center'
+          }
+        }
       },
       animation: {
-        "gradient-x": "gradient-x 3s ease infinite",
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
+        'gradient-x': 'gradient-x 30s ease infinite',
       },
     },
   },

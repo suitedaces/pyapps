@@ -122,9 +122,9 @@ export function Chat({
               </Avatar>
               <div className={`mx-2 p-4 rounded-3xl ${
                 message.role === 'assistant' 
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground'
-              } break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg`}>
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600'
+                  : 'bg-yellow-500'
+              } text-white break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg`}>
                 {renderMessage(message.content)}
               </div>
             </div>
@@ -136,11 +136,7 @@ export function Chat({
               <Avatar className="w-8 h-8 flex-shrink-0">
                 <AvatarFallback>A</AvatarFallback>
               </Avatar>
-              <div className="mx-2 p-4 rounded-3xl bg-primary text-primary-foreground break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg">
-                <div className="animate-pulse mb-2">
-                  <div className="h-2 bg-primary-foreground/30 rounded w-3/4"></div>
-                  <div className="h-2 bg-primary-foreground/30 rounded w-1/2 mt-2"></div>
-                </div>
+              <div className="mx-2 p-4 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x text-white break-words overflow-hidden shadow-md transition-all duration-500 ease-in-out hover:shadow-lg">
                 {renderMessage(streamingMessage)}
               </div>
             </div>
