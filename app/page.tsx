@@ -22,6 +22,7 @@ export default function Home() {
     streamlitUrl,
     generatedCode,
     streamingMessage,
+    isProcessingCode,
   } = useChat();
 
   return (
@@ -49,7 +50,10 @@ export default function Home() {
               <StreamlitPreview url={streamlitUrl} />
             </TabsContent>
             <TabsContent value="code" className="flex-grow">
-              <CodeView code={streamingMessage || generatedCode} />
+              <CodeView 
+                code={generatedCode} 
+                isProcessing={isProcessingCode}
+              />
             </TabsContent>
           </Tabs>
           {isLoading && (

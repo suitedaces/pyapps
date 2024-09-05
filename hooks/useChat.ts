@@ -21,6 +21,7 @@ export function useChat() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [codeInterpreter, setCodeInterpreter] = useState<Sandbox | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
+  const [isProcessingCode, setIsProcessingCode] = useState(false);
 
   useEffect(() => {
     async function createInterpreter() {
@@ -81,8 +82,11 @@ export function useChat() {
       } else if (parsedChunk.type === 'generated_code' && parsedChunk.content) {
         accumulatedCode += parsedChunk.content;
         setGeneratedCode(prev => prev + parsedChunk.content);
+        setIsProcessingCode(true);
       } else if (parsedChunk.type === 'tool_use') {
         handleToolUse(parsedChunk);
+      } else if (parsedChunk.type === 'full_response') {
+        setIsProcessingCode(false);
       }
     } catch (error) {
       console.error('Error parsing chunk:', error);
@@ -233,12 +237,15 @@ export function useChat() {
 
   const handleFileUpload = useCallback(async (content: string, fileName: string) => {
     const lines = content.split('\n').filter(line => line.trim() !== '');
-    
-    const headers = lines[0].split(',').map(header => `"${header}"`);
-    console.log('Column names:', headers);
   
-    const dataRows = lines.slice(1).map(line => line.split(','));
-    console.log('First 5 data rows:', dataRows.slice(0, 5));
+    const headers = lines[0].split(',').map(header => header.trim());
+    const dataRows = lines.slice(1).map(line => line.split(',').map(value => value.trim()));
+  
+    // Construct Markdown table
+    const tableHeaders = `| ${headers.join(' | ')} |`;
+    const tableDivider = `| ${headers.map(() => '---').join(' | ')} |`;
+    const tableRows = dataRows.slice(0, 5).map(row => `| ${row.join(' | ')} |`).join('\n');
+    const markdownTable = `\n${tableHeaders}\n${tableDivider}\n${tableRows}\n`;
   
     setCsvContent(content);
     setCsvFileName(fileName);
@@ -250,15 +257,13 @@ export function useChat() {
   
         const newMessage: Message = {
           role: 'user',
-          content: `I've uploaded a CSV file named "/app/${fileName}" (use it exactly like that). Here's the structure:
+          content: `I've uploaded a CSV file named "/app/${fileName}". Here’s a preview of the data:
+          
+  \`\`\`markdown
+  ${markdownTable}
+  \`\`\`
   
-  Column names (enclosed in quotes to show spaces):
-  ${headers.join(', ')}
-  
-  First 5 data rows:
-  ${dataRows.slice(0, 5).map(row => row.join(', ')).join('\n')}
-  
-  Can you analyze it and create a Streamlit app to visualize the data? When reading the CSV in your code, make sure to use the exact column names as they appear in the file.`
+  Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code.`
         };
   
         setMessages(prev => [...prev, newMessage]);
@@ -278,6 +283,8 @@ export function useChat() {
       ]);
     }
   }, [codeInterpreter, handleChatOperation]);
+  
+  
 
   return {
     messages,
@@ -290,6 +297,7 @@ export function useChat() {
     csvFileName,
     streamlitUrl,
     generatedCode,
-    streamingMessage
+    streamingMessage,
+    isProcessingCode,
   };
 }
