@@ -22,6 +22,7 @@ export function useChat() {
   const [codeInterpreter, setCodeInterpreter] = useState<Sandbox | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [isProcessingCode, setIsProcessingCode] = useState(false);
+  const [isGeneratingStreamlit, setIsGeneratingStreamlit] = useState(false);
 
   useEffect(() => {
     async function createInterpreter() {
@@ -117,9 +118,38 @@ export function useChat() {
 
   const handleToolUse = useCallback(async (toolUseBlock: StreamChunk) => {
     if (toolUseBlock.name === 'generate_code' && toolUseBlock.input?.query && toolUseBlock.id) {
+      setIsGeneratingStreamlit(true);
       await sendToolResult(toolUseBlock.id, toolUseBlock.input.query);
+      setIsGeneratingStreamlit(false);
     }
   }, []);
+
+  const updateStreamlitApp = useCallback(async (code: string) => {
+    if (codeInterpreter && code) {
+      try {
+        setIsGeneratingStreamlit(true);
+        await codeInterpreter.filesystem.write('/app/app.py', code);
+        console.log('Streamlit code updated');
+
+        const process = await codeInterpreter.process.start({
+          cmd: "streamlit run /app/app.py",
+          onStdout: console.log,
+          onStderr: console.error,
+        });
+        console.log('Streamlit process restarted');
+
+        const url = codeInterpreter.getHostname(8501);
+        console.log('Streamlit URL:', url);
+        setStreamlitUrl('https://' + url);
+      } catch (error) {
+        console.error('Error updating Streamlit app:', error);
+      } finally {
+        setIsGeneratingStreamlit(false);
+      }
+    } else {
+      console.error(`CodeInterpreter or generated code not available {codeInterpreter: ${!!codeInterpreter}, code length: ${code.length}}`);
+    }
+  }, [codeInterpreter]);
   
   const sendToolResult = useCallback(async (toolUseId: string, query: string) => {
     const response = await fetch('/api/chat', {
@@ -154,29 +184,6 @@ export function useChat() {
     }
   }, [messages, csvContent, csvFileName, processStream]);
 
-  const updateStreamlitApp = useCallback(async (code: string) => {
-    if (codeInterpreter && code) {
-      try {
-        await codeInterpreter.filesystem.write('/app/app.py', code);
-        console.log('Streamlit code updated');
-  
-        const process = await codeInterpreter.process.start({
-          cmd: "streamlit run /app/app.py",
-          onStdout: console.log,
-          onStderr: console.error,
-        });
-        console.log('Streamlit process restarted');
-  
-        const url = codeInterpreter.getHostname(8501);
-        console.log('Streamlit URL:', url);
-        setStreamlitUrl('https://' + url);
-      } catch (error) {
-        console.error('Error updating Streamlit app:', error);
-      }
-    } else {
-      console.error(`CodeInterpreter or generated code not available {codeInterpreter: ${!!codeInterpreter}, code length: ${code.length}}`);
-    }
-  }, [codeInterpreter]);
 
   const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
     setIsLoading(true);
@@ -299,5 +306,6 @@ export function useChat() {
     generatedCode,
     streamingMessage,
     isProcessingCode,
+    isGeneratingStreamlit
   };
 }

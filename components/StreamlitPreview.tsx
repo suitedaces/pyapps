@@ -1,6 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card"
+import { Loader2 } from 'lucide-react';
 
-export function StreamlitPreview({ url }: { url: string | null }) {
+export function StreamlitPreview({ url, isLoading }: { url: string | null, isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <Card className="bg-gray-800 border-gray-700 h-full flex items-center justify-center">
+        <CardContent className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+          <p className="text-gray-400">Updating Streamlit app...</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (!url) {
     return (
       <Card className="bg-gray-800 border-gray-700 h-full flex items-center justify-center">

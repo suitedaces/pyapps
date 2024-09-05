@@ -17,12 +17,10 @@ export default function Home() {
     handleSubmit,
     isLoading,
     handleFileUpload,
-    csvContent,
-    csvFileName,
     streamlitUrl,
     generatedCode,
     streamingMessage,
-    isProcessingCode,
+    isGeneratingStreamlit,
   } = useChat();
 
   return (
@@ -47,20 +45,20 @@ export default function Home() {
               <TabsTrigger value="code">Code</TabsTrigger>
             </TabsList>
             <TabsContent value="preview" className="flex-grow">
-              <StreamlitPreview url={streamlitUrl} />
+              <StreamlitPreview url={streamlitUrl} isLoading={isGeneratingStreamlit} />
             </TabsContent>
             <TabsContent value="code" className="flex-grow">
               <CodeView 
                 code={generatedCode} 
-                isProcessing={isProcessingCode}
+                isProcessing={isGeneratingStreamlit}
               />
             </TabsContent>
           </Tabs>
-          {isLoading && (
+          {isGeneratingStreamlit && (
             <div className="flex justify-center mt-2">
               <Button disabled>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
+                Generating Streamlit App...
               </Button>
             </div>
           )}

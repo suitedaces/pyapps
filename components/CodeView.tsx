@@ -10,9 +10,8 @@ export function CodeView({ code, isProcessing }: { code: string, isProcessing: b
     <Card className="bg-gray-900 border border-gray-700 h-full max-h-[80vh] flex-grow rounded-lg shadow-lg">
       <CardContent className="p-0 h-full overflow-auto relative">
         {isProcessing && (
-          <div className="absolute top-2 right-2 flex items-center bg-gray-800 rounded-full px-2 py-1">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-500 mr-2" />
-            <span className="text-xs text-blue-500">Generating code...</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-10">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
         )}
         <Editor
