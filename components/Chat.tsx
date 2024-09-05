@@ -72,7 +72,7 @@ export function Chat({
           
           return (
             <div className="rounded-xl overflow-hidden bg-muted my-4 shadow-lg w-full">
-              <div className="flex items-center justify-between px-4 py-2 bg-accent">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-400">
                 <div className="flex items-center">
                   <Code className="w-5 h-5 mr-2 text-accent-foreground" />
                   <span className="text-sm font-medium text-accent-foreground">{lang.toUpperCase() || 'Code'}</span>
@@ -121,8 +121,8 @@ export function Chat({
               </Avatar>
               <div className={`mx-2 p-4 rounded-3xl ${
                 message.role === 'assistant' 
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600'
-                  : 'bg-yellow-500'
+                  ? 'bg-gradient-to-r from-green-600 via-lime-600 to-yellow-600'
+                  : 'bg-gradient-to-r from-gray-800 via-slate-800 to-purple-900'
               } text-white break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg`}>
                 {renderMessage(message.content)}
               </div>

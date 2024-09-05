@@ -16,17 +16,31 @@ Analyze queries carefully and suggest helpful visualizations or analyses.`;
 
 const tools = [
   {
-    name: "generate_code",
+    name: "create_streamlit_app",
     description: "Generates Python (Streamlit) code based on a given query",
     input_schema: {
       type: "object" as const,
       properties: {
         query: {
           type: "string",
-          description: "Explain the requirements for the Streamlit code you want to generate. Include details about the data, and the EXACT column headers verbatim. Keep an eye about the column headers.",
+          description: "Explain the requirements for the Streamlit code you want to generate. Include details about the data if there's any context and the column names VERBATIM as a list, with any spaces or special chars like this: [\"col 1 \", \" 2col 1\"].",
         },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "run_python_notebook_analysis",
+    description: "Runs analysis on a Python notebook",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        python_code: {
+          type: "string",
+          description: "Provide only the exact Python code to analyze in the Jupyter notebook"
+        }
+      },
+      required: ["python_code"],
     },
   },
 ];
@@ -42,7 +56,7 @@ async function generateCode(query: string): Promise<string> {
     const response = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20240620",
       max_tokens: 2000,
-      system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. Only respond with the code, no explanations!",
+      system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use \"st.experimental_rerun()\" at any cost. Only respond with the code, no explanations!",
       messages: [{ role: "user", content: query }],
     });
 
