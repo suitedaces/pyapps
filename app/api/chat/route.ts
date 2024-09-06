@@ -9,9 +9,8 @@ const SYSTEM_PROMPT = `You are an AI assistant specializing in data analysis and
 1. Use Markdown formatting for structure (headers, lists, code blocks).
 2. For code, use triple backticks with language identifiers (e.g., \`\`\`python).
 3. Provide clear explanations with code suggestions.
-4. Use the generate_code function for Streamlit app creation or updates.
+4. Use the create_streamlit_app tool for Streamlit app creation or updates. Don't leak the tool choice to the user.
 5. Ask for clarification on data details when needed.
-6. Offer multiple approaches for complex analyses when appropriate.
 Analyze queries carefully and suggest helpful visualizations or analyses.`;
 
 const tools = [
@@ -27,20 +26,6 @@ const tools = [
         },
       },
       required: ["query"],
-    },
-  },
-  {
-    name: "run_python_notebook_analysis",
-    description: "Runs analysis on a Python notebook",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        python_code: {
-          type: "string",
-          description: "Provide only the exact Python code to analyze in the Jupyter notebook"
-        }
-      },
-      required: ["python_code"],
     },
   },
 ];
@@ -61,7 +46,8 @@ async function generateCode(query: string): Promise<string> {
     });
 
     if (Array.isArray(response.content) && response.content.length > 0) {
-      return response.content[0].type === 'text' ? response.content[0].text : '';
+      const generatedCode = response.content[0].type === 'text' ? response.content[0].text.replace(/^```python/, "").replace(/```$/, "") : '';
+      return generatedCode;
     } else {
       console.error('Unexpected response format:', response);
       throw new Error('Unexpected response format from code generation API');
@@ -116,8 +102,10 @@ export async function POST(request: NextRequest) {
                 if (parsedInput.query) {
                   console.log('Generating code for query:', parsedInput.query);
                   const generatedCode = await generateCode(parsedInput.query);
+
                   controller.enqueue(encoder.encode(JSON.stringify({
                     type: 'generated_code',
+                    query: parsedInput.query,
                     content: generatedCode
                   }) + '\n'));
                 } else {

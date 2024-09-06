@@ -21,8 +21,7 @@ export function useChat() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [codeInterpreter, setCodeInterpreter] = useState<Sandbox | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
-  const [isProcessingCode, setIsProcessingCode] = useState(false);
-  const [isGeneratingStreamlit, setIsGeneratingStreamlit] = useState(false);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
 
   useEffect(() => {
     async function createInterpreter() {
@@ -83,11 +82,8 @@ export function useChat() {
       } else if (parsedChunk.type === 'generated_code' && parsedChunk.content) {
         accumulatedCode += parsedChunk.content;
         setGeneratedCode(prev => prev + parsedChunk.content);
-        setIsProcessingCode(true);
-      } else if (parsedChunk.type === 'tool_use') {
-        handleToolUse(parsedChunk);
       } else if (parsedChunk.type === 'full_response') {
-        setIsProcessingCode(false);
+        setIsGeneratingCode(false);
       }
     } catch (error) {
       console.error('Error parsing chunk:', error);
@@ -116,18 +112,10 @@ export function useChat() {
     return { accumulatedResponse, accumulatedCode };
   }, [processStreamChunk]);
 
-  const handleToolUse = useCallback(async (toolUseBlock: StreamChunk) => {
-    if (toolUseBlock.name === 'generate_code' && toolUseBlock.input?.query && toolUseBlock.id) {
-      setIsGeneratingStreamlit(true);
-      await sendToolResult(toolUseBlock.id, toolUseBlock.input.query);
-      setIsGeneratingStreamlit(false);
-    }
-  }, []);
 
   const updateStreamlitApp = useCallback(async (code: string) => {
     if (codeInterpreter && code) {
       try {
-        setIsGeneratingStreamlit(true);
         await codeInterpreter.filesystem.write('/app/app.py', code);
         console.log('Streamlit code updated');
 
@@ -143,46 +131,11 @@ export function useChat() {
         setStreamlitUrl('https://' + url);
       } catch (error) {
         console.error('Error updating Streamlit app:', error);
-      } finally {
-        setIsGeneratingStreamlit(false);
       }
     } else {
       console.error(`CodeInterpreter or generated code not available {codeInterpreter: ${!!codeInterpreter}, code length: ${code.length}}`);
     }
   }, [codeInterpreter]);
-  
-  const sendToolResult = useCallback(async (toolUseId: string, query: string) => {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [
-          ...messages,
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'tool_result',
-                tool_use_id: toolUseId,
-                content: query
-              }
-            ]
-          }
-        ],
-        csvContent,
-        csvFileName
-      })
-    });
-  
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-  
-    const reader = response.body?.getReader();
-    if (reader) {
-      await processStream(reader);
-    }
-  }, [messages, csvContent, csvFileName, processStream]);
 
 
   const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
@@ -209,7 +162,7 @@ export function useChat() {
       }
   
       const { accumulatedResponse, accumulatedCode } = await processStream(reader);
-  
+
       setMessages(prev => {
         if (prev[prev.length - 1].content !== newMessage.content) {
           return [...prev, newMessage, { role: 'assistant', content: accumulatedResponse }];
@@ -217,6 +170,7 @@ export function useChat() {
           return [...prev, { role: 'assistant', content: accumulatedResponse }];
         }
       });
+      setIsGeneratingCode(false);
       setGeneratedCode(accumulatedCode);
   
       if (accumulatedCode && codeInterpreter) {
@@ -305,7 +259,6 @@ export function useChat() {
     streamlitUrl,
     generatedCode,
     streamingMessage,
-    isProcessingCode,
-    isGeneratingStreamlit
+    isGeneratingCode
   };
 }
