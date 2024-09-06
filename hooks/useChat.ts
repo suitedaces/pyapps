@@ -43,6 +43,30 @@ export function useChat() {
   }, []);
   
 
+  const updateStreamlitApp = useCallback(async (code: string) => {
+    if (codeInterpreter && code) {
+      try {
+        await codeInterpreter.filesystem.write('/app/app.py', code);
+        console.log('Streamlit code updated');
+
+        const process = await codeInterpreter.process.start({
+          cmd: "streamlit run /app/app.py",
+          onStdout: console.log,
+          onStderr: console.error,
+        });
+        console.log('Streamlit process restarted');
+
+        const url = codeInterpreter.getHostname(8501);
+        console.log('Streamlit URL:', url);
+        setStreamlitUrl('https://' + url);
+      } catch (error) {
+        console.error('Error updating Streamlit app:', error);
+      }
+    } else {
+      console.error(`CodeInterpreter or generated code not available {codeInterpreter: ${!!codeInterpreter}, code length: ${code.length}}`);
+    }
+  }, [codeInterpreter]);
+
   const processStreamChunk = useCallback((chunk: string, accumulatedResponse: string, accumulatedCode: string) => {
     try {
       const parsedChunk: StreamChunk = JSON.parse(chunk);
@@ -52,6 +76,10 @@ export function useChat() {
       } else if (parsedChunk.type === 'generated_code' && 'content' in parsedChunk) {
         accumulatedCode += parsedChunk.content;
         setGeneratedCode(prev => prev + parsedChunk.content);
+      } else if (parsedChunk.type === 'code_explanation' && 'content' in parsedChunk) {
+        // For code explanations, we'll add them to the accumulated response
+        accumulatedResponse += parsedChunk.content;
+        setStreamingMessage(prev => prev + '\n\n' + parsedChunk.content);
       } else if (parsedChunk.type === 'message_stop') {
         setIsGeneratingCode(false);
       }
@@ -82,33 +110,10 @@ export function useChat() {
     return { accumulatedResponse, accumulatedCode };
   }, [processStreamChunk]);
 
-  const updateStreamlitApp = useCallback(async (code: string) => {
-    if (codeInterpreter && code) {
-      try {
-        await codeInterpreter.filesystem.write('/app/app.py', code);
-        console.log('Streamlit code updated');
-
-        const process = await codeInterpreter.process.start({
-          cmd: "streamlit run /app/app.py",
-          onStdout: console.log,
-          onStderr: console.error,
-        });
-        console.log('Streamlit process restarted');
-
-        const url = codeInterpreter.getHostname(8501);
-        console.log('Streamlit URL:', url);
-        setStreamlitUrl('https://' + url);
-      } catch (error) {
-        console.error('Error updating Streamlit app:', error);
-      }
-    } else {
-      console.error(`CodeInterpreter or generated code not available {codeInterpreter: ${!!codeInterpreter}, code length: ${code.length}}`);
-    }
-  }, [codeInterpreter]);
-
   const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
     setIsLoading(true);
     setStreamingMessage('');
+    setGeneratedCode('');
   
     try {
       console.log("Sending messages to API:", JSON.stringify([newMessage], null, 2));
@@ -132,25 +137,24 @@ export function useChat() {
   
       setMessages(prev => {
         const updatedMessages = [...prev];
-        if (updatedMessages[updatedMessages.length - 1].content !== newMessage.content) {
-          updatedMessages.push(newMessage);
+        
+        if (accumulatedResponse) {
+          updatedMessages.push({ 
+            role: 'assistant', 
+            content: accumulatedResponse, 
+            created_at: new Date() 
+          });
         }
-        updatedMessages.push({ 
-          role: 'assistant', 
-          content: accumulatedResponse, 
-          created_at: new Date() 
-        });
+        
         return updatedMessages;
       });
-      setIsGeneratingCode(false);
-      setGeneratedCode(accumulatedCode);
   
       if (accumulatedCode && codeInterpreter) {
         await updateStreamlitApp(accumulatedCode);
       }
     } catch (error) {
       console.error('Error in chat operation:', error);
-      setMessages(prev => [...prev, { 
+      setMessages(prev => [...prev, newMessage, { 
         role: 'assistant', 
         content: 'An error occurred. Please try again.', 
         created_at: new Date() 
@@ -158,6 +162,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
       setStreamingMessage('');
+      setIsGeneratingCode(false);
     }
   }, [messages, csvContent, csvFileName, codeInterpreter, processStream, updateStreamlitApp]);
 
