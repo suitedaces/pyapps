@@ -6,8 +6,6 @@ import { Navbar } from '@/components/NavBar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CodeView } from '@/components/CodeView'
 import { useChat } from '@/hooks/useChat'
-import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
 
 export default function Home() {
   const {
