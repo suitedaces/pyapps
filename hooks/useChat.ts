@@ -65,7 +65,6 @@ export function useChat() {
   const updateStreamlitApp = useCallback(async (code: string) => {
     if (code && sandboxId) {
       try {
-        setIsGeneratingCode(true);
         console.log('Updating Streamlit app with code:', code);
         const response = await fetch('/api/sandbox', {
           method: 'POST',
@@ -98,6 +97,7 @@ export function useChat() {
     }
   }, [sandboxId]);
 
+
   const processStreamChunk = useCallback((chunk: string, accumulatedResponse: string, accumulatedCode: string) => {
     try {
       const parsedChunk: StreamChunk = JSON.parse(chunk);
@@ -111,6 +111,8 @@ export function useChat() {
         setCodeExplanation(prev => prev + parsedChunk.content);
       } else if (parsedChunk.type === 'message_stop') {
         setIsGeneratingCode(false);
+      } else if (parsedChunk.type === 'tool_use' && parsedChunk.name === 'create_streamlit_app') {
+        setIsGeneratingCode(true);
       }
     } catch (error) {
       console.error('Error parsing chunk:', error);
@@ -149,7 +151,6 @@ export function useChat() {
     setStreamingMessage('');
     setGeneratedCode('');
     setCodeExplanation('');
-    setIsGeneratingCode(true);
     setSandboxErrors([]);
 
     try {

@@ -112,14 +112,14 @@ export class GruntyAgent {
       } else if (event.type === 'message_delta') {
         Object.assign(currentMessage, event.delta);
       } else if (event.type === 'message_stop') {
-        // Combine all generated content into a single assistant message
+        // combine all generated content into a single assistant message
         let fullResponse = accumulatedResponse;
 
         if (generatedCode) {
           fullResponse += `\n\nI've generated the following Streamlit code based on your request:\n\n\`\`\`python\n${generatedCode}\n\`\`\``;
         }
 
-        // Update the agent's memory with the full response
+        // update the agent's memory with the full response
         this.messages.push({
           role: 'assistant',
           content: fullResponse.trim(),
