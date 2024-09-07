@@ -61,7 +61,7 @@ export function Chat({
           const match = /language-(\w+)/.exec(className || '')
           const lang = match && match[1] ? match[1] : ''
           const codeString = String(children).replace(/\n$/, '')
-          
+
           if (inline) {
             return (
               <code className="px-1 py-0.5 rounded-md bg-muted text-muted-foreground text-sm font-mono" {...props}>
@@ -69,7 +69,7 @@ export function Chat({
               </code>
             )
           }
-          
+
           return (
             <div className="rounded-xl overflow-hidden bg-muted my-4 shadow-lg w-full">
               <div className="flex items-center justify-between px-4 py-2 bg-slate-400">
@@ -120,7 +120,7 @@ export function Chat({
                 <AvatarFallback>{message.role === 'user' ? 'U' : 'A'}</AvatarFallback>
               </Avatar>
               <div className={`mx-2 p-4 rounded-3xl ${
-                message.role === 'assistant' 
+                message.role === 'assistant'
                   ? 'bg-gradient-to-r from-green-600 via-lime-600 to-yellow-600'
                   : 'bg-gradient-to-r from-gray-800 via-slate-800 to-purple-900'
               } text-white break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg`}>
@@ -159,12 +159,12 @@ export function Chat({
               onChange={handleInputChange}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="pr-10 bg-input text-foreground placeholder-muted-foreground border-input focus:ring-2 focus:ring-accent transition-all duration-300 ease-in-out"
+              className="relative flex min-h-[80px] w-full rounded-base border-2 text-text dark:text-darkText font-base selection:bg-main selection:text-black border-border dark:border-darkBorder bg-white dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-white placeholder:text-black/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-accent transition-colors duration-300 ease-in-out"
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-accent transition-colors duration-300 ease-in-out"
             >
               <Paperclip className="h-5 w-5" />
             </button>
@@ -175,14 +175,14 @@ export function Chat({
               onChange={handleFileChange}
               className="hidden"
             />
-          </div>
-          <Button 
-            type="submit" 
-            disabled={isLoading} 
-            className="bg-accent hover:bg-accent-foreground text-accent-foreground hover:text-accent transition-all duration-300 ease-in-out"
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="absolute right-4 bottom-6 bg-accent text-accent-foreground transition-all duration-300 ease-in-out"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
+          </div>
         </div>
       </form>
     </div>
