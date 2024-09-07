@@ -49,7 +49,6 @@ export class GruntyAgent {
       model: this.model,
       system: this.roleDescription,
       messages: sanitizedMessages,
-      temperature,
       max_tokens: maxTokens,
       tools,
     });
@@ -97,7 +96,8 @@ export class GruntyAgent {
               } as unknown as StreamChunk;
 
               // Stream the code explanation
-              yield* this.streamExplanation(generatedCode, tools, temperature, maxTokens);
+              // commenting out the code explanation for now till we figure out the interface
+              // yield* this.streamExplanation(generatedCode, tools, temperature, maxTokens);
 
             } catch (error) {
               console.error('Error parsing JSON, generating Streamlit code, or explaining code:', error);
