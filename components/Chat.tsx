@@ -17,6 +17,7 @@ export function Chat({
   handleSubmit,
   isLoading,
   streamingMessage,
+  streamingCodeExplanation,
   handleFileUpload
 }: {
   messages: Message[];
@@ -25,6 +26,7 @@ export function Chat({
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
   streamingMessage: string;
+  streamingCodeExplanation: string;
   handleFileUpload: (content: string, fileName: string) => void;
 }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -35,7 +37,7 @@ export function Chat({
     if (isAtBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, streamingMessage, isAtBottom]);
+  }, [messages, streamingMessage, streamingCodeExplanation, isAtBottom]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -137,6 +139,18 @@ export function Chat({
               </Avatar>
               <div className="mx-2 p-4 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x text-white break-words overflow-hidden shadow-md transition-all duration-500 ease-in-out hover:shadow-lg">
                 {renderMessage(streamingMessage)}
+              </div>
+            </div>
+          </div>
+        )}
+        {streamingCodeExplanation && (
+          <div className="flex justify-start mb-4">
+            <div className="flex flex-row items-start max-w-[80%]">
+              <Avatar className="w-8 h-8 flex-shrink-0">
+                <AvatarFallback>A</AvatarFallback>
+              </Avatar>
+              <div className="mx-2 p-4 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x text-white break-words overflow-hidden shadow-md transition-all duration-500 ease-in-out hover:shadow-lg">
+                {renderMessage(streamingCodeExplanation)}
               </div>
             </div>
           </div>

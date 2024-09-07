@@ -18,7 +18,8 @@ export default function Home() {
     streamlitUrl,
     generatedCode,
     streamingMessage,
-    isGeneratingCode
+    streamingCodeExplanation,
+    isGeneratingCode,
   } = useChat();
 
   return (
@@ -33,6 +34,7 @@ export default function Home() {
             handleSubmit={handleSubmit}
             isLoading={isLoading}
             streamingMessage={streamingMessage}
+            streamingCodeExplanation={streamingCodeExplanation}
             handleFileUpload={handleFileUpload}
           />
         </div>
