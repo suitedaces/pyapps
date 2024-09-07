@@ -1,6 +1,6 @@
 import { Anthropic } from '@anthropic-ai/sdk';
-import { Tool } from "@anthropic-ai/sdk/resources/messages.mjs";
 import { CSVAnalysis } from './types';
+import { Tool } from './types';
 
 const codeGenerationAnthropicAgent = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -8,67 +8,61 @@ const codeGenerationAnthropicAgent = new Anthropic({
 
 export const tools: Tool[] = [
   {
-    name: "generate_code",
-    description: "Generate Python code based on a given query",
+    name: "create_streamlit_app",
+    description: "Generates Python (Streamlit) code based on a given query",
     input_schema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         query: {
           type: "string",
-          description: "Query describing the code to be generated",
+          description: "Explain the requirements for the Streamlit code you want to generate. Include details about the data if there's any context and the column names VERBATIM as a list, with any spaces or special chars like this: [\"col 1 \", \" 2col 1\"].",
         },
       },
       required: ["query"],
-    },
-  },
-  {
-    name: "analyze_csv",
-    description: "Analyze the uploaded CSV file",
-    input_schema: {
-      type: "object",
-      properties: {
-        operation: {
-          type: "string",
-          description: "Specific analysis operation to perform",
-        },
-      },
-      required: ["operation"],
-    },
+    }
   },
 ];
 
-export const functions: { [key: string]: Function } = {
-  generate_code: async (input: { query: string; csvAnalysis: CSVAnalysis }): Promise<string> => {
-    try {
-      const response = await codeGenerationAnthropicAgent.messages.create({
-        model: "claude-3-5-sonnet-20240620",
-        max_tokens: 4000,
-        system: "You are a code generation assistant. Your task is to write Python code based on the given query and CSV analysis. The code should work with the provided CSV data structure. Respond with only the Python code, no explanations or comments.",
-        messages: [
-          { role: "assistant", content: `CSV Analysis: ${JSON.stringify(input.csvAnalysis, null, 2)}` },
-          { role: "user", content: input.query }
-        ],
-      });
+export async function generateCode(query: string): Promise<string> {
+  if (!query || !query.trim()) {
+    throw new Error('Query cannot be empty or just whitespace.');
+  }
 
-      const generatedCode = response.content
-        .filter((block) => block.type === "text")
-        .map((block) => block.text)
-        .join("\n");
+  console.log('Sending query to LLM:', query);
 
+  try {
+    const response = await codeGenerationAnthropicAgent.messages.create({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 2000,
+      system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use \"st.experimental_rerun()\" at any cost. Only respond with the code, no explanations!",
+      messages: [{ role: "user", content: query }],
+    });
+
+    if (Array.isArray(response.content) && response.content.length > 0) {
+      const generatedCode = response.content[0].type === 'text' ? response.content[0].text.replace(/^```python/, "").replace(/```$/, "") : '';
       return generatedCode;
-    } catch (err) {
-      console.error(`Error generating code:`, err);
-      return `Error generating code for query: ${input.query}`;
+    } else {
+      console.error('Unexpected response format:', response);
+      throw new Error('Unexpected response format from code generation API');
     }
-  },
-  analyze_csv: async (input: { operation: string; csvContent: string; csvAnalysis: CSVAnalysis }): Promise<string> => {
+  } catch (error) {
+    console.error('Error generating code:', error);
+    throw new Error('Failed to generate code. Please check the query and try again.');
+  }
+}
+
+export const functions = {
+  create_streamlit_app: async (input: { query: string; csvAnalysis: CSVAnalysis }): Promise<string> => {
     try {
-      // Perform additional analysis based on the operation
-      // For now, we'll just return the existing analysis
-      return JSON.stringify(input.csvAnalysis, null, 2);
+      const codeQuery = `
+        Create a Streamlit app that ${input.query}
+        Use the following CSV analysis to inform your code:
+        ${JSON.stringify(input.csvAnalysis, null, 2)}
+      `;
+      return await generateCode(codeQuery);
     } catch (err) {
-      console.error(`Error analyzing CSV:`, err);
-      return `Error analyzing CSV for operation: ${input.operation}`;
+      console.error(`Error generating Streamlit app:`, err);
+      return `Error generating Streamlit app for query: ${input.query}`;
     }
   },
 };
@@ -77,6 +71,6 @@ export function toolExists(name: string): boolean {
   return tools.some(tool => tool.name === name);
 }
 
-export function getToolByName(name: string): Tool | undefined {
+export function getToolByName(name: string): any {
   return tools.find(tool => tool.name === name);
 }

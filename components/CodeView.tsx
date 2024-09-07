@@ -5,12 +5,12 @@ import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
 import { Loader2 } from 'lucide-react';
 
-export function CodeView({ code, isProcessing }: { code: string, isProcessing: boolean }) {
+export function CodeView({ code, isGeneratingCode }: { code: string, isGeneratingCode: boolean }) {
   return (
     <Card className="bg-gray-900 border border-gray-700 h-full max-h-[80vh] flex-grow rounded-lg shadow-lg">
       <CardContent className="p-0 h-full overflow-auto relative">
-        {isProcessing && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-10">
+        {isGeneratingCode && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-10">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
         )}

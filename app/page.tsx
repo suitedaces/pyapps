@@ -6,8 +6,6 @@ import { Navbar } from '@/components/NavBar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CodeView } from '@/components/CodeView'
 import { useChat } from '@/hooks/useChat'
-import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
 
 export default function Home() {
   const {
@@ -20,7 +18,7 @@ export default function Home() {
     streamlitUrl,
     generatedCode,
     streamingMessage,
-    isGeneratingStreamlit,
+    isGeneratingCode
   } = useChat();
 
   return (
@@ -45,23 +43,15 @@ export default function Home() {
               <TabsTrigger value="code">Code</TabsTrigger>
             </TabsList>
             <TabsContent value="preview" className="flex-grow">
-              <StreamlitPreview url={streamlitUrl} isLoading={isGeneratingStreamlit} />
+              <StreamlitPreview url={streamlitUrl} isGeneratingCode={isGeneratingCode} />
             </TabsContent>
             <TabsContent value="code" className="flex-grow">
               <CodeView 
-                code={generatedCode} 
-                isProcessing={isGeneratingStreamlit}
+                code={generatedCode}
+                isGeneratingCode={isGeneratingCode}
               />
             </TabsContent>
           </Tabs>
-          {isGeneratingStreamlit && (
-            <div className="flex justify-center mt-2">
-              <Button disabled>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating Streamlit App...
-              </Button>
-            </div>
-          )}
         </div>
       </main>
     </div>
