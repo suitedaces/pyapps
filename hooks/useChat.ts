@@ -1,6 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Message, StreamChunk } from '@/lib/types';
-import { Sandbox } from 'e2b';
+
+interface SandboxError {
+  message: string;
+  traceback?: string;
+}
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -10,30 +14,46 @@ export function useChat() {
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null);
   const [generatedCode, setGeneratedCode] = useState('');
-  const [codeInterpreter, setCodeInterpreter] = useState<Sandbox | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [codeExplanation, setCodeExplanation] = useState('');
+  const [sandboxErrors, setSandboxErrors] = useState<SandboxError[]>([]);
+  const [sandboxId, setSandboxId] = useState<string | null>(null);
+
+  const initializeSandbox = useCallback(async () => {
+    try {
+      const response = await fetch('/api/sandbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'initialize' }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSandboxId(data.sandboxId);
+      console.log('Sandbox initialized with ID:', data.sandboxId);
+    } catch (error) {
+      console.error('Error initializing sandbox:', error);
+      setSandboxErrors(prev => [...prev, { 
+        message: 'Error initializing sandbox', 
+        traceback: error instanceof Error ? error.message : String(error) 
+      }]);
+    }
+  }, []);
 
   useEffect(() => {
-    async function createInterpreter() {
-      try {
-        const interpreter = await Sandbox.create({
-          apiKey: "e2b_d05766c8269872cc3e43114a87eca0b66ebc784a",
-          template: "streamlit-sandbox-me"
-        });
-        await interpreter.filesystem.makeDir('/app');
-        setCodeInterpreter(interpreter);
-      } catch (error) {
-        console.error('Error creating CodeInterpreter:', error);
-      }
-    }
-    createInterpreter();
-  
+    initializeSandbox();
+
     return () => {
-      if (codeInterpreter) {
-        codeInterpreter.close().catch(error => {
-          console.error('Error closing CodeInterpreter:', error);
-        });
+      if (sandboxId) {
+        fetch('/api/sandbox', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'close', sandboxId }),
+        }).catch(error => console.error('Error closing sandbox:', error));
       }
     };
   }, []);
@@ -41,31 +61,42 @@ export function useChat() {
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
   }, []);
-  
 
   const updateStreamlitApp = useCallback(async (code: string) => {
-    if (codeInterpreter && code) {
+    if (code && sandboxId) {
       try {
-        await codeInterpreter.filesystem.write('/app/app.py', code);
-        console.log('Streamlit code updated');
-
-        const process = await codeInterpreter.process.start({
-          cmd: "streamlit run /app/app.py",
-          onStdout: console.log,
-          onStderr: console.error,
+        console.log('Updating Streamlit app with code:', code);
+        const response = await fetch('/api/sandbox', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'updateCode', code, sandboxId }),
         });
-        console.log('Streamlit process restarted');
 
-        const url = codeInterpreter.getHostname(8501);
-        console.log('Streamlit URL:', url);
-        setStreamlitUrl('https://' + url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.url) {
+          setStreamlitUrl(data.url);
+          console.log('Streamlit URL updated:', data.url);
+        } else {
+          throw new Error('No URL returned from sandbox API');
+        }
       } catch (error) {
         console.error('Error updating Streamlit app:', error);
+        setSandboxErrors(prev => [...prev, { 
+          message: 'Error updating Streamlit app', 
+          traceback: error instanceof Error ? error.message : String(error) 
+        }]);
+      } finally {
+        setIsGeneratingCode(false);
       }
     } else {
-      console.error(`CodeInterpreter or generated code not available {codeInterpreter: ${!!codeInterpreter}, code length: ${code.length}}`);
+      console.error('Generated code not available or sandbox not initialized');
     }
-  }, [codeInterpreter]);
+  }, [sandboxId]);
+
 
   const processStreamChunk = useCallback((chunk: string, accumulatedResponse: string, accumulatedCode: string) => {
     try {
@@ -77,11 +108,11 @@ export function useChat() {
         accumulatedCode += parsedChunk.content;
         setGeneratedCode(prev => prev + parsedChunk.content);
       } else if (parsedChunk.type === 'code_explanation' && 'content' in parsedChunk) {
-        // For code explanations, we'll add them to the accumulated response
-        accumulatedResponse += parsedChunk.content;
-        setStreamingMessage(prev => prev + '\n\n' + parsedChunk.content);
+        setCodeExplanation(prev => prev + parsedChunk.content);
       } else if (parsedChunk.type === 'message_stop') {
         setIsGeneratingCode(false);
+      } else if (parsedChunk.type === 'tool_use' && parsedChunk.name === 'create_streamlit_app') {
+        setIsGeneratingCode(true);
       }
     } catch (error) {
       console.error('Error parsing chunk:', error);
@@ -111,46 +142,53 @@ export function useChat() {
   }, [processStreamChunk]);
 
   const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
+    if (!sandboxId) {
+      console.error('Sandbox not initialized');
+      return;
+    }
+
     setIsLoading(true);
     setStreamingMessage('');
     setGeneratedCode('');
-  
+    setCodeExplanation('');
+    setSandboxErrors([]);
+
     try {
       console.log("Sending messages to API:", JSON.stringify([newMessage], null, 2));
-  
+
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName }),
+        body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName, sandboxId }),
       });
-  
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-  
+
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('Failed to get response reader');
       }
-  
+
       const { accumulatedResponse, accumulatedCode } = await processStream(reader);
-  
-      setMessages(prev => {
-        const updatedMessages = [...prev];
-        
-        if (accumulatedResponse) {
-          updatedMessages.push({ 
-            role: 'assistant', 
-            content: accumulatedResponse, 
-            created_at: new Date() 
-          });
-        }
-        
-        return updatedMessages;
-      });
-  
-      if (accumulatedCode && codeInterpreter) {
+
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: accumulatedResponse, created_at: new Date() }
+      ]);
+
+      if (accumulatedCode) {
+        setGeneratedCode(accumulatedCode);
+        console.log('Generated code:', accumulatedCode);
         await updateStreamlitApp(accumulatedCode);
+      }
+
+      if (codeExplanation) {
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: codeExplanation, created_at: new Date() }
+        ]);
       }
     } catch (error) {
       console.error('Error in chat operation:', error);
@@ -159,12 +197,16 @@ export function useChat() {
         content: 'An error occurred. Please try again.', 
         created_at: new Date() 
       }]);
+      setSandboxErrors(prev => [...prev, { 
+        message: 'Error in chat operation', 
+        traceback: error instanceof Error ? error.message : String(error) 
+      }]);
     } finally {
       setIsLoading(false);
       setStreamingMessage('');
       setIsGeneratingCode(false);
     }
-  }, [messages, csvContent, csvFileName, codeInterpreter, processStream, updateStreamlitApp]);
+  }, [sandboxId, csvContent, csvFileName, processStream, updateStreamlitApp, codeExplanation]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -182,43 +224,64 @@ export function useChat() {
   }, [input, handleChatOperation]);
 
   const handleFileUpload = useCallback(async (content: string, fileName: string) => {
-    const lines = content.split('\n').filter(line => line.trim() !== '');
+    if (!sandboxId) {
+      console.error('Sandbox not initialized');
+      return;
+    }
+
+    const sanitizeCSVContent = (content: string): string => {
+      return content
+        .split('\n')
+        .map(row => row.replace(/[\r\n]+/g, ''))
+        .join('\n');
+    };
+  
+    const sanitizedContent = sanitizeCSVContent(content);
+    const lines = sanitizedContent.split('\n').filter(line => line.trim() !== '');
   
     const headers = lines[0].split(',').map(header => header.trim());
     const dataRows = lines.slice(1).map(line => line.split(',').map(value => value.trim()));
   
-    // Construct Markdown table
-    const tableHeaders = `| ${headers.join(' | ')} |`;
-    const tableDivider = `| ${headers.map(() => '---').join(' | ')} |`;
-    const tableRows = dataRows.slice(0, 5).map(row => `| ${row.join(' | ')} |`).join('\n');
-    const markdownTable = `\n${tableHeaders}\n${tableDivider}\n${tableRows}\n`;
+    const formatTableRow = (row: string[]): string => 
+      `| ${row.map(cell => cell.replace(/\|/g, '\\|').replace(/\n/g, '<br>')).join(' | ')} |`;
+  
+    const markdownTable = `
+  | ${headers.join(' | ')} |
+  | ${headers.map(() => '---').join(' | ')} |
+  ${dataRows.slice(0, 5).map(formatTableRow).join('\n')}`
   
     setCsvContent(content);
     setCsvFileName(fileName);
   
     try {
-      if (codeInterpreter) {
-        const uploadedPath = await codeInterpreter.filesystem.write(`/app/${fileName}`, content);
-        console.log('File uploaded to:', uploadedPath);
-  
-        const newMessage: Message = {
-          role: 'user',
-          content: `I've uploaded a CSV file named "/app/${fileName}". Here's a preview of the data:
-          
-  \`\`\`markdown
-  ${markdownTable}
-  \`\`\`
-  
-  Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code.`,
-          created_at: new Date()
-        };
-  
-        setMessages(prev => [...prev, newMessage]);
-  
-        await handleChatOperation(newMessage, '/api/chat');
-      } else {
-        throw new Error('CodeInterpreter not available for file upload');
+      const response = await fetch('/api/sandbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'uploadFile', fileName, fileContent: content, sandboxId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const data = await response.json();
+      console.log('File uploaded to:', data.path);
+
+      const newMessage: Message = {
+        role: 'user',
+        content: `I've uploaded a CSV file named "${fileName}". Here's a preview of the data:
+        
+\`\`\`markdown
+${markdownTable}
+\`\`\`
+
+Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code.`,
+        created_at: new Date()
+      };
+
+      setMessages(prev => [...prev, newMessage]);
+
+      await handleChatOperation(newMessage, '/api/chat');
     } catch (error) {
       console.error('Error in file upload:', error);
       setMessages(prev => [
@@ -229,8 +292,12 @@ export function useChat() {
           created_at: new Date()
         }
       ]);
+      setSandboxErrors(prev => [...prev, { 
+        message: 'Error uploading file', 
+        traceback: error instanceof Error ? error.message : String(error) 
+      }]);
     }
-  }, [codeInterpreter, handleChatOperation]);
+  }, [sandboxId, handleChatOperation]);
 
   return {
     messages,
@@ -244,6 +311,9 @@ export function useChat() {
     streamlitUrl,
     generatedCode,
     streamingMessage,
-    isGeneratingCode
+    isGeneratingCode,
+    streamingCodeExplanation: codeExplanation,
+    sandboxErrors,
+    sandboxId,
   };
 }

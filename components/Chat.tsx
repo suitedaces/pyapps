@@ -17,6 +17,7 @@ export function Chat({
   handleSubmit,
   isLoading,
   streamingMessage,
+  streamingCodeExplanation,
   handleFileUpload
 }: {
   messages: Message[];
@@ -25,6 +26,7 @@ export function Chat({
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
   streamingMessage: string;
+  streamingCodeExplanation: string;
   handleFileUpload: (content: string, fileName: string) => void;
 }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -35,7 +37,7 @@ export function Chat({
     if (isAtBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, streamingMessage, isAtBottom]);
+  }, [messages, streamingMessage, streamingCodeExplanation, isAtBottom]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -99,9 +101,15 @@ export function Chat({
         h1: ({children}) => <h1 className="text-2xl font-bold mb-3">{children}</h1>,
         h2: ({children}) => <h2 className="text-xl font-bold mb-2">{children}</h2>,
         h3: ({children}) => <h3 className="text-lg font-bold mb-2">{children}</h3>,
-        ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-        ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-        li: ({children}) => <li className="mb-1">{children}</li>,
+        ul: ({children}) => <ul className="list-disc list-outside pl-6 mb-2">{children}</ul>,
+        ol: ({children}) => <ol className="list-decimal list-outside pl-6 mb-2">{children}</ol>,
+        li: ({children}) => (
+          <li className="mb-1">
+            {React.Children.map(children, child => 
+              typeof child === 'string' ? <span>{child}</span> : child
+            )}
+          </li>
+        ),
         blockquote: ({children}) => <blockquote className="border-l-4 border-accent pl-4 italic mb-2">{children}</blockquote>,
       }}
       className="prose prose-invert max-w-none"
@@ -137,6 +145,18 @@ export function Chat({
               </Avatar>
               <div className="mx-2 p-4 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x text-white break-words overflow-hidden shadow-md transition-all duration-500 ease-in-out hover:shadow-lg">
                 {renderMessage(streamingMessage)}
+              </div>
+            </div>
+          </div>
+        )}
+        {streamingCodeExplanation && (
+          <div className="flex justify-start mb-4">
+            <div className="flex flex-row items-start max-w-[80%]">
+              <Avatar className="w-8 h-8 flex-shrink-0">
+                <AvatarFallback>A</AvatarFallback>
+              </Avatar>
+              <div className="mx-2 p-4 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x text-white break-words overflow-hidden shadow-md transition-all duration-500 ease-in-out hover:shadow-lg">
+                {renderMessage(streamingCodeExplanation)}
               </div>
             </div>
           </div>
