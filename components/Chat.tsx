@@ -97,7 +97,7 @@ export function Chat({
             </div>
           )
         },
-        p: ({children}) => <p className="mb-2">{children}</p>,
+        p: ({children}) => <p className="mb-2 break-words">{children}</p>,
         h1: ({children}) => <h1 className="text-2xl font-bold mb-3">{children}</h1>,
         h2: ({children}) => <h2 className="text-xl font-bold mb-2">{children}</h2>,
         h3: ({children}) => <h3 className="text-lg font-bold mb-2">{children}</h3>,
