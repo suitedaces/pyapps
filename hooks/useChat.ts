@@ -1,323 +1,200 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Message, StreamChunk } from '@/lib/types';
-
-interface SandboxError {
-  message: string;
-  traceback?: string;
-}
+import { useState, useCallback, useEffect } from 'react'
+import { useUser } from '@auth0/nextjs-auth0/client'
+import { Message, StreamChunk } from '@/lib/types'
 
 export function useChat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [csvContent, setCsvContent] = useState<string | null>(null);
-  const [csvFileName, setCsvFileName] = useState<string | null>(null);
-  const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null);
-  const [generatedCode, setGeneratedCode] = useState('');
-  const [streamingMessage, setStreamingMessage] = useState('');
-  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
-  const [codeExplanation, setCodeExplanation] = useState('');
-  const [sandboxErrors, setSandboxErrors] = useState<SandboxError[]>([]);
-  const [sandboxId, setSandboxId] = useState<string | null>(null);
-
-  const initializeSandbox = useCallback(async () => {
-    try {
-      const response = await fetch('/api/sandbox', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'initialize' }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setSandboxId(data.sandboxId);
-      console.log('Sandbox initialized with ID:', data.sandboxId);
-    } catch (error) {
-      console.error('Error initializing sandbox:', error);
-      setSandboxErrors(prev => [...prev, { 
-        message: 'Error initializing sandbox', 
-        traceback: error instanceof Error ? error.message : String(error) 
-      }]);
-    }
-  }, []);
+  const { user } = useUser()
+  const [chatId, setChatId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [csvContent, setCsvContent] = useState<string | null>(null)
+  const [csvFileName, setCsvFileName] = useState<string | null>(null)
+  const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
+  const [generatedCode, setGeneratedCode] = useState('')
+  const [streamingMessage, setStreamingMessage] = useState('')
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false)
+  const [codeExplanation, setCodeExplanation] = useState('')
 
   useEffect(() => {
-    initializeSandbox();
-
-    return () => {
-      if (sandboxId) {
-        fetch('/api/sandbox', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'close', sandboxId }),
-        }).catch(error => console.error('Error closing sandbox:', error));
-      }
-    };
-  }, []);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  }, []);
-
-  const updateStreamlitApp = useCallback(async (code: string) => {
-    if (code && sandboxId) {
-      try {
-        console.log('Updating Streamlit app with code:', code);
-        const response = await fetch('/api/sandbox', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'updateCode', code, sandboxId }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.url) {
-          setStreamlitUrl(data.url);
-          console.log('Streamlit URL updated:', data.url);
-        } else {
-          throw new Error('No URL returned from sandbox API');
-        }
-      } catch (error) {
-        console.error('Error updating Streamlit app:', error);
-        setSandboxErrors(prev => [...prev, { 
-          message: 'Error updating Streamlit app', 
-          traceback: error instanceof Error ? error.message : String(error) 
-        }]);
-      } finally {
-        setIsGeneratingCode(false);
-      }
-    } else {
-      console.error('Generated code not available or sandbox not initialized');
+    if (user) {
+      initializeChat()
     }
-  }, [sandboxId]);
+  }, [user])
 
-
-  const processStreamChunk = useCallback((chunk: string, accumulatedResponse: string, accumulatedCode: string) => {
+  const initializeChat = useCallback(async () => {
     try {
-      const parsedChunk: StreamChunk = JSON.parse(chunk);
-      if (parsedChunk.type === 'content_block_delta' && 'delta' in parsedChunk && parsedChunk.delta?.type === 'text_delta') {
-        accumulatedResponse += parsedChunk.delta.text;
-        setStreamingMessage(prev => prev + parsedChunk.delta.text);
-      } else if (parsedChunk.type === 'generated_code' && 'content' in parsedChunk) {
-        accumulatedCode += parsedChunk.content;
-        setGeneratedCode(prev => prev + parsedChunk.content);
-      } else if (parsedChunk.type === 'code_explanation' && 'content' in parsedChunk) {
-        setCodeExplanation(prev => prev + parsedChunk.content);
-      } else if (parsedChunk.type === 'message_stop') {
-        setIsGeneratingCode(false);
-      } else if (parsedChunk.type === 'tool_use' && parsedChunk.name === 'create_streamlit_app') {
-        setIsGeneratingCode(true);
-      }
-    } catch (error) {
-      console.error('Error parsing chunk:', error);
-    }
-    return { accumulatedResponse, accumulatedCode };
-  }, []);
-
-  const processStream = useCallback(async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
-    const decoder = new TextDecoder();
-    let accumulatedResponse = '';
-    let accumulatedCode = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-      for (const line of lines) {
-        const result = processStreamChunk(line, accumulatedResponse, accumulatedCode);
-        accumulatedResponse = result.accumulatedResponse;
-        accumulatedCode = result.accumulatedCode;
-      }
-    }
-
-    return { accumulatedResponse, accumulatedCode };
-  }, [processStreamChunk]);
-
-  const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
-    if (!sandboxId) {
-      console.error('Sandbox not initialized');
-      return;
-    }
-
-    setIsLoading(true);
-    setStreamingMessage('');
-    setGeneratedCode('');
-    setCodeExplanation('');
-    setSandboxErrors([]);
-
-    try {
-      console.log("Sending messages to API:", JSON.stringify([newMessage], null, 2));
-
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch('/api/chat/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName, sandboxId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setChatId(data.chatId)
+        setMessages(data.messages || [])
       }
+    } catch (error) {
+      console.error('Error initializing chat:', error)
+    }
+  }, [])
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('Failed to get response reader');
+  const processStreamChunk = useCallback((chunk: StreamChunk, accumulatedResponse: string, accumulatedCode: string) => {
+    if (chunk.type === 'content_block_delta' && 'delta' in chunk && chunk.delta?.type === 'text_delta') {
+      accumulatedResponse += chunk.delta.text
+      setStreamingMessage(prev => prev + chunk.delta.text)
+    } else if (chunk.type === 'generated_code' && 'content' in chunk) {
+      accumulatedCode += chunk.content
+      setGeneratedCode(prev => prev + chunk.content)
+    } else if (chunk.type === 'code_explanation' && 'content' in chunk) {
+      setCodeExplanation(prev => prev + chunk.content)
+    } else if (chunk.type === 'message_stop') {
+      setIsGeneratingCode(false)
+    } else if (chunk.type === 'tool_use' && chunk.name === 'create_streamlit_app') {
+      setIsGeneratingCode(true)
+    }
+    return { accumulatedResponse, accumulatedCode }
+  }, [])
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!input.trim() || !chatId) return
+
+    setIsLoading(true)
+    const newMessage: Message = { role: 'user', content: input, createdAt: new Date(), chatId }
+    setMessages(prev => [...prev, newMessage])
+    setInput('')
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: [newMessage], 
+          csvContent, 
+          csvFileName, 
+          chatId 
+        }),
+      })
+
+      if (!response.ok) throw new Error('Chat API request failed')
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Failed to get response reader')
+
+      let accumulatedResponse = ''
+      let accumulatedCode = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = new TextDecoder().decode(value)
+        const lines = chunk.split('\n').filter(line => line.trim() !== '')
+
+        for (const line of lines) {
+          const parsedChunk: StreamChunk = JSON.parse(line)
+          const result = processStreamChunk(parsedChunk, accumulatedResponse, accumulatedCode)
+          accumulatedResponse = result.accumulatedResponse
+          accumulatedCode = result.accumulatedCode
+        }
       }
-
-      const { accumulatedResponse, accumulatedCode } = await processStream(reader);
 
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: accumulatedResponse, created_at: new Date() }
-      ]);
+        { role: 'assistant', content: accumulatedResponse, createdAt: new Date(), chatId }
+      ])
 
       if (accumulatedCode) {
-        setGeneratedCode(accumulatedCode);
-        console.log('Generated code:', accumulatedCode);
-        await updateStreamlitApp(accumulatedCode);
+        setGeneratedCode(accumulatedCode)
+        await updateStreamlitApp(accumulatedCode)
       }
 
-      if (codeExplanation) {
-        setMessages(prev => [
-          ...prev,
-          { role: 'assistant', content: codeExplanation, created_at: new Date() }
-        ]);
-      }
     } catch (error) {
-      console.error('Error in chat operation:', error);
-      setMessages(prev => [...prev, newMessage, { 
+      console.error('Error in chat operation:', error)
+      setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: 'An error occurred. Please try again.', 
-        created_at: new Date() 
-      }]);
-      setSandboxErrors(prev => [...prev, { 
-        message: 'Error in chat operation', 
-        traceback: error instanceof Error ? error.message : String(error) 
-      }]);
+        createdAt: new Date(),
+        chatId 
+      }])
     } finally {
-      setIsLoading(false);
-      setStreamingMessage('');
-      setIsGeneratingCode(false);
+      setIsLoading(false)
+      setStreamingMessage('')
+      setIsGeneratingCode(false)
     }
-  }, [sandboxId, csvContent, csvFileName, processStream, updateStreamlitApp, codeExplanation]);
+  }, [input, chatId, csvContent, csvFileName, processStreamChunk])
 
-  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-  
-    const newUserMessage: Message = { 
-      role: 'user', 
-      content: input, 
-      created_at: new Date() 
-    };
-    setMessages(prev => [...prev, newUserMessage]);
-    setInput('');
-  
-    await handleChatOperation(newUserMessage, '/api/chat');
-  }, [input, handleChatOperation]);
-
-  const handleFileUpload = useCallback(async (content: string, fileName: string) => {
-    if (!sandboxId) {
-      console.error('Sandbox not initialized');
-      return;
-    }
-
-    const sanitizeCSVContent = (content: string): string => {
-      return content
-        .split('\n')
-        .map(row => row.replace(/[\r\n]+/g, ''))
-        .join('\n');
-    };
-  
-    const sanitizedContent = sanitizeCSVContent(content);
-    const lines = sanitizedContent.split('\n').filter(line => line.trim() !== '');
-  
-    const headers = lines[0].split(',').map(header => header.trim());
-    const dataRows = lines.slice(1).map(line => line.split(',').map(value => value.trim()));
-  
-    const formatTableRow = (row: string[]): string => 
-      `| ${row.map(cell => cell.replace(/\|/g, '\\|').replace(/\n/g, '<br>')).join(' | ')} |`;
-  
-    const markdownTable = `
-  | ${headers.join(' | ')} |
-  | ${headers.map(() => '---').join(' | ')} |
-  ${dataRows.slice(0, 5).map(formatTableRow).join('\n')}`
-  
-    setCsvContent(content);
-    setCsvFileName(fileName);
-
-    console.log(`YOOOO ${fileName} ${content.length.toString()} ${sandboxId}`);
-  
+  const updateStreamlitApp = useCallback(async (code: string) => {
     try {
       const response = await fetch('/api/sandbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'uploadFile', fileName, fileContent: content, sandboxId }),
-      });
+        body: JSON.stringify({ 
+          action: 'updateCode', 
+          code, 
+          chatId 
+        }),
+      })
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error('Failed to update Streamlit app')
 
-      const data = await response.json();
-      console.log('File uploaded to:', data.path);
+      const data = await response.json()
+      setStreamlitUrl(data.url)
+    } catch (error) {
+      console.error('Error updating Streamlit app:', error)
+    }
+  }, [chatId])
 
-      const newUserMessage: Message = {
+  const handleFileUpload = useCallback(async (content: string, fileName: string) => {
+    if (!chatId) return
+
+    setCsvContent(content)
+    setCsvFileName(fileName)
+
+    try {
+      const response = await fetch('/api/sandbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'uploadFile', 
+          fileName, 
+          fileContent: content, 
+          chatId 
+        }),
+      })
+
+      if (!response.ok) throw new Error('File upload failed')
+
+      const data = await response.json()
+      console.log('File uploaded:', data.path)
+
+      const newMessage: Message = {
         role: 'user',
-        content: `I've uploaded a CSV file named "/app/${fileName}". Here's a preview of the data:
-        
-\`\`\`markdown
-${markdownTable}
-\`\`\`
+        content: `Uploaded file: ${fileName}`,
+        createdAt: new Date(),
+        chatId
+      }
+      setMessages(prev => [...prev, newMessage])
 
-Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code.`,
-        created_at: new Date()
-      };
-
-      // Update messages state with the new user message
-      setMessages(prev => [...prev, newUserMessage]);
-
-      await handleChatOperation(newUserMessage, '/api/chat');
+      handleSubmit({ preventDefault: () => {} } as React.FormEvent<HTMLFormElement>)
 
     } catch (error) {
-      console.error('Error in file upload:', error);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-          created_at: new Date()
-        }
-      ]);
-      setSandboxErrors(prev => [...prev, { 
-        message: 'Error uploading file', 
-        traceback: error instanceof Error ? error.message : String(error) 
-      }]);
+      console.error('Error uploading file:', error)
     }
-  }, [sandboxId, handleChatOperation]);
+  }, [chatId, handleSubmit])
 
   return {
     messages,
     input,
-    handleInputChange,
+    handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value),
     handleSubmit,
     isLoading,
     handleFileUpload,
-    csvContent,
-    csvFileName,
     streamlitUrl,
     generatedCode,
     streamingMessage,
     isGeneratingCode,
     streamingCodeExplanation: codeExplanation,
-    sandboxErrors,
-    sandboxId,
-  };
+    chatId,
+  }
 }

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState, ComponentProps } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Message } from '@/lib/types'
 import { Paperclip, Send, Loader2, Code } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import { CodeProps } from 'react-markdown/lib/ast-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
@@ -18,48 +17,53 @@ export function Chat({
   isLoading,
   streamingMessage,
   streamingCodeExplanation,
-  handleFileUpload
+  handleFileUpload,
+  chatId,
 }: {
-  messages: Message[];
-  input: string;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  isLoading: boolean;
-  streamingMessage: string;
-  streamingCodeExplanation: string;
-  handleFileUpload: (content: string, fileName: string) => void;
+  messages: Message[]
+  input: string
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+  isLoading: boolean
+  streamingMessage: string
+  streamingCodeExplanation: string
+  handleFileUpload: (content: string, fileName: string) => void
+  chatId: string
 }) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
 
   useEffect(() => {
     if (isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
-  }, [messages, streamingMessage, streamingCodeExplanation, isAtBottom]);
+  }, [messages, streamingMessage, streamingCodeExplanation, isAtBottom])
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    setIsAtBottom(scrollHeight - scrollTop === clientHeight);
-  };
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    setIsAtBottom(scrollHeight - scrollTop === clientHeight)
+  }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event.target.files?.[0]
     if (file) {
-      const reader = new FileReader();
+      const reader = new FileReader()
       reader.onload = (e) => {
-        const content = e.target?.result as string;
-        handleFileUpload(content, file.name);
-      };
-      reader.readAsText(file);
+        const content = e.target?.result as string
+        handleFileUpload(content, file.name)
+      }
+      reader.readAsText(file)
     }
-  };
+  }
 
   const renderMessage = (content: string) => (
     <ReactMarkdown
       components={{
-        code({node, inline, className, children, ...props}: CodeProps) {
+        code({node, inline, className, children, ...props}: ComponentProps<'code'> & {
+          inline?: boolean;
+          node?: any;
+        }) {
           const match = /language-(\w+)/.exec(className || '')
           const lang = match && match[1] ? match[1] : ''
           const codeString = String(children).replace(/\n$/, '')
@@ -97,26 +101,12 @@ export function Chat({
             </div>
           )
         },
-        p: ({children}) => <p className="mb-2 break-words">{children}</p>,
-        h1: ({children}) => <h1 className="text-2xl font-bold mb-3">{children}</h1>,
-        h2: ({children}) => <h2 className="text-xl font-bold mb-2">{children}</h2>,
-        h3: ({children}) => <h3 className="text-lg font-bold mb-2">{children}</h3>,
-        ul: ({children}) => <ul className="list-disc list-outside pl-6 mb-2">{children}</ul>,
-        ol: ({children}) => <ol className="list-decimal list-outside pl-6 mb-2">{children}</ol>,
-        li: ({children}) => (
-          <li className="mb-1">
-            {React.Children.map(children, child => 
-              typeof child === 'string' ? <span>{child}</span> : child
-            )}
-          </li>
-        ),
-        blockquote: ({children}) => <blockquote className="border-l-4 border-accent pl-4 italic mb-2">{children}</blockquote>,
       }}
       className="prose prose-invert max-w-none"
     >
       {content}
     </ReactMarkdown>
-  );
+  )
 
   return (
     <div className="flex flex-col h-full border border-border rounded-lg bg-background text-foreground">
@@ -206,5 +196,5 @@ export function Chat({
         </div>
       </form>
     </div>
-  );
+  )
 }

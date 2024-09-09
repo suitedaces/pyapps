@@ -1,10 +1,11 @@
-import { Anthropic } from '@anthropic-ai/sdk';
-import { CSVAnalysis } from './types';
-import { Tool } from './types';
+import { Anthropic } from '@anthropic-ai/sdk'
+import { CSVAnalysis } from './types'
+import { Tool } from './types'
+import prisma from './prisma'
 
 const codeGenerationAnthropicAgent = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
-});
+})
 
 export const tools: Tool[] = [
   {
@@ -21,14 +22,14 @@ export const tools: Tool[] = [
       required: ["query"],
     }
   },
-];
+]
 
 export async function generateCode(query: string): Promise<string> {
   if (!query || !query.trim()) {
-    throw new Error('Query cannot be empty or just whitespace.');
+    throw new Error('Query cannot be empty or just whitespace.')
   }
 
-  console.log('Sending query to LLM:', query);
+  console.log('Sending query to LLM:', query)
 
   try {
     const response = await codeGenerationAnthropicAgent.messages.create({
@@ -36,41 +37,63 @@ export async function generateCode(query: string): Promise<string> {
       max_tokens: 2000,
       system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use \"st.experimental_rerun()\" at any cost. Only respond with the code, no explanations!",
       messages: [{ role: "user", content: query }],
-    });
+    })
 
     if (Array.isArray(response.content) && response.content.length > 0) {
-      const generatedCode = response.content[0].type === 'text' ? response.content[0].text.replace(/^```python/, "").replace(/```$/, "") : '';
-      return generatedCode;
+      const generatedCode = response.content[0].type === 'text' ? response.content[0].text.replace(/^```python/, "").replace(/```$/, "") : ''
+      return generatedCode
     } else {
-      console.error('Unexpected response format:', response);
-      throw new Error('Unexpected response format from code generation API');
+      console.error('Unexpected response format:', response)
+      throw new Error('Unexpected response format from code generation API')
     }
   } catch (error) {
-    console.error('Error generating code:', error);
-    throw new Error('Failed to generate code. Please check the query and try again.');
+    console.error('Error generating code:', error)
+    throw new Error('Failed to generate code. Please check the query and try again.')
   }
 }
 
 export const functions = {
-  create_streamlit_app: async (input: { query: string; csvAnalysis: CSVAnalysis }): Promise<string> => {
+  create_streamlit_app: async (input: { query: string; csvAnalysis: CSVAnalysis; chatId: string }): Promise<string> => {
     try {
       const codeQuery = `
         Create a Streamlit app that ${input.query}
         Use the following CSV analysis to inform your code:
         ${JSON.stringify(input.csvAnalysis, null, 2)}
-      `;
-      return await generateCode(codeQuery);
+      `
+      const generatedCode = await generateCode(codeQuery)
+
+      // Store the generated code in the database
+      const app = await prisma.streamlitApp.upsert({
+        where: { chatId: input.chatId },
+        update: {},
+        create: { chatId: input.chatId, name: 'Generated App' },
+      })
+
+      const newVersion = await prisma.streamlitAppVersion.create({
+        data: {
+          appId: app.id,
+          code: generatedCode,
+          versionNumber: (await prisma.streamlitAppVersion.count({ where: { appId: app.id } })) + 1,
+        },
+      })
+
+      await prisma.streamlitApp.update({
+        where: { id: app.id },
+        data: { currentVersionId: newVersion.id },
+      })
+
+      return generatedCode
     } catch (err) {
-      console.error(`Error generating Streamlit app:`, err);
-      return `Error generating Streamlit app for query: ${input.query}`;
+      console.error(`Error generating Streamlit app:`, err)
+      return `Error generating Streamlit app for query: ${input.query}`
     }
   },
-};
+}
 
 export function toolExists(name: string): boolean {
-  return tools.some(tool => tool.name === name);
+  return tools.some(tool => tool.name === name)
 }
 
 export function getToolByName(name: string): any {
-  return tools.find(tool => tool.name === name);
+  return tools.find(tool => tool.name === name)
 }

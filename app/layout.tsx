@@ -1,13 +1,6 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
+'use client'
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'CSV Streamlit Analyzer',
-  description: 'Analyze CSV files with Streamlit and AI',
-}
+import { UserProvider } from '@auth0/nextjs-auth0/client'
 
 export default function RootLayout({
   children,
@@ -16,7 +9,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body>
+        <UserProvider>{children}</UserProvider>
+      </body>
     </html>
   )
 }

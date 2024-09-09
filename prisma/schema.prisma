@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  auth0Id   String    @unique
+  name      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  chats     Chat[]
+  sandboxes Sandbox[]
+  metrics   Metric[] // Added relation to Metric model
+}
+
+model Chat {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  messages      Message[]
+  streamlitApps StreamlitApp[]
+  files         File[]
+  csvAnalyses   CSVAnalysis[]
+  sandbox       Sandbox?
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id])
+  role        String
+  content     String   @db.Text // Changed to Text for potentially long content
+  createdAt   DateTime @default(now())
+  toolCalls   Json? // Stored as JSON
+  toolResults Json? // Stored as JSON
+}
+
+model StreamlitAppVersion {
+  id                String        @id @default(uuid())
+  code              String        @db.Text // Changed to Text for potentially long code
+  versionNumber     Int
+  createdAt         DateTime      @default(now())
+  appId             String
+  app               StreamlitApp  @relation("AppVersions", fields: [appId], references: [id])
+  currentVersionFor StreamlitApp? @relation("CurrentVersion")
+}
+
+model StreamlitApp {
+  id               String                @id @default(uuid())
+  name             String
+  chatId           String                @unique
+  chat             Chat                  @relation(fields: [chatId], references: [id])
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  versions         StreamlitAppVersion[] @relation("AppVersions")
+  currentVersionId String?               @unique
+  currentVersion   StreamlitAppVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+}
+
+model File {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  name      String
+  path      String
+  content   String   @db.Text // Changed to Text for potentially large file content
+  createdAt DateTime @default(now())
+}
+
+model CSVAnalysis {
+  id         String   @id @default(uuid())
+  chatId     String
+  chat       Chat     @relation(fields: [chatId], references: [id])
+  totalRows  Int
+  columns    Json // Stored as JSON
+  sampleRows Json // Stored as JSON
+  createdAt  DateTime @default(now())
+}
+
+model Sandbox {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  chatId    String   @unique
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Metric {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id]) // Added relation to User model
+  type      MetricType
+  value     Int
+  createdAt DateTime   @default(now())
+}
+
+enum MetricType {
+  API_CALL
+  STORAGE
+  COMPUTATION
+}

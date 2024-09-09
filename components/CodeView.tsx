@@ -1,9 +1,9 @@
-import { Card, CardContent } from "@/components/ui/card";
-import Editor from 'react-simple-code-editor';
-import { highlight, languages } from 'prismjs';
-import 'prismjs/components/prism-python';
-import 'prismjs/themes/prism-tomorrow.css';
-import { Loader2 } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card"
+import Editor from 'react-simple-code-editor'
+import { highlight, languages } from 'prismjs'
+import 'prismjs/components/prism-python'
+import 'prismjs/themes/prism-tomorrow.css'
+import { Loader2 } from 'lucide-react'
 
 export function CodeView({ code, isGeneratingCode }: { code: string, isGeneratingCode: boolean }) {
   return (
@@ -30,5 +30,5 @@ export function CodeView({ code, isGeneratingCode }: { code: string, isGeneratin
         />
       </CardContent>
     </Card>
-  );
+  )
 }
