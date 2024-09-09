@@ -252,6 +252,8 @@ export function useChat() {
   
     setCsvContent(content);
     setCsvFileName(fileName);
+
+    console.log(`YOOOO ${fileName} ${content.length.toString()} ${sandboxId}`);
   
     try {
       const response = await fetch('/api/sandbox', {
@@ -267,9 +269,9 @@ export function useChat() {
       const data = await response.json();
       console.log('File uploaded to:', data.path);
 
-      const newMessage: Message = {
+      const newUserMessage: Message = {
         role: 'user',
-        content: `I've uploaded a CSV file named "${fileName}". Here's a preview of the data:
+        content: `I've uploaded a CSV file named "/app/${fileName}". Here's a preview of the data:
         
 \`\`\`markdown
 ${markdownTable}
@@ -279,9 +281,11 @@ Can you analyze it and create a Streamlit app to visualize the data? Make sure t
         created_at: new Date()
       };
 
-      setMessages(prev => [...prev, newMessage]);
+      // Update messages state with the new user message
+      setMessages(prev => [...prev, newUserMessage]);
 
-      await handleChatOperation(newMessage, '/api/chat');
+      await handleChatOperation(newUserMessage, '/api/chat');
+
     } catch (error) {
       console.error('Error in file upload:', error);
       setMessages(prev => [

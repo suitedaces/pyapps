@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Sandbox } from 'e2b';
 
-const SANDBOX_LIFETIME = 2 * 60 * 1000; // 2 mins sandbox timeout for now
+const SANDBOX_LIFETIME = 5 * 60 * 1000; // Extended to 5 minutes
 const sandboxes = new Map<string, Sandbox>();
 
 async function getSandbox(id?: string): Promise<Sandbox> {
   if (id && sandboxes.has(id)) {
-    return sandboxes.get(id)!;
+    const sandbox = sandboxes.get(id)!;
+    await sandbox.keepAlive(SANDBOX_LIFETIME); // Refresh the sandbox lifetime
+    return sandbox;
   }
 
   const sandbox = await Sandbox.create({
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
         sandbox = await getSandbox(sandboxId);
         console.log('Uploading file to sandbox:', fileName);
         const uploadedPath = await sandbox.filesystem.write(`/app/${fileName}`, fileContent);
+        console.log('File uploaded successfully to:', uploadedPath);
         return NextResponse.json({ path: uploadedPath });
 
       default:
@@ -66,7 +69,8 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error in sandbox operation:', error);
-    return NextResponse.json({ error: 'Sandbox operation failed' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Sandbox operation failed: ${errorMessage}` }, { status: 500 });
   }
 }
 

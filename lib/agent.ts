@@ -40,10 +40,7 @@ export class GruntyAgent {
     messages.push(userMessage);
     this.messages.push(userMessage);
 
-    const sanitizedMessages = messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
+    const sanitizedMessages = this.ensureAlternatingMessages(messages);
 
     const stream = await this.client.messages.stream({
       model: this.model,
@@ -138,6 +135,44 @@ export class GruntyAgent {
     }
   }
 
+  // ensuring alternating messages between user and assistant
+  private ensureAlternatingMessages(messages: Message[]): any[] {
+    if (messages.length === 0) return [];
+
+    const result: Message[] = [];
+    let lastRole: 'user' | 'assistant' | null = null;
+
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      
+      if (message.role === 'user') {
+        if (lastRole === 'user') {
+          // Combine consecutive user messages
+          result[result.length - 1].content += '\n\n' + message.content;
+        } else {
+          result.push(message);
+        }
+        lastRole = 'user';
+      } else if (message.role === 'assistant' && lastRole === 'user') {
+        result.push(message);
+        lastRole = 'assistant';
+      }
+    }
+
+    // Ensure the last message is from the user
+    if (result.length > 0 && result[result.length - 1].role === 'assistant') {
+      result.pop();
+    }
+
+    return result.map(message => ({
+      role: message.role,
+      content: message.content,
+    }));
+  }
+
+
+
+
   private async *streamExplanation(
     generatedCode: string,
     tools: Tool[],
@@ -169,7 +204,6 @@ Provide a brief overview of what the code does and how it utilizes the CSV data.
       }
     }
 
-    // Append the explanation to the last message in the agent's memory
     if (this.messages.length > 0) {
       const lastMessage = this.messages[this.messages.length - 1];
       if (lastMessage.role === 'assistant') {
@@ -177,6 +211,7 @@ Provide a brief overview of what the code does and how it utilizes the CSV data.
       }
     }
   }
+
 
   private buildChatHistory(): any[] {
     return this.messages.map(message => ({
