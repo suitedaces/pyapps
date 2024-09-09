@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Sandbox } from 'e2b';
 
-const SANDBOX_LIFETIME = 5 * 60 * 1000; // Extended to 5 minutes
+const SANDBOX_LIFETIME = 5 * 60 * 1000; // 5 minutes
 const sandboxes = new Map<string, Sandbox>();
 
 async function getSandbox(id?: string): Promise<Sandbox> {
