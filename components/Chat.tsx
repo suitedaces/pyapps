@@ -119,13 +119,13 @@ export function Chat({
   );
 
   return (
-    <div className="flex flex-col h-full dark:border-darkBorder rounded-base bg-darkText dark:bg-darkBg text-text dark:text-darkText">
+    <div className="flex flex-col h-full dark:border-darkBorder rounded-3xl border-2 border-border bg-darkText dark:bg-darkBg text-text dark:text-darkText">
       <ScrollArea className="flex-grow p-4 space-y-4" onScroll={handleScroll}>
         {messages.map((message, index) => (
-        //   <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-        //     <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
-        <div key={index} className={`flex justify-start mb-4`}>
-            <div className={`flex flex-row items-start max-w-[80%]`}>
+        // <div key={index} className={`flex justify-start mb-4`}>
+        //     <div className={`flex flex-row items-start max-w-[80%]`}>
+           <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+             <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
               <Avatar className={`w-8 h-8 ${message.role === 'user' ? 'bg-blue' : 'bg-main'} border-2 border-border flex-shrink-0`}>
                 <AvatarFallback>{message.role === 'user' ? 'U' : 'G'}</AvatarFallback>
               </Avatar>
