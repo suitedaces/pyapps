@@ -8,10 +8,12 @@ import { CodeView } from '@/components/CodeView'
 import { useChat } from '@/hooks/useChat'
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from "@/components/ui/button"
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 import SVG from 'react-inlinesvg'
+import { Children } from 'react'
 
-export default function Home() {
+export default function Home({children}) {
     const {
         messages,
         input,
@@ -93,7 +95,12 @@ export default function Home() {
                         <CodeView
                             code={generatedCode}
                             isGeneratingCode={isGeneratingCode}
-                        />
+                        >
+                            <ScrollArea>
+                                {children}
+                            </ScrollArea>
+
+                        </CodeView>
                     </TabsContent>
                 </Tabs>
             </SheetContent>
