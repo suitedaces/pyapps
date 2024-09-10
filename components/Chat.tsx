@@ -131,7 +131,7 @@ export function Chat({
               </Avatar>
               <div className={`mx-2 p-4 rounded-base ${
                 message.role === 'assistant'
-                  ? 'bg-bg'
+                  ? 'bg-main'
                   : 'bg-bg'
               } text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out`}>
               {/* } text-text dark:text-darkText border-2 border-border break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none`}> */}
