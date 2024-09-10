@@ -2,15 +2,27 @@ import { createClient } from '@supabase/supabase-js'
 import { Database } from './database.types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseServiceKey) {
+if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
+export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+
+export const getSupabaseClient = (accessToken?: string) => {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: accessToken
+        ? { Authorization: `Bearer ${accessToken}` }
+        : {},
+    },
+  });
+}
+
 
 export async function getSupabaseUserId(auth0UserId: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('users')
     .select('id')
@@ -22,6 +34,7 @@ export async function getSupabaseUserId(auth0UserId: string) {
 }
 
 export async function getUserProfile(auth0UserId: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('users')
     .select('*')
@@ -33,6 +46,7 @@ export async function getUserProfile(auth0UserId: string) {
 }
 
 export async function updateUserProfile(userId: string, updates: Partial<Database['public']['Tables']['users']['Update']>) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('users')
     .update(updates)
@@ -44,6 +58,7 @@ export async function updateUserProfile(userId: string, updates: Partial<Databas
 }
 
 export async function createChat(userId: string, name: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('chats')
     .insert({ user_id: userId, name })
@@ -54,6 +69,7 @@ export async function createChat(userId: string, name: string) {
 }
 
 export async function getUserChats(userId: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('chats')
     .select('*')
@@ -65,6 +81,7 @@ export async function getUserChats(userId: string) {
 }
 
 export async function addMessage(chatId: string, userId: string, content: string, role: 'user' | 'assistant') {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('messages')
     .insert({ chat_id: chatId, user_id: userId, content, role })
@@ -75,6 +92,7 @@ export async function addMessage(chatId: string, userId: string, content: string
 }
 
 export async function createApp(userId: string, name: string, description: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('apps')
     .insert({ user_id: userId, name, description })
@@ -85,6 +103,7 @@ export async function createApp(userId: string, name: string, description: strin
 }
 
 export async function getUserApps(userId: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('apps')
     .select('*')
@@ -96,6 +115,7 @@ export async function getUserApps(userId: string) {
 }
 
 export async function updateApp(appId: string, userId: string, updates: Partial<Database['public']['Tables']['apps']['Update']>) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('apps')
     .update(updates)
@@ -108,6 +128,7 @@ export async function updateApp(appId: string, userId: string, updates: Partial<
 }
 
 export async function deleteApp(appId: string, userId: string) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('apps')
     .delete()
@@ -118,6 +139,7 @@ export async function deleteApp(appId: string, userId: string) {
 }
 
 export async function createAppVersion(appId: string, versionNumber: number, codeContent: string, metadata: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('app_versions')
     .insert({ app_id: appId, version_number: versionNumber, code_content: codeContent, metadata })
@@ -128,6 +150,7 @@ export async function createAppVersion(appId: string, versionNumber: number, cod
 }
 
 export async function uploadFile(userId: string, fileName: string, fileType: string, fileSize: number, fileUrl: string, analysis?: any) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('files')
     .insert({ user_id: userId, file_name: fileName, file_type: fileType, file_size: fileSize, file_url: fileUrl, analysis })
@@ -138,6 +161,7 @@ export async function uploadFile(userId: string, fileName: string, fileType: str
 }
 
 export async function getUserFiles(userId: string) {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('files')
     .select('*')
@@ -149,6 +173,7 @@ export async function getUserFiles(userId: string) {
 }
 
 export async function deleteFile(fileId: string, userId: string) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('files')
     .delete()
@@ -159,8 +184,21 @@ export async function deleteFile(fileId: string, userId: string) {
 }
 
 export function subscribeToChat(chatId: string, callback: (payload: any) => void) {
+  const supabase = getSupabaseClient();
   return supabase
     .channel(`chat:${chatId}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, callback)
     .subscribe()
+}
+
+export async function createUserInDatabase(email: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('users')
+    .insert({ email })
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data
 }

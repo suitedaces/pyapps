@@ -1,10 +1,31 @@
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Github } from 'lucide-react'
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useEffect, useState } from 'react'
+import { Session } from '@supabase/supabase-js'
 
 export function Navbar() {
-  const { user, error, isLoading } = useUser();
+  const [session, setSession] = useState<Session | null>(null)
+  const supabase = createClientComponentClient()
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+  }
 
   return (
     <nav className="border-b border-gray-700 bg-gray-900">
@@ -18,21 +39,17 @@ export function Navbar() {
               <Github className="mr-2 h-4 w-4" />
               Star on GitHub
             </Button>
-            {isLoading ? (
-              <p>Loading...</p>
-            ) : error ? (
-              <p>Error: {error.message}</p>
-            ) : user ? (
+            {session ? (
               <div className="flex items-center">
-                <span className="text-white mr-4">{user.name}</span>
-                <a href="/api/auth/logout" className="text-white hover:text-gray-300">
+                <span className="text-white mr-4">{session.user.email}</span>
+                <button onClick={handleSignOut} className="text-white hover:text-gray-300">
                   Logout
-                </a>
+                </button>
               </div>
             ) : (
-              <a href="/api/auth/login" className="text-white hover:text-gray-300">
+              <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} className="text-white hover:text-gray-300">
                 Login
-              </a>
+              </button>
             )}
           </div>
         </div>

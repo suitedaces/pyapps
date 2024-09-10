@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@auth0/nextjs-auth0';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { analyzeCSV } from '@/lib/csvAnalyzer';
-import { getSupabaseUserId, uploadFile } from '@/lib/supabase';
+import { uploadFile } from '@/lib/supabase';
 
 export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session?.user) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -16,11 +19,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const supabaseUserId = await getSupabaseUserId(session.user.sub!);
+    const userId = session.user.id;
     const analysis = await analyzeCSV(csvContent);
 
     const file = await uploadFile(
-      supabaseUserId,
+      userId,
       fileName,
       'csv',
       Buffer.from(csvContent).length,

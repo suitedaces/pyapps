@@ -12,6 +12,7 @@ export interface Database {
       users: {
         Row: {
           id: string
+          auth0_id: string
           email: string
           full_name: string | null
           avatar_url: string | null
@@ -19,10 +20,10 @@ export interface Database {
           provider_id: string | null
           created_at: string
           updated_at: string
-          auth0_id: string
         }
         Insert: {
-          id: string
+          id?: string
+          auth0_id: string
           email: string
           full_name?: string | null
           avatar_url?: string | null
@@ -30,10 +31,10 @@ export interface Database {
           provider_id?: string | null
           created_at?: string
           updated_at?: string
-          auth0_id: string
         }
         Update: {
           id?: string
+          auth0_id?: string
           email?: string
           full_name?: string | null
           avatar_url?: string | null
@@ -41,7 +42,6 @@ export interface Database {
           provider_id?: string | null
           created_at?: string
           updated_at?: string
-          auth0_id?: string
         }
       }
       files: {

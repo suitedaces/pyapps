@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Message, StreamChunk } from '@/lib/types';
-import { useUser } from '@auth0/nextjs-auth0/client';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Session } from '@supabase/supabase-js'
 
 interface SandboxError {
   message: string;
@@ -8,10 +9,11 @@ interface SandboxError {
 }
 
 export function useChat() {
-  const { user, error: userError, isLoading: userLoading } = useUser();
+  const [session, setSession] = useState<Session | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const supabase = createClientComponentClient()
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [csvContent, setCsvContent] = useState<string | null>(null);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null);
@@ -22,45 +24,63 @@ export function useChat() {
   const [sandboxErrors, setSandboxErrors] = useState<SandboxError[]>([]);
   const [sandboxId, setSandboxId] = useState<string | null>(null);
 
-  const initializeSandbox = useCallback(async () => {
-    try {
-      const response = await fetch('/api/sandbox', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'initialize' }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setSandboxId(data.sandboxId);
-      console.log('Sandbox initialized with ID:', data.sandboxId);
-    } catch (error) {
-      console.error('Error initializing sandbox:', error);
-      setSandboxErrors(prev => [...prev, { 
-        message: 'Error initializing sandbox', 
-        traceback: error instanceof Error ? error.message : String(error) 
-      }]);
-    }
-  }, []);
-
   useEffect(() => {
-    if (user) {
-      initializeSandbox();
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setIsLoading(false)
+    })
 
-    return () => {
-      if (sandboxId) {
-        fetch('/api/sandbox', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'close', sandboxId }),
-        }).catch(error => console.error('Error closing sandbox:', error));
-      }
-    };
-  }, [user]);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setIsLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase.auth])
+
+
+
+  // const initializeSandbox = useCallback(async () => {
+  //   try {
+  //     const response = await fetch('/api/sandbox', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ action: 'initialize' }),
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+
+  //     const data = await response.json();
+  //     setSandboxId(data.sandboxId);
+  //     console.log('Sandbox initialized with ID:', data.sandboxId);
+  //   } catch (error) {
+  //     console.error('Error initializing sandbox:', error);
+  //     setSandboxErrors(prev => [...prev, { 
+  //       message: 'Error initializing sandbox', 
+  //       traceback: error instanceof Error ? error.message : String(error) 
+  //     }]);
+  //   }
+  // }, []);
+
+  // useEffect(() => {
+  //   if (user) {
+  //     // initializeSandbox();
+  //   }
+
+  //   return () => {
+  //     if (sandboxId) {
+  //       fetch('/api/sandbox', {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({ action: 'close', sandboxId }),
+  //       }).catch(error => console.error('Error closing sandbox:', error));
+  //     }
+  //   };
+  // }, [user]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
@@ -145,17 +165,12 @@ export function useChat() {
   }, [processStreamChunk]);
 
   const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
-    if (userLoading) {
+    if (isLoading) {
       console.log('User authentication is still loading...');
       return;
     }
 
-    if (userError) {
-      console.error('Error in user authentication:', userError);
-      return;
-    }
-
-    if (!user) {
+    if (!session) {
       console.error('User not authenticated');
       return;
     }
@@ -171,7 +186,10 @@ export function useChat() {
 
       const response = await fetch(apiEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName }),
       });
 
@@ -219,7 +237,8 @@ export function useChat() {
       setStreamingMessage('');
       setIsGeneratingCode(false);
     }
-  }, [user, userError, userLoading, csvContent, csvFileName, processStream, updateStreamlitApp, codeExplanation]);
+  }, [session, isLoading, csvContent, csvFileName, processStream, updateStreamlitApp, codeExplanation]);
+
 
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -237,10 +256,6 @@ export function useChat() {
   }, [input, handleChatOperation]);
 
   const handleFileUpload = useCallback(async (content: string, fileName: string) => {
-    if (!user) {
-      console.error('User not authenticated');
-      return;
-    }
 
     const sanitizeCSVContent = (content: string): string => {
       return content
@@ -311,7 +326,7 @@ Can you analyze it and create a Streamlit app to visualize the data? Make sure t
         traceback: error instanceof Error ? error.message : String(error) 
       }]);
     }
-  }, [user, handleChatOperation]);
+  }, [handleChatOperation]);
 
   return {
     messages,
@@ -329,8 +344,5 @@ Can you analyze it and create a Streamlit app to visualize the data? Make sure t
     streamingCodeExplanation: codeExplanation,
     sandboxErrors,
     sandboxId,
-    user,
-    userError,
-    userLoading,
   };
 }

@@ -1,16 +1,20 @@
-import { NextResponse } from 'next/server';
-import { getSession } from '@auth0/nextjs-auth0';
-import { supabase, getSupabaseUserId, createApp, getUserApps, updateApp, deleteApp } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { createApp, getUserApps, updateApp, deleteApp } from '@/lib/supabase';
 
-export async function GET(req: Request) {
-  const session = await getSession();
-  if (!session?.user) {
+
+export async function GET(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   try {
-    const supabaseUserId = await getSupabaseUserId(session.user.sub!);
-    const apps = await getUserApps(supabaseUserId);
+    const userId = session.user.id;
+    const apps = await getUserApps(userId);
     return NextResponse.json(apps);
   } catch (error) {
     console.error('Failed to fetch apps:', error);
@@ -18,9 +22,11 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session?.user) {
+export async function POST(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
@@ -31,8 +37,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const supabaseUserId = await getSupabaseUserId(session.user.sub!);
-    const newApp = await createApp(supabaseUserId, name, description);
+    const userId = session.user.id;
+    const newApp = await createApp(userId, name, description);
     return NextResponse.json(newApp);
   } catch (error) {
     console.error('Failed to create app:', error);
@@ -40,17 +46,19 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PUT(req: Request) {
-  const session = await getSession();
-  if (!session?.user) {
+export async function PUT(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   const { appId, updates } = await req.json();
 
   try {
-    const supabaseUserId = await getSupabaseUserId(session.user.sub!);
-    const updatedApp = await updateApp(appId, supabaseUserId, updates);
+    const userId = session.user.id;
+    const updatedApp = await updateApp(appId, userId, updates);
     return NextResponse.json(updatedApp);
   } catch (error) {
     console.error('Failed to update app:', error);
@@ -58,17 +66,19 @@ export async function PUT(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
-  const session = await getSession();
-  if (!session?.user) {
+export async function DELETE(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
   const { appId } = await req.json();
 
   try {
-    const supabaseUserId = await getSupabaseUserId(session.user.sub!);
-    await deleteApp(appId, supabaseUserId);
+    const userId = session.user.id;
+    await deleteApp(appId, userId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to delete app:', error);
