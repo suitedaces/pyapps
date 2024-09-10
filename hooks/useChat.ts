@@ -42,45 +42,43 @@ export function useChat() {
 
 
 
-  // const initializeSandbox = useCallback(async () => {
-  //   try {
-  //     const response = await fetch('/api/sandbox', {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({ action: 'initialize' }),
-  //     });
+  const initializeSandbox = useCallback(async () => {
+    try {
+      const response = await fetch('/api/sandbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'initialize' }),
+      });
 
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-  //     const data = await response.json();
-  //     setSandboxId(data.sandboxId);
-  //     console.log('Sandbox initialized with ID:', data.sandboxId);
-  //   } catch (error) {
-  //     console.error('Error initializing sandbox:', error);
-  //     setSandboxErrors(prev => [...prev, { 
-  //       message: 'Error initializing sandbox', 
-  //       traceback: error instanceof Error ? error.message : String(error) 
-  //     }]);
-  //   }
-  // }, []);
+      const data = await response.json();
+      setSandboxId(data.sandboxId);
+      console.log('Sandbox initialized with ID:', data.sandboxId);
+    } catch (error) {
+      console.error('Error initializing sandbox:', error);
+      setSandboxErrors(prev => [...prev, { 
+        message: 'Error initializing sandbox', 
+        traceback: error instanceof Error ? error.message : String(error) 
+      }]);
+    }
+  }, []);
 
-  // useEffect(() => {
-  //   if (user) {
-  //     // initializeSandbox();
-  //   }
+  useEffect(() => {
+    initializeSandbox();
 
-  //   return () => {
-  //     if (sandboxId) {
-  //       fetch('/api/sandbox', {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json' },
-  //         body: JSON.stringify({ action: 'close', sandboxId }),
-  //       }).catch(error => console.error('Error closing sandbox:', error));
-  //     }
-  //   };
-  // }, [user]);
+    return () => {
+      if (sandboxId) {
+        fetch('/api/sandbox', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'close', sandboxId }),
+        }).catch(error => console.error('Error closing sandbox:', error));
+      }
+    };
+  }, []);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
