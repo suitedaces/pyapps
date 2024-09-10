@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Message, StreamChunk } from '@/lib/types';
+import { useUser } from '@auth0/nextjs-auth0/client';
 
 interface SandboxError {
   message: string;
@@ -7,6 +8,7 @@ interface SandboxError {
 }
 
 export function useChat() {
+  const { user, error: userError, isLoading: userLoading } = useUser();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +47,9 @@ export function useChat() {
   }, []);
 
   useEffect(() => {
-    initializeSandbox();
+    if (user) {
+      initializeSandbox();
+    }
 
     return () => {
       if (sandboxId) {
@@ -56,7 +60,7 @@ export function useChat() {
         }).catch(error => console.error('Error closing sandbox:', error));
       }
     };
-  }, []);
+  }, [user]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
@@ -96,7 +100,6 @@ export function useChat() {
       console.error('Generated code not available or sandbox not initialized');
     }
   }, [sandboxId]);
-
 
   const processStreamChunk = useCallback((chunk: string, accumulatedResponse: string, accumulatedCode: string) => {
     try {
@@ -142,8 +145,18 @@ export function useChat() {
   }, [processStreamChunk]);
 
   const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
-    if (!sandboxId) {
-      console.error('Sandbox not initialized');
+    if (userLoading) {
+      console.log('User authentication is still loading...');
+      return;
+    }
+
+    if (userError) {
+      console.error('Error in user authentication:', userError);
+      return;
+    }
+
+    if (!user) {
+      console.error('User not authenticated');
       return;
     }
 
@@ -159,7 +172,7 @@ export function useChat() {
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName, sandboxId }),
+        body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName }),
       });
 
       if (!response.ok) {
@@ -206,7 +219,7 @@ export function useChat() {
       setStreamingMessage('');
       setIsGeneratingCode(false);
     }
-  }, [sandboxId, csvContent, csvFileName, processStream, updateStreamlitApp, codeExplanation]);
+  }, [user, userError, userLoading, csvContent, csvFileName, processStream, updateStreamlitApp, codeExplanation]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -224,8 +237,8 @@ export function useChat() {
   }, [input, handleChatOperation]);
 
   const handleFileUpload = useCallback(async (content: string, fileName: string) => {
-    if (!sandboxId) {
-      console.error('Sandbox not initialized');
+    if (!user) {
+      console.error('User not authenticated');
       return;
     }
 
@@ -252,14 +265,12 @@ export function useChat() {
   
     setCsvContent(content);
     setCsvFileName(fileName);
-
-    console.log(`YOOOO ${fileName} ${content.length.toString()} ${sandboxId}`);
   
     try {
-      const response = await fetch('/api/sandbox', {
+      const response = await fetch('/api/csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'uploadFile', fileName, fileContent: content, sandboxId }),
+        body: JSON.stringify({ csvContent: content, fileName }),
       });
 
       if (!response.ok) {
@@ -267,7 +278,7 @@ export function useChat() {
       }
 
       const data = await response.json();
-      console.log('File uploaded to:', data.path);
+      console.log('CSV analyzed and stored:', data);
 
       const newUserMessage: Message = {
         role: 'user',
@@ -281,7 +292,6 @@ Can you analyze it and create a Streamlit app to visualize the data? Make sure t
         created_at: new Date()
       };
 
-      // Update messages state with the new user message
       setMessages(prev => [...prev, newUserMessage]);
 
       await handleChatOperation(newUserMessage, '/api/chat');
@@ -301,7 +311,7 @@ Can you analyze it and create a Streamlit app to visualize the data? Make sure t
         traceback: error instanceof Error ? error.message : String(error) 
       }]);
     }
-  }, [sandboxId, handleChatOperation]);
+  }, [user, handleChatOperation]);
 
   return {
     messages,
@@ -319,5 +329,8 @@ Can you analyze it and create a Streamlit app to visualize the data? Make sure t
     streamingCodeExplanation: codeExplanation,
     sandboxErrors,
     sandboxId,
+    user,
+    userError,
+    userLoading,
   };
 }

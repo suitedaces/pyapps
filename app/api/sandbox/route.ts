@@ -1,13 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { getSession } from '@auth0/nextjs-auth0';
 import { Sandbox } from 'e2b';
+import { getSupabaseUserId, createAppVersion } from '@/lib/supabase';
+import { NextRequest } from 'next/server';
 
-const SANDBOX_LIFETIME = 5 * 60 * 1000; // Extended to 5 minutes
+const SANDBOX_LIFETIME = 5 * 60 * 1000; // 5 minutes
 const sandboxes = new Map<string, Sandbox>();
 
 async function getSandbox(id?: string): Promise<Sandbox> {
   if (id && sandboxes.has(id)) {
     const sandbox = sandboxes.get(id)!;
-    await sandbox.keepAlive(SANDBOX_LIFETIME); // Refresh the sandbox lifetime
+    await sandbox.keepAlive(SANDBOX_LIFETIME);
     return sandbox;
   }
 
@@ -24,9 +27,15 @@ async function getSandbox(id?: string): Promise<Sandbox> {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getSession();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
   const { action, code, fileName, fileContent, sandboxId } = await request.json();
 
   try {
+    const supabaseUserId = await getSupabaseUserId(session.user.sub!);
     let sandbox: Sandbox;
 
     switch (action) {
@@ -55,6 +64,10 @@ export async function POST(request: NextRequest) {
         console.log('Streamlit process started');
         const url = sandbox.getHostname(8501);
         console.log('Streamlit URL:', url);
+        
+        // Save the new app version
+        await createAppVersion(sandboxId, 1, code, { url });
+        
         return NextResponse.json({ url: 'https://' + url });
 
       case 'uploadFile':

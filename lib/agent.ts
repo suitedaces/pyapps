@@ -31,7 +31,6 @@ export class GruntyAgent {
     csvAnalysis?: CSVAnalysis
   ): AsyncGenerator<StreamChunk> {
     const messages = this.buildChatHistory();
-    console.log('Chat history before the stream:', this.messages);
     const userMessage: Message = { 
       role: 'user', 
       content: latestMessage, 
@@ -57,7 +56,6 @@ export class GruntyAgent {
     let generatedCode = '';
   
     for await (const event of stream) {
-      console.log('Received stream chunk:', event);
       yield event as StreamChunk;
   
       if (event.type === 'message_start') {
@@ -77,7 +75,6 @@ export class GruntyAgent {
           currentContentBlock.input = accumulatedJson;
           currentMessage.content.push(currentContentBlock);
           if (currentContentBlock.name === 'create_streamlit_app') {
-            console.log('Generating Streamlit code for:', currentContentBlock);
             try {
               const toolInput = JSON.parse(accumulatedJson);
               const codeQuery = `
@@ -91,16 +88,11 @@ export class GruntyAgent {
                 type: 'generated_code',
                 content: generatedCode,
               } as unknown as StreamChunk;
-
-              // Stream the code explanation
-              // commenting out the code explanation for now till we figure out the interface
-              // yield* this.streamExplanation(generatedCode, tools, temperature, maxTokens);
-
             } catch (error) {
-              console.error('Error parsing JSON, generating Streamlit code, or explaining code:', error);
+              console.error('Error parsing JSON or generating Streamlit code:', error);
               yield {
                 type: 'error',
-                content: 'Error in code generation or explanation process',
+                content: 'Error in code generation process',
               } as unknown as StreamChunk;
             }
           }
@@ -109,14 +101,12 @@ export class GruntyAgent {
       } else if (event.type === 'message_delta') {
         Object.assign(currentMessage, event.delta);
       } else if (event.type === 'message_stop') {
-        // combine all generated content into a single assistant message
         let fullResponse = accumulatedResponse;
 
         if (generatedCode) {
           fullResponse += `\n\nI've generated the following Streamlit code based on your request:\n\n\`\`\`python\n${generatedCode}\n\`\`\``;
         }
 
-        // update the agent's memory with the full response
         this.messages.push({
           role: 'assistant',
           content: fullResponse.trim(),
@@ -135,7 +125,6 @@ export class GruntyAgent {
     }
   }
 
-  // ensuring alternating messages between user and assistant
   private ensureAlternatingMessages(messages: Message[]): any[] {
     if (messages.length === 0) return [];
 
@@ -147,7 +136,6 @@ export class GruntyAgent {
       
       if (message.role === 'user') {
         if (lastRole === 'user') {
-          // Combine consecutive user messages
           result[result.length - 1].content += '\n\n' + message.content;
         } else {
           result.push(message);
@@ -159,7 +147,6 @@ export class GruntyAgent {
       }
     }
 
-    // Ensure the last message is from the user
     if (result.length > 0 && result[result.length - 1].role === 'assistant') {
       result.pop();
     }
@@ -169,8 +156,6 @@ export class GruntyAgent {
       content: message.content,
     }));
   }
-
-
 
 
   private async *streamExplanation(

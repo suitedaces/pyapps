@@ -1,10 +1,13 @@
-import { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+import { getSession } from '@auth0/nextjs-auth0';
 import { Anthropic } from '@anthropic-ai/sdk';
 import { GruntyAgent } from '@/lib/agent';
 import { tools } from '@/lib/tools';
 import { analyzeCSV } from '@/lib/csvAnalyzer';
 import { CSVAnalysis, StreamChunk } from '@/lib/types';
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts';
+import { getSupabaseUserId, createChat, addMessage } from '@/lib/supabase';
+import { NextRequest } from 'next/server';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -24,11 +27,18 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
 
   try {
+    const session = await getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const { messages, csvContent, csvFileName } = await request.json();
 
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new Error('Invalid or empty messages array');
     }
+
+    const supabaseUserId = await getSupabaseUserId(session.user.sub!);
 
     let csvAnalysis: CSVAnalysis | undefined;
     if (csvContent) {
@@ -38,6 +48,7 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          const chat = await createChat(supabaseUserId, "New Chat");
           const chatGenerator = agent.chat(
             messages[messages.length - 1].content,
             tools,
@@ -48,6 +59,10 @@ export async function POST(request: NextRequest) {
 
           for await (const chunk of chatGenerator) {
             controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
+            
+            if (chunk.type === 'content_block_delta' && chunk.delta?.type === 'text_delta') {
+              await addMessage(chat.id, supabaseUserId, chunk.delta.text, 'assistant');
+            }
           }
 
           controller.close();
