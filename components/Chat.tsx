@@ -73,8 +73,8 @@ export function Chat({
           }
 
           return (
-            <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 shadow-light dark:shadow-dark w-full">
-              <div className="flex items-center justify-between px-4 py-2 bg-main">
+            <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 border-border border-2 dark:shadow-dark w-full">
+              <div className="flex items-center justify-between px-4 py-2 bg-bg">
                 <div className="flex items-center">
                   <Code className="w-5 h-5 mr-2 text-text dark:text-darkText" />
                   <span className="text-sm font-medium text-text dark:text-darkText">{lang.toUpperCase() || 'Code'}</span>
@@ -122,16 +122,19 @@ export function Chat({
     <div className="flex flex-col h-full dark:border-darkBorder rounded-base bg-darkText dark:bg-darkBg text-text dark:text-darkText">
       <ScrollArea className="flex-grow p-4 space-y-4" onScroll={handleScroll}>
         {messages.map((message, index) => (
-          <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-            <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback>{message.role === 'user' ? 'U' : 'A'}</AvatarFallback>
+        //   <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+        //     <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
+        <div key={index} className={`flex justify-start mb-4`}>
+            <div className={`flex flex-row items-start max-w-[80%]`}>
+              <Avatar className={`w-8 h-8 ${message.role === 'user' ? 'bg-blue' : 'bg-main'} border-2 border-border flex-shrink-0`}>
+                <AvatarFallback>{message.role === 'user' ? 'U' : 'G'}</AvatarFallback>
               </Avatar>
               <div className={`mx-2 p-4 rounded-base ${
                 message.role === 'assistant'
-                  ? 'bg-main'
-                  : 'bg-secondaryBlack'
-              } text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none`}>
+                  ? 'bg-bg'
+                  : 'bg-bg'
+              } text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out`}>
+              {/* } text-text dark:text-darkText border-2 border-border break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none`}> */}
                 {renderMessage(message.content)}
               </div>
             </div>
@@ -140,8 +143,8 @@ export function Chat({
         {streamingMessage && (
           <div className="flex justify-start mb-4">
             <div className="flex flex-row items-start max-w-[80%]">
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback>A</AvatarFallback>
+              <Avatar className="w-8 h-8 bg-main flex-shrink-0">
+                <AvatarFallback>G</AvatarFallback>
               </Avatar>
               <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
                 {renderMessage(streamingMessage)}
@@ -152,8 +155,8 @@ export function Chat({
         {streamingCodeExplanation && (
           <div className="flex justify-start mb-4">
             <div className="flex flex-row items-start max-w-[80%]">
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback>A</AvatarFallback>
+              <Avatar className="w-8 bg-main h-8 flex-shrink-0">
+                <AvatarFallback>G</AvatarFallback>
               </Avatar>
               <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
                 {renderMessage(streamingCodeExplanation)}
