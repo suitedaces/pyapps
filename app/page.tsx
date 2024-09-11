@@ -12,6 +12,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 import SVG from 'react-inlinesvg'
 import { Children } from 'react'
+import { Metadata } from '@/components/Metadata'
+import { Spreadsheet } from '@/components/Spreadsheet'
+import Sidebar from '@/components/Sidebar'
 
 export default function Home({ children }) {
     const {
@@ -21,6 +24,7 @@ export default function Home({ children }) {
         handleSubmit,
         isLoading,
         handleFileUpload,
+        csvFileName,
         streamlitUrl,
         generatedCode,
         streamingMessage,
@@ -36,10 +40,19 @@ export default function Home({ children }) {
         </SheetTrigger>
     );
 
+    const truncateFileName = (fileName: string, maxLength: number) => {
+        if (fileName.length <= maxLength) return fileName;
+        const extension = fileName.split('.').pop();
+        const nameWithoutExtension = fileName.slice(0, fileName.lastIndexOf('.'));
+        const truncatedName = nameWithoutExtension.slice(0, maxLength - extension.length - 3);
+        return `${truncatedName}...${extension}`;
+    };
+
     return (
         // <Sheet>
         <div className="flex flex-col min-h-screen  bg-bg text-white">
             {/* <Navbar sheetTrigger={sheetTrigger} /> */}
+            <Sidebar />
             <Navbar />
             <main className="flex-grow flex flex-col lg:flex-row overflow-hidden justify-center">
                 <div className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]">
@@ -57,19 +70,22 @@ export default function Home({ children }) {
                 <div className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
                     <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
                         <SheetHeader>
-                            <TabsList className="grid w-full grid-cols-4 mb-4">
-                                <TabsTrigger value="meta">Metadata</TabsTrigger>
-                                <TabsTrigger value="spreadsheet">Spreadsheet</TabsTrigger>
+                            <TabsList className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
+                                {csvFileName && (
+                                    <TabsTrigger value="file">
+                                        {truncateFileName(csvFileName, 20)}
+                                    </TabsTrigger>
+                                )}
                                 <TabsTrigger value="preview">App</TabsTrigger>
                                 <TabsTrigger value="code">Code</TabsTrigger>
                             </TabsList>
                         </SheetHeader>
-                        <TabsContent value="meta" className="flex-grow">
-                            Metadata Content
-                        </TabsContent>
-                        <TabsContent value="spreadsheet" className="flex-grow">
-                            Spreadsheet Content
-                        </TabsContent>
+                        {csvFileName && (
+                            <TabsContent value="file" className="flex-grow">
+                                <Metadata />
+                                <Spreadsheet />
+                            </TabsContent>
+                        )}
                         <TabsContent value="preview" className="flex-grow">
                             <StreamlitPreview url={streamlitUrl} isGeneratingCode={isGeneratingCode} />
                         </TabsContent>

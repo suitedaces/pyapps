@@ -14,6 +14,7 @@ module.exports = {
         mainAccent: '#ffc800', // not needed for shadcn components
         overlay: 'rgba(0,0,0,0.8)', // background color overlay for alert dialogs, modals, etc.
         blue: '#AF79FF',
+        matte: '#212121',
 
         // light mode
         bg: '#F0EFE9',
