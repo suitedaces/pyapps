@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus, Menu, User, Settings } from 'lucide-react'
+import { Settings, SidebarIcon } from 'lucide-react'
 import Link from 'next/link'
 
 export default function Sidebar() {
@@ -29,7 +29,7 @@ export default function Sidebar() {
         size="icon"
         // variant="outline"
       >
-        <Menu className="h-4 w-4" />
+        <SidebarIcon className="h-4 w-4" />
         <span className="sr-only">Toggle Sidebar</span>
       </Button>
 
