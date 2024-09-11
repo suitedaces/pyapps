@@ -63,21 +63,21 @@ export function Chat({
           const match = /language-(\w+)/.exec(className || '')
           const lang = match && match[1] ? match[1] : ''
           const codeString = String(children).replace(/\n$/, '')
-          
+
           if (inline) {
             return (
-              <code className="px-1 py-0.5 rounded-md bg-muted text-muted-foreground text-sm font-mono" {...props}>
+              <code className="px-1 py-0.5 rounded-base bg-bg dark:bg-darkBg text-text dark:text-darkText text-sm font-mono" {...props}>
                 {codeString}
               </code>
             )
           }
-          
+
           return (
-            <div className="rounded-xl overflow-hidden bg-muted my-4 shadow-lg w-full">
-              <div className="flex items-center justify-between px-4 py-2 bg-slate-400">
+            <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 border-border border-2 dark:shadow-dark w-full">
+              <div className="flex items-center justify-between px-4 py-2 bg-bg">
                 <div className="flex items-center">
-                  <Code className="w-5 h-5 mr-2 text-accent-foreground" />
-                  <span className="text-sm font-medium text-accent-foreground">{lang.toUpperCase() || 'Code'}</span>
+                  <Code className="w-5 h-5 mr-2 text-text dark:text-darkText" />
+                  <span className="text-sm font-medium text-text dark:text-darkText">{lang.toUpperCase() || 'Code'}</span>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -105,12 +105,12 @@ export function Chat({
         ol: ({children}) => <ol className="list-decimal list-outside pl-6 mb-2">{children}</ol>,
         li: ({children}) => (
           <li className="mb-1">
-            {React.Children.map(children, child => 
+            {React.Children.map(children, child =>
               typeof child === 'string' ? <span>{child}</span> : child
             )}
           </li>
         ),
-        blockquote: ({children}) => <blockquote className="border-l-4 border-accent pl-4 italic mb-2">{children}</blockquote>,
+        blockquote: ({children}) => <blockquote className="border-l-4 border-main pl-4 italic mb-2">{children}</blockquote>,
       }}
       className="prose prose-invert max-w-none"
     >
@@ -119,19 +119,22 @@ export function Chat({
   );
 
   return (
-    <div className="flex flex-col h-full border border-border rounded-lg bg-background text-foreground">
+    <div className="flex flex-col h-full dark:border-darkBorder rounded-3xl border-2 border-border bg-darkText dark:bg-darkBg text-text dark:text-darkText">
       <ScrollArea className="flex-grow p-4 space-y-4" onScroll={handleScroll}>
         {messages.map((message, index) => (
-          <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-            <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback>{message.role === 'user' ? 'U' : 'A'}</AvatarFallback>
+        // <div key={index} className={`flex justify-start mb-4`}>
+        //     <div className={`flex flex-row items-start max-w-[80%]`}>
+           <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+             <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}>
+              <Avatar className={`w-8 h-8 ${message.role === 'user' ? 'bg-blue' : 'bg-main'} border-2 border-border flex-shrink-0`}>
+                <AvatarFallback>{message.role === 'user' ? 'U' : 'G'}</AvatarFallback>
               </Avatar>
-              <div className={`mx-2 p-4 rounded-3xl ${
-                message.role === 'assistant' 
-                  ? 'bg-gradient-to-r from-green-600 via-lime-600 to-yellow-600'
-                  : 'bg-gradient-to-r from-gray-800 via-slate-800 to-purple-900'
-              } text-white break-words overflow-hidden shadow-md transition-all duration-300 ease-in-out hover:shadow-lg`}>
+              <div className={`mx-2 p-4 rounded-base ${
+                message.role === 'assistant'
+                  ? 'bg-main'
+                  : 'bg-bg'
+              } text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out`}>
+              {/* } text-text dark:text-darkText border-2 border-border break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none`}> */}
                 {renderMessage(message.content)}
               </div>
             </div>
@@ -140,10 +143,10 @@ export function Chat({
         {streamingMessage && (
           <div className="flex justify-start mb-4">
             <div className="flex flex-row items-start max-w-[80%]">
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback>A</AvatarFallback>
+              <Avatar className="w-8 h-8 bg-main flex-shrink-0">
+                <AvatarFallback>G</AvatarFallback>
               </Avatar>
-              <div className="mx-2 p-4 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x text-white break-words overflow-hidden shadow-md transition-all duration-500 ease-in-out hover:shadow-lg">
+              <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
                 {renderMessage(streamingMessage)}
               </div>
             </div>
@@ -152,10 +155,10 @@ export function Chat({
         {streamingCodeExplanation && (
           <div className="flex justify-start mb-4">
             <div className="flex flex-row items-start max-w-[80%]">
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback>A</AvatarFallback>
+              <Avatar className="w-8 bg-main h-8 flex-shrink-0">
+                <AvatarFallback>G</AvatarFallback>
               </Avatar>
-              <div className="mx-2 p-4 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 animate-gradient-x text-white break-words overflow-hidden shadow-md transition-all duration-500 ease-in-out hover:shadow-lg">
+              <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
                 {renderMessage(streamingCodeExplanation)}
               </div>
             </div>
@@ -166,12 +169,12 @@ export function Chat({
       {!isAtBottom && (
         <Button
           onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
-          className="absolute bottom-20 right-8 bg-accent hover:bg-accent-foreground text-accent-foreground hover:text-accent rounded-full p-2 shadow-lg transition-all duration-300 ease-in-out"
+          className="absolute bottom-20 right-8 bg-main hover:bg-mainAccent text-text dark:text-darkText rounded-full p-2 shadow-light dark:shadow-dark transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none"
         >
           ↓
         </Button>
       )}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-border">
+      <form onSubmit={handleSubmit} className="p-4 dark:border-darkBorder">
         <div className="flex space-x-2">
           <div className="relative flex-grow">
             <Input
@@ -179,12 +182,12 @@ export function Chat({
               onChange={handleInputChange}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="pr-10 bg-input text-foreground placeholder-muted-foreground border-input focus:ring-2 focus:ring-accent transition-all duration-300 ease-in-out"
+              className="relative flex min-h-[70px] w-full rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-accent transition-colors duration-300 ease-in-out"
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text dark:text-darkText hover:text-main transition-colors duration-300 ease-in-out"
             >
               <Paperclip className="h-5 w-5" />
             </button>
@@ -195,14 +198,15 @@ export function Chat({
               onChange={handleFileChange}
               className="hidden"
             />
-          </div>
-          <Button 
-            type="submit" 
-            disabled={isLoading} 
-            className="bg-accent hover:bg-accent-foreground text-accent-foreground hover:text-accent transition-all duration-300 ease-in-out"
+          <Button
+            type="submit"
+            variant={"noShadow"}
+            disabled={isLoading}
+            className="absolute rounded-full right-5 bottom-4 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
+          </div>
         </div>
       </form>
     </div>
