@@ -10,66 +10,39 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border, 210, 15%, 25%))",
-        input: "hsl(var(--input, 210, 15%, 20%))",
-        ring: "hsl(var(--ring, 210, 15%, 30%))",
-        background: "hsl(var(--background, 210, 15%, 10%))",
-        foreground: "hsl(var(--foreground, 210, 15%, 90%))",
-        primary: {
-          DEFAULT: "hsl(var(--primary, 220, 90%, 56%))",  // Blue for primary buttons or elements
-          foreground: "hsl(var(--primary-foreground, 210, 15%, 95%))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary, 330, 100%, 60%))",  // Pink for secondary accents
-          foreground: "hsl(var(--secondary-foreground, 210, 15%, 95%))",
-        },
-        userMessage: {
-          DEFAULT: "#5e435d", 
-          foreground: "hsl(174, 80%, 95%)",
-        },
-        gradientStart: "#4F46E5", // Indigo
-        gradientMid: "#3B82F6", // Blue
-        gradientEnd: "#6366F1", // Lighter Indigo
-        destructive: {
-          DEFAULT: "hsl(var(--destructive, 0, 70%, 55%))",  // Red for warnings or destructive actions
-          foreground: "hsl(var(--destructive-foreground, 210, 15%, 95%))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted, 210, 15%, 40%))",  // Muted gray for subtle elements
-          foreground: "hsl(var(--muted-foreground, 210, 15%, 80%))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent, 50, 100%, 50%))",  // Yellow for highlights or alerts
-          foreground: "hsl(var(--accent-foreground, 210, 15%, 20%))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover, 210, 15%, 20%))",  // Dark gray for popovers
-          foreground: "hsl(var(--popover-foreground, 210, 15%, 90%))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card, 210, 15%, 15%))",  // Slightly lighter gray for cards
-          foreground: "hsl(var(--card-foreground, 210, 15%, 85%))",
-        },
+        main: '#FFDC58',
+        mainAccent: '#ffc800', // not needed for shadcn components
+        overlay: 'rgba(0,0,0,0.8)', // background color overlay for alert dialogs, modals, etc.
+        blue: '#AF79FF',
+        matte: '#212121',
+
+        // light mode
+        bg: '#F0EFE9',
+        text: '#000',
+        border: '#000',
+
+        // dark mode
+        darkBg: '#374151',
+        darkText: '#eeefe9',
+        darkBorder: '#000',
+        secondaryBlack: '#1b1b1b', // opposite of plain white, not used pitch black because borders and box-shadows are that color
       },
       borderRadius: {
-        lg: "var(--radius, 12px)",
-        md: "calc(var(--radius, 12px) - 2px)",
-        sm: "calc(var(--radius, 12px) - 4px)",
+        base: '15px'
       },
-      keyframes: {
-        'gradient-x': {
-          '0%, 100%': {
-            'background-size': '200% 200%',
-            'background-position': 'left center'
-          },
-          '50%': {
-            'background-size': '200% 200%',
-            'background-position': 'right center'
-          }
-        }
+      boxShadow: {
+        light: '4px 4px 0px 0px #000',
+        dark: '4px 4px 0px 0px #000',
       },
-      animation: {
-        'gradient-x': 'gradient-x 30s ease infinite',
+      translate: {
+        boxShadowX: '4px',
+        boxShadowY: '4px',
+        reverseBoxShadowX: '-4px',
+        reverseBoxShadowY: '-4px',
+      },
+      fontWeight: {
+        base: '500',
+        heading: '700',
       },
     },
   },
