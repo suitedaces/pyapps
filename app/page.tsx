@@ -1,5 +1,8 @@
 "use client"
 
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+
 import { Chat } from '@/components/Chat'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { Navbar } from '@/components/NavBar'
@@ -10,6 +13,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTrigger } from '@/components/ui/
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+
 import SVG from 'react-inlinesvg'
 import { Children } from 'react'
 import { Metadata } from '@/components/Metadata'
@@ -17,6 +22,8 @@ import { Spreadsheet } from '@/components/Spreadsheet'
 import Sidebar from '@/components/Sidebar'
 
 export default function Home({ children }) {
+    const [isRightContentVisible, setIsRightContentVisible] = useState(true)
+
     const {
         messages,
         input,
@@ -31,6 +38,10 @@ export default function Home({ children }) {
         streamingCodeExplanation,
         isGeneratingCode,
     } = useChat();
+
+    const toggleRightContent = () => {
+        setIsRightContentVisible(!isRightContentVisible)
+    }
 
     const sheetTrigger = (
         <SheetTrigger asChild>
@@ -52,10 +63,17 @@ export default function Home({ children }) {
         // <Sheet>
         <div className="flex flex-col min-h-screen  bg-bg text-white">
             {/* <Navbar sheetTrigger={sheetTrigger} /> */}
-            <Sidebar />
-            <Navbar />
+            <Sidebar isRightContentVisible={isRightContentVisible} setIsRightContentVisible={setIsRightContentVisible} />
+            <Navbar isRightContentVisible={isRightContentVisible} />
             <main className="flex-grow flex flex-col lg:flex-row overflow-hidden justify-center">
-                <div className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]">
+                <motion.div
+                    className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]"
+                    animate={{
+                        x: isRightContentVisible ? 0 : '50%',
+                    }}
+                    transition={{ type: "ease", stiffness: 300, damping: 30 }}
+                >
+                    {/* <div className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]"> */}
                     <Chat
                         messages={messages}
                         input={input}
@@ -66,20 +84,28 @@ export default function Home({ children }) {
                         streamingCodeExplanation={streamingCodeExplanation}
                         handleFileUpload={handleFileUpload}
                     />
-                </div>
-                <div className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
+                    {/* </div> */}
+                </motion.div>
+
+                {/* Right Content */}
+
+                <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{
+                        x: isRightContentVisible ? 0 : '100%',
+                    }}
+                    transition={{ type: "ease", stiffness: 300, damping: 30 }}
+                    className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
                     <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
-                        <SheetHeader>
-                            <TabsList className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
-                                {csvFileName && (
-                                    <TabsTrigger value="file">
-                                        {truncateFileName(csvFileName, 20)}
-                                    </TabsTrigger>
-                                )}
-                                <TabsTrigger value="preview">App</TabsTrigger>
-                                <TabsTrigger value="code">Code</TabsTrigger>
-                            </TabsList>
-                        </SheetHeader>
+                        <TabsList className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
+                            {csvFileName && (
+                                <TabsTrigger value="file">
+                                    {truncateFileName(csvFileName, 20)}
+                                </TabsTrigger>
+                            )}
+                            <TabsTrigger value="preview">App</TabsTrigger>
+                            <TabsTrigger value="code">Code</TabsTrigger>
+                        </TabsList>
                         {csvFileName && (
                             <TabsContent value="file" className="flex-grow">
                                 <Metadata />
@@ -101,7 +127,15 @@ export default function Home({ children }) {
                             </CodeView>
                         </TabsContent>
                     </Tabs>
-                </div>
+                </motion.div>
+
+                <Button
+                    onClick={toggleRightContent}
+                    className="absolute top-2 right-4 z-10 bg-main text-text"
+                    size="icon"
+                >
+                    {isRightContentVisible ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                </Button>
             </main>
         </div>
     )
