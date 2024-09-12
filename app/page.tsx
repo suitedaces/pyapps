@@ -17,12 +17,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import SVG from 'react-inlinesvg'
 import { Children } from 'react'
-import { Metadata } from '@/components/Metadata'
-import { Spreadsheet } from '@/components/Spreadsheet'
+import { MetaSheet } from '@/components/MetaSheet'
 import Sidebar from '@/components/Sidebar'
 
 export default function Home({ children }) {
     const [isRightContentVisible, setIsRightContentVisible] = useState(true)
+    const [isAtBottom, setIsAtBottom] = useState(true);
 
     const {
         messages,
@@ -32,6 +32,7 @@ export default function Home({ children }) {
         isLoading,
         handleFileUpload,
         csvFileName,
+        csvContent,
         streamlitUrl,
         generatedCode,
         streamingMessage,
@@ -42,6 +43,11 @@ export default function Home({ children }) {
     const toggleRightContent = () => {
         setIsRightContentVisible(!isRightContentVisible)
     }
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        setIsAtBottom(scrollHeight - scrollTop === clientHeight);
+    };
 
     const sheetTrigger = (
         <SheetTrigger asChild>
@@ -89,45 +95,41 @@ export default function Home({ children }) {
 
                 {/* Right Content */}
 
-                <motion.div
-                    initial={{ x: '100%' }}
-                    animate={{
-                        x: isRightContentVisible ? 0 : '100%',
-                    }}
-                    transition={{ type: "ease", stiffness: 300, damping: 30 }}
-                    className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
-                    <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
-                        <TabsList className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
+                    <motion.div
+                        initial={{ x: '100%' }}
+                        animate={{
+                            x: isRightContentVisible ? 0 : '100%',
+                        }}
+                        transition={{ type: "ease", stiffness: 300, damping: 30 }}
+                        className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
+                        <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
+                            <TabsList className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
+                                {csvFileName && (
+                                    <TabsTrigger value="file">
+                                        {truncateFileName(csvFileName, 20)}
+                                    </TabsTrigger>
+                                )}
+                                <TabsTrigger value="preview">App</TabsTrigger>
+                                <TabsTrigger value="code">Code</TabsTrigger>
+                            </TabsList>
                             {csvFileName && (
-                                <TabsTrigger value="file">
-                                    {truncateFileName(csvFileName, 20)}
-                                </TabsTrigger>
+                                <TabsContent value="file" className="flex-grow">
+                                    <MetaSheet csvContent={csvContent} />
+                                </TabsContent>
                             )}
-                            <TabsTrigger value="preview">App</TabsTrigger>
-                            <TabsTrigger value="code">Code</TabsTrigger>
-                        </TabsList>
-                        {csvFileName && (
-                            <TabsContent value="file" className="flex-grow">
-                                <Metadata />
-                                <Spreadsheet />
+                            <TabsContent value="preview" className="flex-grow">
+                                <StreamlitPreview url={streamlitUrl} isGeneratingCode={isGeneratingCode} />
                             </TabsContent>
-                        )}
-                        <TabsContent value="preview" className="flex-grow">
-                            <StreamlitPreview url={streamlitUrl} isGeneratingCode={isGeneratingCode} />
-                        </TabsContent>
-                        <TabsContent value="code" className="flex-grow">
-                            <CodeView
-                                code={generatedCode}
-                                isGeneratingCode={isGeneratingCode}
-                            >
-                                <ScrollArea>
+                            <TabsContent value="code" className="flex-grow">
+                                <CodeView
+                                    code={generatedCode}
+                                    isGeneratingCode={isGeneratingCode}
+                                >
                                     {children}
-                                </ScrollArea>
-
-                            </CodeView>
-                        </TabsContent>
-                    </Tabs>
-                </motion.div>
+                                </CodeView>
+                            </TabsContent>
+                        </Tabs>
+                    </motion.div>
 
                 <Button
                     onClick={toggleRightContent}
@@ -145,14 +147,14 @@ export default function Home({ children }) {
                 <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
                     <SheetHeader>
                         <TabsList className="mt-10 grid w-full grid-cols-4 mb-4">
-                            <TabsTrigger value="meta">Metadata</TabsTrigger>
+                            <TabsTrigger value="meta">MetaSheet</TabsTrigger>
                             <TabsTrigger value="spreadsheet">Spreadsheet</TabsTrigger>
                             <TabsTrigger value="preview">App</TabsTrigger>
                             <TabsTrigger value="code">Code</TabsTrigger>
                         </TabsList>
                     </SheetHeader>
                     <TabsContent value="meta" className="flex-grow">
-                        Metadata Content
+                        MetaSheet Content
                     </TabsContent>
                     <TabsContent value="spreadsheet" className="flex-grow">
                         Spreadsheet Content

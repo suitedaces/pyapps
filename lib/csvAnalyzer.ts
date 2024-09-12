@@ -44,7 +44,7 @@ export async function analyzeCSV(csvContent: string): Promise<CSVAnalysis> {
 function inferColumnType(values: string[]): string {
   const sampleSize = Math.min(1000, values.length);
   const sample = values.slice(0, sampleSize);
-  
+
   const isNumeric = sample.every(value => !isNaN(Number(value)) && value.trim() !== '');
   const isBoolean = sample.every(value => ['true', 'false', '0', '1'].includes(value.toLowerCase()));
   const isDate = sample.every(value => !isNaN(Date.parse(value)));
