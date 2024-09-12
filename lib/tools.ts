@@ -34,7 +34,7 @@ export async function generateCode(query: string): Promise<string> {
     const response = await codeGenerationAnthropicAgent.messages.create({
       model: "claude-3-5-sonnet-20240620",
       max_tokens: 2000,
-      system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use \"st.experimental_rerun()\" at any cost. Only respond with the code, no explanations!",
+      system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use \"st.experimental_rerun()\" at any cost. Only respond with the code, no potential errors, no explanations!",
       messages: [{ role: "user", content: query }],
     });
 
@@ -54,12 +54,7 @@ export async function generateCode(query: string): Promise<string> {
 export const functions = {
   create_streamlit_app: async (input: { query: string; csvAnalysis: CSVAnalysis }): Promise<string> => {
     try {
-      const codeQuery = `
-        Create a Streamlit app that ${input.query}
-        Use the following CSV analysis to inform your code:
-        ${JSON.stringify(input.csvAnalysis, null, 2)}
-      `;
-      return await generateCode(codeQuery);
+      return await generateCode(input.query);
     } catch (err) {
       console.error(`Error generating Streamlit app:`, err);
       return `Error generating Streamlit app for query: ${input.query}`;

@@ -128,7 +128,7 @@ export class GruntyAgent {
           }] : undefined,
         });
 
-        currentMessage = null;
+      currentMessage = null;
         accumulatedResponse = '';
         generatedCode = '';
       }
