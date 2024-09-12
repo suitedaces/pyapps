@@ -24,7 +24,7 @@ import { Metadata } from '@/components/Metadata'
 import { Spreadsheet } from '@/components/Spreadsheet'
 import Sidebar from '@/components/Sidebar'
 
-export default function Home() {
+export default function Home({ children }) {
   const [session, setSession] = useState<Session | null>(null)
   const supabase = createClientComponentClient()
   const [isRightContentVisible, setIsRightContentVisible] = useState(true)

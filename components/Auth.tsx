@@ -39,8 +39,6 @@ export default function Auth() {
     <div>
       {session ? (
         <div>
-          <p>Signed in as {session.user.email}</p>
-          <button onClick={signOut}>Sign Out</button>
         </div>
       ) : (
         <button onClick={signInWithGoogle}>Sign In with Google</button>
