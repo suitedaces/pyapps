@@ -57,6 +57,7 @@ CREATE TABLE public.chats (
     user_id UUID REFERENCES auth.users(id),
     app_id UUID REFERENCES public.apps(id),
     name TEXT,
+    sandbox_id TEXT,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );

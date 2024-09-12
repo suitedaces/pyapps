@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const { code } = await req.json()
-  const sandbox = await Sandbox.reconnect(params.id, process.env.E2B_API_KEY!)
+  const sandbox = await Sandbox.reconnect(params.id)
 
   try {
     await sandbox.filesystem.write('/app/app.py', code)
