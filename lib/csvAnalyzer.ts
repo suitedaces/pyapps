@@ -1,15 +1,11 @@
-// File: /lib/csvAnalysis.ts
-
 import { parse } from 'papaparse';
-
-interface ColumnMetadata {
-  name: string;
-  type: string;
-}
 
 export interface CSVAnalysis {
   totalRows: number;
-  columns: ColumnMetadata[];
+  columns: {
+    name: string;
+    type: string;
+  }[];
   sampleRows: string[][];
 }
 

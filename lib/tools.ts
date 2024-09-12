@@ -1,6 +1,8 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 import { CSVAnalysis } from './types';
 import { Tool } from './types';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 const codeGenerationAnthropicAgent = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -17,8 +19,12 @@ export const tools: Tool[] = [
           type: "string",
           description: "Explain the requirements for the Streamlit code you want to generate. Include details about the data if there's any context and the column names VERBATIM as a list, with any spaces or special chars like this: [\"col 1 \", \" 2col 1\"].",
         },
+        appId: {
+          type: "string",
+          description: "The ID of the app to create a new version for",
+        },
       },
-      required: ["query"],
+      required: ["query", "appId"],
     }
   },
 ];
@@ -52,14 +58,32 @@ export async function generateCode(query: string): Promise<string> {
 }
 
 export const functions = {
-  create_streamlit_app: async (input: { query: string; csvAnalysis: CSVAnalysis }): Promise<string> => {
+  create_streamlit_app: async (input: { query: string; csvAnalysis: CSVAnalysis; appId: string }): Promise<string> => {
     try {
       const codeQuery = `
         Create a Streamlit app that ${input.query}
         Use the following CSV analysis to inform your code:
         ${JSON.stringify(input.csvAnalysis, null, 2)}
       `;
-      return await generateCode(codeQuery);
+      const generatedCode = await generateCode(codeQuery);
+      
+      // Create a new app version with the generated code
+      const supabase = createRouteHandlerClient({ cookies })
+      const { data, error } = await supabase
+        .from('app_versions')
+        .insert({
+          app_id: input.appId,
+          code: generatedCode,
+          version_number: 1 // You might want to implement logic to increment this
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to create app version: ${error.message}`);
+      }
+
+      return generatedCode;
     } catch (err) {
       console.error(`Error generating Streamlit app:`, err);
       return `Error generating Streamlit app for query: ${input.query}`;

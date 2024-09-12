@@ -1,62 +1,57 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { uploadFile, getUserFiles, deleteFile } from '@/lib/supabase';
-
-export async function POST(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  const { fileName, fileType, fileSize, fileUrl, analysis } = await req.json();
-
-  try {
-    const userId = session.user.id;
-    const file = await uploadFile(userId, fileName, fileType, fileSize, fileUrl, analysis);
-    return NextResponse.json(file);
-  } catch (error) {
-    console.error('Failed to upload file:', error);
-    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
-  }
-}
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const { data: { session } } = await supabase.auth.getSession();
+  const supabase = createRouteHandlerClient({ cookies })
+  const { data: { session } } = await supabase.auth.getSession()
 
   if (!session) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  try {
-    const userId = session.user.id;
-    const files = await getUserFiles(userId);
-    return NextResponse.json(files);
-  } catch (error) {
-    console.error('Failed to fetch files:', error);
-    return NextResponse.json({ error: 'Failed to fetch files' }, { status: 500 });
+  const { data, error } = await supabase
+    .from('files')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return NextResponse.json({ error: 'Failed to fetch files' }, { status: 500 })
   }
+
+  return NextResponse.json(data)
 }
 
-export async function DELETE(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const { data: { session } } = await supabase.auth.getSession();
+export async function POST(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies })
+  const { data: { session } } = await supabase.auth.getSession()
 
   if (!session) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  const { fileId } = await req.json();
+  const { file_name, file_type, file_size, file_url, backup_url, content_hash, analysis, expires_at } = await req.json()
 
-  try {
-    const userId = session.user.id;
-    await deleteFile(fileId, userId);
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Failed to delete file:', error);
-    return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 });
+  const { data, error } = await supabase
+    .from('files')
+    .insert({
+      user_id: session.user.id,
+      file_name,
+      file_type,
+      file_size,
+      file_url,
+      backup_url,
+      content_hash,
+      analysis,
+      expires_at
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
   }
+
+  return NextResponse.json(data)
 }

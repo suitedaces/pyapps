@@ -2,6 +2,8 @@ import { Anthropic } from '@anthropic-ai/sdk';
 import { Message, ToolResult, StreamChunk, CSVAnalysis } from './types';
 import { generateCode } from './tools';
 import { Tool } from './types';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 export class GruntyAgent {
   private client: Anthropic;
@@ -20,10 +22,11 @@ export class GruntyAgent {
     this.model = model;
     this.role = role;
     this.roleDescription = roleDescription;
-    this.messages = [];
   }
 
   async *chat(
+    chatId: string,
+    userId: string,
     latestMessage: string,
     tools: Tool[],
     temperature: number,
@@ -38,6 +41,9 @@ export class GruntyAgent {
     };
     messages.push(userMessage);
     this.messages.push(userMessage);
+
+    // Store the user message in the database
+    await this.storeMessage(chatId, userId, latestMessage, '', 0, null, null);
 
     const sanitizedMessages = this.ensureAlternatingMessages(messages);
 
@@ -54,6 +60,8 @@ export class GruntyAgent {
     let accumulatedJson = '';
     let accumulatedResponse = '';
     let generatedCode = '';
+    let toolCalls = null;
+    let toolResults = null;
   
     for await (const event of stream) {
       yield event as StreamChunk;
@@ -74,6 +82,8 @@ export class GruntyAgent {
         if (currentContentBlock.type === 'tool_use') {
           currentContentBlock.input = accumulatedJson;
           currentMessage.content.push(currentContentBlock);
+          toolCalls = toolCalls || [];
+          toolCalls.push(currentContentBlock);
           if (currentContentBlock.name === 'create_streamlit_app') {
             try {
               const toolInput = JSON.parse(accumulatedJson);
@@ -88,6 +98,12 @@ export class GruntyAgent {
                 type: 'generated_code',
                 content: generatedCode,
               } as unknown as StreamChunk;
+
+              toolResults = toolResults || [];
+              toolResults.push({
+                name: 'create_streamlit_app',
+                result: generatedCode
+              });
             } catch (error) {
               console.error('Error parsing JSON or generating Streamlit code:', error);
               yield {
@@ -107,22 +123,47 @@ export class GruntyAgent {
           fullResponse += `\n\nI've generated the following Streamlit code based on your request:\n\n\`\`\`python\n${generatedCode}\n\`\`\``;
         }
 
-        this.messages.push({
-          role: 'assistant',
-          content: fullResponse.trim(),
-          created_at: new Date(),
-          tool_results: generatedCode ? [{
-            id: currentMessage.id,
-            name: 'create_streamlit_app',
-            result: generatedCode,
-          }] : undefined,
-        });
+        // Store the assistant's response in the database
+        await this.storeMessage(chatId, userId, latestMessage, fullResponse.trim(), this.calculateTokenCount(fullResponse), toolCalls, toolResults);
 
         currentMessage = null;
         accumulatedResponse = '';
         generatedCode = '';
+        toolCalls = null;
+        toolResults = null;
       }
     }
+  }
+
+  private async storeMessage(
+    chatId: string, 
+    userId: string, 
+    userMessage: string, 
+    assistantMessage: string, 
+    tokenCount: number,
+    toolCalls: any,
+    toolResults: any
+  ) {
+    const supabase = createRouteHandlerClient({ cookies })
+    const { error } = await supabase.rpc('insert_message', {
+      p_chat_id: chatId,
+      p_user_id: userId,
+      p_user_message: userMessage,
+      p_assistant_message: assistantMessage,
+      p_token_count: tokenCount,
+      p_tool_calls: toolCalls,
+      p_tool_results: toolResults
+    })
+
+    if (error) {
+      console.error('Failed to store message:', error);
+    }
+  }
+
+  private calculateTokenCount(text: string): number {
+    // This is a very rough estimate. For more accurate results,
+    // you should use a proper tokenizer that matches the model's tokenization.
+    return text.split(/\s+/).length;
   }
 
   private ensureAlternatingMessages(messages: Message[]): any[] {
@@ -155,63 +196,5 @@ export class GruntyAgent {
       role: message.role,
       content: message.content,
     }));
-  }
-
-
-  private async *streamExplanation(
-    generatedCode: string,
-    tools: Tool[],
-    temperature: number,
-    maxTokens: number
-  ): AsyncGenerator<StreamChunk> {
-    const explanationQuery = `Explain the following Streamlit code in simple terms:
-
-${generatedCode}
-
-Provide a brief overview of what the code does and how it utilizes the CSV data.`;
-
-    const stream = await this.client.messages.stream({
-      model: this.model,
-      messages: [{ role: 'user', content: explanationQuery }],
-      temperature,
-      max_tokens: maxTokens,
-    });
-
-    let explanationText = '\n\nHere\'s an explanation of the generated Streamlit code:\n\n';
-
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        explanationText += event.delta.text;
-        yield {
-          type: 'code_explanation',
-          content: event.delta.text,
-        } as unknown as StreamChunk;
-      }
-    }
-
-    if (this.messages.length > 0) {
-      const lastMessage = this.messages[this.messages.length - 1];
-      if (lastMessage.role === 'assistant') {
-        lastMessage.content += explanationText;
-      }
-    }
-  }
-
-
-  private buildChatHistory(): any[] {
-    return this.messages.map(message => ({
-      role: message.role,
-      content: message.content,
-      ...(message.tool_calls && { tool_calls: message.tool_calls }),
-      ...(message.tool_results && { tool_results: message.tool_results }),
-    }));
-  }
-
-  clearMemory(): void {
-    this.messages = [];
-  }
-
-  get history(): Message[] {
-    return this.messages;
   }
 }

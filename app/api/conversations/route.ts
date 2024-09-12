@@ -11,13 +11,13 @@ export async function GET(req: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from('apps')
+    .from('chats')
     .select('*')
     .eq('user_id', session.user.id)
     .order('created_at', { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: 'Failed to fetch apps' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -31,20 +31,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  const { name, description } = await req.json()
+  const { name, appId } = await req.json()
 
   const { data, error } = await supabase
-    .from('apps')
-    .insert({
-      user_id: session.user.id,
-      name,
-      description
-    })
+    .from('chats')
+    .insert({ user_id: session.user.id, name, app_id: appId })
     .select()
     .single()
 
   if (error) {
-    return NextResponse.json({ error: 'Failed to create app' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
   }
 
   return NextResponse.json(data)
