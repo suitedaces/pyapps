@@ -126,7 +126,7 @@ export class GruntyAgent {
         // Store the assistant's response in the database
         await this.storeMessage(chatId, userId, latestMessage, fullResponse.trim(), this.calculateTokenCount(fullResponse), toolCalls, toolResults);
 
-        currentMessage = null;
+      currentMessage = null;
         accumulatedResponse = '';
         generatedCode = '';
         toolCalls = null;

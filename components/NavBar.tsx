@@ -1,7 +1,5 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Button } from "@/components/ui/button"
-import { Github } from 'lucide-react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useEffect, useState } from 'react'
 import { Session } from 'inspector'
@@ -45,15 +43,15 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
 
   return (
     <motion.nav
-      className="bg-bg"
-      animate={{ x: slideDistance }}
-      transition={{ type: "ease", stiffness: 300, damping: 30 }}
-    >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="font-bold text-xl text-black">Grunty 🧐</Link>
-          </div>
+            className="bg-bg"
+            animate={{ x: slideDistance }}
+            transition={{ type: "ease", stiffness: 300, damping: 30 }}
+        >
+        <div className="container mx-10 px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between h-16">
+                <div className="flex-shrink-0 flex items-center">
+                    <Link href="/" className="font-bold text-xl text-black">Grunty 🧐</Link>
+                </div>
           {session ? (
             <div className="flex items-center">
               <span className="text-white mr-4">{session.user.email}</span>

@@ -40,7 +40,7 @@ export async function generateCode(query: string): Promise<string> {
     const response = await codeGenerationAnthropicAgent.messages.create({
       model: "claude-3-5-sonnet-20240620",
       max_tokens: 2000,
-      system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use \"st.experimental_rerun()\" at any cost. Only respond with the code, no explanations!",
+      system: "You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use \"st.experimental_rerun()\" at any cost. Only respond with the code, no potential errors, no explanations!",
       messages: [{ role: "user", content: query }],
     });
 
@@ -60,12 +60,7 @@ export async function generateCode(query: string): Promise<string> {
 export const functions = {
   create_streamlit_app: async (input: { query: string; csvAnalysis: CSVAnalysis; appId: string }): Promise<string> => {
     try {
-      const codeQuery = `
-        Create a Streamlit app that ${input.query}
-        Use the following CSV analysis to inform your code:
-        ${JSON.stringify(input.csvAnalysis, null, 2)}
-      `;
-      const generatedCode = await generateCode(codeQuery);
+      const generatedCode = await generateCode(input.query);
       
       // Create a new app version with the generated code
       const supabase = createRouteHandlerClient({ cookies })
@@ -75,6 +70,7 @@ export const functions = {
           app_id: input.appId,
           code: generatedCode,
           version_number: 1 // You might want to implement logic to increment this
+          prompt: input.query
         })
         .select()
         .single();
