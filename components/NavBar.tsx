@@ -1,81 +1,85 @@
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { useEffect, useState } from "react";
-import { Session } from "@supabase/supabase-js";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Session } from '@supabase/supabase-js'
+import { motion } from 'framer-motion'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 interface NavbarProps {
-  isRightContentVisible: boolean;
+    isRightContentVisible: boolean
 }
 
 export function Navbar({ isRightContentVisible }: NavbarProps) {
-  const [session, setSession] = useState<Session | null>(null);
-  const supabase = createClientComponentClient();
+    const [session, setSession] = useState<Session | null>(null)
+    const supabase = createClientComponentClient()
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session)
+        })
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session)
+        })
 
-    return () => subscription.unsubscribe();
-  }, []);
+        return () => subscription.unsubscribe()
+    }, [])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+    }
 
-  const [windowWidth, setWindowWidth] = useState(0);
+    const [windowWidth, setWindowWidth] = useState(0)
 
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    useEffect(() => {
+        const handleResize = () => setWindowWidth(window.innerWidth)
+        handleResize()
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
 
-  const slideDistance = isRightContentVisible ? 0 : windowWidth / 8;
+    const slideDistance = isRightContentVisible ? 0 : windowWidth / 8
 
-  return (
-    <motion.nav
-      className="bg-bg"
-      animate={{ x: slideDistance }}
-      transition={{ type: "ease", stiffness: 300, damping: 30 }}
-    >
-      <div className="container mx-10 px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="font-bold text-xl text-black">
-              Grunty 🧐
-            </Link>
-          </div>
-          {session ? (
-            <div className="flex items-center">
-              <span className="text-white mr-4">{session.user.email}</span>
-              <button
-                onClick={handleSignOut}
-                className="text-white hover:text-gray-300"
-              >
-                Logout
-              </button>
+    return (
+        <motion.nav
+            className="bg-bg"
+            animate={{ x: slideDistance }}
+            transition={{ type: 'ease', stiffness: 300, damping: 30 }}
+        >
+            <div className="container mx-10 px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between h-16">
+                    <div className="flex-shrink-0 flex items-center">
+                        <Link href="/" className="font-bold text-xl text-black">
+                            Grunty 🧐
+                        </Link>
+                    </div>
+                    {session ? (
+                        <div className="flex items-center">
+                            <span className="text-white mr-4">
+                                {session.user.email}
+                            </span>
+                            <button
+                                onClick={handleSignOut}
+                                className="text-white hover:text-gray-300"
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() =>
+                                supabase.auth.signInWithOAuth({
+                                    provider: 'google',
+                                })
+                            }
+                            className="text-white hover:text-gray-300"
+                        >
+                            Login
+                        </button>
+                    )}
+                </div>
             </div>
-          ) : (
-            <button
-              onClick={() =>
-                supabase.auth.signInWithOAuth({ provider: "google" })
-              }
-              className="text-white hover:text-gray-300"
-            >
-              Login
-            </button>
-          )}
-        </div>
-      </div>
-    </motion.nav>
-  );
+        </motion.nav>
+    )
 }
