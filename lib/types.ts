@@ -14,7 +14,7 @@ export type ToolResult = {
 };
 
 export type Message = {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   tool_calls?: ToolCall[];
   tool_results?: ToolResult[];
@@ -22,7 +22,17 @@ export type Message = {
 };
 
 export type StreamChunk = {
-  type: 'message_start' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_delta' | 'message_stop' | 'generated_code' | 'code_explanation' | 'error' | 'tool_use';
+  type:
+    | "message_start"
+    | "content_block_start"
+    | "content_block_delta"
+    | "content_block_stop"
+    | "message_delta"
+    | "message_stop"
+    | "generated_code"
+    | "code_explanation"
+    | "error"
+    | "tool_use";
   message?: any;
   content_block?: any;
   delta?: any;

@@ -1,9 +1,15 @@
-import { Anthropic } from '@anthropic-ai/sdk';
-import { Message, ToolResult, StreamChunk, CSVAnalysis, ToolCall } from './types';
-import { generateCode } from './tools';
-import { Tool } from './types';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { Anthropic } from "@anthropic-ai/sdk";
+import {
+  Message,
+  ToolResult,
+  StreamChunk,
+  CSVAnalysis,
+  ToolCall,
+} from "./types";
+import { generateCode } from "./tools";
+import { Tool } from "./types";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 
 export class GruntyAgent {
   private client: Anthropic;
@@ -15,7 +21,7 @@ export class GruntyAgent {
     client: Anthropic,
     model: string,
     role: string,
-    roleDescription: string
+    roleDescription: string,
   ) {
     this.client = client;
     this.model = model;
@@ -24,22 +30,25 @@ export class GruntyAgent {
   }
 
   private async fetchChatHistory(chatId: string): Promise<Message[]> {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data, error } = await supabase.rpc('get_chat_messages', {
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data, error } = await supabase.rpc("get_chat_messages", {
       p_chat_id: chatId,
-      p_limit: 50,  // Adjust this limit as needed
-      p_offset: 0
-    })
+      p_limit: 50, // Adjust this limit as needed
+      p_offset: 0,
+    });
 
     if (error) {
-      console.error('Failed to fetch chat history:', error);
+      console.error("Failed to fetch chat history:", error);
       return [];
     }
 
     return data.map((message: any) => ({
-      role: message.role === 'assistant' ? 'assistant' : 'user',
-      content: message.role === 'assistant' ? message.assistant_message : message.user_message,
-      created_at: new Date(message.created_at)
+      role: message.role === "assistant" ? "assistant" : "user",
+      content:
+        message.role === "assistant"
+          ? message.assistant_message
+          : message.user_message,
+      created_at: new Date(message.created_at),
     }));
   }
 
@@ -50,18 +59,18 @@ export class GruntyAgent {
     tools: Tool[],
     temperature: number,
     maxTokens: number,
-    csvAnalysis?: CSVAnalysis
+    csvAnalysis?: CSVAnalysis,
   ): AsyncGenerator<StreamChunk> {
     const chatHistory = await this.fetchChatHistory(chatId);
-    const userMessage: Message = { 
-      role: 'user', 
-      content: latestMessage, 
-      created_at: new Date() 
+    const userMessage: Message = {
+      role: "user",
+      content: latestMessage,
+      created_at: new Date(),
     };
     chatHistory.push(userMessage);
 
     // Store the user message in the database
-    await this.storeMessage(chatId, userId, latestMessage, '', 0, null, null);
+    await this.storeMessage(chatId, userId, latestMessage, "", 0, null, null);
 
     const sanitizedMessages = this.ensureAlternatingMessages(chatHistory);
 
@@ -75,34 +84,41 @@ export class GruntyAgent {
 
     let currentMessage: any = null;
     let currentContentBlock: any = null;
-    let accumulatedJson = '';
-    let accumulatedResponse = '';
-    let generatedCode = '';
+    let accumulatedJson = "";
+    let accumulatedResponse = "";
+    let generatedCode = "";
     let toolCalls: ToolCall[] | null = null;
     let toolResults: ToolResult[] | null = null;
-  
+
     for await (const event of stream) {
       yield event as StreamChunk;
-  
-      if (event.type === 'message_start') {
+
+      if (event.type === "message_start") {
         currentMessage = event.message;
-      } else if (event.type === 'content_block_start') {
+      } else if (event.type === "content_block_start") {
         currentContentBlock = event.content_block;
-        accumulatedJson = '';
-      } else if (event.type === 'content_block_delta') {
-        if (currentContentBlock.type === 'text' && event.delta.type === 'text_delta') {
-          currentContentBlock.text = (currentContentBlock.text || '') + event.delta.text;
+        accumulatedJson = "";
+      } else if (event.type === "content_block_delta") {
+        if (
+          currentContentBlock.type === "text" &&
+          event.delta.type === "text_delta"
+        ) {
+          currentContentBlock.text =
+            (currentContentBlock.text || "") + event.delta.text;
           accumulatedResponse += event.delta.text;
-        } else if (currentContentBlock.type === 'tool_use' && event.delta.type === 'input_json_delta') {
+        } else if (
+          currentContentBlock.type === "tool_use" &&
+          event.delta.type === "input_json_delta"
+        ) {
           accumulatedJson += event.delta.partial_json;
         }
-      } else if (event.type === 'content_block_stop') {
-        if (currentContentBlock.type === 'tool_use') {
+      } else if (event.type === "content_block_stop") {
+        if (currentContentBlock.type === "tool_use") {
           currentContentBlock.input = accumulatedJson;
           currentMessage.content.push(currentContentBlock);
           toolCalls = toolCalls || [];
           toolCalls.push(currentContentBlock);
-          if (currentContentBlock.name === 'create_streamlit_app') {
+          if (currentContentBlock.name === "create_streamlit_app") {
             try {
               const toolInput = JSON.parse(accumulatedJson);
               const codeQuery = `
@@ -111,30 +127,33 @@ export class GruntyAgent {
                 ${JSON.stringify(csvAnalysis, null, 2)}
               `;
               generatedCode = await generateCode(codeQuery);
-              
+
               yield {
-                type: 'generated_code',
+                type: "generated_code",
                 content: generatedCode,
               } as unknown as StreamChunk;
 
               toolResults = toolResults || [];
               toolResults.push({
-                name: 'create_streamlit_app',
-                result: generatedCode
+                name: "create_streamlit_app",
+                result: generatedCode,
               });
             } catch (error) {
-              console.error('Error parsing JSON or generating Streamlit code:', error);
+              console.error(
+                "Error parsing JSON or generating Streamlit code:",
+                error,
+              );
               yield {
-                type: 'error',
-                content: 'Error in code generation process',
+                type: "error",
+                content: "Error in code generation process",
               } as unknown as StreamChunk;
             }
           }
         }
         currentContentBlock = null;
-      } else if (event.type === 'message_delta') {
+      } else if (event.type === "message_delta") {
         Object.assign(currentMessage, event.delta);
-      } else if (event.type === 'message_stop') {
+      } else if (event.type === "message_stop") {
         let fullResponse = accumulatedResponse;
 
         if (generatedCode) {
@@ -142,11 +161,19 @@ export class GruntyAgent {
         }
 
         // Store the assistant's response in the database
-        await this.storeMessage(chatId, userId, latestMessage, fullResponse.trim(), this.calculateTokenCount(fullResponse), toolCalls, toolResults);
+        await this.storeMessage(
+          chatId,
+          userId,
+          latestMessage,
+          fullResponse.trim(),
+          this.calculateTokenCount(fullResponse),
+          toolCalls,
+          toolResults,
+        );
 
         currentMessage = null;
-        accumulatedResponse = '';
-        generatedCode = '';
+        accumulatedResponse = "";
+        generatedCode = "";
         toolCalls = null;
         toolResults = null;
       }
@@ -154,27 +181,27 @@ export class GruntyAgent {
   }
 
   private async storeMessage(
-    chatId: string, 
-    userId: string, 
-    userMessage: string, 
-    assistantMessage: string, 
+    chatId: string,
+    userId: string,
+    userMessage: string,
+    assistantMessage: string,
     tokenCount: number,
     toolCalls: any,
-    toolResults: any
+    toolResults: any,
   ) {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { error } = await supabase.rpc('insert_message', {
+    const supabase = createRouteHandlerClient({ cookies });
+    const { error } = await supabase.rpc("insert_message", {
       p_chat_id: chatId,
       p_user_id: userId,
       p_user_message: userMessage,
       p_assistant_message: assistantMessage,
       p_token_count: tokenCount,
       p_tool_calls: toolCalls,
-      p_tool_results: toolResults
-    })
+      p_tool_results: toolResults,
+    });
 
     if (error) {
-      console.error('Failed to store message:', error);
+      console.error("Failed to store message:", error);
     }
   }
 
@@ -187,29 +214,29 @@ export class GruntyAgent {
     if (messages.length === 0) return [];
 
     const result: Message[] = [];
-    let lastRole: 'user' | 'assistant' | null = null;
+    let lastRole: "user" | "assistant" | null = null;
 
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
-      
-      if (message.role === 'user') {
-        if (lastRole === 'user') {
-          result[result.length - 1].content += '\n\n' + message.content;
+
+      if (message.role === "user") {
+        if (lastRole === "user") {
+          result[result.length - 1].content += "\n\n" + message.content;
         } else {
           result.push(message);
         }
-        lastRole = 'user';
-      } else if (message.role === 'assistant' && lastRole === 'user') {
+        lastRole = "user";
+      } else if (message.role === "assistant" && lastRole === "user") {
         result.push(message);
-        lastRole = 'assistant';
+        lastRole = "assistant";
       }
     }
 
-    if (result.length > 0 && result[result.length - 1].role === 'assistant') {
+    if (result.length > 0 && result[result.length - 1].role === "assistant") {
       result.pop();
     }
 
-    return result.map(message => ({
+    return result.map((message) => ({
       role: message.role,
       content: message.content,
     }));

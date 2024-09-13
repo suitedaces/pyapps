@@ -1,23 +1,23 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { createBrowserClient } from '@supabase/ssr'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { createBrowserClient } from "@supabase/ssr";
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'CSV Streamlit Analyzer',
-  description: 'Analyze CSV files with Streamlit and AI',
-}
+  title: "CSV Streamlit Analyzer",
+  description: "Analyze CSV files with Streamlit and AI",
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
       <body className={inter.className}>{children}</body>
     </html>
-  )
+  );
 }
