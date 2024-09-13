@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useEffect, useState } from 'react'
-import { Session } from 'inspector'
+import { Session } from '@supabase/supabase-js'
 
 interface NavbarProps {
   isRightContentVisible: boolean;

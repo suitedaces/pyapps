@@ -30,6 +30,33 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { message } = await req.json()
 
+  // Fetch CSV analysis if it exists for this chat
+  const { data: chatData, error: chatError } = await supabase
+    .from('chats')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+
+  if (chatError) {
+    console.error('Error fetching chat data:', chatError)
+    return NextResponse.json({ error: 'Failed to fetch chat data' }, { status: 500 })
+  }
+
+  let csvAnalysis = null
+  if (chatData.file_id) {
+    const { data: fileData, error: fileError } = await supabase
+      .from('files')
+      .select('analysis')
+      .eq('id', chatData.file_id)
+      .single()
+
+    if (fileError) {
+      console.error('Error fetching file analysis:', fileError)
+    } else {
+      csvAnalysis = fileData.analysis
+    }
+  }
+
   const encoder = new TextEncoder()
 
   try {
@@ -41,7 +68,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           message,
           tools,
           0.7,
-          4000
+          4000,
+          csvAnalysis
         )
 
         for await (const chunk of chatGenerator) {

@@ -8,7 +8,7 @@ interface SandboxError {
   traceback?: string;
 }
 
-export function useChat() {
+export function useChat(chatId: string | null) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClientComponentClient()
@@ -40,14 +40,43 @@ export function useChat() {
     return () => subscription.unsubscribe()
   }, [supabase.auth])
 
+  useEffect(() => {
+    if (chatId) {
+      fetchMessages();
+      initializeSandbox();
+    } else {
+      // reset state when no chat is selected
+      setMessages([]);
+      setCsvContent(null);
+      setCsvFileName(null);
+      setStreamlitUrl(null);
+      setGeneratedCode('');
+      setStreamingMessage('');
+      setCodeExplanation('');
+      setSandboxErrors([]);
+      setSandboxId(null);
+    }
+  }, [chatId]);
 
+  const fetchMessages = useCallback(async () => {
+    if (!chatId) return;
+    try {
+      const response = await fetch(`/api/conversations/${chatId}/messages`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch messages');
+      }
+      const data = await response.json();
+      setMessages(data);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  }, [chatId]);
 
   const initializeSandbox = useCallback(async () => {
     try {
-      const response = await fetch('/api/sandbox', {
+      const response = await fetch('/api/sandbox/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'initialize' }),
       });
 
       if (!response.ok) {
@@ -66,20 +95,6 @@ export function useChat() {
     }
   }, []);
 
-  useEffect(() => {
-    initializeSandbox();
-
-    return () => {
-      if (sandboxId) {
-        fetch('/api/sandbox', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'close', sandboxId }),
-        }).catch(error => console.error('Error closing sandbox:', error));
-      }
-    };
-  }, []);
-
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
   }, []);
@@ -88,10 +103,10 @@ export function useChat() {
     if (code && sandboxId) {
       try {
         console.log('Updating Streamlit app with code:', code);
-        const response = await fetch('/api/sandbox', {
+        const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'updateCode', code, sandboxId }),
+          body: JSON.stringify({ code }),
         });
 
         if (!response.ok) {
@@ -162,14 +177,9 @@ export function useChat() {
     return { accumulatedResponse, accumulatedCode };
   }, [processStreamChunk]);
 
-  const handleChatOperation = useCallback(async (newMessage: Message, apiEndpoint: string) => {
-    if (isLoading) {
-      console.log('User authentication is still loading...');
-      return;
-    }
-
-    if (!session) {
-      console.error('User not authenticated');
+  const handleChatOperation = useCallback(async (newMessage: Message) => {
+    if (isLoading || !session || !chatId) {
+      console.error('User not authenticated, session is loading, or no chat selected');
       return;
     }
 
@@ -180,15 +190,10 @@ export function useChat() {
     setSandboxErrors([]);
 
     try {
-      console.log("Sending messages to API:", JSON.stringify([newMessage], null, 2));
-
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch(`/api/conversations/${chatId}/stream`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ messages: [newMessage], csvContent, csvFileName }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: newMessage.content }),
       });
 
       if (!response.ok) {
@@ -235,8 +240,7 @@ export function useChat() {
       setStreamingMessage('');
       setIsGeneratingCode(false);
     }
-  }, [session, isLoading, csvContent, csvFileName, processStream, updateStreamlitApp, codeExplanation]);
-
+  }, [session, isLoading, chatId, processStream, updateStreamlitApp, codeExplanation]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -250,11 +254,10 @@ export function useChat() {
     setMessages(prev => [...prev, newUserMessage]);
     setInput('');
   
-    await handleChatOperation(newUserMessage, '/api/chat');
+    await handleChatOperation(newUserMessage);
   }, [input, handleChatOperation]);
 
   const handleFileUpload = useCallback(async (content: string, fileName: string) => {
-
     const sanitizeCSVContent = (content: string): string => {
       return content
         .split('\n')
@@ -280,10 +283,16 @@ export function useChat() {
     setCsvFileName(fileName);
   
     try {
-      const response = await fetch('/api/csv', {
+      const response = await fetch('/api/files', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvContent: content, fileName }),
+        body: JSON.stringify({ 
+          file_name: fileName,
+          file_type: 'csv',
+          file_size: content.length,
+          file_url: 'placeholder_url', // You might want to implement actual file storage
+          content: content // This is not ideal for large files, consider using FormData and file upload
+        }),
       });
 
       if (!response.ok) {
@@ -291,11 +300,25 @@ export function useChat() {
       }
 
       const data = await response.json();
-      console.log('CSV analyzed and stored:', data);
+      console.log('CSV uploaded and stored:', data);
+
+      // Analyze the CSV file
+      const analysisResponse = await fetch(`/api/files/${data.id}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileContent: content }),
+      });
+
+      if (!analysisResponse.ok) {
+        throw new Error(`HTTP error! status: ${analysisResponse.status}`);
+      }
+
+      const analysisData = await analysisResponse.json();
+      console.log('CSV analyzed:', analysisData);
 
       const newUserMessage: Message = {
         role: 'user',
-        content: `I've uploaded a CSV file named "/app/${fileName}". Here's a preview of the data:
+        content: `I've uploaded a CSV file named "${fileName}". Here's a preview of the data:
         
 \`\`\`markdown
 ${markdownTable}
@@ -307,7 +330,7 @@ Can you analyze it and create a Streamlit app to visualize the data? Make sure t
 
       setMessages(prev => [...prev, newUserMessage]);
 
-      await handleChatOperation(newUserMessage, '/api/chat');
+      await handleChatOperation(newUserMessage);
 
     } catch (error) {
       console.error('Error in file upload:', error);

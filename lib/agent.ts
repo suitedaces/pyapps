@@ -1,5 +1,5 @@
 import { Anthropic } from '@anthropic-ai/sdk';
-import { Message, ToolResult, StreamChunk, CSVAnalysis } from './types';
+import { Message, ToolResult, StreamChunk, CSVAnalysis, ToolCall } from './types';
 import { generateCode } from './tools';
 import { Tool } from './types';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
@@ -10,7 +10,6 @@ export class GruntyAgent {
   private model: string;
   private role: string;
   private roleDescription: string;
-  private messages: Message[];
 
   constructor(
     client: Anthropic,
@@ -24,6 +23,26 @@ export class GruntyAgent {
     this.roleDescription = roleDescription;
   }
 
+  private async fetchChatHistory(chatId: string): Promise<Message[]> {
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data, error } = await supabase.rpc('get_chat_messages', {
+      p_chat_id: chatId,
+      p_limit: 50,  // Adjust this limit as needed
+      p_offset: 0
+    })
+
+    if (error) {
+      console.error('Failed to fetch chat history:', error);
+      return [];
+    }
+
+    return data.map((message: any) => ({
+      role: message.role === 'assistant' ? 'assistant' : 'user',
+      content: message.role === 'assistant' ? message.assistant_message : message.user_message,
+      created_at: new Date(message.created_at)
+    }));
+  }
+
   async *chat(
     chatId: string,
     userId: string,
@@ -33,19 +52,18 @@ export class GruntyAgent {
     maxTokens: number,
     csvAnalysis?: CSVAnalysis
   ): AsyncGenerator<StreamChunk> {
-    const messages = this.buildChatHistory();
+    const chatHistory = await this.fetchChatHistory(chatId);
     const userMessage: Message = { 
       role: 'user', 
       content: latestMessage, 
       created_at: new Date() 
     };
-    messages.push(userMessage);
-    this.messages.push(userMessage);
+    chatHistory.push(userMessage);
 
     // Store the user message in the database
     await this.storeMessage(chatId, userId, latestMessage, '', 0, null, null);
 
-    const sanitizedMessages = this.ensureAlternatingMessages(messages);
+    const sanitizedMessages = this.ensureAlternatingMessages(chatHistory);
 
     const stream = await this.client.messages.stream({
       model: this.model,
@@ -60,8 +78,8 @@ export class GruntyAgent {
     let accumulatedJson = '';
     let accumulatedResponse = '';
     let generatedCode = '';
-    let toolCalls = null;
-    let toolResults = null;
+    let toolCalls: ToolCall[] | null = null;
+    let toolResults: ToolResult[] | null = null;
   
     for await (const event of stream) {
       yield event as StreamChunk;
@@ -126,7 +144,7 @@ export class GruntyAgent {
         // Store the assistant's response in the database
         await this.storeMessage(chatId, userId, latestMessage, fullResponse.trim(), this.calculateTokenCount(fullResponse), toolCalls, toolResults);
 
-      currentMessage = null;
+        currentMessage = null;
         accumulatedResponse = '';
         generatedCode = '';
         toolCalls = null;
@@ -161,8 +179,7 @@ export class GruntyAgent {
   }
 
   private calculateTokenCount(text: string): number {
-    // This is a very rough estimate. For more accurate results,
-    // you should use a proper tokenizer that matches the model's tokenization.
+    // TODO: use a proper tokenizer that matches the model's tokenization.
     return text.split(/\s+/).length;
   }
 

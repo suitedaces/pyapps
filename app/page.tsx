@@ -3,7 +3,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useEffect, useState } from 'react'
 import { Session } from '@supabase/supabase-js'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 import { Chat } from '@/components/Chat'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
@@ -11,21 +11,20 @@ import { Navbar } from '@/components/NavBar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CodeView } from '@/components/CodeView'
 import { useChat } from '@/hooks/useChat'
-import Auth from '@/components/Auth'
-import { Sheet, SheetContent, SheetHeader, SheetTrigger } from '@/components/ui/sheet'
+import LoginPage from '@/components/LoginPage'
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from '@/components/ui/scroll-area'
 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-import SVG from 'react-inlinesvg'
-import { Children } from 'react'
 import { MetaSheet } from '@/components/MetaSheet'
 import Sidebar from '@/components/Sidebar'
 
-export default function Home({ children }) {
+export default function Home({ children }: { children: React.ReactNode }) {
     const [isRightContentVisible, setIsRightContentVisible] = useState(true)
     const [isAtBottom, setIsAtBottom] = useState(true);
+    const [session, setSession] = useState<Session | null>(null)
+    const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+    const supabase = createClientComponentClient()
 
     const {
         messages,
@@ -41,7 +40,21 @@ export default function Home({ children }) {
         streamingMessage,
         streamingCodeExplanation,
         isGeneratingCode,
-    } = useChat();
+    } = useChat(currentChatId);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session)
+        })
+
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session)
+        })
+
+        return () => subscription.unsubscribe()
+    }, [supabase.auth])
 
     const toggleRightContent = () => {
         setIsRightContentVisible(!isRightContentVisible)
@@ -52,30 +65,44 @@ export default function Home({ children }) {
         setIsAtBottom(scrollHeight - scrollTop === clientHeight);
     };
 
-    const sheetTrigger = (
-        <SheetTrigger asChild>
-            <Button className='bg-main text-text p-3 h-11 mr-4'>
-                <SVG src="/icons/code.svg" className="text-text" width={30} height={30} title={'code'} />
-            </Button>
-        </SheetTrigger>
-    );
+    const handleChatSelect = (chatId: string) => {
+        setCurrentChatId(chatId);
+    }
 
-    const truncateFileName = (fileName: string, maxLength: number) => {
-        if (fileName.length <= maxLength) return fileName;
-        const extension = fileName.split('.').pop();
-        const nameWithoutExtension = fileName.slice(0, fileName.lastIndexOf('.'));
-        const truncatedName = nameWithoutExtension.slice(0, maxLength - extension.length - 3);
-        return `${truncatedName}...${extension}`;
-    };
+    const handleNewChat = async () => {
+        try {
+            const response = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: 'New Chat' }),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to create new chat');
+            }
+            const data = await response.json();
+            setCurrentChatId(data.id);
+        } catch (error) {
+            console.error('Error creating new chat:', error);
+        }
+    }
+
+    if (!session) {
+        return <LoginPage />
+    }
 
     return (
-        // <Sheet>
-        <div className="flex flex-col min-h-screen  bg-bg text-white">
-            {/* <Navbar sheetTrigger={sheetTrigger} /> */}
-            <Sidebar isRightContentVisible={isRightContentVisible} setIsRightContentVisible={setIsRightContentVisible} />
+        <div className="flex flex-col min-h-screen bg-bg text-white">
+            <Sidebar 
+                isRightContentVisible={isRightContentVisible} 
+                setIsRightContentVisible={setIsRightContentVisible}
+                onChatSelect={handleChatSelect}
+                onNewChat={handleNewChat}
+                currentChatId={currentChatId}
+            />
             <Navbar isRightContentVisible={isRightContentVisible} />
             <main className="flex-grow flex flex-col lg:flex-row overflow-hidden justify-center">
-                <Auth />
                 <motion.div
                     className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]"
                     animate={{
@@ -83,57 +110,59 @@ export default function Home({ children }) {
                     }}
                     transition={{ type: "ease", stiffness: 300, damping: 30 }}
                 >
-                    {/* <div className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]"> */}
-                    <Chat
-                        messages={messages}
-                        input={input}
-                        handleInputChange={handleInputChange}
-                        handleSubmit={handleSubmit}
-                        isLoading={isLoading}
-                        streamingMessage={streamingMessage}
-                        streamingCodeExplanation={streamingCodeExplanation}
-                        handleFileUpload={handleFileUpload}
-                    />
-                    {/* </div> */}
+                    {currentChatId ? (
+                        <Chat
+                            messages={messages}
+                            input={input}
+                            handleInputChange={handleInputChange}
+                            handleSubmit={handleSubmit}
+                            isLoading={isLoading}
+                            streamingMessage={streamingMessage}
+                            streamingCodeExplanation={streamingCodeExplanation}
+                            handleFileUpload={handleFileUpload}
+                        />
+                    ) : (
+                        <div className="flex items-center justify-center h-full">
+                            <p>Select a chat or create a new one to get started.</p>
+                        </div>
+                    )}
                 </motion.div>
 
-                {/* Right Content */}
-
-                    <motion.div
-                        initial={{ x: '100%' }}
-                        animate={{
-                            x: isRightContentVisible ? 0 : '100%',
-                        }}
-                        transition={{ type: "ease", stiffness: 300, damping: 30 }}
-                        className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
-                        <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
-                            <TabsList className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
-                                {csvFileName && (
-                                    <TabsTrigger value="file">
-                                        {truncateFileName(csvFileName, 20)}
-                                    </TabsTrigger>
-                                )}
-                                <TabsTrigger value="preview">App</TabsTrigger>
-                                <TabsTrigger value="code">Code</TabsTrigger>
-                            </TabsList>
+                <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{
+                        x: isRightContentVisible ? 0 : '100%',
+                    }}
+                    transition={{ type: "ease", stiffness: 300, damping: 30 }}
+                    className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
+                    <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
+                        <TabsList className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
                             {csvFileName && (
-                                <TabsContent value="file" className="flex-grow">
-                                    <MetaSheet csvContent={csvContent} />
-                                </TabsContent>
+                                <TabsTrigger value="file">
+                                    {csvFileName}
+                                </TabsTrigger>
                             )}
-                            <TabsContent value="preview" className="flex-grow">
-                                <StreamlitPreview url={streamlitUrl} isGeneratingCode={isGeneratingCode} />
+                            <TabsTrigger value="preview">App</TabsTrigger>
+                            <TabsTrigger value="code">Code</TabsTrigger>
+                        </TabsList>
+                        {csvFileName && (
+                            <TabsContent value="file" className="flex-grow">
+                                <MetaSheet csvContent={csvContent} />
                             </TabsContent>
-                            <TabsContent value="code" className="flex-grow">
-                                <CodeView
-                                    code={generatedCode}
-                                    isGeneratingCode={isGeneratingCode}
-                                >
-                                    {children}
-                                </CodeView>
-                            </TabsContent>
-                        </Tabs>
-                    </motion.div>
+                        )}
+                        <TabsContent value="preview" className="flex-grow">
+                            <StreamlitPreview url={streamlitUrl} isGeneratingCode={isGeneratingCode} />
+                        </TabsContent>
+                        <TabsContent value="code" className="flex-grow">
+                            <CodeView
+                                code={generatedCode}
+                                isGeneratingCode={isGeneratingCode}
+                            >
+                                {children}
+                            </CodeView>
+                        </TabsContent>
+                    </Tabs>
+                </motion.div>
 
                 <Button
                     onClick={toggleRightContent}
@@ -146,37 +175,3 @@ export default function Home({ children }) {
         </div>
     )
 }
-
-{/* <SheetContent>
-                <Tabs defaultValue="preview" className="flex-grow flex flex-col h-full">
-                    <SheetHeader>
-                        <TabsList className="mt-10 grid w-full grid-cols-4 mb-4">
-                            <TabsTrigger value="meta">MetaSheet</TabsTrigger>
-                            <TabsTrigger value="spreadsheet">Spreadsheet</TabsTrigger>
-                            <TabsTrigger value="preview">App</TabsTrigger>
-                            <TabsTrigger value="code">Code</TabsTrigger>
-                        </TabsList>
-                    </SheetHeader>
-                    <TabsContent value="meta" className="flex-grow">
-                        MetaSheet Content
-                    </TabsContent>
-                    <TabsContent value="spreadsheet" className="flex-grow">
-                        Spreadsheet Content
-                    </TabsContent>
-                    <TabsContent value="preview" className="flex-grow">
-                        <StreamlitPreview url={streamlitUrl} isGeneratingCode={isGeneratingCode} />
-                    </TabsContent>
-                    <TabsContent value="code" className="flex-grow">
-                        <CodeView
-                            code={generatedCode}
-                            isGeneratingCode={isGeneratingCode}
-                        >
-                            <ScrollArea>
-                                {children}
-                            </ScrollArea>
-
-                        </CodeView>
-                    </TabsContent>
-                </Tabs>
-            </SheetContent>
-        </Sheet> */}

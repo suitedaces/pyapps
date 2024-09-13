@@ -69,7 +69,7 @@ export const functions = {
         .insert({
           app_id: input.appId,
           code: generatedCode,
-          version_number: 1 // You might want to implement logic to increment this
+          version_number: 1, // You might want to implement logic to increment this
           prompt: input.query
         })
         .select()

@@ -1,13 +1,13 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 
 export type ToolCall = {
-  id: string;
+  id?: string;
   name: string;
   parameters: string;
 };
 
 export type ToolResult = {
-  id: string;
+  id?: string;
   name: string;
   result: any;
   error?: any;
