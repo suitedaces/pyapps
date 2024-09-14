@@ -1,7 +1,8 @@
 .streaming-gradient {
     background: linear-gradient(270deg, var(--tw-gradient-stops));
-    --tw-gradient-from: #3A6073; /* Start color */
-    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, #16222A 50%), #3A6073; /* Gradient cycle */
+    --tw-gradient-from: #3a6073; /* Start color */
+    --tw-gradient-stops: var(--tw-gradient-from),
+        var(--tw-gradient-to, #16222a 50%), #3a6073; /* Gradient cycle */
     background-size: 200% 200%;
     animation: gradient-x 5s ease infinite; /* Ensure animation is applied */
-  }
+}

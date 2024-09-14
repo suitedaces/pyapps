@@ -5,18 +5,18 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'CSV Streamlit Analyzer',
-  description: 'Analyze CSV files with Streamlit and AI',
+    title: 'CSV Streamlit Analyzer',
+    description: 'Analyze CSV files with Streamlit and AI',
 }
 
 export default function RootLayout({
-  children,
+    children,
 }: {
-  children: React.ReactNode
+    children: React.ReactNode
 }) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
-    </html>
-  )
+    return (
+        <html lang="en">
+            <body className={inter.className}>{children}</body>
+        </html>
+    )
 }
