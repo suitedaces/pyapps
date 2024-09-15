@@ -1,3 +1,4 @@
+import { Json } from '@/lib/database.types'
 import { Anthropic } from '@anthropic-ai/sdk'
 
 export type ToolCall = {
@@ -13,12 +14,22 @@ export type ToolResult = {
     error?: any
 }
 
-export type Message = {
-    role: 'user' | 'assistant'
-    content: string
-    tool_calls?: ToolCall[]
-    tool_results?: ToolResult[]
-    created_at: Date
+
+export interface ClientMessage {
+    role: 'user' | 'assistant';
+    content: string;
+    created_at?: Date;
+}
+
+export interface Message {
+    id: string
+    user_id: string
+    user_message: string
+    assistant_message: string
+    tool_calls: Json
+    tool_results: Json
+    token_count: number
+    created_at: string
 }
 
 export type StreamChunk = {

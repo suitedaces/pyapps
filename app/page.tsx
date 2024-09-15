@@ -25,7 +25,6 @@ export default function Home({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
     const supabase = createClientComponentClient()
-
     const {
         messages,
         input,
@@ -120,12 +119,13 @@ export default function Home({ children }: { children: React.ReactNode }) {
                             streamingMessage={streamingMessage}
                             streamingCodeExplanation={streamingCodeExplanation}
                             handleFileUpload={handleFileUpload}
+                            onChatSelect={handleChatSelect}
                         />
                     ) : (
-                        <div className="flex items-center justify-center h-full">
+                        <div className="flex items-center text-black justify-center h-full">
                             <p>
                                 Select a chat or create a new one to get
-                                started.
+                                started!
                             </p>
                         </div>
                     )}
@@ -169,6 +169,7 @@ export default function Home({ children }: { children: React.ReactNode }) {
                             <CodeView
                                 code={generatedCode}
                                 isGeneratingCode={isGeneratingCode}
+                                onChatSelect={handleChatSelect}
                             >
                                 {children}
                             </CodeView>
