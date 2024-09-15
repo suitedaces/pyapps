@@ -5,13 +5,15 @@ import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 import Editor from 'react-simple-code-editor'
 
-export function CodeView({
-    code,
-    isGeneratingCode,
-}: {
+interface CodeViewProps {
     code: string
     isGeneratingCode: boolean
-}) {
+}
+
+export const CodeView: React.FC<CodeViewProps> = ({
+    code,
+    isGeneratingCode,
+}) => {
     return (
         <Card className="bg-gray-900 border border-gray-700 h-full max-h-[82vh] flex-grow rounded-lg shadow-lg">
             <CardContent className="p-0 h-full overflow-auto relative">
