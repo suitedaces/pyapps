@@ -4,8 +4,9 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Message } from '@/lib/types'
 import { Code, Loader2, Paperclip, Send } from 'lucide-react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { ClientMessage } from '@/lib/types'
 import { CodeProps } from 'react-markdown/lib/ast-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -19,8 +20,9 @@ export function Chat({
     streamingMessage,
     streamingCodeExplanation,
     handleFileUpload,
+    onChatSelect,
 }: {
-    messages: Message[]
+    messages: ClientMessage[]
     input: string
     handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
@@ -28,10 +30,12 @@ export function Chat({
     streamingMessage: string
     streamingCodeExplanation: string
     handleFileUpload: (content: string, fileName: string) => void
+    onChatSelect: (chatId: string) => void
 }) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isAtBottom, setIsAtBottom] = useState(true)
+    const [chats, setChats] = useState<{ id: string; name: string }[]>([])
 
     useEffect(() => {
         if (isAtBottom) {
@@ -43,6 +47,30 @@ export function Chat({
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
         setIsAtBottom(scrollHeight - scrollTop === clientHeight)
     }
+
+    useEffect(() => {
+        fetchChats()
+    }, [])
+
+    const fetchChats = async () => {
+        try {
+            const response = await fetch('/api/conversations')
+            if (!response.ok) {
+                throw new Error('Failed to fetch chats')
+            }
+            const data = await response.json()
+            setChats(data)
+        } catch (error) {
+            console.error('Error fetching chats:', error)
+        }
+    }
+
+    const handleChatSelection = useCallback(
+        (chatId: string) => {
+            onChatSelect(chatId)
+        },
+        [onChatSelect]
+    )
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0]
@@ -160,42 +188,40 @@ export function Chat({
                 onScroll={handleScroll}
             >
                 {messages.map((message, index) => (
-                    // <div key={index} className={`flex justify-start mb-4`}>
-                    //     <div className={`flex flex-row items-start max-w-[80%]`}>
-                    <div
-                        key={index}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-                    >
-                        <div
-                            className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start max-w-[80%]`}
-                        >
-                            <Avatar
-                                className={`w-8 h-8 ${message.role === 'user' ? 'bg-blue' : 'bg-main'} border-2 border-border flex-shrink-0`}
-                            >
-                                <AvatarFallback>
-                                    {message.role === 'user' ? 'U' : 'G'}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div
-                                className={`mx-2 p-4 rounded-base ${
-                                    message.role === 'assistant'
-                                        ? 'bg-main'
-                                        : 'bg-bg'
-                                } text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out`}
-                            >
-                                {/* } text-text dark:text-darkText border-2 border-border break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none`}> */}
-                                {renderMessage(message.content)}
+                    <React.Fragment key={index}>
+                        {message.role === 'user' && (
+                            <div className="flex justify-end mb-4">
+                                <div className="flex flex-row-reverse items-start max-w-[80%]">
+                                    <Avatar className="w-8 h-8 bg-blue border-2 border-border flex-shrink-0">
+                                        <AvatarFallback>U</AvatarFallback>
+                                    </Avatar>
+                                    <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                        {renderMessage(message.content)}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    {message.role === 'assistant' && (
+                        <div className="flex justify-start mb-4">
+                            <div className="flex flex-row items-start max-w-[80%]">
+                                <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
+                                    <AvatarFallback>G</AvatarFallback>
+                                </Avatar>
+                                <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    {renderMessage(message.content)}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
+                    </React.Fragment>
                 ))}
                 {streamingMessage && (
                     <div className="flex justify-start mb-4">
                         <div className="flex flex-row items-start max-w-[80%]">
-                            <Avatar className="w-8 h-8 bg-main flex-shrink-0">
+                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                 <AvatarFallback>G</AvatarFallback>
                             </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
+                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                 {renderMessage(streamingMessage)}
                             </div>
                         </div>

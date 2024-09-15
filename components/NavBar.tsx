@@ -55,17 +55,7 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
                         </Link>
                     </div>
                     {session ? (
-                        <div className="flex items-center">
-                            <span className="text-white mr-4">
-                                {session.user.email}
-                            </span>
-                            <button
-                                onClick={handleSignOut}
-                                className="text-white hover:text-gray-300"
-                            >
-                                Logout
-                            </button>
-                        </div>
+                        <></>
                     ) : (
                         <button
                             onClick={() =>
@@ -73,7 +63,7 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
                                     provider: 'google',
                                 })
                             }
-                            className="text-white hover:text-gray-300"
+                            className="text-black hover:text-main"
                         >
                             Login
                         </button>

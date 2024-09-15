@@ -2,21 +2,20 @@ import { Button } from '@/components/ui/button'
 import {
     Card,
     CardContent,
-    CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter } from 'next/navigation' // Changed from 'next/router' to 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 export default function LoginPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState<string | null>(null)
-    const router = useRouter() // This should now work correctly
+    const router = useRouter()
     const supabase = createClientComponentClient()
 
     const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -51,12 +50,9 @@ export default function LoginPage() {
         <div className="flex items-center justify-center min-h-screen bg-bg dark:bg-darkBg">
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle className="text-2xl font-bold text-center">
+                    <CardTitle className="text-2xl text-black font-bold text-center">
                         Login to Grunty 🧐
                     </CardTitle>
-                    <CardDescription className="text-center">
-                        Enter your credentials to access your account
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSignIn} className="space-y-4">

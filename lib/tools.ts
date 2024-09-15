@@ -2,6 +2,7 @@ import { Anthropic } from '@anthropic-ai/sdk'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { CSVAnalysis, Tool } from './types'
+import { runNotebook } from './jupyterInterpreter'
 
 const codeGenerationAnthropicAgent = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -19,13 +20,22 @@ export const tools: Tool[] = [
                     description:
                         'Explain the requirements for the Streamlit code you want to generate. Include details about the data if there\'s any context and the column names VERBATIM as a list, with any spaces or special chars like this: ["col 1 ", " 2col 1"].',
                 },
-                appId: {
+            },
+            required: ['query'],
+        },
+    },
+    {
+        name: 'execute_jupyter_notebook',
+        description: 'Executes Python code in a Jupyter Notebook',
+        input_schema: {
+            type: 'object' as const,
+            properties: {
+                code: {
                     type: 'string',
-                    description:
-                        'The ID of the app to create a new version for',
+                    description: 'The Python code to execute in the Jupyter Notebook',
                 },
             },
-            required: ['query', 'appId'],
+            required: ['code'],
         },
     },
 ]
@@ -70,37 +80,24 @@ export async function generateCode(query: string): Promise<string> {
 export const functions = {
     create_streamlit_app: async (input: {
         query: string
-        csvAnalysis: CSVAnalysis
-        appId: string
     }): Promise<string> => {
         try {
             const generatedCode = await generateCode(input.query)
-
-            // Create a new app version with the generated code
-            const supabase = createRouteHandlerClient({ cookies })
-            const { data, error } = await supabase
-                .from('app_versions')
-                .insert({
-                    app_id: input.appId,
-                    code: generatedCode,
-                    version_number: 1, // You might want to implement logic to increment this
-                    prompt: input.query,
-                })
-                .select()
-                .single()
-
-            if (error) {
-                throw new Error(
-                    `Failed to create app version: ${error.message}`
-                )
-            }
-
             return generatedCode
         } catch (err) {
             console.error(`Error generating Streamlit app:`, err)
             return `Error generating Streamlit app for query: ${input.query}`
         }
     },
+    execute_jupyter_notebook: async (input: { code: string }): Promise<string> => {
+        try {
+            const results = await runNotebook(input.code)
+            return JSON.stringify(results)
+        } catch (err) {
+            console.error(`Error executing Jupyter Notebook:`, err)
+            return `Error executing Jupyter Notebook for code: ${input.code}`
+        }
+    }
 }
 
 export function toolExists(name: string): boolean {

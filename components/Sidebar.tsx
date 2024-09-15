@@ -55,7 +55,7 @@ export default function Sidebar({
 
     const handleNewChat = async () => {
         await onNewChat()
-        fetchChats() // Refresh the chat list
+        fetchChats() // refresh the chat list
     }
 
     const sidebarVariants = {

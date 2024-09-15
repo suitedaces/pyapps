@@ -62,7 +62,7 @@ export class GruntyAgent {
         csvAnalysis?: CSVAnalysis
     ): AsyncGenerator<StreamChunk> {
         const chatHistory = await this.fetchChatHistory(chatId)
-        const userMessage: Message = {
+        const userMessage: any = {
             role: 'user',
             content: latestMessage,
             created_at: new Date(),
@@ -130,10 +130,10 @@ export class GruntyAgent {
                         try {
                             const toolInput = JSON.parse(accumulatedJson)
                             const codeQuery = `
-                Create a Streamlit app that ${toolInput.query}
-                Use the following CSV analysis to inform your code:
-                ${JSON.stringify(csvAnalysis, null, 2)}
-              `
+                                ${toolInput.query}
+                                Use the following CSV analysis to inform your code:
+                                ${JSON.stringify(csvAnalysis, null, 2)}
+                            `
                             generatedCode = await generateCode(codeQuery)
 
                             yield {
@@ -168,7 +168,7 @@ export class GruntyAgent {
                     fullResponse += `\n\nI've generated the following Streamlit code based on your request:\n\n\`\`\`python\n${generatedCode}\n\`\`\``
                 }
 
-                // Store the assistant's response in the database
+                // Store both the responses in the database
                 await this.storeMessage(
                     chatId,
                     userId,
@@ -213,11 +213,14 @@ export class GruntyAgent {
         }
     }
 
+
+
     private calculateTokenCount(text: string): number {
-        // TODO: use a proper tokenizer that matches the model's tokenization.
+        // TODO: use something like tiktoken, a proper tokenizer, that matches the model's tokenization
         return text.split(/\s+/).length
     }
 
+    // TODO: make this match types
     private ensureAlternatingMessages(messages: Message[]): any[] {
         if (messages.length === 0) return []
 
