@@ -2,11 +2,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Message } from '@/lib/types'
+import { ClientMessage } from '@/lib/types'
 import { Code, Loader2, Paperclip, Send } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { ClientMessage } from '@/lib/types'
 import { CodeProps } from 'react-markdown/lib/ast-to-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -201,18 +200,18 @@ export function Chat({
                                 </div>
                             </div>
                         )}
-                    {message.role === 'assistant' && (
-                        <div className="flex justify-start mb-4">
-                            <div className="flex flex-row items-start max-w-[80%]">
-                                <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
-                                    <AvatarFallback>G</AvatarFallback>
-                                </Avatar>
-                                <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
-                                    {renderMessage(message.content)}
+                        {message.role === 'assistant' && (
+                            <div className="flex justify-start mb-4">
+                                <div className="flex flex-row items-start max-w-[80%]">
+                                    <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
+                                        <AvatarFallback>G</AvatarFallback>
+                                    </Avatar>
+                                    <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                        {renderMessage(message.content)}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
                     </React.Fragment>
                 ))}
                 {streamingMessage && (

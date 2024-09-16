@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import { PlusCircle, Settings, SidebarIcon } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -28,6 +29,7 @@ export default function Sidebar({
 }: SidebarProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [chats, setChats] = useState<Chat[]>([])
+    const [newChatButtonText, setNewChatButtonText] = useState('New Chat')
     const router = useRouter()
 
     const toggleSidebar = () => {
@@ -53,9 +55,45 @@ export default function Sidebar({
         }
     }
 
+    const generateChatName = async (): Promise<string> => {
+        try {
+            const response = await fetch('/api/generate-chat-name', {
+                method: 'POST',
+            })
+            if (!response.ok) {
+                throw new Error('Failed to generate chat name')
+            }
+            const data = await response.json()
+            return data.name
+        } catch (error) {
+            console.error('Error generating chat name:', error)
+            return 'New Chat'
+        }
+    }
+
     const handleNewChat = async () => {
-        await onNewChat()
-        fetchChats() // refresh the chat list
+        try {
+            const chatName = await generateChatName()
+            setNewChatButtonText(chatName)
+            const response = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: chatName }),
+            })
+            if (!response.ok) {
+                throw new Error('Failed to create new chat')
+            }
+            const newChat = await response.json()
+            router.push(`/chat/${newChat.id}`)
+            fetchChats()
+            // Reset the button text after a short delay
+            setTimeout(() => setNewChatButtonText('New Chat'), 3000)
+        } catch (error) {
+            console.error('Error creating new chat:', error)
+            setNewChatButtonText('New Chat')
+        }
     }
 
     const sidebarVariants = {
@@ -87,22 +125,22 @@ export default function Sidebar({
                         className="mb-4 w-full justify-start"
                     >
                         <PlusCircle className="mr-2 h-4 w-4" />
-                        New Chat
+                        {newChatButtonText}
                     </Button>
 
                     <div className="flex-grow mt-20 overflow-auto">
                         {chats.map((chat) => (
-                            <Button
-                                key={chat.id}
-                                onClick={() => onChatSelect(chat.id)}
-                                className={`w-full text-left py-2 px-3 mb-1 rounded-lg hover:bg-gray-700 transition-colors ${
-                                    currentChatId === chat.id
-                                        ? 'bg-gray-700'
-                                        : ''
-                                }`}
-                            >
-                                {chat.name || `Chat ${chat.id.slice(0, 8)}`}
-                            </Button>
+                            <Link href={`/chat/${chat.id}`} key={chat.id}>
+                                <Button
+                                    className={`w-full text-left py-2 px-3 mb-1 rounded-lg hover:bg-gray-700 transition-colors ${
+                                        currentChatId === chat.id
+                                            ? 'bg-gray-700'
+                                            : ''
+                                    }`}
+                                >
+                                    {chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                                </Button>
+                            </Link>
                         ))}
                     </div>
 

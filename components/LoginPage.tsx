@@ -93,11 +93,7 @@ export default function LoginPage() {
                             </span>
                         </div>
                     </div>
-                    <Button
-                        onClick={handleSignInWithGoogle}
-                        variant="outline"
-                        className="w-full"
-                    >
+                    <Button onClick={handleSignInWithGoogle} className="w-full">
                         Sign in with Google
                     </Button>
                 </CardFooter>

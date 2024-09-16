@@ -213,8 +213,6 @@ export class GruntyAgent {
         }
     }
 
-
-
     private calculateTokenCount(text: string): number {
         // TODO: use something like tiktoken, a proper tokenizer, that matches the model's tokenization
         return text.split(/\s+/).length

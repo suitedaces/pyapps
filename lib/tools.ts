@@ -1,8 +1,6 @@
 import { Anthropic } from '@anthropic-ai/sdk'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { CSVAnalysis, Tool } from './types'
 import { runNotebook } from './jupyterInterpreter'
+import { Tool } from './types'
 
 const codeGenerationAnthropicAgent = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -32,13 +30,62 @@ export const tools: Tool[] = [
             properties: {
                 code: {
                     type: 'string',
-                    description: 'The Python code to execute in the Jupyter Notebook',
+                    description:
+                        'The Python code to execute in the Jupyter Notebook',
                 },
             },
             required: ['code'],
         },
     },
+    {
+        name: 'generate_chat_name',
+        description: 'Generates a Name/Title of the Chat',
+        input_schema: {
+            type: 'object' as const,
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'Optional context or theme for the chat name',
+                },
+            },
+            required: ['query'],
+        },
+    },
 ]
+
+export async function generateChatName(query?: string): Promise<string> {
+    try {
+        const response = await codeGenerationAnthropicAgent.messages.create({
+            model: 'claude-3-haiku-20240307',
+            max_tokens: 50,
+            system: 'You are a creative assistant tasked with generating short, relevant titles for chat conversations. The titles should be concise, no longer than 4-6 words, and reflective of the key topics or themes discussed. Avoid generic words like "Chat" or "Conversation."',
+            messages: [
+                {
+                    role: 'user',
+                    content: query
+                        ? `Generate a short, relevant title for a chat about: ${query}`
+                        : 'Generate a concise and descriptive title for a new chat conversation.',
+                },
+            ],
+        })
+
+        if (Array.isArray(response.content) && response.content.length > 0) {
+            const generatedName =
+                response.content[0].type === 'text'
+                    ? response.content[0].text.trim()
+                    : ''
+            return generatedName
+        } else {
+            console.error('Unexpected response format:', response)
+            throw new Error(
+                'Unexpected response format from chat name generation API'
+            )
+        }
+    } catch (error) {
+        console.error('Error generating chat name:', error)
+        throw new Error('Failed to generate chat name. Please try again.')
+    }
+}
 
 export async function generateCode(query: string): Promise<string> {
     if (!query || !query.trim()) {
@@ -78,9 +125,7 @@ export async function generateCode(query: string): Promise<string> {
 }
 
 export const functions = {
-    create_streamlit_app: async (input: {
-        query: string
-    }): Promise<string> => {
+    create_streamlit_app: async (input: { query: string }): Promise<string> => {
         try {
             const generatedCode = await generateCode(input.query)
             return generatedCode
@@ -89,7 +134,9 @@ export const functions = {
             return `Error generating Streamlit app for query: ${input.query}`
         }
     },
-    execute_jupyter_notebook: async (input: { code: string }): Promise<string> => {
+    execute_jupyter_notebook: async (input: {
+        code: string
+    }): Promise<string> => {
         try {
             const results = await runNotebook(input.code)
             return JSON.stringify(results)
@@ -97,7 +144,17 @@ export const functions = {
             console.error(`Error executing Jupyter Notebook:`, err)
             return `Error executing Jupyter Notebook for code: ${input.code}`
         }
-    }
+    },
+
+    generate_chat_name: async (input: { query?: string }): Promise<string> => {
+        try {
+            const chatName = await generateChatName(input.query)
+            return chatName
+        } catch (err) {
+            console.error(`Error generating chat name:`, err)
+            return `New Chat ${new Date().toISOString()}`
+        }
+    },
 }
 
 export function toolExists(name: string): boolean {

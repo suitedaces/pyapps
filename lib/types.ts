@@ -14,11 +14,10 @@ export type ToolResult = {
     error?: any
 }
 
-
 export interface ClientMessage {
-    role: 'user' | 'assistant';
-    content: string;
-    created_at?: Date;
+    role: 'user' | 'assistant'
+    content: string
+    created_at?: Date
 }
 
 export interface Message {
