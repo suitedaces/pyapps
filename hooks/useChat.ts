@@ -88,6 +88,7 @@ export function useChat(chatId: string | null) {
             console.error('Error fetching messages:', error);
         }
     }
+
     const initializeSandbox = useCallback(async () => {
         try {
             const response = await fetch('/api/sandbox/init', {
@@ -108,10 +109,12 @@ export function useChat(chatId: string | null) {
         }
     }, []);
 
+
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setInput(e.target.value);
     }, []);
 
+    
     const updateStreamlitApp = useCallback(async (code: string) => {
         if (code && sandboxId) {
             try {
@@ -143,6 +146,7 @@ export function useChat(chatId: string | null) {
             console.error('Generated code not available or sandbox not initialized');
         }
     }, [sandboxId]);
+
 
     const processStreamChunk = useCallback((chunk: string, accumulatedResponse: string, accumulatedCode: string) => {
         try {
@@ -197,7 +201,6 @@ export function useChat(chatId: string | null) {
             return;
         }
 
-        setIsLoading(true);
         setStreamingMessage('');
         setGeneratedCode('');
         setCodeExplanation('');
@@ -259,6 +262,7 @@ export function useChat(chatId: string | null) {
             setIsGeneratingCode(false);
         }
     }, [session, isLoading, chatId, processStream, updateStreamlitApp, codeExplanation]);
+    
 
     const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();

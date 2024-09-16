@@ -57,6 +57,7 @@ export class GruntyAgent {
         maxTokens: number,
         csvAnalysis?: CSVAnalysis
     ): AsyncGenerator<StreamChunk> {
+        
         const chatHistory = await this.fetchChatHistory(chatId)
         const userMessage: any = {
             role: 'user',
@@ -66,6 +67,7 @@ export class GruntyAgent {
         chatHistory.push(userMessage)
 
         const sanitizedMessages = this.prepareMessagesForAnthropicAPI(chatHistory)
+
 
         const stream = await this.client.messages.stream({
             model: this.model,
@@ -85,7 +87,6 @@ export class GruntyAgent {
 
         for await (const event of stream) {
             yield event as StreamChunk
-
             if (event.type === 'message_start') {
                 currentMessage = event.message
             } else if (event.type === 'content_block_start') {
