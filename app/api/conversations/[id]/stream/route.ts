@@ -38,6 +38,8 @@ export async function POST(
 
     const { message } = await req.json()
 
+    console.log('Received message:', message)
+
     // Fetch CSV analysis if it exists for this chat
     const { data: chatData, error: chatError } = await supabase
         .from('chats')
@@ -78,17 +80,16 @@ export async function POST(
                     session.user.id,
                     message,
                     tools,
-                    0.7,
+                    0.2,
                     4000,
                     csvAnalysis
                 )
-
+                console.log('Starting chat generator...')
                 for await (const chunk of chatGenerator) {
                     controller.enqueue(
                         encoder.encode(JSON.stringify(chunk) + '\n')
                     )
                 }
-
                 controller.close()
             },
         })
@@ -108,3 +109,5 @@ export async function POST(
         )
     }
 }
+
+export const runtime = 'edge'

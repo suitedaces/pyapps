@@ -19,7 +19,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { MetaSheet } from '@/components/MetaSheet'
 import Sidebar from '@/components/Sidebar'
 
-export default function Home({ children }: { children: React.ReactNode }) {
+export default function Home() {
     const [isRightContentVisible, setIsRightContentVisible] = useState(true)
     const [isAtBottom, setIsAtBottom] = useState(true)
     const [session, setSession] = useState<Session | null>(null)
@@ -166,13 +166,7 @@ export default function Home({ children }: { children: React.ReactNode }) {
                             />
                         </TabsContent>
                         <TabsContent value="code" className="flex-grow">
-                            <CodeView
-                                code={generatedCode}
-                                isGeneratingCode={isGeneratingCode}
-                                onChatSelect={handleChatSelect}
-                            >
-                                {children}
-                            </CodeView>
+                            <CodeView code={generatedCode} isGeneratingCode={isGeneratingCode} />
                         </TabsContent>
                     </Tabs>
                 </motion.div>

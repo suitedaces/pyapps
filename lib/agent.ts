@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { generateCode } from './tools'
 import {
+    ClientMessage,
     CSVAnalysis,
     Message,
     StreamChunk,
@@ -10,6 +11,7 @@ import {
     ToolCall,
     ToolResult,
 } from './types'
+import { countTokens } from '@anthropic-ai/tokenizer'
 
 export class GruntyAgent {
     private client: Anthropic
@@ -33,7 +35,7 @@ export class GruntyAgent {
         const supabase = createRouteHandlerClient({ cookies })
         const { data, error } = await supabase.rpc('get_chat_messages', {
             p_chat_id: chatId,
-            p_limit: 50, // Adjust this limit as needed
+            p_limit: 50,
             p_offset: 0,
         })
 
@@ -42,14 +44,7 @@ export class GruntyAgent {
             return []
         }
 
-        return data.map((message: any) => ({
-            role: message.role === 'assistant' ? 'assistant' : 'user',
-            content:
-                message.role === 'assistant'
-                    ? message.assistant_message
-                    : message.user_message,
-            created_at: new Date(message.created_at),
-        }))
+        return data
     }
 
     async *chat(
@@ -61,26 +56,20 @@ export class GruntyAgent {
         maxTokens: number,
         csvAnalysis?: CSVAnalysis
     ): AsyncGenerator<StreamChunk> {
+        
         const chatHistory = await this.fetchChatHistory(chatId)
+        console.log("Chat History:", chatHistory)
         const userMessage: any = {
             role: 'user',
-            content: latestMessage,
-            created_at: new Date(),
+            content: latestMessage
         }
-        chatHistory.push(userMessage)
+        
+        const sanitizedMessages = this.prepareMessagesForAnthropicAPI(chatHistory)
 
-        // Store the user message in the database
-        await this.storeMessage(
-            chatId,
-            userId,
-            latestMessage,
-            '',
-            0,
-            null,
-            null
-        )
+        sanitizedMessages.push(userMessage)
 
-        const sanitizedMessages = this.ensureAlternatingMessages(chatHistory)
+        console.log("Sanitized Messages:", sanitizedMessages)
+
 
         const stream = await this.client.messages.stream({
             model: this.model,
@@ -100,7 +89,6 @@ export class GruntyAgent {
 
         for await (const event of stream) {
             yield event as StreamChunk
-
             if (event.type === 'message_start') {
                 currentMessage = event.message
             } else if (event.type === 'content_block_start') {
@@ -162,19 +150,13 @@ export class GruntyAgent {
             } else if (event.type === 'message_delta') {
                 Object.assign(currentMessage, event.delta)
             } else if (event.type === 'message_stop') {
-                let fullResponse = accumulatedResponse
 
-                if (generatedCode) {
-                    fullResponse += `\n\nI've generated the following Streamlit code based on your request:\n\n\`\`\`python\n${generatedCode}\n\`\`\``
-                }
-
-                // Store both the responses in the database
                 await this.storeMessage(
                     chatId,
                     userId,
                     latestMessage,
-                    fullResponse.trim(),
-                    this.calculateTokenCount(fullResponse),
+                    accumulatedResponse.trim(),
+                    this.calculateTokenCount(accumulatedResponse),
                     toolCalls,
                     toolResults
                 )
@@ -213,47 +195,58 @@ export class GruntyAgent {
         }
     }
 
-
-
     private calculateTokenCount(text: string): number {
-        // TODO: use something like tiktoken, a proper tokenizer, that matches the model's tokenization
-        return text.split(/\s+/).length
+        return countTokens(text)
     }
 
-    // TODO: make this match types
-    private ensureAlternatingMessages(messages: Message[]): any[] {
-        if (messages.length === 0) return []
-
-        const result: Message[] = []
-        let lastRole: 'user' | 'assistant' | null = null
-
-        for (let i = 0; i < messages.length; i++) {
-            const message = messages[i]
-
-            if (message.role === 'user') {
-                if (lastRole === 'user') {
-                    result[result.length - 1].content +=
-                        '\n\n' + message.content
-                } else {
-                    result.push(message)
+    private prepareMessagesForAnthropicAPI(messages: Message[]): Anthropic.Messages.MessageParam[] {
+        const sanitizedMessages: Anthropic.Messages.MessageParam[] = [];
+    
+        for (const message of messages) {
+            sanitizedMessages.push({
+                role: 'user',
+                content: message.user_message
+            });
+    
+            // Process assistant messages
+            const assistantMessage: Anthropic.Messages.MessageParam = {
+                role: 'assistant',
+                content: message.assistant_message
+            };
+    
+            if (message.tool_calls) {
+                const toolCalls = message.tool_calls as ToolCall[];
+                assistantMessage.content = [
+                    { type: 'text', text: message.assistant_message },
+                    ...toolCalls.map(call => ({
+                        type: 'tool_use' as const,
+                        id: call.id ?? '',
+                        name: call.name,
+                        input: call.parameters
+                    }))
+                ];
+            }
+    
+            sanitizedMessages.push(assistantMessage);
+    
+            if (message.tool_results) {
+                const toolResults = message.tool_results as ToolResult[];
+                for (const result of toolResults) {
+                    sanitizedMessages.push({
+                        role: 'user', // Set role to 'user' for tool results
+                        content: [
+                            {
+                                type: 'tool_result',
+                                tool_use_id: result.id || '',
+                                content: JSON.stringify(result.result)
+                            }
+                        ]
+                    });
                 }
-                lastRole = 'user'
-            } else if (message.role === 'assistant' && lastRole === 'user') {
-                result.push(message)
-                lastRole = 'assistant'
             }
         }
-
-        if (
-            result.length > 0 &&
-            result[result.length - 1].role === 'assistant'
-        ) {
-            result.pop()
-        }
-
-        return result.map((message) => ({
-            role: message.role,
-            content: message.content,
-        }))
+    
+        return sanitizedMessages;
     }
+
 }
