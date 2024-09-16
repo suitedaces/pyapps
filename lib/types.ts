@@ -25,7 +25,6 @@ export interface ClientMessage {
 export interface Message {
     id: string
     user_id: string
-    role: 'user' | 'assistant'
     user_message: string
     assistant_message: string
     tool_calls: Json | null

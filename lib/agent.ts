@@ -11,6 +11,7 @@ import {
     ToolCall,
     ToolResult,
 } from './types'
+import { countTokens } from '@anthropic-ai/tokenizer'
 
 export class GruntyAgent {
     private client: Anthropic
@@ -57,14 +58,17 @@ export class GruntyAgent {
     ): AsyncGenerator<StreamChunk> {
         
         const chatHistory = await this.fetchChatHistory(chatId)
+        console.log("Chat History:", chatHistory)
         const userMessage: any = {
             role: 'user',
             content: latestMessage
         }
         
         const sanitizedMessages = this.prepareMessagesForAnthropicAPI(chatHistory)
-        
+
         sanitizedMessages.push(userMessage)
+
+        console.log("Sanitized Messages:", sanitizedMessages)
 
 
         const stream = await this.client.messages.stream({
@@ -192,54 +196,52 @@ export class GruntyAgent {
     }
 
     private calculateTokenCount(text: string): number {
-        // TODO: Implement a more accurate token counting method
-        return text.split(/\s+/).length
+        return countTokens(text)
     }
 
     private prepareMessagesForAnthropicAPI(messages: Message[]): Anthropic.Messages.MessageParam[] {
         const sanitizedMessages: Anthropic.Messages.MessageParam[] = [];
     
         for (const message of messages) {
-            if (message.role === 'user') {
-                sanitizedMessages.push({
-                    role: 'user',
-                    content: message.user_message
-                });
-            } else if (message.role === 'assistant') {
-                const assistantMessage: Anthropic.Messages.MessageParam = {
-                    role: 'assistant',
-                    content: message.assistant_message
-                };
+            sanitizedMessages.push({
+                role: 'user',
+                content: message.user_message
+            });
     
-                if (message.tool_calls) {
-                    const toolCalls = message.tool_calls as ToolCall[];
-                    assistantMessage.content = [
-                        { type: 'text', text: message.assistant_message },
-                        ...toolCalls.map(call => ({
-                            type: 'tool_use' as const,
-                            id: call.id ?? '',
-                            name: call.name,
-                            input: call.parameters
-                        }))
-                    ];
-                }
+            // Process assistant messages
+            const assistantMessage: Anthropic.Messages.MessageParam = {
+                role: 'assistant',
+                content: message.assistant_message
+            };
     
-                sanitizedMessages.push(assistantMessage);
+            if (message.tool_calls) {
+                const toolCalls = message.tool_calls as ToolCall[];
+                assistantMessage.content = [
+                    { type: 'text', text: message.assistant_message },
+                    ...toolCalls.map(call => ({
+                        type: 'tool_use' as const,
+                        id: call.id ?? '',
+                        name: call.name,
+                        input: call.parameters
+                    }))
+                ];
+            }
     
-                if (message.tool_results) {
-                    const toolResults = message.tool_results as ToolResult[];
-                    for (const result of toolResults) {
-                        sanitizedMessages.push({
-                            role: 'user',
-                            content: [
-                                {
-                                    type: 'tool_result',
-                                    tool_use_id: result.id || '',
-                                    content: JSON.stringify(result.result)
-                                }
-                            ]
-                        });
-                    }
+            sanitizedMessages.push(assistantMessage);
+    
+            if (message.tool_results) {
+                const toolResults = message.tool_results as ToolResult[];
+                for (const result of toolResults) {
+                    sanitizedMessages.push({
+                        role: 'user', // Set role to 'user' for tool results
+                        content: [
+                            {
+                                type: 'tool_result',
+                                tool_use_id: result.id || '',
+                                content: JSON.stringify(result.result)
+                            }
+                        ]
+                    });
                 }
             }
         }
