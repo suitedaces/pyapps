@@ -38,6 +38,8 @@ export async function POST(
 
     const { message } = await req.json()
 
+    console.log('Received message:', message)
+
     // Fetch CSV analysis if it exists for this chat
     const { data: chatData, error: chatError } = await supabase
         .from('chats')
