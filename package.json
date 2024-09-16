@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "next dev",
+        "dev": "next dev --turbo",
         "build": "next build",
         "start": "next start",
         "lint": "next lint",
@@ -51,6 +51,7 @@
     "devDependencies": {
         "@types/jsonwebtoken": "^9.0.6",
         "@types/node": "^20",
+        "@types/prismjs": "^1.26.4",
         "@types/react": "^18",
         "@types/react-dom": "^18",
         "@types/react-syntax-highlighter": "^15.5.13",
