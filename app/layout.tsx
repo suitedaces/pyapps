@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-    title: 'CSV Streamlit Analyzer',
+    title: 'grunty - generate apps for your data in seconds',
     description: 'Analyze CSV files with Streamlit and AI',
 }
 

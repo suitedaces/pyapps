@@ -324,7 +324,7 @@ export function useChat(chatId: string | null) {
 
             const newUserMessage: ClientMessage = {
                 role: 'user',
-                content: `I've uploaded a CSV file named "${fileName}". <hidden_prompt>Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code.</hidden_prompt>`,
+                content: `I've uploaded a CSV file named "/app/${fileName}". <hidden_prompt>Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code.</hidden_prompt>`,
                 created_at: new Date(),
             };
 
