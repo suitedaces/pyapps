@@ -196,68 +196,55 @@ export class GruntyAgent {
         return text.split(/\s+/).length
     }
 
+    private prepareMessagesForAnthropicAPI(messages: Message[]): Anthropic.Messages.MessageParam[] {
+        const sanitizedMessages: Anthropic.Messages.MessageParam[] = [];
     
-    private prepareMessagesForAnthropicAPI(messages: Message[]): ClientMessage[] {
-        const clientMessages: ClientMessage[] = [];
-
-        for (const msg of messages) {
-            // Add user message
-            if (msg.user_message && msg.user_message.trim() !== '') {
-                clientMessages.push({
+        for (const message of messages) {
+            if (message.role === 'user') {
+                sanitizedMessages.push({
                     role: 'user',
-                    content: msg.user_message,
+                    content: message.user_message
                 });
-            }
-
-            // Add assistant message
-            if (msg.assistant_message || msg.tool_calls || msg.tool_results) {
-                const assistantMessage: ClientMessage = {
+            } else if (message.role === 'assistant') {
+                const assistantMessage: Anthropic.Messages.MessageParam = {
                     role: 'assistant',
-                    content: [],
+                    content: message.assistant_message
                 };
-
-                // Add text content if present
-                if (msg.assistant_message && msg.assistant_message.trim() !== '') {
-                    assistantMessage.content.push({
-                        type: 'text',
-                        text: msg.assistant_message,
-                    });
+    
+                if (message.tool_calls) {
+                    const toolCalls = message.tool_calls as ToolCall[];
+                    assistantMessage.content = [
+                        { type: 'text', text: message.assistant_message },
+                        ...toolCalls.map(call => ({
+                            type: 'tool_use' as const,
+                            id: call.id ?? '',
+                            name: call.name,
+                            input: call.parameters
+                        }))
+                    ];
                 }
-
-                // Add tool calls if present
-                if (msg.tool_calls && msg.tool_calls.length > 0) {
-                    for (const toolCall of msg.tool_calls) {
-                        assistantMessage.content.push({
-                            type: 'tool_use',
-                            id: toolCall.id,
-                            name: toolCall.name,
-                            input: toolCall.input,
-                        });
-                    }
-                }
-
-                // Add tool results if present
-                if (msg.tool_results && msg.tool_results.length > 0) {
-                    for (const toolResult of msg.tool_results) {
-                        clientMessages.push({
+    
+                sanitizedMessages.push(assistantMessage);
+    
+                if (message.tool_results) {
+                    const toolResults = message.tool_results as ToolResult[];
+                    for (const result of toolResults) {
+                        sanitizedMessages.push({
                             role: 'user',
                             content: [
                                 {
                                     type: 'tool_result',
-                                    tool_use_id: toolResult.tool_use_id,
-                                    content: toolResult.content,
-                                },
-                            ],
+                                    tool_use_id: result.id || '',
+                                    content: JSON.stringify(result.result)
+                                }
+                            ]
                         });
                     }
                 }
-
-                if (assistantMessage.content.length > 0) {
-                    clientMessages.push(assistantMessage);
-                }
             }
         }
-
-        return clientMessages;
+    
+        return sanitizedMessages;
     }
+
 }
