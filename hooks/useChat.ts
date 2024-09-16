@@ -230,7 +230,7 @@ export function useChat(chatId: string | null) {
                 created_at: new Date(),
             };
 
-            setMessages(prev => [...prev, newMessage, assistantMessage]);
+            setMessages(prev => [...prev, assistantMessage]);
 
             setStreamingMessage('');
 
