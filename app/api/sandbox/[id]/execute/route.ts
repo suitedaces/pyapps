@@ -3,10 +3,12 @@ import { Sandbox } from 'e2b'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
+
 export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
+    const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
     const supabase = createRouteHandlerClient({ cookies })
     const {
         data: { session },
@@ -34,17 +36,17 @@ export async function POST(
 
         // POST /api/apps/{id}/versions with code and app_id
 
-        const response = await fetch(`/api/apps/${params.id}/versions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ code, app_id: params.id }),
-        })
+        // const response = await fetch(`${NEXT_PUBLIC_BASE_URL}/api/apps/${params.id}/versions`, {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //     },
+        //     body: JSON.stringify({ code, app_id: params.id }),
+        // })
 
-        if (!response.ok) {
-            throw new Error('Failed to save app version')
-        }
+        // if (!response.ok) {
+        //     throw new Error('Failed to save app version')
+        // }
 
         return NextResponse.json({ url: `https://${url}` })
     } catch (error) {
