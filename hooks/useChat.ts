@@ -12,12 +12,13 @@ export function useChat(chatId: string | null) {
     const [csvFileName, setCsvFileName] = useState<string | null>(null);
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null);
     const [generatedCode, setGeneratedCode] = useState('');
-    const [completedMessages, setCompletedMessages] = useState<ClientMessage[]>([]);
+    const [messages, setMessages] = useState<ClientMessage[]>([]);
     const [streamingMessage, setStreamingMessage] = useState<string>('');
     const [isGeneratingCode, setIsGeneratingCode] = useState(false);
     const [codeExplanation, setCodeExplanation] = useState('');
     const [sandboxErrors, setSandboxErrors] = useState<any[]>([]);
     const [sandboxId, setSandboxId] = useState<string | null>(null);
+
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -45,7 +46,7 @@ export function useChat(chatId: string | null) {
     }, [chatId]);
 
     const resetState = () => {
-        setCompletedMessages([]);
+        setMessages([]);
         setCsvContent(null);
         setCsvFileName(null);
         setStreamlitUrl(null);
@@ -73,9 +74,11 @@ export function useChat(chatId: string | null) {
                     role: 'assistant',
                     content: msg.assistant_message,
                     created_at: new Date(msg.created_at),
+                    tool_calls: msg.tool_calls,
+                    tool_results: msg.tool_results,
                 }
             ]);
-            setCompletedMessages(clientMessages);
+            setMessages(clientMessages);
         } catch (error) {
             console.error('Error fetching messages:', error);
         }
@@ -177,12 +180,12 @@ export function useChat(chatId: string | null) {
                 accumulatedCode = result.accumulatedCode;
             }
     
-            // Update streaming message state
             setStreamingMessage(accumulatedResponse);
         }
     
         return { accumulatedResponse, accumulatedCode };
     }, [processStreamChunk]);
+
 
     const handleChatOperation = useCallback(async (newMessage: ClientMessage) => {
         if (isLoading || !session || !chatId) {
@@ -195,7 +198,6 @@ export function useChat(chatId: string | null) {
         setGeneratedCode('');
         setCodeExplanation('');
         setSandboxErrors([]);
-
 
         try {
             const response = await fetch(`/api/conversations/${chatId}/stream`, {
@@ -221,14 +223,9 @@ export function useChat(chatId: string | null) {
                 created_at: new Date(),
             };
 
-            // Add the assistant's message to the completed messages
-            setCompletedMessages(prev => [...prev, assistantMessage]);
+            setMessages(prev => [...prev, newMessage, assistantMessage]);
 
-            // Clear the streaming message
             setStreamingMessage('');
-
-            // Store messages in the database
-            await storeMessages(chatId, newMessage, assistantMessage);
 
             if (accumulatedCode) {
                 setGeneratedCode(accumulatedCode);
@@ -242,12 +239,11 @@ export function useChat(chatId: string | null) {
                     content: codeExplanation,
                     created_at: new Date(),
                 };
-                setCompletedMessages(prev => [...prev, explanationMessage]);
-                await storeMessages(chatId, newMessage, explanationMessage);
+                setMessages(prev => [...prev, explanationMessage]);
             }
         } catch (error) {
             console.error('Error in chat operation:', error);
-            setCompletedMessages(prev => [...prev, {
+            setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: 'An error occurred. Please try again.',
                 created_at: new Date(),
@@ -260,27 +256,6 @@ export function useChat(chatId: string | null) {
         }
     }, [session, isLoading, chatId, processStream, updateStreamlitApp, codeExplanation]);
 
-
-    const storeMessages = async (chatId: string, userMessage: ClientMessage, assistantMessage: ClientMessage) => {
-        try {
-            const response = await fetch(`/api/conversations/${chatId}/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_message: userMessage.content,
-                    assistant_message: assistantMessage.content,
-                    token_count: userMessage.content.length + assistantMessage.content.length, // Simplified token count
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to store messages');
-            }
-        } catch (error) {
-            console.error('Error storing messages:', error);
-        }
-    };
-
     const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!input.trim()) return;
@@ -290,11 +265,12 @@ export function useChat(chatId: string | null) {
             content: input,
             created_at: new Date(),
         };
-        setCompletedMessages(prev => [...prev, newUserMessage]);
+        setMessages(prev => [...prev, newUserMessage]);
         setInput('');
 
         await handleChatOperation(newUserMessage);
     }, [input, handleChatOperation]);
+
 
     const handleFileUpload = useCallback(async (content: string, fileName: string) => {
         const sanitizeCSVContent = (content: string): string => {
@@ -344,11 +320,11 @@ export function useChat(chatId: string | null) {
                 created_at: new Date(),
             };
 
-            setCompletedMessages(prev => [...prev, newUserMessage]);
+            setMessages(prev => [...prev, newUserMessage]);
             await handleChatOperation(newUserMessage);
         } catch (error) {
             console.error('Error in file upload:', error);
-            setCompletedMessages(prev => [...prev, {
+            setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
                 created_at: new Date(),
@@ -358,7 +334,7 @@ export function useChat(chatId: string | null) {
     }, [handleChatOperation]);
 
     return {
-        messages: completedMessages,
+        messages,
         input,
         handleInputChange,
         handleSubmit,
