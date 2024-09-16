@@ -14,24 +14,25 @@ export type ToolResult = {
     error?: any
 }
 
-
 export interface ClientMessage {
     role: 'user' | 'assistant';
     content: string;
     created_at?: Date;
+    tool_calls?: ToolCall[] | Json | null;
+    tool_results?: ToolResult[] | Json | null;
 }
 
 export interface Message {
     id: string
     user_id: string
+    role: 'user' | 'assistant'
     user_message: string
     assistant_message: string
-    tool_calls: Json
-    tool_results: Json
+    tool_calls: Json | null
+    tool_results: Json | null
     token_count: number
     created_at: string
 }
-
 export type StreamChunk = {
     type:
         | 'message_start'

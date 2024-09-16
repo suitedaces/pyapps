@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createClientComponentClient, Session } from '@supabase/auth-helpers-nextjs';
-import { ClientMessage, Message, StreamChunk } from '@/lib/types';
+import { ClientMessage, Message, StreamChunk, ToolCall, ToolResult } from '@/lib/types';
 
 
 export function useChat(chatId: string | null) {
@@ -64,26 +64,30 @@ export function useChat(chatId: string | null) {
                 throw new Error('Failed to fetch messages');
             }
             const data: Message[] = await response.json();
-            const clientMessages: ClientMessage[] = data.flatMap(msg => [
-                {
+            const clientMessages: ClientMessage[] = data.flatMap(msg => {
+                const messages: ClientMessage[] = [{
                     role: 'user',
                     content: msg.user_message,
                     created_at: new Date(msg.created_at),
-                },
-                {
-                    role: 'assistant',
-                    content: msg.assistant_message,
-                    created_at: new Date(msg.created_at),
-                    tool_calls: msg.tool_calls,
-                    tool_results: msg.tool_results,
+                }];
+
+                if (msg.assistant_message) {
+                    messages.push({
+                        role: 'assistant',
+                        content: msg.assistant_message,
+                        created_at: new Date(msg.created_at),
+                        tool_calls: msg.tool_calls as ToolCall[] | null,
+                        tool_results: msg.tool_results as ToolResult[] | null,
+                    });
                 }
-            ]);
+
+                return messages;
+            });
             setMessages(clientMessages);
         } catch (error) {
             console.error('Error fetching messages:', error);
         }
-    };
-
+    }
     const initializeSandbox = useCallback(async () => {
         try {
             const response = await fetch('/api/sandbox/init', {
