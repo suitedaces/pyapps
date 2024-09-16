@@ -1,5 +1,3 @@
-// ./lib/agent.ts
-
 import { Anthropic } from '@anthropic-ai/sdk'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
@@ -64,9 +62,10 @@ export class GruntyAgent {
             content: latestMessage,
             created_at: new Date(),
         }
-        chatHistory.push(userMessage)
-
+        
         const sanitizedMessages = this.prepareMessagesForAnthropicAPI(chatHistory)
+        
+        sanitizedMessages.push(userMessage)
 
 
         const stream = await this.client.messages.stream({
