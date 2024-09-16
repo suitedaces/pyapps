@@ -9,9 +9,15 @@ import { Code, Loader2, Paperclip, Send } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { ClientMessage } from '@/lib/types'
-import { CodeProps } from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
+
+interface CodeProps {
+    node?: any,
+    inline?: any,
+    className?: any,
+    children?: any,
+}
 
 export function Chat({
     messages,
