@@ -1,3 +1,5 @@
+'use client'
+
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
