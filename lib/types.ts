@@ -16,7 +16,7 @@ export type ToolResult = {
 
 export interface ClientMessage {
     role: 'user' | 'assistant';
-    content: string | Array<any>;
+    content: string;
     created_at?: Date;
     tool_calls?: ToolCall[] | Json | null;
     tool_results?: ToolResult[] | Json | null;
