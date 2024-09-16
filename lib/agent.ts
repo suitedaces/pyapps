@@ -220,40 +220,36 @@ export class GruntyAgent {
         return text.split(/\s+/).length
     }
 
-    // TODO: make this match types
-    private ensureAlternatingMessages(messages: Message[]): any[] {
+    private ensureAlternatingMessages(messages: Message[]): Message[] {
         if (messages.length === 0) return []
 
         const result: Message[] = []
-        let lastRole: 'user' | 'assistant' | null = null
+        let lastMessage: Message | null = null
 
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i]
 
-            if (message.role === 'user') {
-                if (lastRole === 'user') {
-                    result[result.length - 1].content +=
-                        '\n\n' + message.content
-                } else {
-                    result.push(message)
-                }
-                lastRole = 'user'
-            } else if (message.role === 'assistant' && lastRole === 'user') {
+            if (!lastMessage || message.user_id !== lastMessage.user_id) {
                 result.push(message)
-                lastRole = 'assistant'
+                lastMessage = message
+            } else {
+                lastMessage.user_message += '\n\n' + message.user_message
+                lastMessage.assistant_message += '\n\n' + message.assistant_message
+                lastMessage.token_count += message.token_count
+                if (typeof lastMessage.tool_calls === 'object' && typeof message.tool_calls === 'object') {
+                    lastMessage.tool_calls = { ...lastMessage.tool_calls, ...message.tool_calls }
+                }
+                if (typeof lastMessage.tool_results === 'object' && typeof message.tool_results === 'object') {
+                    lastMessage.tool_results = { ...lastMessage.tool_results, ...message.tool_results }
+                }
             }
         }
 
-        if (
-            result.length > 0 &&
-            result[result.length - 1].role === 'assistant'
-        ) {
+        // Ensure the last message is from the user
+        if (result.length > 0 && result[result.length - 1].assistant_message !== '') {
             result.pop()
         }
 
-        return result.map((message) => ({
-            role: message.role,
-            content: message.content,
-        }))
+        return result
     }
 }
