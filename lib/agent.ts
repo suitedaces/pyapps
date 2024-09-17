@@ -155,8 +155,8 @@ export class GruntyAgent {
                 currentContentBlock = null
             } else if (event.type === 'message_delta') {
                 Object.assign(currentMessage, event.delta)
-                if (event.delta.usage) {
-                    this.outputTokens = event.delta.usage.output_tokens
+                if (event.usage) {
+                    this.outputTokens = event.usage.output_tokens
                 }
             } else if (event.type === 'message_stop') {
                 console.log("Storing Message for chatId:", chatId)
