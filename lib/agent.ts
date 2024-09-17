@@ -10,7 +10,6 @@ import {
     ToolCall,
     ToolResult,
 } from './types'
-import { countToken } from '@anthropic-ai/sdk'
 
 export class GruntyAgent {
     private client: Anthropic
@@ -263,5 +262,4 @@ export class GruntyAgent {
     
         return sanitizedMessages;
     }
-
 }
