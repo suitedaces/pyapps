@@ -62,7 +62,7 @@ export async function generateCode(query: string): Promise<string> {
                           .replace(/^```python/, '')
                           .replace(/```$/, '')
                     : ''
-            return generatedCode
+            return generatedCode, response.usage.input_tokens + response.usage.output_tokens
         } else {
             console.error('Unexpected response format:', response)
             throw new Error(

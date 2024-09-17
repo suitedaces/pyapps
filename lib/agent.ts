@@ -3,7 +3,6 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { generateCode } from './tools'
 import {
-    ClientMessage,
     CSVAnalysis,
     Message,
     StreamChunk,
@@ -11,24 +10,30 @@ import {
     ToolCall,
     ToolResult,
 } from './types'
-import { countTokens } from '@anthropic-ai/tokenizer'
+import { countToken } from '@anthropic-ai/sdk'
 
 export class GruntyAgent {
     private client: Anthropic
     private model: string
     private role: string
     private roleDescription: string
+    private inputTokens: number
+    private outputTokens: number
+    private codeTokens: number
 
     constructor(
         client: Anthropic,
         model: string,
         role: string,
-        roleDescription: string
+        roleDescription: string,
     ) {
         this.client = client
         this.model = model
         this.role = role
         this.roleDescription = roleDescription
+        this.inputTokens = 0
+        this.outputTokens = 0
+        this.codeTokens = 0
     }
 
     private async fetchChatHistory(chatId: string): Promise<Message[]> {
@@ -65,11 +70,9 @@ export class GruntyAgent {
         }
         
         const sanitizedMessages = this.prepareMessagesForAnthropicAPI(chatHistory)
-
         sanitizedMessages.push(userMessage)
 
         console.log("Sanitized Messages:", sanitizedMessages)
-
 
         const stream = await this.client.messages.stream({
             model: this.model,
@@ -91,6 +94,9 @@ export class GruntyAgent {
             yield event as StreamChunk
             if (event.type === 'message_start') {
                 currentMessage = event.message
+                if (event.message.usage) {
+                    this.inputTokens = event.message.usage.input_tokens
+                }
             } else if (event.type === 'content_block_start') {
                 currentContentBlock = event.content_block
                 accumulatedJson = ''
@@ -122,7 +128,8 @@ export class GruntyAgent {
                                 Use the following CSV analysis to inform your code:
                                 ${JSON.stringify(csvAnalysis, null, 2)}
                             `
-                            generatedCode = await generateCode(codeQuery)
+                            const { generatedCode, codeTokenCount } = await generateCode(codeQuery)
+                            this.codeTokens += codeTokenCount
 
                             yield {
                                 type: 'generated_code',
@@ -149,14 +156,19 @@ export class GruntyAgent {
                 currentContentBlock = null
             } else if (event.type === 'message_delta') {
                 Object.assign(currentMessage, event.delta)
+                if (event.delta.usage) {
+                    this.outputTokens = event.delta.usage.output_tokens
+                }
             } else if (event.type === 'message_stop') {
                 console.log("Storing Message for chatId:", chatId)
+                const totalTokenCount = this.outputTokens + this.codeTokens + this.inputTokens
+                console.log("Total Token Count (output, code, input):", this.outputTokens, this.codeTokens, this.inputTokens)
                 await this.storeMessage(
                     chatId,
                     userId,
                     latestMessage,
                     accumulatedResponse.trim(),
-                    this.calculateTokenCount(accumulatedResponse),
+                    totalTokenCount,
                     toolCalls,
                     toolResults
                 )
@@ -169,6 +181,7 @@ export class GruntyAgent {
             }
         }
     }
+
 
     private async storeMessage(
         chatId: string,
@@ -199,10 +212,6 @@ export class GruntyAgent {
         } else {
             console.log('Message stored successfully with ID:', data)
         }
-    }
-
-    private calculateTokenCount(text: string): number {
-        return countTokens(text)
     }
 
     private prepareMessagesForAnthropicAPI(messages: Message[]): Anthropic.Messages.MessageParam[] {
