@@ -40,7 +40,7 @@ export const tools: Tool[] = [
     },
 ]
 
-export async function generateCode(query: string): Promise<string> {
+export async function generateCode(query: string): Promise<{ generatedCode: string, codeTokenCount: number }> {
     if (!query || !query.trim()) {
         throw new Error('Query cannot be empty or just whitespace.')
     }
