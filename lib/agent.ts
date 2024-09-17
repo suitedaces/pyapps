@@ -58,7 +58,7 @@ export class GruntyAgent {
     ): AsyncGenerator<StreamChunk> {
         
         const chatHistory = await this.fetchChatHistory(chatId)
-        console.log("Chat History:", chatHistory)
+        console.log("Chat History for chatId:", chatId, chatHistory)
         const userMessage: any = {
             role: 'user',
             content: latestMessage
@@ -150,7 +150,7 @@ export class GruntyAgent {
             } else if (event.type === 'message_delta') {
                 Object.assign(currentMessage, event.delta)
             } else if (event.type === 'message_stop') {
-
+                console.log("Storing Message for chatId:", chatId)
                 await this.storeMessage(
                     chatId,
                     userId,
@@ -180,18 +180,24 @@ export class GruntyAgent {
         toolResults: any
     ) {
         const supabase = createRouteHandlerClient({ cookies })
-        const { error } = await supabase.rpc('insert_message', {
-            p_chat_id: chatId,
-            p_user_id: userId,
-            p_user_message: userMessage,
-            p_assistant_message: assistantMessage,
-            p_token_count: tokenCount,
-            p_tool_calls: toolCalls,
-            p_tool_results: toolResults,
+        const { data, error } = await supabase
+        .from('messages')
+        .insert({
+            chat_id: chatId,
+            user_id: userId,
+            user_message: userMessage,
+            assistant_message: assistantMessage,
+            tool_calls: toolCalls,
+            tool_results: toolResults,
+            token_count: tokenCount
         })
-
+        .select()
+    
         if (error) {
-            console.error('Failed to store message:', error)
+            console.error('Failed to store message:', error.message, error.details, error.hint)
+            throw error
+        } else {
+            console.log('Message stored successfully with ID:', data)
         }
     }
 
