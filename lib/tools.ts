@@ -82,7 +82,8 @@ export const functions = {
         query: string
     }): Promise<string> => {
         try {
-            const generatedCode = await generateCode(input.query)
+            const { generatedCode, codeTokenCount } = await generateCode(input.query)
+            
             return generatedCode
         } catch (err) {
             console.error(`Error generating Streamlit app:`, err)
