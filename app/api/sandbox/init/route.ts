@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         })
 
         await sandbox.filesystem.makeDir('/app')
-        await sandbox.keepAlive(5 * 60 * 1000) // 5 minutes
+        await sandbox.keepAlive(10 * 60 * 1000) // 10 minutes
 
         return NextResponse.json({ sandboxId: sandbox.id })
     } catch (error) {

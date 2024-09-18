@@ -39,7 +39,6 @@ export function useChat(chatId: string | null) {
     useEffect(() => {
         if (chatId) {
             fetchMessages(chatId);
-            initializeSandbox();
         } else {
             resetState();
         }
@@ -88,27 +87,6 @@ export function useChat(chatId: string | null) {
             console.error('Error fetching messages:', error);
         }
     }
-
-    const initializeSandbox = useCallback(async () => {
-        try {
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            setSandboxId(data.sandboxId);
-            console.log('Sandbox initialized with ID:', data.sandboxId);
-        } catch (error) {
-            console.error('Error initializing sandbox:', error);
-            setSandboxErrors(prev => [...prev, { message: 'Error initializing sandbox' }]);
-        }
-    }, []);
-
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setInput(e.target.value);
@@ -294,11 +272,13 @@ export function useChat(chatId: string | null) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    chat_id: chatId,
                     file_name: fileName,
                     file_type: 'csv',
-                    file_size: content.length,
-                    file_url: 'placeholder_url',
-                    content: sanitizedContent,
+                    file_size: sanitizedContent.length,
+                    content_hash: sanitizedContent,
+                    analysis: null,
+                    expires_at: new Date(Date.now() + 1 * 60 * 1000),
                 }),
             });
 
@@ -324,7 +304,7 @@ export function useChat(chatId: string | null) {
 
             const newUserMessage: ClientMessage = {
                 role: 'user',
-                content: `I've uploaded a CSV file named "/app/${fileName}". <hidden_prompt>Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code.</hidden_prompt>`,
+                content: `I've uploaded a CSV file named "${fileName}". <hidden_prompt>Can you analyze it and create a Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code. The file is located at ${data.remotePath} in the sandbox.</hidden_prompt>`,
                 created_at: new Date(),
             };
 
