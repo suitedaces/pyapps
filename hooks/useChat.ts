@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createClientComponentClient, Session } from '@supabase/auth-helpers-nextjs';
 import { ClientMessage, Message, StreamChunk, ToolCall, ToolResult } from '@/lib/types';
+import { init } from 'next/dist/compiled/webpack/webpack';
 
 
 export function useChat(chatId: string | null) {
@@ -38,6 +39,7 @@ export function useChat(chatId: string | null) {
 
     useEffect(() => {
         if (chatId) {
+            initializeSandbox();
             fetchMessages(chatId);
         } else {
             resetState();
@@ -55,6 +57,27 @@ export function useChat(chatId: string | null) {
         setSandboxErrors([]);
         setSandboxId(null);
     };
+
+    const initializeSandbox = useCallback(async () => {
+        try {
+            const response = await fetch('/api/sandbox/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            setSandboxId(data.sandboxId);
+            console.log('Sandbox initialized with ID:', data.sandboxId);
+        } catch (error) {
+            console.error('Error initializing sandbox:', error);
+            setSandboxErrors(prev => [...prev, { message: 'Error initializing sandbox' }]);
+        }
+    }, []);
+
 
     const fetchMessages = async (id: string) => {
         try {
@@ -275,9 +298,12 @@ export function useChat(chatId: string | null) {
                     chat_id: chatId,
                     file_name: fileName,
                     file_type: 'csv',
+                    file_url: `app/${fileName}`,
+                    backup_url: 'placeholder_url',
                     file_size: sanitizedContent.length,
                     content_hash: sanitizedContent,
                     analysis: null,
+                    sandbox_id: sandboxId,
                     expires_at: new Date(Date.now() + 1 * 60 * 1000),
                 }),
             });
