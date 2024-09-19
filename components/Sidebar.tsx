@@ -1,10 +1,12 @@
 'use client'
 
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import { PlusCircle, Settings, SidebarIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useMessageStore } from '@/lib/messageStore'
 
 interface SidebarProps {
     isRightContentVisible: boolean
@@ -25,9 +27,13 @@ export default function Sidebar({
     onChatSelect,
     onNewChat,
     currentChatId,
-}: SidebarProps) {
+}: SidebarProps, id: string) {
     const [isOpen, setIsOpen] = useState(false)
     const [chats, setChats] = useState<Chat[]>([])
+    const [isNewChat, setIsNewChat] = useState(false);
+    const { loading: messageStopStatus, fetchTitle, title, messageStoredChatId } = useMessageStore()
+
+
     const router = useRouter()
 
     const toggleSidebar = () => {
@@ -40,6 +46,13 @@ export default function Sidebar({
         fetchChats()
     }, [])
 
+    useEffect(() => {
+        if (messageStoredChatId) {
+            fetchTitle(messageStoredChatId)
+        }
+    }, [messageStoredChatId, fetchTitle])
+
+
     const fetchChats = async () => {
         try {
             const response = await fetch('/api/conversations')
@@ -48,14 +61,23 @@ export default function Sidebar({
             }
             const data = await response.json()
             setChats(data)
+
+            console.log(data);
+
         } catch (error) {
             console.error('Error fetching chats:', error)
         }
     }
 
     const handleNewChat = async () => {
+        setIsNewChat(true)
         await onNewChat()
         fetchChats() // refresh the chat list
+    }
+
+    const handleChatSelect = (chatId: string) => {
+        setIsNewChat(false)
+        onChatSelect(chatId)
     }
 
     const sidebarVariants = {
@@ -67,7 +89,7 @@ export default function Sidebar({
         <div className="relative">
             <Button
                 onClick={toggleSidebar}
-                className="fixed top-2 left-4 z-30"
+                className="fixed top-4 left-4 z-30"
                 size="icon"
             >
                 <SidebarIcon className="h-4 w-4" />
@@ -81,28 +103,29 @@ export default function Sidebar({
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                 className="fixed left-0 top-0 bottom-0 w-64 bg-matte text-white p-4 z-20"
             >
-                <div className="flex flex-col h-full">
+                <div className="flex relative flex-col h-full">
                     <Button
                         onClick={handleNewChat}
-                        className="mb-4 w-full justify-start"
+                        className="absolute right-0 top-0"
                     >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        New Chat
+                        <PlusCircle className="h-4 w-4" />
                     </Button>
 
                     <div className="flex-grow mt-20 overflow-auto">
                         {chats.map((chat) => (
-                            <Button
-                                key={chat.id}
-                                onClick={() => onChatSelect(chat.id)}
-                                className={`w-full text-left py-2 px-3 mb-1 rounded-lg hover:bg-gray-700 transition-colors ${
-                                    currentChatId === chat.id
+                            <Link href={`/chat/${chat.id}`} key={chat.id}>
+                                <Button
+                                    key={chat.id}
+                                    onClick={() => onChatSelect(chat.id)}
+                                    className={`w-full text-left py-2 px-3 mb-1 rounded-lg hover:bg-gray-700 transition-colors ${currentChatId === chat.id
                                         ? 'bg-gray-700'
                                         : ''
-                                }`}
-                            >
-                                {chat.name || `Chat ${chat.id.slice(0, 8)}`}
-                            </Button>
+                                        }`}
+                                >
+                                    {currentChatId === chat.id && title ? title : chat.name || `Chat ${chat.id.slice(0, 8)}`}
+
+                                </Button>
+                            </Link>
                         ))}
                     </div>
 
