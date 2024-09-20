@@ -1,24 +1,41 @@
 'use client'
 
+import React, { useEffect, useRef, useState, ChangeEvent, FormEvent } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ClientMessage } from '@/lib/types'
 import { Code, FileIcon, Loader2, Paperclip, Send, X } from 'lucide-react'
-import React, { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 interface CodeProps {
-    node?: any
-    inline?: any
-    className?: any
-    children?: any
+    node?: any;
+    inline?: boolean;
+    className?: string;
+    children?: React.ReactNode;
 }
 
-const formatFileSize = (bytes) => {
+interface ChatProps {
+    messages: ClientMessage[];
+    input: string;
+    handleInputChange: (e: ChangeEvent<HTMLInputElement>) => void;
+    handleSubmit: (e: FormEvent<HTMLFormElement>) => void;
+    isLoading: boolean;
+    streamingMessage: string;
+    streamingCodeExplanation: string;
+    handleFileUpload: (content: string, fileName: string) => void;
+    onChatSelect: (chatId: string) => void;
+}
+
+interface Chat {
+    id: string;
+    name: string;
+}
+
+const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' bytes'
     else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
     else return (bytes / 1048576).toFixed(1) + ' MB'
@@ -29,28 +46,21 @@ export function Chat({
     input,
     handleInputChange,
     handleSubmit,
-    isLoading,
+    isLoading: isLoadingProp,
     streamingMessage,
     streamingCodeExplanation,
     handleFileUpload,
-}: {
-    messages: ClientMessage[]
-    input: string
-    handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
-    isLoading: boolean
-    streamingMessage: string
-    streamingCodeExplanation: string
-    handleFileUpload: (content: string, fileName: string) => void
-    onChatSelect: (chatId: string) => void
-}) {
+}: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const [isAtBottom, setIsAtBottom] = useState(true)
-    const [chats, setChats] = useState<{ id: string; name: string }[]>([])
-    const [file, setFile] = useState(null)
+    const [isAtBottom, setIsAtBottom] = useState<boolean>(true)
+    const [chats, setChats] = useState<Chat[]>([])
+    const [file, setFile] = useState<File | null>(null)
+    const [isLoadingInternal, setIsLoadingInternal] = useState<boolean>(false)
 
-    useEffect(() => { 
+    const isLoading = isLoadingProp || isLoadingInternal
+
+    useEffect(() => {
         if (isAtBottom) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
         }
@@ -71,14 +81,14 @@ export function Chat({
             if (!response.ok) {
                 throw new Error('Failed to fetch chats')
             }
-            const data = await response.json()
+            const data: Chat[] = await response.json()
             setChats(data)
         } catch (error) {
             console.error('Error fetching chats:', error)
         }
     }
 
-    const handleFileChange = (event) => {
+    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0]
         if (selectedFile && selectedFile.name.endsWith('.csv')) {
             setFile(selectedFile)
@@ -94,29 +104,35 @@ export function Chat({
         }
     }
 
-    const handleFormSubmit = (e) => {
+    const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        if (file) {
-            const reader = new FileReader()
-            reader.onload = (e) => {
-                const content = e.target?.result
-                handleFileUpload(content, file.name)
+        setIsLoadingInternal(true)
+
+        try {
+            if (file) {
+                const reader = new FileReader()
+                reader.onload = async (e: ProgressEvent<FileReader>) => {
+                    const content = e.target?.result as string
+                    await handleFileUpload(content, file.name)
+                }
+                reader.readAsText(file)
             }
-            reader.readAsText(file)
+            await handleSubmit(e)
+        } catch (error) {
+            console.error('Error submitting form:', error)
+        } finally {
+            setIsLoadingInternal(false)
+            setFile(null)
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
         }
-        handleSubmit(e)
     }
 
     const renderMessage = (content: string) => (
         <ReactMarkdown
             components={{
-                code({
-                    node,
-                    inline,
-                    className,
-                    children,
-                    ...props
-                }: CodeProps) {
+                code({ node, inline, className, children, ...props }: CodeProps) {
                     const match = /language-(\w+)/.exec(className || '')
                     const lang = match && match[1] ? match[1] : ''
                     const codeString = String(children).replace(/\n$/, '')
@@ -283,11 +299,12 @@ export function Chat({
                 <div className="flex space-x-2">
                     <div className="relative flex-grow">
                         <div
-                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'}`}
+                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'
+                                }`}
                         >
                             {file && (
                                 <div className="px-3 flex justify-start mb-2">
-                                    <div className="inline-flex items-center bg-white border border-black border-2 rounded-xl py-1 px-3 max-w-full">
+                                    <div className="inline-flex items-center bg-white border-black border-2 rounded-xl py-1 px-3 max-w-full">
                                         <FileIcon
                                             size={16}
                                             className="text-blue-400 mr-2 flex-shrink-0"
