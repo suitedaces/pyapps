@@ -98,10 +98,7 @@ export async function POST(req: NextRequest) {
     try {
         const sandbox = await Sandbox.reconnect(sandbox_id)
         const fileBuffer = Buffer.from(content_hash)
-        const remotePath = await sandbox.uploadFile(
-            fileBuffer,
-            `app/${file_name}`
-        )
+        const remotePath = await sandbox.uploadFile(fileBuffer, `${file_name}`)
 
         console.log(`File uploaded to sandbox at: ${remotePath}`)
         return NextResponse.json({ ...data, remotePath })

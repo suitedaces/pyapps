@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState, ChangeEvent, FormEvent } from 'react'
+import React, { useEffect, useCallback, useRef, useState, ChangeEvent, FormEvent } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,7 @@ const formatFileSize = (bytes: number): string => {
     else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
     else return (bytes / 1048576).toFixed(1) + ' MB'
 }
+
 
 export function Chat({
     messages,
