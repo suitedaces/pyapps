@@ -4,19 +4,24 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Message } from '@/lib/types'
-import { Code, Loader2, Paperclip, Send } from 'lucide-react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
 import { ClientMessage } from '@/lib/types'
+import { Code, FileIcon, Loader2, Paperclip, Send, X } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 interface CodeProps {
-    node?: any,
-    inline?: any,
-    className?: any,
-    children?: any,
+    node?: any
+    inline?: any
+    className?: any
+    children?: any
+}
+
+const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + ' bytes'
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+    else return (bytes / 1048576).toFixed(1) + ' MB'
 }
 
 export function Chat({
@@ -28,7 +33,6 @@ export function Chat({
     streamingMessage,
     streamingCodeExplanation,
     handleFileUpload,
-    onChatSelect,
 }: {
     messages: ClientMessage[]
     input: string
@@ -44,8 +48,9 @@ export function Chat({
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isAtBottom, setIsAtBottom] = useState(true)
     const [chats, setChats] = useState<{ id: string; name: string }[]>([])
+    const [file, setFile] = useState(null)
 
-    useEffect(() => {
+    useEffect(() => { 
         if (isAtBottom) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
         }
@@ -73,23 +78,33 @@ export function Chat({
         }
     }
 
-    const handleChatSelection = useCallback(
-        (chatId: string) => {
-            onChatSelect(chatId)
-        },
-        [onChatSelect]
-    )
+    const handleFileChange = (event) => {
+        const selectedFile = event.target.files?.[0]
+        if (selectedFile && selectedFile.name.endsWith('.csv')) {
+            setFile(selectedFile)
+        } else {
+            alert('Please select a CSV file.')
+        }
+    }
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0]
+    const removeFile = () => {
+        setFile(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+    const handleFormSubmit = (e) => {
+        e.preventDefault()
         if (file) {
             const reader = new FileReader()
             reader.onload = (e) => {
-                const content = e.target?.result as string
+                const content = e.target?.result
                 handleFileUpload(content, file.name)
             }
             reader.readAsText(file)
         }
+        handleSubmit(e)
     }
 
     const renderMessage = (content: string) => (
@@ -209,18 +224,18 @@ export function Chat({
                                 </div>
                             </div>
                         )}
-                    {message.role === 'assistant' && (
-                        <div className="flex justify-start mb-4">
-                            <div className="flex flex-row items-start max-w-[80%]">
-                                <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
-                                    <AvatarFallback>G</AvatarFallback>
-                                </Avatar>
-                                <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
-                                    {renderMessage(message.content)}
+                        {message.role === 'assistant' && (
+                            <div className="flex justify-start mb-4">
+                                <div className="flex flex-row items-start max-w-[80%]">
+                                    <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
+                                        <AvatarFallback>G</AvatarFallback>
+                                    </Avatar>
+                                    <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                        {renderMessage(message.content)}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
                     </React.Fragment>
                 ))}
                 {streamingMessage && (
@@ -262,22 +277,52 @@ export function Chat({
                 </Button>
             )}
             <form
-                onSubmit={handleSubmit}
+                onSubmit={handleFormSubmit}
                 className="p-4 dark:border-darkBorder"
             >
                 <div className="flex space-x-2">
                     <div className="relative flex-grow">
+                        <div
+                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'}`}
+                        >
+                            {file && (
+                                <div className="px-3 flex justify-start mb-2">
+                                    <div className="inline-flex items-center bg-white border border-black border-2 rounded-xl py-1 px-3 max-w-full">
+                                        <FileIcon
+                                            size={16}
+                                            className="text-blue-400 mr-2 flex-shrink-0"
+                                        />
+                                        <div className="flex flex-col min-w-0 mr-2">
+                                            <span className="text-black text-sm truncate max-w-[200px]">
+                                                {file.name}
+                                            </span>
+                                            <span className="text-gray-700 text-xs">
+                                                {formatFileSize(file.size)}
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={removeFile}
+                                            className="text-gray-400 hover:text-black p-1 ml-1"
+                                            aria-label="Remove file"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <Input
                             value={input}
                             onChange={handleInputChange}
                             placeholder="Type your message..."
                             disabled={isLoading}
-                            className="relative flex min-h-[70px] w-full rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
+                            className="relative flex w-full h-20 rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
                         />
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text dark:text-darkText hover:text-main transition-colors duration-300 ease-in-out"
+                            className="absolute left-5 bottom-5 transform -translate-y-1/2 text-text dark:text-darkText hover:text-main transition-colors duration-300 ease-in-out"
                         >
                             <Paperclip className="h-5 w-5" />
                         </button>
@@ -292,7 +337,7 @@ export function Chat({
                             type="submit"
                             variant={'noShadow'}
                             disabled={isLoading}
-                            className="absolute rounded-full right-5 bottom-4 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
+                            className="absolute rounded-full right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
                         >
                             {isLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

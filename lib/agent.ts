@@ -24,7 +24,7 @@ export class GruntyAgent {
         client: Anthropic,
         model: string,
         role: string,
-        roleDescription: string,
+        roleDescription: string
     ) {
         this.client = client
         this.model = model
@@ -60,18 +60,18 @@ export class GruntyAgent {
         maxTokens: number,
         csvAnalysis?: CSVAnalysis
     ): AsyncGenerator<StreamChunk> {
-        
         const chatHistory = await this.fetchChatHistory(chatId)
-        console.log("Chat History for chatId:", chatId, chatHistory)
+        console.log('Chat History for chatId:', chatId, chatHistory)
         const userMessage: any = {
             role: 'user',
-            content: latestMessage
+            content: latestMessage,
         }
-        
-        const sanitizedMessages = this.prepareMessagesForAnthropicAPI(chatHistory)
+
+        const sanitizedMessages =
+            this.prepareMessagesForAnthropicAPI(chatHistory)
         sanitizedMessages.push(userMessage)
 
-        console.log("Sanitized Messages:", sanitizedMessages)
+        console.log('Sanitized Messages:', sanitizedMessages)
 
         const stream = await this.client.messages.stream({
             model: this.model,
@@ -127,7 +127,8 @@ export class GruntyAgent {
                                 Use the following CSV analysis to inform your code:
                                 ${JSON.stringify(csvAnalysis, null, 2)}
                             `
-                            const { generatedCode, codeTokenCount } = await generateCode(codeQuery)
+                            const { generatedCode, codeTokenCount } =
+                                await generateCode(codeQuery)
                             this.codeTokens += codeTokenCount
 
                             yield {
@@ -159,9 +160,15 @@ export class GruntyAgent {
                     this.outputTokens = event.usage.output_tokens
                 }
             } else if (event.type === 'message_stop') {
-                console.log("Storing Message for chatId:", chatId)
-                const totalTokenCount = this.outputTokens + this.codeTokens + this.inputTokens
-                console.log("Total Token Count (output, code, input):", this.outputTokens, this.codeTokens, this.inputTokens)
+                console.log('Storing Message for chatId:', chatId)
+                const totalTokenCount =
+                    this.outputTokens + this.codeTokens + this.inputTokens
+                console.log(
+                    'Total Token Count (output, code, input):',
+                    this.outputTokens,
+                    this.codeTokens,
+                    this.inputTokens
+                )
                 await this.storeMessage(
                     chatId,
                     userId,
@@ -181,7 +188,6 @@ export class GruntyAgent {
         }
     }
 
-
     private async storeMessage(
         chatId: string,
         userId: string,
@@ -193,87 +199,115 @@ export class GruntyAgent {
     ) {
         const supabase = createRouteHandlerClient({ cookies })
         const { data, error } = await supabase
-        .from('messages')
-        .insert({
-            chat_id: chatId,
-            user_id: userId,
-            user_message: userMessage,
-            assistant_message: assistantMessage,
-            tool_calls: toolCalls,
-            tool_results: toolResults,
-            token_count: tokenCount
-        })
-        .select()
-    
+            .from('messages')
+            .insert({
+                chat_id: chatId,
+                user_id: userId,
+                user_message: userMessage,
+                assistant_message: assistantMessage,
+                tool_calls: toolCalls,
+                tool_results: toolResults,
+                token_count: tokenCount,
+            })
+            .select()
+
         if (error) {
-            console.error('Failed to store message:', error.message, error.details, error.hint)
+            console.error(
+                'Failed to store message:',
+                error.message,
+                error.details,
+                error.hint
+            )
             throw error
         } else {
             console.log('Message stored successfully with ID:', data)
         }
     }
 
-    private prepareMessagesForAnthropicAPI(messages: Message[]): Anthropic.Messages.MessageParam[] {
-        const sanitizedMessages: Anthropic.Messages.MessageParam[] = [];
-    
+    private prepareMessagesForAnthropicAPI(
+        messages: Message[]
+    ): Anthropic.Messages.MessageParam[] {
+        const sanitizedMessages: Anthropic.Messages.MessageParam[] = []
+
         for (const message of messages) {
             // Add user message
             sanitizedMessages.push({
                 role: 'user',
-                content: message.user_message
-            });
-    
+                content: message.user_message,
+            })
+
             // Add assistant message
             const assistantMessage: Anthropic.Messages.MessageParam = {
                 role: 'assistant',
-                content: []
-            };
-    
+                content: [],
+            }
+
             // Add text content
             if (message.assistant_message) {
-                (assistantMessage.content as Anthropic.Messages.ContentBlock[]).push({
+                ;(
+                    assistantMessage.content as Anthropic.Messages.ContentBlock[]
+                ).push({
                     type: 'text',
-                    text: message.assistant_message
-                });
+                    text: message.assistant_message,
+                })
             }
-    
+
             // Add tool calls if they exist
-            if (message.tool_calls && typeof message.tool_calls === 'object' && !Array.isArray(message.tool_calls)) {
-                const toolCalls = message.tool_calls as Record<string, Json>;
+            if (
+                message.tool_calls &&
+                typeof message.tool_calls === 'object' &&
+                !Array.isArray(message.tool_calls)
+            ) {
+                const toolCalls = message.tool_calls as Record<string, Json>
                 for (const [id, callData] of Object.entries(toolCalls)) {
-                    if (typeof callData === 'object' && callData !== null && 'name' in callData && 'parameters' in callData) {
-                        (assistantMessage.content as Anthropic.Messages.ContentBlock[]).push({
+                    if (
+                        typeof callData === 'object' &&
+                        callData !== null &&
+                        'name' in callData &&
+                        'parameters' in callData
+                    ) {
+                        ;(
+                            assistantMessage.content as Anthropic.Messages.ContentBlock[]
+                        ).push({
                             type: 'tool_use',
                             id: id,
                             name: callData.name as string,
-                            input: callData.parameters as Record<string, Json>
-                        });
+                            input: callData.parameters as Record<string, Json>,
+                        })
                     }
                 }
             }
-    
-            sanitizedMessages.push(assistantMessage);
-    
+
+            sanitizedMessages.push(assistantMessage)
+
             // Add tool results if they exist
-            if (message.tool_results && typeof message.tool_results === 'object' && !Array.isArray(message.tool_results)) {
-                const toolResults = message.tool_results as Record<string, Json>;
+            if (
+                message.tool_results &&
+                typeof message.tool_results === 'object' &&
+                !Array.isArray(message.tool_results)
+            ) {
+                const toolResults = message.tool_results as Record<string, Json>
                 for (const [id, resultData] of Object.entries(toolResults)) {
-                    if (typeof resultData === 'object' && resultData !== null && 'result' in resultData) {
+                    if (
+                        typeof resultData === 'object' &&
+                        resultData !== null &&
+                        'result' in resultData
+                    ) {
                         sanitizedMessages.push({
                             role: 'user',
                             content: [
                                 {
                                     type: 'tool_result',
                                     tool_use_id: id,
-                                    content: resultData.result as string
-                                }
-                            ]
-                        });
+                                    content: resultData.result as string,
+                                },
+                            ],
+                        })
                     }
                 }
             }
         }
-    
-        return sanitizedMessages;
+
+        return sanitizedMessages
     }
 }
