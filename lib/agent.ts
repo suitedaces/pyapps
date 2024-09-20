@@ -239,14 +239,14 @@ export class GruntyAgent {
     
             // Add tool calls if they exist
             if (message.tool_calls && typeof message.tool_calls === 'object' && !Array.isArray(message.tool_calls)) {
-                const toolCalls = message.tool_calls as Record<string, Json>;
+                const toolCalls = message.tool_calls as Record<string, Record<string, any>>;
                 for (const [id, callData] of Object.entries(toolCalls)) {
                     if (typeof callData === 'object' && callData !== null && 'name' in callData && 'parameters' in callData) {
                         (assistantMessage.content as Anthropic.Messages.ContentBlock[]).push({
                             type: 'tool_use',
                             id: id,
                             name: callData.name as string,
-                            input: callData.parameters as Record<string, Json>
+                            input: callData.parameters as Record<string, Record<string, any>>
                         });
                     }
                 }
@@ -256,7 +256,7 @@ export class GruntyAgent {
     
             // Add tool results if they exist
             if (message.tool_results && typeof message.tool_results === 'object' && !Array.isArray(message.tool_results)) {
-                const toolResults = message.tool_results as Record<string, Json>;
+                const toolResults = message.tool_results as Record<string, Record<string, any>>;
                 for (const [id, resultData] of Object.entries(toolResults)) {
                     if (typeof resultData === 'object' && resultData !== null && 'result' in resultData) {
                         sanitizedMessages.push({
