@@ -59,17 +59,17 @@ export async function POST(
     } = await req.json()
 
     const { data, error } = await supabase
-    .from('messages')
-    .insert({
-        chat_id: params.id,
-        user_id: session.user.id,
-        user_message: user_message,
-        assistant_message: assistant_message,
-        tool_calls: tool_calls,
-        tool_results: tool_results,
-        token_count: token_count
-    })
-    .select()
+        .from('messages')
+        .insert({
+            chat_id: params.id,
+            user_id: session.user.id,
+            user_message: user_message,
+            assistant_message: assistant_message,
+            tool_calls: tool_calls,
+            tool_results: tool_results,
+            token_count: token_count,
+        })
+        .select()
     if (error) {
         return NextResponse.json(
             { error: 'Failed to create message' },
