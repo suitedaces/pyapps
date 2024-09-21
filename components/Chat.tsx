@@ -58,6 +58,8 @@ export function Chat({
     const [chats, setChats] = useState<Chat[]>([])
     const [file, setFile] = useState<File | null>(null)
     const [isLoadingInternal, setIsLoadingInternal] = useState<boolean>(false)
+    const [isInputDisabled, setIsInputDisabled] = useState<boolean>(false)
+    const [isFileSubmitted, setIsFileSubmitted] = useState<boolean>(false)
 
     const isLoading = isLoadingProp || isLoadingInternal
 
@@ -93,6 +95,8 @@ export function Chat({
         const selectedFile = event.target.files?.[0]
         if (selectedFile && selectedFile.name.endsWith('.csv')) {
             setFile(selectedFile)
+            setIsInputDisabled(true)
+            setIsFileSubmitted(false)
         } else {
             alert('Please select a CSV file.')
         }
@@ -100,6 +104,8 @@ export function Chat({
 
     const removeFile = () => {
         setFile(null)
+        setIsInputDisabled(false)
+        setIsFileSubmitted(false)
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
         }
@@ -117,15 +123,19 @@ export function Chat({
                     await handleFileUpload(content, file.name)
                 }
                 reader.readAsText(file)
+                setIsFileSubmitted(true)
+                setIsInputDisabled(false)
             }
             await handleSubmit(e)
         } catch (error) {
             console.error('Error submitting form:', error)
         } finally {
             setIsLoadingInternal(false)
-            setFile(null)
-            if (fileInputRef.current) {
-                fileInputRef.current.value = ''
+            if (!isFileSubmitted) {
+                setFile(null)
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = ''
+                }
             }
         }
     }
@@ -333,8 +343,8 @@ export function Chat({
                         <Input
                             value={input}
                             onChange={handleInputChange}
-                            placeholder="Type your message..."
-                            disabled={isLoading}
+                            placeholder={isInputDisabled ? "File attached. Remove file to type a message." : "Type your message..."}
+                            disabled={isLoading || (isInputDisabled && !isFileSubmitted)}
                             className="relative flex w-full h-20 rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
                         />
                         <button
@@ -354,7 +364,7 @@ export function Chat({
                         <Button
                             type="submit"
                             variant={'noShadow'}
-                            disabled={isLoading}
+                            disabled={isLoading || (!input.trim() && !file)}
                             className="absolute rounded-full right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
                         >
                             {isLoading ? (
