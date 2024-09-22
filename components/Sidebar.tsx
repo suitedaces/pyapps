@@ -190,52 +190,52 @@ export default function Sidebar({
                                 >
                                     <Button
                                         onClick={() => onChatSelect(chat.id)}
-                                        className={`w-full text-left py-2 px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''
-                                            }`}
+                                        className={`w-full text-left py-2 px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''}`}
                                     >
                                         <span className="flex-grow truncate">
                                             {chat.name || `Chat ${chat.id.slice(0, 8)}`}
                                         </span>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    className="ml-2 p-1 absolute right-2 top opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    size="icon"
-                                                    variant="noBg"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">More options</span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <DropdownMenuItem onClick={() => handleRenameChat(chat)}>
-                                                    <Edit2 className="mr-2 h-4 w-4" />
-                                                    Rename Chat
-                                                </DropdownMenuItem>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <DropdownMenuItem onSelect={(e: any) => e.preventDefault()}>
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                            Delete Chat
-                                                        </DropdownMenuItem>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                This action cannot be undone. This will permanently delete your chat.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
-                                                                Confirm
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                                            <Button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRenameChat(chat);
+                                                }}
+                                                className="p-0.5"
+                                                size="icon"
+                                                variant="noBg"
+                                            >
+                                                <Edit2 className="h-3.5 w-3.5" />
+                                                <span className="sr-only">Rename Chat</span>
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-0.5"
+                                                        size="icon"
+                                                        variant="noBg"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        <span className="sr-only">Delete Chat</span>
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This action cannot be undone. This will permanently delete your chat.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
+                                                            Confirm
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
                                     </Button>
                                 </motion.div>
                             ))}
@@ -293,7 +293,7 @@ export default function Sidebar({
                         placeholder="Enter new chat name"
                     />
                     <DialogFooter>
-                        <Button variant="default" onClick={() => setIsRenameDialogOpen(false)}>
+                        <Button variant="neutral" onClick={() => setIsRenameDialogOpen(false)}>
                             Cancel
                         </Button>
                         <Button onClick={confirmRenameChat}>
