@@ -1,5 +1,4 @@
 import { Anthropic } from '@anthropic-ai/sdk'
-import { runNotebook } from './jupyterInterpreter'
 import { Tool } from './types'
 
 const codeGenerationAnthropicAgent = new Anthropic({
@@ -22,21 +21,21 @@ export const tools: Tool[] = [
             required: ['query'],
         },
     },
-    {
-        name: 'execute_jupyter_notebook',
-        description: 'Executes Python code in a Jupyter Notebook',
-        input_schema: {
-            type: 'object' as const,
-            properties: {
-                code: {
-                    type: 'string',
-                    description:
-                        'The Python code to execute in the Jupyter Notebook',
-                },
-            },
-            required: ['code'],
-        },
-    },
+    // {
+    //     name: 'execute_jupyter_notebook',
+    //     description: 'Executes Python code in a Jupyter Notebook',
+    //     input_schema: {
+    //         type: 'object' as const,
+    //         properties: {
+    //             code: {
+    //                 type: 'string',
+    //                 description:
+    //                     'The Python code to execute in the Jupyter Notebook',
+    //             },
+    //         },
+    //         required: ['code'],
+    //     },
+    // },
 ]
 
 export async function generateCode(
@@ -95,17 +94,17 @@ export const functions = {
             return `Error generating Streamlit app for query: ${input.query}`
         }
     },
-    execute_jupyter_notebook: async (input: {
-        code: string
-    }): Promise<string> => {
-        try {
-            const results = await runNotebook(input.code)
-            return JSON.stringify(results)
-        } catch (err) {
-            console.error(`Error executing Jupyter Notebook:`, err)
-            return `Error executing Jupyter Notebook for code: ${input.code}`
-        }
-    },
+    // execute_jupyter_notebook: async (input: {
+    //     code: string
+    // }): Promise<string> => {
+    //     try {
+    //         const results = await runNotebook(input.code)
+    //         return JSON.stringify(results)
+    //     } catch (err) {
+    //         console.error(`Error executing Jupyter Notebook:`, err)
+    //         return `Error executing Jupyter Notebook for code: ${input.code}`
+    //     }
+    // },
 }
 
 export function toolExists(name: string): boolean {

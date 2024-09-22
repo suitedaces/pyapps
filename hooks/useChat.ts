@@ -108,8 +108,8 @@ export function useChat(chatId: string | null) {
                         role: 'assistant',
                         content: msg.assistant_message,
                         created_at: new Date(msg.created_at),
-                        tool_calls: msg.tool_calls as ToolCall[] | null,
-                        tool_results: msg.tool_results as ToolResult[] | null,
+                        tool_calls: msg.tool_calls ? msg.tool_calls as ToolCall[] : undefined,
+                        tool_results: msg.tool_results ? msg.tool_results as ToolResult[] : undefined,
                     })
                 }
 
