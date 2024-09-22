@@ -26,6 +26,8 @@ export function useChat(chatId: string | null) {
     const [codeExplanation, setCodeExplanation] = useState('')
     const [sandboxErrors, setSandboxErrors] = useState<any[]>([])
     const [sandboxId, setSandboxId] = useState<string | null>(null)
+    const [executionResults, setExecutionResults] = useState<any[]>([])
+    const [isExecutingCode, setIsExecutingCode] = useState(false)
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -108,8 +110,10 @@ export function useChat(chatId: string | null) {
                         role: 'assistant',
                         content: msg.assistant_message,
                         created_at: new Date(msg.created_at),
-                        tool_calls: msg.tool_calls as ToolCall[] | null,
-                        tool_results: msg.tool_results as ToolResult[] | null,
+                        tool_calls: msg.tool_calls as ToolCall[] | undefined,
+                        tool_results: msg.tool_results as
+                            | ToolResult[]
+                            | undefined,
                     })
                 }
 
@@ -206,13 +210,24 @@ export function useChat(chatId: string | null) {
                     'content' in parsedChunk
                 ) {
                     setCodeExplanation((prev) => prev + parsedChunk.content)
+                } else if (
+                    parsedChunk.type === 'execution_results' &&
+                    'content' in parsedChunk
+                ) {
+                    setExecutionResults(
+                        Array.isArray(parsedChunk.content)
+                            ? parsedChunk.content
+                            : []
+                    )
+                    setIsExecutingCode(false)
                 } else if (parsedChunk.type === 'message_stop') {
                     setIsGeneratingCode(false)
+                    setIsExecutingCode(false)
                 } else if (
                     parsedChunk.type === 'tool_use' &&
-                    parsedChunk.name === 'create_streamlit_app'
+                    parsedChunk.name === 'execute_jupyter_notebook'
                 ) {
-                    setIsGeneratingCode(true)
+                    setIsExecutingCode(true)
                 }
             } catch (error) {
                 console.error('Error processing stream chunk:', error)

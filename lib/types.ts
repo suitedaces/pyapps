@@ -17,9 +17,12 @@ export type ToolResult = {
 export interface ClientMessage {
     role: 'user' | 'assistant'
     content: string
-    created_at?: Date
-    tool_calls?: ToolCall[] | Json | null
-    tool_results?: ToolResult[] | Json | null
+    created_at: Date
+    executedCode?: string
+    results?: any[]
+    resultType?: 'text' | 'image'
+    tool_calls?: any[]
+    tool_results?: any[]
 }
 
 export interface Message {
@@ -38,6 +41,7 @@ export type StreamChunk = {
         | 'content_block_start'
         | 'content_block_delta'
         | 'content_block_stop'
+        | 'execution_results'
         | 'message_delta'
         | 'message_stop'
         | 'generated_code'

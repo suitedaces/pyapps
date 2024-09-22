@@ -1,5 +1,5 @@
 import { Anthropic } from '@anthropic-ai/sdk'
-import { runNotebook } from './jupyterInterpreter'
+import { CodeInterpreter } from '@e2b/code-interpreter'
 import { Tool } from './types'
 
 const codeGenerationAnthropicAgent = new Anthropic({
@@ -83,16 +83,18 @@ export async function generateCode(
 }
 
 export const functions = {
-    create_streamlit_app: async (input: { query: string }): Promise<string> => {
+    create_streamlit_app: async (input: {
+        query: string
+    }): Promise<{ generatedCode: string; codeTokenCount: number }> => {
         try {
             const { generatedCode, codeTokenCount } = await generateCode(
                 input.query
             )
 
-            return generatedCode
+            return { generatedCode, codeTokenCount }
         } catch (err) {
             console.error(`Error generating Streamlit app:`, err)
-            return `Error generating Streamlit app for query: ${input.query}`
+            return { generatedCode: '', codeTokenCount: 0 }
         }
     },
     execute_jupyter_notebook: async (input: {
@@ -106,6 +108,30 @@ export const functions = {
             return `Error executing Jupyter Notebook for code: ${input.code}`
         }
     },
+}
+
+export async function createCodeInterpreter() {
+    try {
+        const codeInterpreter = await CodeInterpreter.create({
+            apiKey: process.env.E2B_API_KEY,
+        })
+
+        codeInterpreter.uploadFile(new File([], 'data.csv'), 'data.csv')
+
+        return codeInterpreter
+    } catch (error) {
+        console.error('Error creating CodeInterpreter:', error)
+        throw error
+    }
+}
+
+export async function runNotebook(code: string) {
+    const codeInterpreter = await createCodeInterpreter()
+
+    const { results } = await codeInterpreter.notebook.execCell(code)
+    await codeInterpreter.close()
+
+    return results
 }
 
 export function toolExists(name: string): boolean {

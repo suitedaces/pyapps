@@ -1,7 +1,7 @@
 import { Anthropic } from '@anthropic-ai/sdk'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { generateCode } from './tools'
+import { generateCode, runNotebook } from './tools'
 import {
     CSVAnalysis,
     Message,
@@ -85,7 +85,6 @@ export class GruntyAgent {
         let currentContentBlock: any = null
         let accumulatedJson = ''
         let accumulatedResponse = ''
-        let generatedCode = ''
         let toolCalls: ToolCall[] | null = null
         let toolResults: ToolResult[] | null = null
 
@@ -119,6 +118,7 @@ export class GruntyAgent {
                     currentMessage.content.push(currentContentBlock)
                     toolCalls = toolCalls || []
                     toolCalls.push(currentContentBlock)
+
                     if (currentContentBlock.name === 'create_streamlit_app') {
                         try {
                             const toolInput = JSON.parse(accumulatedJson)
@@ -151,6 +151,44 @@ export class GruntyAgent {
                                 content: 'Error in code generation process',
                             } as unknown as StreamChunk
                         }
+                    } else if (
+                        currentContentBlock.name === 'execute_jupyter_notebook'
+                    ) {
+                        try {
+                            const toolInput = JSON.parse(accumulatedJson)
+                            const codeToExecute = toolInput.code
+
+                            const execution = await runNotebook(codeToExecute)
+                            const processedResults =
+                                this.processExecutionResults(execution)
+
+                            yield {
+                                type: 'execution_results',
+                                content: {
+                                    executedCode: codeToExecute,
+                                    ...processedResults,
+                                },
+                            } as unknown as StreamChunk
+
+                            toolResults = toolResults || []
+                            toolResults.push({
+                                name: 'execute_jupyter_notebook',
+                                result: {
+                                    executedCode: codeToExecute,
+                                    ...processedResults,
+                                },
+                            })
+                        } catch (error) {
+                            console.error(
+                                'Error executing Jupyter code:',
+                                error
+                            )
+                            yield {
+                                type: 'error',
+                                content:
+                                    'Error in Jupyter code execution process',
+                            } as unknown as StreamChunk
+                        }
                     }
                 }
                 currentContentBlock = null
@@ -181,11 +219,67 @@ export class GruntyAgent {
 
                 currentMessage = null
                 accumulatedResponse = ''
-                generatedCode = ''
                 toolCalls = null
                 toolResults = null
+                this.codeTokens = 0
+                this.inputTokens = 0
+                this.outputTokens = 0
             }
         }
+    }
+
+    private processExecutionResults(execution: any) {
+        if (execution.error) {
+            return {
+                error: {
+                    name: execution.error.name,
+                    value: execution.error.value,
+                    traceback: execution.error.traceback,
+                },
+            }
+        }
+
+        const processedResults = {
+            results: [] as any[],
+            logs: {
+                stdout: execution.logs.stdout,
+                stderr: execution.logs.stderr,
+            },
+        }
+
+        for (const result of execution.results) {
+            const processedResult: any = {
+                isMainResult: result.isMainResult,
+                text: result.text,
+                formats: result.formats(),
+            }
+
+            if (result.png) {
+                processedResult.png = result.png
+            }
+            if (result.jpeg) {
+                processedResult.jpeg = result.jpeg
+            }
+            if (result.svg) {
+                processedResult.svg = result.svg
+            }
+            if (result.html) {
+                processedResult.html = result.html
+            }
+            if (result.json) {
+                processedResult.json = result.json
+            }
+            if (result.javascript) {
+                processedResult.javascript = result.javascript
+            }
+            if (result.pdf) {
+                processedResult.pdf = result.pdf
+            }
+
+            processedResults.results.push(processedResult)
+        }
+
+        return processedResults
     }
 
     private async storeMessage(

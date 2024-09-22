@@ -28,6 +28,9 @@ export function Chat({
     streamingCodeExplanation,
     handleFileUpload,
     onChatSelect,
+    generatedCode,
+    executionResults,
+    isExecutingCode,
 }: {
     messages: ClientMessage[]
     input: string
@@ -38,6 +41,9 @@ export function Chat({
     streamingCodeExplanation: string
     handleFileUpload: (content: string, fileName: string) => void
     onChatSelect: (chatId: string) => void
+    generatedCode: string
+    executionResults: any | null
+    isExecutingCode: boolean
 }) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -188,6 +194,85 @@ export function Chat({
         </ReactMarkdown>
     )
 
+    const renderCode = (code: string, language: string = 'python') => (
+        <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 border-border border-2 dark:shadow-dark w-full">
+            <div className="flex items-center justify-between px-4 py-2 bg-bg">
+                <div className="flex items-center">
+                    <Code className="w-5 h-5 mr-2 text-text dark:text-darkText" />
+                    <span className="text-sm font-medium text-text dark:text-darkText">
+                        {language.toUpperCase()}
+                    </span>
+                </div>
+            </div>
+            <div className="overflow-x-auto">
+                <SyntaxHighlighter
+                    style={tomorrow}
+                    language={language}
+                    PreTag="div"
+                    customStyle={{
+                        margin: 0,
+                        padding: '1rem',
+                    }}
+                >
+                    {code}
+                </SyntaxHighlighter>
+            </div>
+        </div>
+    )
+
+    const renderExecutionResults = (results: any) => (
+        <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 border-border border-2 dark:shadow-dark w-full p-4">
+            <h3 className="text-lg font-bold mb-2">Execution Results</h3>
+            {results.error ? (
+                <div className="text-red-500">
+                    <p>Error: {results.error.name}</p>
+                    <p>{results.error.value}</p>
+                    <pre className="mt-2 whitespace-pre-wrap">
+                        {results.error.traceback}
+                    </pre>
+                </div>
+            ) : (
+                <>
+                    {results.results.map((result: any, index: number) => (
+                        <div key={index} className="mb-4">
+                            {result.text && <p>{result.text}</p>}
+                            {result.png && (
+                                <img
+                                    src={`data:image/png;base64,${result.png}`}
+                                    alt={`Result ${index}`}
+                                    className="mt-2"
+                                />
+                            )}
+                            {result.html && (
+                                <div
+                                    dangerouslySetInnerHTML={{
+                                        __html: result.html,
+                                    }}
+                                />
+                            )}
+                        </div>
+                    ))}
+                    {results.logs.stdout && (
+                        <div className="mt-4">
+                            <h4 className="font-bold">Standard Output:</h4>
+                            <pre className="whitespace-pre-wrap">
+                                {results.logs.stdout}
+                            </pre>
+                        </div>
+                    )}
+                    {results.logs.stderr && (
+                        <div className="mt-4">
+                            <h4 className="font-bold">Standard Error:</h4>
+                            <pre className="whitespace-pre-wrap">
+                                {results.logs.stderr}
+                            </pre>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    )
+
     return (
         <div className="flex flex-col h-full dark:border-darkBorder rounded-3xl border-2 border-border bg-darkText dark:bg-darkBg text-text dark:text-darkText">
             <ScrollArea
@@ -230,6 +315,46 @@ export function Chat({
                             </Avatar>
                             <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                 {renderMessage(streamingMessage)}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {generatedCode && (
+                    <div className="flex justify-start mb-4">
+                        <div className="flex flex-row items-start max-w-[80%]">
+                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
+                                <AvatarFallback>G</AvatarFallback>
+                            </Avatar>
+                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                <h3 className="text-lg font-bold mb-2">
+                                    Generated Code
+                                </h3>
+                                {renderCode(generatedCode)}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {isExecutingCode && (
+                    <div className="flex justify-start mb-4">
+                        <div className="flex flex-row items-start max-w-[80%]">
+                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
+                                <AvatarFallback>G</AvatarFallback>
+                            </Avatar>
+                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                <span className="ml-2">Executing code...</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {executionResults && (
+                    <div className="flex justify-start mb-4">
+                        <div className="flex flex-row items-start max-w-[80%]">
+                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
+                                <AvatarFallback>G</AvatarFallback>
+                            </Avatar>
+                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                {renderExecutionResults(executionResults)}
                             </div>
                         </div>
                     </div>

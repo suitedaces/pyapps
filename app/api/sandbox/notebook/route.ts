@@ -1,4 +1,4 @@
-import { runNotebook } from '@/lib/jupyterInterpreter'
+import { runNotebook } from '@/lib/tools'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
