@@ -10,7 +10,7 @@ import {
     ToolCall,
     ToolResult,
 } from './types'
-import { useMessageStore } from './messageStore'
+import { messageStore } from './messageStore'
 
 export class GruntyAgent {
     private client: Anthropic
@@ -223,9 +223,7 @@ export class GruntyAgent {
         } else {
             console.log('Message stored successfully with ID:', data)
 
-            // After storing the message, trigger a state change in the Zustand store
-            const messageStore = useMessageStore.getState()
-            messageStore.setMessageStored(chatId) // Trigger state change
+            messageStore.setMessageStored(chatId)
         }
     }
 

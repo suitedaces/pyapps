@@ -6,7 +6,6 @@ import { motion } from 'framer-motion'
 import { PlusCircle, Settings, SidebarIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
-import { useMessageStore } from '@/lib/messageStore'
 
 interface SidebarProps {
     isRightContentVisible: boolean
@@ -31,7 +30,6 @@ export default function Sidebar({
     const [isOpen, setIsOpen] = useState(false)
     const [chats, setChats] = useState<Chat[]>([])
     const [isNewChat, setIsNewChat] = useState(false);
-    const { loading: messageStopStatus, fetchTitle, title, messageStoredChatId } = useMessageStore()
 
 
     const router = useRouter()
@@ -45,12 +43,6 @@ export default function Sidebar({
     useEffect(() => {
         fetchChats()
     }, [])
-
-    useEffect(() => {
-        if (messageStoredChatId) {
-            fetchTitle(messageStoredChatId)
-        }
-    }, [messageStoredChatId, fetchTitle])
 
 
     const fetchChats = async () => {
@@ -122,7 +114,7 @@ export default function Sidebar({
                                         : ''
                                         }`}
                                 >
-                                    {currentChatId === chat.id && title ? title : chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                                    NEW CHAT
 
                                 </Button>
                             </Link>
