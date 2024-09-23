@@ -1,8 +1,5 @@
 import { Anthropic } from '@anthropic-ai/sdk'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { CSVAnalysis, Tool } from './types'
-import { runNotebook } from './jupyterInterpreter'
+import { Tool } from './types'
 
 const codeGenerationAnthropicAgent = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -24,23 +21,26 @@ export const tools: Tool[] = [
             required: ['query'],
         },
     },
-    {
-        name: 'execute_jupyter_notebook',
-        description: 'Executes Python code in a Jupyter Notebook',
-        input_schema: {
-            type: 'object' as const,
-            properties: {
-                code: {
-                    type: 'string',
-                    description: 'The Python code to execute in the Jupyter Notebook',
-                },
-            },
-            required: ['code'],
-        },
-    },
+    // {
+    //     name: 'execute_jupyter_notebook',
+    //     description: 'Executes Python code in a Jupyter Notebook',
+    //     input_schema: {
+    //         type: 'object' as const,
+    //         properties: {
+    //             code: {
+    //                 type: 'string',
+    //                 description:
+    //                     'The Python code to execute in the Jupyter Notebook',
+    //             },
+    //         },
+    //         required: ['code'],
+    //     },
+    // },
 ]
 
-export async function generateCode(query: string): Promise<{ generatedCode: string, codeTokenCount: number }> {
+export async function generateCode(
+    query: string
+): Promise<{ generatedCode: string; codeTokenCount: number }> {
     if (!query || !query.trim()) {
         throw new Error('Query cannot be empty or just whitespace.')
     }
@@ -62,7 +62,11 @@ export async function generateCode(query: string): Promise<{ generatedCode: stri
                           .replace(/^```python/, '')
                           .replace(/```$/, '')
                     : ''
-            return { generatedCode, codeTokenCount: response.usage.input_tokens + response.usage.output_tokens }
+            return {
+                generatedCode,
+                codeTokenCount:
+                    response.usage.input_tokens + response.usage.output_tokens,
+            }
         } else {
             console.error('Unexpected response format:', response)
             throw new Error(
@@ -78,27 +82,29 @@ export async function generateCode(query: string): Promise<{ generatedCode: stri
 }
 
 export const functions = {
-    create_streamlit_app: async (input: {
-        query: string
-    }): Promise<string> => {
+    create_streamlit_app: async (input: { query: string }): Promise<string> => {
         try {
-            const { generatedCode, codeTokenCount } = await generateCode(input.query)
-            
+            const { generatedCode, codeTokenCount } = await generateCode(
+                input.query
+            )
+
             return generatedCode
         } catch (err) {
             console.error(`Error generating Streamlit app:`, err)
             return `Error generating Streamlit app for query: ${input.query}`
         }
     },
-    execute_jupyter_notebook: async (input: { code: string }): Promise<string> => {
-        try {
-            const results = await runNotebook(input.code)
-            return JSON.stringify(results)
-        } catch (err) {
-            console.error(`Error executing Jupyter Notebook:`, err)
-            return `Error executing Jupyter Notebook for code: ${input.code}`
-        }
-    }
+    // execute_jupyter_notebook: async (input: {
+    //     code: string
+    // }): Promise<string> => {
+    //     try {
+    //         const results = await runNotebook(input.code)
+    //         return JSON.stringify(results)
+    //     } catch (err) {
+    //         console.error(`Error executing Jupyter Notebook:`, err)
+    //         return `Error executing Jupyter Notebook for code: ${input.code}`
+    //     }
+    // },
 }
 
 export function toolExists(name: string): boolean {

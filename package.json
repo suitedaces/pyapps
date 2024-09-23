@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "next dev --turbo",
+        "dev": "next dev",
         "build": "next build",
         "start": "next start",
         "lint": "next lint",
@@ -11,7 +11,6 @@
     },
     "dependencies": {
         "@anthropic-ai/sdk": "^0.27.1",
-        "@anthropic-ai/tokenizer": "^0.0.4",
         "@auth0/nextjs-auth0": "^3.5.0",
         "@e2b/code-interpreter": "^0.0.8",
         "@radix-ui/react-avatar": "^1.1.0",
@@ -25,8 +24,6 @@
         "@supabase/ssr": "^0.5.1",
         "@supabase/supabase-js": "^2.45.3",
         "@types/papaparse": "^5.3.14",
-        "ai": "^3.3.21",
-        "ast-to-react": "link:react-markdown/lib/ast-to-react",
         "class-variance-authority": "^0.7.0",
         "clsx": "^2.1.1",
         "e2b": "^0.16.2",

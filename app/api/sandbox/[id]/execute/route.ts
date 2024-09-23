@@ -3,7 +3,6 @@ import { Sandbox } from 'e2b'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
-
 export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }

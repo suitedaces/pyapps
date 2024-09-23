@@ -166,7 +166,10 @@ export default function Home() {
                             />
                         </TabsContent>
                         <TabsContent value="code" className="flex-grow">
-                            <CodeView code={generatedCode} isGeneratingCode={isGeneratingCode} />
+                            <CodeView
+                                code={generatedCode}
+                                isGeneratingCode={isGeneratingCode}
+                            />
                         </TabsContent>
                     </Tabs>
                 </motion.div>

@@ -8,7 +8,9 @@ export async function POST(req: NextRequest) {
         const sandbox = await Sandbox.reconnect(sandboxId)
         await sandbox.close()
 
-        return NextResponse.json({ message: `Sandbox ${sandboxId} closed successfully` })
+        return NextResponse.json({
+            message: `Sandbox ${sandboxId} closed successfully`,
+        })
     } catch (error) {
         console.error('Error closing sandbox:', error)
         return NextResponse.json(
