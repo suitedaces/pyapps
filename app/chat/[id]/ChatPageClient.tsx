@@ -71,20 +71,6 @@ export default function ChatPageClient({
         setCurrentChatId(chatId)
     }
 
-    const truncateFilename = (filename: string, maxLength = 20) => {
-        if (filename.length <= maxLength) return filename
-        const extension = filename.split('.').pop()
-        const nameWithoutExtension = filename.slice(
-            0,
-            filename.lastIndexOf('.')
-        )
-        const truncatedName = nameWithoutExtension.slice(
-            0,
-            maxLength - extension.length
-        )
-        return `${truncatedName}...${extension}`
-    }
-
     const handleNewChat = async () => {
         try {
             const response = await fetch('/api/conversations', {
@@ -166,7 +152,7 @@ export default function ChatPageClient({
                             >
                                 {csvFileName && (
                                     <TabsTrigger value="file">
-                                        {truncateFilename(csvFileName)}
+                                        {csvFileName}
                                     </TabsTrigger>
                                 )}
                                 <TabsTrigger value="preview">App</TabsTrigger>
