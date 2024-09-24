@@ -76,7 +76,7 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
 
     return (
         <nav className="bg-bg">
-            <div className="2xl:container mx-auto px-4 sm:px-6 lg:px-20">
+            <div className="2xl:container mx-auto 2xl:px-0 sm:px-6 lg:px-20">
                 <div className="flex justify-between items-center h-16">
                     <div className="flex-1 flex items-center">
                         <motion.div
