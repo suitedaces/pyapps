@@ -50,6 +50,8 @@ export default function Home() {
         streamingMessage,
         streamingCodeExplanation,
         isGeneratingCode,
+        executionResults,
+        isExecutingCode
     } = useChat(currentChatId)
 
     useEffect(() => {
@@ -135,7 +137,10 @@ export default function Home() {
                             streamingCodeExplanation={streamingCodeExplanation}
                             handleFileUpload={handleFileUpload}
                             onChatSelect={handleChatSelect}
-                        />
+                            generatedCode={generatedCode}
+                            executionResults={executionResults}
+                            isExecutingCode={isExecutingCode}
+                            />
                     ) : (
                         <div className="flex items-center text-black justify-center h-full">
                             <p>

@@ -476,5 +476,7 @@ export function useChat(chatId: string | null) {
         streamingCodeExplanation: codeExplanation,
         sandboxErrors,
         sandboxId,
+        executionResults,
+        isExecutingCode
     }
 }
