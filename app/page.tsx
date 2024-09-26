@@ -52,6 +52,7 @@ export default function Home() {
         isGeneratingCode,
     } = useChat(currentChatId)
 
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session)

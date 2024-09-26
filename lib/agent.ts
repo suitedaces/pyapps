@@ -10,6 +10,7 @@ import {
     ToolCall,
     ToolResult,
 } from './types'
+import { messageStore } from './messageStore'
 
 export class GruntyAgent {
     private client: Anthropic
@@ -221,6 +222,8 @@ export class GruntyAgent {
             throw error
         } else {
             console.log('Message stored successfully with ID:', data)
+
+            messageStore.setMessageStored(chatId)
         }
     }
 

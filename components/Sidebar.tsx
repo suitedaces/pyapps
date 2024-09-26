@@ -1,10 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PlusCircle, Settings, SidebarIcon, MoreHorizontal, Trash2, Edit2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -32,7 +33,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
-
 interface SidebarProps {
     isRightContentVisible: boolean
     setIsRightContentVisible: (isVisible: boolean) => void
@@ -52,9 +52,10 @@ export default function Sidebar({
     onChatSelect,
     onNewChat,
     currentChatId,
-}: SidebarProps) {
+}: SidebarProps, id: string) {
     const [isOpen, setIsOpen] = useState(false)
     const [chats, setChats] = useState<Chat[]>([])
+    const [isNewChat, setIsNewChat] = useState(false);
     const [chatToDelete, setChatToDelete] = useState<string | null>(null)
 
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
@@ -73,6 +74,7 @@ export default function Sidebar({
         fetchChats()
     }, [])
 
+
     const fetchChats = async () => {
         try {
             const response = await fetch('/api/conversations')
@@ -81,12 +83,16 @@ export default function Sidebar({
             }
             const data = await response.json()
             setChats(data)
+
+            console.log(data);
+
         } catch (error) {
             console.error('Error fetching chats:', error)
         }
     }
 
     const handleNewChat = async () => {
+        setIsNewChat(true)
         await onNewChat()
         fetchChats() // refresh the chat list
     }
