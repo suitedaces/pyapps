@@ -1,48 +1,68 @@
 'use client'
 
+import React, { useEffect, useCallback, useRef, useState, ChangeEvent, FormEvent } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ClientMessage } from '@/lib/types'
-import { Code, Loader2, Paperclip, Send } from 'lucide-react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Code, FileIcon, Loader2, Paperclip, Send, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { CircularProgress } from '@/components/CircularProgress'
 
 interface CodeProps {
-    node?: any
-    inline?: any
-    className?: any
-    children?: any
+    node?: any;
+    inline?: boolean;
+    className?: string;
+    children?: React.ReactNode;
 }
+
+interface ChatProps {
+    messages: ClientMessage[];
+    input: string;
+    handleInputChange: (e: ChangeEvent<HTMLInputElement>) => void;
+    handleSubmit: (e: FormEvent<HTMLFormElement>) => void;
+    isLoading: boolean;
+    streamingMessage: string;
+    streamingCodeExplanation: string;
+    handleFileUpload: (content: string, fileName: string) => void;
+    onChatSelect: (chatId: string) => void;
+}
+
+interface Chat {
+    id: string;
+    name: string;
+}
+
+const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' bytes'
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+    else return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
 
 export function Chat({
     messages,
     input,
     handleInputChange,
     handleSubmit,
-    isLoading,
+    isLoading: isLoadingProp,
     streamingMessage,
     streamingCodeExplanation,
     handleFileUpload,
-    onChatSelect,
-}: {
-    messages: ClientMessage[]
-    input: string
-    handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
-    isLoading: boolean
-    streamingMessage: string
-    streamingCodeExplanation: string
-    handleFileUpload: (content: string, fileName: string) => void
-    onChatSelect: (chatId: string) => void
-}) {
+}: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const [isAtBottom, setIsAtBottom] = useState(true)
-    const [chats, setChats] = useState<{ id: string; name: string }[]>([])
+    const [isAtBottom, setIsAtBottom] = useState<boolean>(true)
+    const [file, setFile] = useState<File | null>(null)
+    const [isLoadingInternal, setIsLoadingInternal] = useState<boolean>(false)
+    const [isInputDisabled, setIsInputDisabled] = useState<boolean>(false)
+    const [uploadProgress, setUploadProgress] = useState<number>(0)
+    const [isUploading, setIsUploading] = useState<boolean>(false)
+
+    const isLoading = isLoadingProp || isLoadingInternal
 
     useEffect(() => {
         if (isAtBottom) {
@@ -55,52 +75,68 @@ export function Chat({
         setIsAtBottom(scrollHeight - scrollTop === clientHeight)
     }
 
-    useEffect(() => {
-        fetchChats()
+    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = event.target.files?.[0]
+        if (selectedFile && selectedFile.name.endsWith('.csv')) {
+            setFile(selectedFile)
+            setIsInputDisabled(true)
+            setUploadProgress(0)
+            uploadFile(selectedFile)
+        } else {
+            alert('Please select a CSV file.')
+        }
+    }
+
+    const uploadFile = (file: File) => {
+        setIsUploading(true)
+        const reader = new FileReader()
+        reader.onload = async (e: ProgressEvent<FileReader>) => {
+            const content = e.target?.result as string
+            await handleFileUpload(content, file.name)
+            setIsUploading(false)
+            setIsInputDisabled(false)
+            removeFile()
+        }
+        reader.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100)
+                setUploadProgress(progress)
+            }
+        }
+        reader.readAsText(file)
+    }
+
+    const removeFile = useCallback(() => {
+        setFile(null)
+        setIsInputDisabled(false)
+        setUploadProgress(0)
+        setIsUploading(false)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
     }, [])
 
-    const fetchChats = async () => {
+
+
+    const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        setIsLoadingInternal(true)
+
         try {
-            const response = await fetch('/api/conversations')
-            if (!response.ok) {
-                throw new Error('Failed to fetch chats')
-            }
-            const data = await response.json()
-            setChats(data)
+            await handleSubmit(e)
         } catch (error) {
-            console.error('Error fetching chats:', error)
+            console.error('Error submitting form:', error)
+        } finally {
+            setIsLoadingInternal(false)
+            removeFile()
         }
     }
 
-    const handleChatSelection = useCallback(
-        (chatId: string) => {
-            onChatSelect(chatId)
-        },
-        [onChatSelect]
-    )
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0]
-        if (file) {
-            const reader = new FileReader()
-            reader.onload = (e) => {
-                const content = e.target?.result as string
-                handleFileUpload(content, file.name)
-            }
-            reader.readAsText(file)
-        }
-    }
 
     const renderMessage = (content: string) => (
         <ReactMarkdown
             components={{
-                code({
-                    node,
-                    inline,
-                    className,
-                    children,
-                    ...props
-                }: CodeProps) {
+                code({ node, inline, className, children, ...props }: CodeProps) {
                     const match = /language-(\w+)/.exec(className || '')
                     const lang = match && match[1] ? match[1] : ''
                     const codeString = String(children).replace(/\n$/, '')
@@ -261,22 +297,61 @@ export function Chat({
                 </Button>
             )}
             <form
-                onSubmit={handleSubmit}
+                onSubmit={handleFormSubmit}
                 className="p-4 dark:border-darkBorder"
             >
                 <div className="flex space-x-2">
                     <div className="relative flex-grow">
+                        <div
+                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'
+                                }`}
+                        >
+                            {file && (
+                                <div className="px-3 flex justify-start mb-2">
+                                    <div className="inline-flex items-center bg-white border-black border-2 rounded-xl py-1 px-3 max-w-full">
+                                        <FileIcon
+                                            size={16}
+                                            className="text-blue-400 mr-2 flex-shrink-0"
+                                        />
+                                        <div className="flex flex-col min-w-0 mr-2">
+                                            <span className="text-black text-sm truncate max-w-[200px]">
+                                                {file.name}
+                                            </span>
+                                            <span className="text-gray-700 text-xs">
+                                                {formatFileSize(file.size)}
+                                            </span>
+                                        </div>
+                                        {isUploading ? (
+                                            <CircularProgress
+                                                size={24}
+                                                percentage={uploadProgress}
+                                                color="text-blue-400"
+                                            />
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={removeFile}
+                                                className="text-gray-400 hover:text-black p-1 ml-1"
+                                                aria-label="Remove file"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <Input
                             value={input}
                             onChange={handleInputChange}
-                            placeholder="Type your message..."
-                            disabled={isLoading}
-                            className="relative flex min-h-[70px] w-full rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
+                            placeholder={isInputDisabled ? "File attached. Remove file to type a message." : "Type your message..."}
+                            className="relative flex w-full h-20 rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
                         />
-                        <button
+                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text dark:text-darkText hover:text-main transition-colors duration-300 ease-in-out"
+                            className="absolute left-5 bottom-5 transform -translate-y-1/2 text-text dark:text-darkText hover:text-main transition-colors duration-300 ease-in-out"
+                            disabled={isUploading}
                         >
                             <Paperclip className="h-5 w-5" />
                         </button>
@@ -286,14 +361,15 @@ export function Chat({
                             accept=".csv"
                             onChange={handleFileChange}
                             className="hidden"
+                            disabled={isUploading}
                         />
                         <Button
                             type="submit"
                             variant={'noShadow'}
-                            disabled={isLoading}
-                            className="absolute rounded-full right-5 bottom-4 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
+                            disabled={isLoading || isUploading || (!input.trim() && !file)}
+                            className="absolute rounded-full right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
                         >
-                            {isLoading ? (
+                            {isLoading || isUploading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                                 <Send className="h-4 w-4" />

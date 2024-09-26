@@ -3,7 +3,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 
 import { Chat } from '@/components/Chat'
 import { CodeView } from '@/components/CodeView'
@@ -19,11 +19,22 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { MetaSheet } from '@/components/MetaSheet'
 import Sidebar from '@/components/Sidebar'
 
+const truncate = (str: string) => {
+    const maxLength = 30; // Adjust this value as needed
+    if (str.length <= maxLength) return str;
+    const extension = str.slice(str.lastIndexOf('.'));
+    const nameWithoutExtension = str.slice(0, str.lastIndexOf('.'));
+    const truncatedName = nameWithoutExtension.slice(0, maxLength - 3 - extension.length);
+    return `${truncatedName}...${extension}`;
+};
+
 export default function Home() {
     const [isRightContentVisible, setIsRightContentVisible] = useState(true)
     const [isAtBottom, setIsAtBottom] = useState(true)
     const [session, setSession] = useState<Session | null>(null)
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+    const [activeTab, setActiveTab] = useState('preview')
+
     const supabase = createClientComponentClient()
     const {
         messages,
@@ -56,20 +67,20 @@ export default function Home() {
         return () => subscription.unsubscribe()
     }, [supabase.auth])
 
-    const toggleRightContent = () => {
-        setIsRightContentVisible(!isRightContentVisible)
-    }
+    const toggleRightContent = useCallback(() => {
+        setIsRightContentVisible((prev) => !prev)
+    }, [])
 
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
         setIsAtBottom(scrollHeight - scrollTop === clientHeight)
-    }
+    }, [])
 
-    const handleChatSelect = (chatId: string) => {
+    const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-    }
+    }, [])
 
-    const handleNewChat = async () => {
+    const handleNewChat = useCallback(async () => {
         try {
             const response = await fetch('/api/conversations', {
                 method: 'POST',
@@ -86,7 +97,11 @@ export default function Home() {
         } catch (error) {
             console.error('Error creating new chat:', error)
         }
-    }
+    }, [])
+
+    const handleTabChange = useCallback((value: string) => {
+        setActiveTab(value)
+    }, [])
 
     if (!session) {
         return <LoginPage />
@@ -141,7 +156,9 @@ export default function Home() {
                     className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]"
                 >
                     <Tabs
-                        defaultValue="preview"
+                        defaultValue='file'
+                        // value={activeTab}
+                        // onValueChange={handleTabChange}
                         className="flex-grow flex flex-col h-full"
                     >
                         <TabsList
@@ -149,7 +166,7 @@ export default function Home() {
                         >
                             {csvFileName && (
                                 <TabsTrigger value="file">
-                                    {csvFileName}
+                                    {truncate(csvFileName)}
                                 </TabsTrigger>
                             )}
                             <TabsTrigger value="preview">App</TabsTrigger>
@@ -157,7 +174,9 @@ export default function Home() {
                         </TabsList>
                         {csvFileName && (
                             <TabsContent value="file" className="flex-grow">
-                                <MetaSheet csvContent={csvContent} />
+                                <MetaSheet
+                                    csvContent={csvContent}
+                                />
                             </TabsContent>
                         )}
                         <TabsContent value="preview" className="flex-grow">

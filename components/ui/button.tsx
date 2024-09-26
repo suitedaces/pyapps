@@ -12,19 +12,21 @@ const buttonVariants = cva(
             variant: {
                 default:
                     'bg-main border-2 border-border dark:border-darkBorder shadow-light dark:shadow-dark hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none dark:hover:shadow-none',
-                noShadow:
-                    'bg-main border-2 border-border dark:border-darkBorder hover:transform-none',
+                noShadow: 'bg-main border-2 border-border dark:border-darkBorder hover:transform-none',
                 link: 'underline-offset-4 text-text dark:text-darkText hover:underline',
                 neutral:
-                    'bg-white dark:bg-darkBg dark:text-darkText border-2 border-border dark:border-darkBorder shadow-light dark:shadow-dark hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none dark:hover:shadow-none',
+                    'bg-bg dark:bg-darkBg dark:text-darkText border-2 border-border dark:border-darkBorder shadow-light dark:shadow-dark hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none dark:hover:shadow-none',
                 reverse:
                     'bg-main border-2 border-border dark:border-darkBorder hover:translate-x-reverseBoxShadowX hover:translate-y-reverseBoxShadowY hover:shadow-light dark:hover:shadow-dark',
+                noBg: 'bg-transparent border-none hover:transform-none',
+                round: 'bg-main border-2 border-border dark:border-darkBorder hover:transform-none rounded-full'
             },
             size: {
                 default: 'h-10 px-4 py-2',
                 sm: 'h-9 px-3',
                 lg: 'h-11 px-8',
                 icon: 'h-10 w-10',
+                round: 'h-11 px-4',
             },
         },
         defaultVariants: {
