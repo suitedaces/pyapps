@@ -238,7 +238,7 @@ export function Chat({
                                     <Avatar className="w-8 h-8 bg-blue border-2 border-border flex-shrink-0">
                                         <AvatarFallback>U</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                         {renderMessage(message.content)}
                                     </div>
                                 </div>
@@ -246,11 +246,11 @@ export function Chat({
                         )}
                         {message.role === 'assistant' && (
                             <div className="flex justify-start mb-4">
-                                <div className="flex flex-row items-start max-w-[80%]">
+                                <div className="flex flex-row items-start w-full">
                                     <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                         <AvatarFallback>G</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    <div className="mx-2 p-4 rounded-base text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                         {renderMessage(message.content)}
                                     </div>
                                 </div>
@@ -260,11 +260,11 @@ export function Chat({
                 ))}
                 {streamingMessage && (
                     <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start max-w-[80%]">
+                        <div className="flex flex-row items-start w-full">
                             <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                 <AvatarFallback>G</AvatarFallback>
                             </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                            <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                 {renderMessage(streamingMessage)}
                             </div>
                         </div>
@@ -272,11 +272,11 @@ export function Chat({
                 )}
                 {streamingCodeExplanation && (
                     <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start max-w-[80%]">
+                        <div className="flex flex-row items-start w-full">
                             <Avatar className="w-8 bg-main h-8 flex-shrink-0">
                                 <AvatarFallback>G</AvatarFallback>
                             </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
+                            <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
                                 {renderMessage(streamingCodeExplanation)}
                             </div>
                         </div>
