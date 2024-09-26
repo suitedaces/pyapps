@@ -27,7 +27,7 @@ export async function analyzeCSV(csvContent: string): Promise<CSVAnalysis> {
                             sampleRows.map((row) => row[index])
                         ),
                     })),
-                    sampleRows: sampleRows.slice(0, 5), // Keep first 5 rows for display
+                    sampleRows: sampleRows.slice(0, 11), // Keep first 10 rows for display
                 }
 
                 resolve(analysis)

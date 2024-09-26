@@ -11,6 +11,8 @@ import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { CircularProgress } from '@/components/CircularProgress'
+import Spreadsheet from './Spreadsheet'
+import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
 
 interface CodeProps {
     node?: any;
@@ -61,6 +63,11 @@ export function Chat({
     const [isInputDisabled, setIsInputDisabled] = useState<boolean>(false)
     const [uploadProgress, setUploadProgress] = useState<number>(0)
     const [isUploading, setIsUploading] = useState<boolean>(false)
+    const [csvAnalysis, setCsvAnalysis] = useState<CSVAnalysis | null>(null)
+    const [showSpreadsheet, setShowSpreadsheet] = useState(false)
+    const [fileContent, setFileContent] = useState<string | null>(null)
+    const [fullData, setFullData] = useState<string[][] | null>(null)
+
 
     const isLoading = isLoadingProp || isLoadingInternal
 
@@ -81,21 +88,22 @@ export function Chat({
             setFile(selectedFile)
             setIsInputDisabled(true)
             setUploadProgress(0)
-            uploadFile(selectedFile)
+            readFile(selectedFile)
         } else {
             alert('Please select a CSV file.')
         }
     }
 
-    const uploadFile = (file: File) => {
+    const readFile = (file: File) => {
         setIsUploading(true)
         const reader = new FileReader()
         reader.onload = async (e: ProgressEvent<FileReader>) => {
             const content = e.target?.result as string
-            await handleFileUpload(content, file.name)
+            setFileContent(content)
             setIsUploading(false)
-            setIsInputDisabled(false)
-            removeFile()
+            setUploadProgress(100)
+            const rows = content.split('\n').map(row => row.split(','));
+            setFullData(rows);
         }
         reader.onprogress = (event) => {
             if (event.lengthComputable) {
@@ -108,6 +116,7 @@ export function Chat({
 
     const removeFile = useCallback(() => {
         setFile(null)
+        setFileContent(null)
         setIsInputDisabled(false)
         setUploadProgress(0)
         setIsUploading(false)
@@ -116,19 +125,23 @@ export function Chat({
         }
     }, [])
 
-
-
     const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setIsLoadingInternal(true)
 
         try {
+            if (file && fileContent) {
+                const analysis = await analyzeCSV(fileContent)
+                setCsvAnalysis(analysis)
+                setShowSpreadsheet(true)
+                await handleFileUpload(fileContent, file.name)
+            }
             await handleSubmit(e)
         } catch (error) {
             console.error('Error submitting form:', error)
         } finally {
             setIsLoadingInternal(false)
-            removeFile()
+            removeFile() // This will remove the file attachment box
         }
     }
 
@@ -230,6 +243,17 @@ export function Chat({
                 className="flex-grow p-4 space-y-4"
                 onScroll={handleScroll}
             >
+                {showSpreadsheet && csvAnalysis && (
+                    <div className="relative w-full mb-10 flex justify-end">
+                        <div className='w-[80%]'>
+                            <Spreadsheet
+                                analysis={csvAnalysis}
+                                onClose={() => setShowSpreadsheet(false)}
+                                fullData={fullData}
+                            />
+                        </div>
+                    </div>
+                )}
                 {messages.map((message, index) => (
                     <React.Fragment key={index}>
                         {message.role === 'user' && (
@@ -347,11 +371,11 @@ export function Chat({
                             placeholder={isInputDisabled ? "File attached. Remove file to type a message." : "Type your message..."}
                             className="relative flex w-full h-20 rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
                         />
-                         <button
+                        <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             className="absolute left-5 bottom-5 transform -translate-y-1/2 text-text dark:text-darkText hover:text-main transition-colors duration-300 ease-in-out"
-                            disabled={isUploading}
+                            disabled={isUploading || file !== null}
                         >
                             <Paperclip className="h-5 w-5" />
                         </button>

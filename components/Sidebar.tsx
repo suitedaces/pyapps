@@ -160,7 +160,7 @@ export default function Sidebar({
         <div className="relative">
             <Button
                 onClick={toggleSidebar}
-                className="fixed top-4 left-4 z-30"
+                className="fixed top-2 left-2 z-30"
                 size="icon"
             >
                 <SidebarIcon className="h-4 w-4" />
