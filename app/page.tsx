@@ -71,11 +71,6 @@ export default function Home() {
         setIsRightContentVisible((prev) => !prev)
     }, [])
 
-    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-        setIsAtBottom(scrollHeight - scrollTop === clientHeight)
-    }, [])
-
     const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
     }, [])

@@ -1,5 +1,8 @@
 'use client'
 
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -31,6 +34,13 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger
+} from "@/components/ui/tooltip"
+
 import { Input } from "@/components/ui/input"
 
 interface SidebarProps {
@@ -63,6 +73,8 @@ export default function Sidebar({
     const [newChatName, setNewChatName] = useState('')
 
     const router = useRouter()
+    const supabase = createClientComponentClient()
+
 
     const toggleSidebar = () => {
         const sIsOpen = !isOpen
@@ -94,25 +106,32 @@ export default function Sidebar({
     const handleNewChat = async () => {
         setIsNewChat(true)
         await onNewChat()
-        fetchChats() // refresh the chat list
+        fetchChats()
     }
 
     const handleDeleteChat = async (chatId: string) => {
-        // API Call to delete the chat
+        try {
+            const { error } = await supabase
+                .from('chats')
+                .delete()
+                .eq('id', chatId)
 
-        // removing it from the local state for now
-        setChats(chats.filter(chat => chat.id !== chatId))
+            if (error) throw error
 
-        if (chatId === currentChatId) {
-            const newCurrentChat = chats.find(chat => chat.id !== chatId)
-            if (newCurrentChat) {
-                onChatSelect(newCurrentChat.id)
-            } else {
-                // Handle the case when no chats are left
-                // This might involve clearing the chat area or showing a placeholder
+            setChats(prevChats => prevChats.filter(chat => chat.id !== chatId))
+
+            // always navigate to home after deletion
+            router.push('/')
+
+            // go to home, if the current one deleted
+            if (chatId === currentChatId) {
+                onChatSelect('')
             }
+
+            setChatToDelete(null)
+        } catch (error) {
+            console.error('Error deleting chat:', error)
         }
-        setChatToDelete(null)
     }
 
     const handleClearAllChats = () => {
@@ -131,17 +150,28 @@ export default function Sidebar({
         setIsRenameDialogOpen(true)
     }
 
-    const confirmRenameChat = () => {
+    const confirmRenameChat = async () => {
         if (chatToRename) {
-            setChats(chats.map(chat =>
-                chat.id === chatToRename.id ? { ...chat, name: newChatName } : chat
-            ))
+            try {
+                const { data, error } = await supabase
+                    .from('chats')
+                    .update({ name: newChatName })
+                    .eq('id', chatToRename.id)
+                    .select()
 
-            // TODO: Add API call to update chat name on the server
+                if (error) throw error
 
-            setIsRenameDialogOpen(false)
-            setChatToRename(null)
-            setNewChatName('')
+                // Update local state
+                setChats(chats.map(chat =>
+                    chat.id === chatToRename.id ? { ...chat, name: newChatName } : chat
+                ))
+
+                setIsRenameDialogOpen(false)
+                setChatToRename(null)
+                setNewChatName('')
+            } catch (error) {
+                console.error('Error renaming chat:', error)
+            }
         }
     }
 
@@ -181,7 +211,6 @@ export default function Sidebar({
                     >
                         <PlusCircle className="h-4 w-4" />
                     </Button>
-
                     <div className="flex-grow mt-20 overflow-auto">
                         <AnimatePresence>
                             {chats.map((chat) => (
@@ -194,55 +223,64 @@ export default function Sidebar({
                                     layout
                                     className="mb-1 relative group"
                                 >
-                                    <Button
-                                        onClick={() => onChatSelect(chat.id)}
-                                        className={`w-full text-left py-2 px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''}`}
-                                    >
-                                        <span className="flex-grow truncate">
-                                            {chat.name || `Chat ${chat.id.slice(0, 8)}`}
-                                        </span>
-                                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                                            <Button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleRenameChat(chat);
-                                                }}
-                                                className="p-0.5"
-                                                size="icon"
-                                                variant="noBg"
-                                            >
-                                                <Edit2 className="h-3.5 w-3.5" />
-                                                <span className="sr-only">Rename Chat</span>
-                                            </Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="p-0.5"
-                                                        size="icon"
-                                                        variant="noBg"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                        <span className="sr-only">Delete Chat</span>
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            This action cannot be undone. This will permanently delete your chat.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
-                                                            Confirm
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
-                                    </Button>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant={'noShadow'}
+                                                    size="sm"
+                                                    onClick={() => onChatSelect(chat.id)}
+                                                    className={`w-full text-left px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''}`}
+                                                >
+                                                    <span className="flex-grow truncate">
+                                                        {chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                                                    </span>
+                                                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-0.5 bg-white rounded-md overflow-hidden">
+                                                        <Button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRenameChat(chat);
+                                                            }}
+                                                            size="xsm"
+                                                            variant="wBg"
+                                                        >
+                                                            <Edit2 className="h-3.5 w-3.5" />
+                                                            <span className="sr-only">Rename Chat</span>
+                                                        </Button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    size="xsm"
+                                                                    variant="wBg"
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                    <span className="sr-only">Delete Chat</span>
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        This action cannot be undone. This will permanently delete your chat.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
+                                                                        Confirm
+                                                                    </AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>{chat.name || `Chat ${chat.id.slice(0, 8)}`}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 </motion.div>
                             ))}
                         </AnimatePresence>
