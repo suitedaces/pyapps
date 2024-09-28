@@ -2,8 +2,6 @@
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PlusCircle, Settings, SidebarIcon, MoreHorizontal, Trash2, Edit2 } from 'lucide-react'
@@ -40,6 +38,7 @@ import {
     TooltipProvider,
     TooltipTrigger
 } from "@/components/ui/tooltip"
+import LoadingSpinner from './LoadingSpinner'
 
 import { Input } from "@/components/ui/input"
 
@@ -71,6 +70,7 @@ export default function Sidebar({
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
     const [chatToRename, setChatToRename] = useState<Chat | null>(null)
     const [newChatName, setNewChatName] = useState('')
+    const [isLoading, setIsLoading] = useState(true)
 
     const router = useRouter()
     const supabase = createClientComponentClient()
@@ -88,6 +88,7 @@ export default function Sidebar({
 
 
     const fetchChats = async () => {
+        setIsLoading(true)
         try {
             const response = await fetch('/api/conversations')
             if (!response.ok) {
@@ -100,6 +101,8 @@ export default function Sidebar({
 
         } catch (error) {
             console.error('Error fetching chats:', error)
+        } finally {
+            setIsLoading(false)
         }
     }
 
@@ -212,78 +215,82 @@ export default function Sidebar({
                         <PlusCircle className="h-4 w-4" />
                     </Button>
                     <div className="flex-grow mt-20 overflow-auto">
-                        <AnimatePresence>
-                            {chats.map((chat) => (
-                                <motion.div
-                                    key={chat.id}
-                                    variants={chatItemVariants}
-                                    initial="hidden"
-                                    animate="visible"
-                                    exit="exit"
-                                    layout
-                                    className="mb-1 relative group"
-                                >
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant={'noShadow'}
-                                                    size="sm"
-                                                    onClick={() => onChatSelect(chat.id)}
-                                                    className={`w-full text-left px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''}`}
-                                                >
-                                                    <span className="flex-grow truncate">
-                                                        {chat.name || `Chat ${chat.id.slice(0, 8)}`}
-                                                    </span>
-                                                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-0.5 bg-white rounded-md overflow-hidden">
-                                                        <Button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRenameChat(chat);
-                                                            }}
-                                                            size="xsm"
-                                                            variant="wBg"
-                                                        >
-                                                            <Edit2 className="h-3.5 w-3.5" />
-                                                            <span className="sr-only">Rename Chat</span>
-                                                        </Button>
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <Button
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    size="xsm"
-                                                                    variant="wBg"
-                                                                >
-                                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                                    <span className="sr-only">Delete Chat</span>
-                                                                </Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>
-                                                                        This action cannot be undone. This will permanently delete your chat.
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
-                                                                        Confirm
-                                                                    </AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
-                                                    </div>
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>{chat.name || `Chat ${chat.id.slice(0, 8)}`}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
+                        {isLoading ? (
+                            <LoadingSpinner />
+                        ) : (
+                            <AnimatePresence>
+                                {chats.map((chat) => (
+                                    <motion.div
+                                        key={chat.id}
+                                        variants={chatItemVariants}
+                                        initial="hidden"
+                                        animate="visible"
+                                        exit="exit"
+                                        layout
+                                        className="mb-1 relative group"
+                                    >
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant={'noShadow'}
+                                                        size="sm"
+                                                        onClick={() => onChatSelect(chat.id)}
+                                                        className={`w-full text-left px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''}`}
+                                                    >
+                                                        <span className="flex-grow truncate">
+                                                            {chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                                                        </span>
+                                                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-0.5 bg-white rounded-md overflow-hidden">
+                                                            <Button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleRenameChat(chat);
+                                                                }}
+                                                                size="xsm"
+                                                                variant="wBg"
+                                                            >
+                                                                <Edit2 className="h-3.5 w-3.5" />
+                                                                <span className="sr-only">Rename Chat</span>
+                                                            </Button>
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        size="xsm"
+                                                                        variant="wBg"
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                        <span className="sr-only">Delete Chat</span>
+                                                                    </Button>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            This action cannot be undone. This will permanently delete your chat.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
+                                                                            Confirm
+                                                                        </AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </div>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>{chat.name || `Chat ${chat.id.slice(0, 8)}`}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        )}
                     </div>
 
                     <div className="mt-auto pt-4 border-t border-white/20">
