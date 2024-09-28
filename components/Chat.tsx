@@ -134,6 +134,7 @@ export function Chat({
                 const analysis = await analyzeCSV(fileContent)
                 setCsvAnalysis(analysis)
                 setShowSpreadsheet(true)
+                removeFile()
                 await handleFileUpload(fileContent, file.name)
             }
             await handleSubmit(e)
@@ -141,7 +142,6 @@ export function Chat({
             console.error('Error submitting form:', error)
         } finally {
             setIsLoadingInternal(false)
-            removeFile() // This will remove the file attachment box
         }
     }
 
