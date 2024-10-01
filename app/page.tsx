@@ -3,7 +3,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 
 import { Chat } from '@/components/Chat'
 import { CodeView } from '@/components/CodeView'
@@ -94,9 +94,9 @@ export default function Home() {
         }
     }, [])
 
-    const handleTabChange = useCallback((value: string) => {
-        setActiveTab(value)
-    }, [])
+    const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
+      }, [handleInputChange]);
 
     if (!session) {
         return <LoginPage />
@@ -124,7 +124,7 @@ export default function Home() {
                         <Chat
                             messages={messages}
                             input={input}
-                            handleInputChange={handleInputChange}
+                            handleInputChange={handleInputChangeWrapper}
                             handleSubmit={handleSubmit}
                             isLoading={isLoading}
                             streamingMessage={streamingMessage}
