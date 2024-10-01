@@ -24,7 +24,7 @@ interface CodeProps {
 interface ChatProps {
     messages: ClientMessage[];
     input: string;
-    handleInputChange: (e: ChangeEvent<HTMLInputElement>) => void;
+    handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
     handleSubmit: (e: FormEvent<HTMLFormElement>) => void;
     isLoading: boolean;
     streamingMessage: string;
@@ -89,10 +89,10 @@ export function Chat({
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         handleInputChange(e);
         if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
         }
-    };
+      };
 
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
