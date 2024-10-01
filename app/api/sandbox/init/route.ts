@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         // Upload files to sandbox
         for (const file of files) {
             const fileBuffer = Buffer.from(file.content_hash)
-            await sandbox.uploadFile(fileBuffer, `/app/${file.file_name}`)
+            await sandbox.uploadFile(fileBuffer, `${file.file_name}`)
         }
 
         return NextResponse.json({ sandboxId: sandbox.id, files })

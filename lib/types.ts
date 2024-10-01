@@ -53,6 +53,7 @@ export type StreamChunk = {
     delta?: any
     content?: string
     name?: string
+    parameters?: string
 }
 
 export type CSVAnalysis = {

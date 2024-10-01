@@ -366,21 +366,6 @@ export function Chat({
                         </div>
                     </div>
                 )}
-                {generatedCode && (
-                    <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start max-w-[80%]">
-                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
-                                <AvatarFallback>G</AvatarFallback>
-                            </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
-                                <h3 className="text-lg font-bold mb-2">
-                                    Generated Code
-                                </h3>
-                                {renderCode(generatedCode)}
-                            </div>
-                        </div>
-                    </div>
-                )}
                 {isExecutingCode && (
                     <div className="flex justify-start mb-4">
                         <div className="flex flex-row items-start max-w-[80%]">

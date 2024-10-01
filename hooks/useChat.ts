@@ -18,16 +18,12 @@ export function useChat(chatId: string | null) {
     const [input, setInput] = useState('')
     const [csvContent, setCsvContent] = useState<string | null>(null)
     const [csvFileName, setCsvFileName] = useState<string | null>(null)
-    const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
-    const [generatedCode, setGeneratedCode] = useState('')
     const [messages, setMessages] = useState<ClientMessage[]>([])
     const [streamingMessage, setStreamingMessage] = useState<string>('')
-    const [isGeneratingCode, setIsGeneratingCode] = useState(false)
-    const [codeExplanation, setCodeExplanation] = useState('')
-    const [sandboxErrors, setSandboxErrors] = useState<any[]>([])
     const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [executionResults, setExecutionResults] = useState<any[]>([])
-    const [isExecutingCode, setIsExecutingCode] = useState(false)
+    const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
+    const [generatedCode, setGeneratedCode] = useState<string>('')
+    const [isGeneratingCode, setIsGeneratingCode] = useState(false)
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -44,33 +40,23 @@ export function useChat(chatId: string | null) {
 
         return () => subscription.unsubscribe()
     }, [supabase.auth])
-
-    useEffect(() => {
-        if (chatId) {
-            initializeSandbox()
-            fetchMessages(chatId)
-        } else {
-            resetState()
-        }
-    }, [chatId])
-
-    const resetState = () => {
+    
+    const resetState = useCallback(() => {
         setMessages([])
         setCsvContent(null)
         setCsvFileName(null)
-        setStreamlitUrl(null)
-        setGeneratedCode('')
         setStreamingMessage('')
-        setCodeExplanation('')
-        setSandboxErrors([])
         setSandboxId(null)
-    }
+        setStreamlitUrl(null)
+        setGeneratedCode('') // Reset the generated code state
+    }, [])
 
     const initializeSandbox = useCallback(async () => {
         try {
             const response = await fetch('/api/sandbox/init', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId }),
             })
 
             if (!response.ok) {
@@ -82,12 +68,17 @@ export function useChat(chatId: string | null) {
             console.log('Sandbox initialized with ID:', data.sandboxId)
         } catch (error) {
             console.error('Error initializing sandbox:', error)
-            setSandboxErrors((prev) => [
-                ...prev,
-                { message: 'Error initializing sandbox' },
-            ])
         }
-    }, [])
+    }, [chatId])
+
+    useEffect(() => {
+        if (chatId) {
+            initializeSandbox()
+            fetchMessages(chatId)
+        } else {
+            resetState()
+        }
+    }, [chatId, initializeSandbox, resetState])
 
     const fetchMessages = async (id: string) => {
         try {
@@ -96,29 +87,20 @@ export function useChat(chatId: string | null) {
                 throw new Error('Failed to fetch messages')
             }
             const data: Message[] = await response.json()
-            const clientMessages: ClientMessage[] = data.flatMap((msg) => {
-                const messages: ClientMessage[] = [
-                    {
-                        role: 'user',
-                        content: msg.user_message,
-                        created_at: new Date(msg.created_at),
-                    },
-                ]
-
-                if (msg.assistant_message) {
-                    messages.push({
-                        role: 'assistant',
-                        content: msg.assistant_message,
-                        created_at: new Date(msg.created_at),
-                        tool_calls: msg.tool_calls as ToolCall[] | undefined,
-                        tool_results: msg.tool_results as
-                            | ToolResult[]
-                            | undefined,
-                    })
-                }
-
-                return messages
-            })
+            const clientMessages: ClientMessage[] = data.flatMap((msg) => [
+                {
+                    role: 'user',
+                    content: msg.user_message,
+                    created_at: new Date(msg.created_at),
+                },
+                {
+                    role: 'assistant',
+                    content: msg.assistant_message,
+                    created_at: new Date(msg.created_at),
+                    tool_calls: msg.tool_calls as ToolCall[] | undefined,
+                    tool_results: msg.tool_results as ToolResult[] | undefined,
+                },
+            ])
             setMessages(clientMessages)
         } catch (error) {
             console.error('Error fetching messages:', error)
@@ -132,141 +114,80 @@ export function useChat(chatId: string | null) {
         []
     )
 
-    const updateStreamlitApp = useCallback(
-        async (code: string) => {
-            if (code && sandboxId) {
-                try {
-                    console.log('Updating Streamlit app with code:', code)
-                    const response = await fetch(
-                        `/api/sandbox/${sandboxId}/execute`,
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ code }),
-                        }
-                    )
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`
-                        )
-                    }
-
-                    const data = await response.json()
-                    if (data.url) {
-                        setStreamlitUrl(data.url)
-                        console.log('Streamlit URL updated:', data.url)
-                    } else {
-                        throw new Error('No URL returned from sandbox API')
-                    }
-                } catch (error) {
-                    console.error('Error updating Streamlit app:', error)
-                    setSandboxErrors((prev) => [
-                        ...prev,
-                        { message: 'Error updating Streamlit app' },
-                    ])
-                } finally {
-                    setIsGeneratingCode(false)
-                }
-            } else {
-                console.error(
-                    'Generated code not available or sandbox not initialized'
-                )
-            }
-        },
-        [sandboxId]
-    )
-
-    const processStreamChunk = useCallback(
-        (
-            chunk: string,
-            accumulatedResponse: string,
-            accumulatedCode: string
-        ) => {
+    const updateStreamlitApp = useCallback(async (code: string) => {
+        if (code && sandboxId) {
             try {
-                const parsedChunk: StreamChunk = JSON.parse(chunk)
-                if (
-                    parsedChunk.type === 'content_block_delta' &&
-                    'delta' in parsedChunk &&
-                    parsedChunk.delta?.type === 'text_delta'
-                ) {
-                    setStreamingMessage((prev) => prev + parsedChunk.delta.text)
-                    return {
-                        accumulatedResponse:
-                            accumulatedResponse + parsedChunk.delta.text,
-                        accumulatedCode,
+                console.log('Updating Streamlit app with code:', code)
+                const response = await fetch(
+                    `/api/sandbox/${sandboxId}/execute`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code }),
                     }
-                } else if (
-                    parsedChunk.type === 'generated_code' &&
-                    'content' in parsedChunk
-                ) {
-                    setGeneratedCode((prev) => prev + parsedChunk.content)
-                    return {
-                        accumulatedResponse,
-                        accumulatedCode: accumulatedCode + parsedChunk.content,
-                    }
-                } else if (
-                    parsedChunk.type === 'code_explanation' &&
-                    'content' in parsedChunk
-                ) {
-                    setCodeExplanation((prev) => prev + parsedChunk.content)
-                } else if (
-                    parsedChunk.type === 'execution_results' &&
-                    'content' in parsedChunk
-                ) {
-                    setExecutionResults(
-                        Array.isArray(parsedChunk.content)
-                            ? parsedChunk.content
-                            : []
-                    )
-                    setIsExecutingCode(false)
-                } else if (parsedChunk.type === 'message_stop') {
-                    setIsGeneratingCode(false)
-                    setIsExecutingCode(false)
-                } else if (
-                    parsedChunk.type === 'tool_use' &&
-                    parsedChunk.name === 'execute_jupyter_notebook'
-                ) {
-                    setIsExecutingCode(true)
+                )
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`)
+                }
+
+                const data = await response.json()
+                if (data.url) {
+                    setStreamlitUrl(data.url)
+                    console.log('Streamlit URL updated:', data.url)
+                } else {
+                    throw new Error('No URL returned from sandbox API')
                 }
             } catch (error) {
-                console.error('Error processing stream chunk:', error)
+                console.error('Error updating Streamlit app:', error)
             }
-            return { accumulatedResponse, accumulatedCode }
-        },
-        []
-    )
+        } else {
+            console.error('Generated code not available or sandbox not initialized')
+        }
+    }, [sandboxId])
 
-    const processStream = useCallback(
-        async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
-            const decoder = new TextDecoder()
-            let accumulatedResponse = ''
-            let accumulatedCode = ''
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-                const chunk = decoder.decode(value)
-                const lines = chunk
-                    .split('\n')
-                    .filter((line) => line.trim() !== '')
-
-                for (const line of lines) {
-                    const result = processStreamChunk(
-                        line,
-                        accumulatedResponse,
-                        accumulatedCode
-                    )
-                    accumulatedResponse = result.accumulatedResponse
-                    accumulatedCode = result.accumulatedCode
-                }
-
-                setStreamingMessage(accumulatedResponse)
+    const processStreamChunk = useCallback(
+        (chunk: StreamChunk) => {
+            switch (chunk.type) {
+                case 'content_block_delta':
+                    if ('delta' in chunk && chunk.delta?.type === 'text_delta') {
+                        setStreamingMessage(prev => prev + chunk.delta.text)
+                    }
+                    break
+                case 'generated_code': // Handle the generated code case
+                    if ('content' in chunk) {
+                        setGeneratedCode(prev => prev + chunk.content)
+                        setIsGeneratingCode(true)
+                        updateStreamlitApp(chunk.content as string)
+                    }
+                    break
+                case 'tool_use':
+                    setMessages(prev => {
+                        const lastMessage = prev[prev.length - 1]
+                        if (lastMessage.role === 'assistant') {
+                            const updatedToolCalls = [...(lastMessage.tool_calls || []), chunk.content]
+                            return [...prev.slice(0, -1), { ...lastMessage, tool_calls: updatedToolCalls }]
+                        }
+                        return prev
+                    })
+                    break
+                case 'message_stop':
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            role: 'assistant',
+                            content: streamingMessage,
+                            created_at: new Date(),
+                            tool_calls: prev[prev.length - 1]?.tool_calls,
+                            tool_results: prev[prev.length - 1]?.tool_results,
+                        },
+                    ])
+                    setStreamingMessage('')
+                    setIsGeneratingCode(false)
+                    break
             }
-
-            return { accumulatedResponse, accumulatedCode }
         },
-        [processStreamChunk]
+        [streamingMessage, updateStreamlitApp]
     )
 
     const handleChatOperation = useCallback(
@@ -279,9 +200,6 @@ export function useChat(chatId: string | null) {
             }
 
             setStreamingMessage('')
-            setGeneratedCode('')
-            setCodeExplanation('')
-            setSandboxErrors([])
 
             try {
                 const response = await fetch(
@@ -302,36 +220,19 @@ export function useChat(chatId: string | null) {
                     throw new Error('Failed to get response reader')
                 }
 
-                const { accumulatedResponse, accumulatedCode } =
-                    await processStream(reader)
-
-                const assistantMessage: ClientMessage = {
-                    role: 'assistant',
-                    content: accumulatedResponse,
-                    created_at: new Date(),
-                }
-
-                setMessages((prev) => [...prev, assistantMessage])
-
-                setStreamingMessage('')
-
-                if (accumulatedCode) {
-                    setGeneratedCode(accumulatedCode)
-                    console.log('Generated code:', accumulatedCode)
-                    await updateStreamlitApp(accumulatedCode)
-                }
-
-                if (codeExplanation) {
-                    const explanationMessage: ClientMessage = {
-                        role: 'assistant',
-                        content: codeExplanation,
-                        created_at: new Date(),
+                const decoder = new TextDecoder()
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+                    const chunk = decoder.decode(value)
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '')
+                    for (const line of lines) {
+                        processStreamChunk(JSON.parse(line))
                     }
-                    setMessages((prev) => [...prev, explanationMessage])
                 }
             } catch (error) {
                 console.error('Error in chat operation:', error)
-                setMessages((prev) => [
+                setMessages(prev => [
                     ...prev,
                     {
                         role: 'assistant',
@@ -339,24 +240,11 @@ export function useChat(chatId: string | null) {
                         created_at: new Date(),
                     },
                 ])
-                setSandboxErrors((prev) => [
-                    ...prev,
-                    { message: 'Error in chat operation' },
-                ])
             } finally {
                 setIsLoading(false)
-                setStreamingMessage('')
-                setIsGeneratingCode(false)
             }
         },
-        [
-            session,
-            isLoading,
-            chatId,
-            processStream,
-            updateStreamlitApp,
-            codeExplanation,
-        ]
+        [session, isLoading, chatId, processStreamChunk]
     )
 
     const handleSubmit = useCallback(
@@ -369,7 +257,7 @@ export function useChat(chatId: string | null) {
                 content: input,
                 created_at: new Date(),
             }
-            setMessages((prev) => [...prev, newUserMessage])
+            setMessages(prev => [...prev, newUserMessage])
             setInput('')
 
             await handleChatOperation(newUserMessage)
@@ -435,15 +323,15 @@ export function useChat(chatId: string | null) {
 
                 const newUserMessage: ClientMessage = {
                     role: 'user',
-                    content: `I've uploaded a CSV file named "${fileName}". Can you analyze it and create a complex, aesthetic Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code. The file is located at '/home/user/${fileName}' in the sandbox. CSV Analysis: ${analysisData}`,
+                    content: `I've uploaded a CSV file named "${fileName}". Can you analyze it and create a Streamlit app to visualize the data? The file is located at '/home/user/${fileName}' in the sandbox.`,
                     created_at: new Date(),
                 }
 
-                setMessages((prev) => [...prev, newUserMessage])
+                setMessages(prev => [...prev, newUserMessage])
                 await handleChatOperation(newUserMessage)
             } catch (error) {
                 console.error('Error in file upload:', error)
-                setMessages((prev) => [
+                setMessages(prev => [
                     ...prev,
                     {
                         role: 'assistant',
@@ -451,13 +339,9 @@ export function useChat(chatId: string | null) {
                         created_at: new Date(),
                     },
                 ])
-                setSandboxErrors((prev) => [
-                    ...prev,
-                    { message: 'Error uploading file' },
-                ])
             }
         },
-        [handleChatOperation]
+        [chatId, sandboxId, handleChatOperation]
     )
 
     return {
@@ -469,14 +353,10 @@ export function useChat(chatId: string | null) {
         handleFileUpload,
         csvContent,
         csvFileName,
-        streamlitUrl,
-        generatedCode,
         streamingMessage,
-        isGeneratingCode,
-        streamingCodeExplanation: codeExplanation,
-        sandboxErrors,
         sandboxId,
-        executionResults,
-        isExecutingCode
+        streamlitUrl,
+        generatedCode,  // Return the generated code
+        isGeneratingCode,
     }
 }

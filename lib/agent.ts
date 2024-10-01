@@ -51,6 +51,41 @@ export class GruntyAgent {
         return data
     }
 
+    private async fetchFileInfo(chatId: string): Promise<{ fileName: string, fileContent: string } | null> {
+        const supabase = createRouteHandlerClient({ cookies })
+        
+        // Get the latest file_id from chat_files for this chat
+        const { data: chatFileData, error: chatFileError } = await supabase
+            .from('chat_files')
+            .select('file_id')
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+    
+        if (chatFileError || !chatFileData) {
+            console.error('Error fetching latest chat file:', chatFileError)
+            return null
+        }
+    
+        // Fetch the file details using the latest file_id
+        const { data: fileData, error: fileError } = await supabase
+            .from('files')
+            .select('file_name, content_hash')
+            .eq('id', chatFileData.file_id)
+            .single()
+    
+        if (fileError || !fileData) {
+            console.error('Error fetching file details:', fileError)
+            return null
+        }
+    
+        return {
+            fileName: fileData.file_name,
+            fileContent: fileData.content_hash || '',
+        }
+    }
+
     async *chat(
         chatId: string,
         userId: string,
@@ -151,45 +186,42 @@ export class GruntyAgent {
                                 content: 'Error in code generation process',
                             } as unknown as StreamChunk
                         }
-                    } else if (
-                        currentContentBlock.name === 'execute_jupyter_notebook'
-                    ) {
-                        try {
-                            const toolInput = JSON.parse(accumulatedJson)
-                            const codeToExecute = toolInput.code
-
-                            const execution = await runNotebook(codeToExecute)
-                            const processedResults =
-                                this.processExecutionResults(execution)
-
-                            yield {
-                                type: 'execution_results',
-                                content: {
-                                    executedCode: codeToExecute,
-                                    ...processedResults,
-                                },
-                            } as unknown as StreamChunk
-
-                            toolResults = toolResults || []
-                            toolResults.push({
-                                name: 'execute_jupyter_notebook',
-                                result: {
-                                    executedCode: codeToExecute,
-                                    ...processedResults,
-                                },
-                            })
-                        } catch (error) {
-                            console.error(
-                                'Error executing Jupyter code:',
-                                error
-                            )
-                            yield {
-                                type: 'error',
-                                content:
-                                    'Error in Jupyter code execution process',
-                            } as unknown as StreamChunk
+                    } else if (currentContentBlock.name === 'execute_jupyter_notebook') {
+                            try {
+                                const toolInput = JSON.parse(accumulatedJson)
+                                const codeToExecute = toolInput.code
+                        
+                                yield {
+                                    type: 'tool_use',
+                                    name: 'execute_jupyter_notebook',
+                                    content: codeToExecute,
+                                } as unknown as StreamChunk
+                        
+                                const fileInfo = await this.fetchFileInfo(chatId)
+                                if (!fileInfo) {
+                                    throw new Error('CSV file not found')
+                                }
+                        
+                                const execution = await runNotebook(codeToExecute, fileInfo.fileContent, fileInfo.fileName)
+                        
+                                yield {
+                                    type: 'execution_results',
+                                    content: execution,
+                                } as unknown as StreamChunk;
+                        
+                                toolResults = toolResults || []
+                                toolResults.push({
+                                    name: 'execute_jupyter_notebook',
+                                    result: execution,
+                                })
+                            } catch (error) {
+                                console.error('Error executing Jupyter code:', error)
+                                yield {
+                                    type: 'error',
+                                    content: 'Error in Jupyter code execution process',
+                                } as unknown as StreamChunk
+                            }
                         }
-                    }
                 }
                 currentContentBlock = null
             } else if (event.type === 'message_delta') {
@@ -226,60 +258,6 @@ export class GruntyAgent {
                 this.outputTokens = 0
             }
         }
-    }
-
-    private processExecutionResults(execution: any) {
-        if (execution.error) {
-            return {
-                error: {
-                    name: execution.error.name,
-                    value: execution.error.value,
-                    traceback: execution.error.traceback,
-                },
-            }
-        }
-
-        const processedResults = {
-            results: [] as any[],
-            logs: {
-                stdout: execution.logs.stdout,
-                stderr: execution.logs.stderr,
-            },
-        }
-
-        for (const result of execution.results) {
-            const processedResult: any = {
-                isMainResult: result.isMainResult,
-                text: result.text,
-                formats: result.formats(),
-            }
-
-            if (result.png) {
-                processedResult.png = result.png
-            }
-            if (result.jpeg) {
-                processedResult.jpeg = result.jpeg
-            }
-            if (result.svg) {
-                processedResult.svg = result.svg
-            }
-            if (result.html) {
-                processedResult.html = result.html
-            }
-            if (result.json) {
-                processedResult.json = result.json
-            }
-            if (result.javascript) {
-                processedResult.javascript = result.javascript
-            }
-            if (result.pdf) {
-                processedResult.pdf = result.pdf
-            }
-
-            processedResults.results.push(processedResult)
-        }
-
-        return processedResults
     }
 
     private async storeMessage(

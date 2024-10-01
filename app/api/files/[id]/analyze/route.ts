@@ -39,7 +39,7 @@ export async function POST(
             )
         }
 
-        return NextResponse.json(data)
+        return NextResponse.json(analysis)
     } catch (error) {
         console.error('Error analyzing CSV:', error)
         return NextResponse.json(

@@ -48,10 +48,7 @@ export default function Home() {
         streamlitUrl,
         generatedCode,
         streamingMessage,
-        streamingCodeExplanation,
         isGeneratingCode,
-        executionResults,
-        isExecutingCode
     } = useChat(currentChatId)
 
     useEffect(() => {
@@ -122,7 +119,7 @@ export default function Home() {
                 <motion.div
                     className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]"
                     animate={{
-                        x: isRightContentVisible ? 0 : '50%',
+                        x: isRightContentVisible ? 0 : '50%',       
                     }}
                     transition={{ type: 'ease', stiffness: 300, damping: 30 }}
                 >
@@ -134,13 +131,11 @@ export default function Home() {
                             handleSubmit={handleSubmit}
                             isLoading={isLoading}
                             streamingMessage={streamingMessage}
-                            streamingCodeExplanation={streamingCodeExplanation}
                             handleFileUpload={handleFileUpload}
                             onChatSelect={handleChatSelect}
-                            generatedCode={generatedCode}
-                            executionResults={executionResults}
-                            isExecutingCode={isExecutingCode}
-                            />
+                            generatedCode={generatedCode} 
+                            streamlitUrl={streamlitUrl} 
+                            isGeneratingCode={isGeneratingCode}                            />
                     ) : (
                         <div className="flex items-center text-black justify-center h-full">
                             <p>

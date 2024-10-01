@@ -15,28 +15,26 @@ export const tools: Tool[] = [
             properties: {
                 query: {
                     type: 'string',
-                    description:
-                        'Explain the requirements for the Streamlit code you want to generate. Include details about the data if there\'s any context and the column names VERBATIM as a list, with any spaces or special chars like this: ["col 1 ", " 2col 1"].',
+                    description: 'Detailed requirements for the Streamlit app, including data context and exact column names. Format: ["column1", "column with spaces"]',
                 },
             },
             required: ['query'],
         },
     },
-    // {
-    //     name: 'execute_jupyter_notebook',
-    //     description: 'Executes Python code in a Jupyter Notebook',
-    //     input_schema: {
-    //         type: 'object' as const,
-    //         properties: {
-    //             code: {
-    //                 type: 'string',
-    //                 description:
-    //                     'The Python code to execute in the Jupyter Notebook',
-    //             },
-    //         },
-    //         required: ['code'],
-    //     },
-    // },
+    {
+        name: 'execute_jupyter_notebook',
+        description: 'Executes Python code in a single Jupyter Notebook cell with access to the uploaded CSV file',
+        input_schema: {
+            type: 'object' as const,
+            properties: {
+                code: {
+                    type: 'string',
+                    description: 'The Python code to execute in the Jupyter Notebook for a single analysis task',
+                },
+            },
+            required: ['code'],
+        },
+    },
 ]
 
 export async function generateCode(
@@ -82,62 +80,57 @@ export async function generateCode(
     }
 }
 
-export const functions = {
-    create_streamlit_app: async (input: {
-        query: string
-    }): Promise<{ generatedCode: string; codeTokenCount: number }> => {
-        try {
-            const { generatedCode, codeTokenCount } = await generateCode(
-                input.query
-            )
+export async function runNotebook(code: string, fileContent: string, fileName: string) {
+    const sandbox = await CodeInterpreter.create({
+        apiKey: process.env.E2B_API_KEY,
+    });
 
-            return { generatedCode, codeTokenCount }
-        } catch (err) {
-            console.error(`Error generating Streamlit app:`, err)
-            return { generatedCode: '', codeTokenCount: 0 }
-        }
-    },
-    // execute_jupyter_notebook: async (input: {
-    //     code: string
-    // }): Promise<string> => {
-    //     try {
-    //         const results = await runNotebook(input.code)
-    //         return JSON.stringify(results)
-    //     } catch (err) {
-    //         console.error(`Error executing Jupyter Notebook:`, err)
-    //         return `Error executing Jupyter Notebook for code: ${input.code}`
-    //     }
-    // },
-}
-
-export async function createCodeInterpreter() {
     try {
-        const codeInterpreter = await CodeInterpreter.create({
-            apiKey: process.env.E2B_API_KEY,
-        })
+        const file = new File([fileContent], fileName, { type: 'text/csv' });
+        await sandbox.uploadFile(file, fileName);
 
-        codeInterpreter.uploadFile(new File([], 'data.csv'), 'data.csv')
+        const execution = await sandbox.notebook.execCell(code);
+        console.log('Raw execution result:', JSON.stringify(execution, null, 2));
 
-        return codeInterpreter
+        if (execution.error) {
+            return {
+                error: {
+                    name: execution.error.name,
+                    value: execution.error.value,
+                    traceback: execution.error.traceback,
+                },
+            };
+        }
+
+        return {
+            results: execution.results.map(result => ({
+                text: result.text,
+                png: result.png,
+                html: result.html,
+            })),
+            logs: {
+                stdout: execution.logs.stdout,
+                stderr: execution.logs.stderr,
+            },
+        };
     } catch (error) {
-        console.error('Error creating CodeInterpreter:', error)
-        throw error
+        console.error('Error in runNotebook:', error);
+        return {
+            error: {
+                name: 'ExecutionError',
+                value: error instanceof Error ? error.message : String(error),
+                traceback: error instanceof Error ? error.stack : '',
+            },
+        };
+    } finally {
+        await sandbox.close();
     }
-}
-
-export async function runNotebook(code: string) {
-    const codeInterpreter = await createCodeInterpreter()
-
-    const { results } = await codeInterpreter.notebook.execCell(code)
-    await codeInterpreter.close()
-
-    return results
 }
 
 export function toolExists(name: string): boolean {
     return tools.some((tool) => tool.name === name)
 }
 
-export function getToolByName(name: string): any {
+export function getToolByName(name: string): Tool | undefined {
     return tools.find((tool) => tool.name === name)
 }
