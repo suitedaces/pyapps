@@ -4,7 +4,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
-import { PlusCircle, Settings, SidebarIcon, MoreHorizontal, Trash2, Edit2 } from 'lucide-react'
+import { PlusCircle, Settings, SidebarIcon, Trash2, Edit2, ChevronUp, ChevronDown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -55,6 +55,8 @@ interface Chat {
     name: string | null
 }
 
+const CHATS_PER_PAGE = 9;
+
 export default function Sidebar({
     isRightContentVisible,
     setIsRightContentVisible,
@@ -65,12 +67,16 @@ export default function Sidebar({
     const [isOpen, setIsOpen] = useState(false)
     const [chats, setChats] = useState<Chat[]>([])
     const [isNewChat, setIsNewChat] = useState(false);
+    const [isChatsExpanded, setIsChatsExpanded] = useState(true);
     const [chatToDelete, setChatToDelete] = useState<string | null>(null)
 
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
     const [chatToRename, setChatToRename] = useState<Chat | null>(null)
     const [newChatName, setNewChatName] = useState('')
     const [isLoading, setIsLoading] = useState(true)
+    const [visibleChats, setVisibleChats] = useState(CHATS_PER_PAGE);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
 
     const router = useRouter()
     const supabase = createClientComponentClient()
@@ -178,6 +184,80 @@ export default function Sidebar({
         }
     }
 
+    const handleLoadMore = () => {
+        setVisibleChats(prevVisible => prevVisible + 5);
+    };
+
+    const renderChatItem = (chat: any) => (
+        <motion.div
+            key={chat.id}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="mb-1 relative group"
+        >
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant={'noShadow'}
+                            size="sm"
+                            onClick={() => onChatSelect(chat.id)}
+                            className={`w-full text-left px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''}`}
+                        >
+                            <span className="flex-grow truncate">
+                                {chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                            </span>
+                            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-0.5 bg-white rounded-md overflow-hidden">
+                                <Button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRenameChat(chat);
+                                    }}
+                                    size="xsm"
+                                    variant="wBg"
+                                >
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                    <span className="sr-only">Rename Chat</span>
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            onClick={(e) => e.stopPropagation()}
+                                            size="xsm"
+                                            variant="wBg"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            <span className="sr-only">Delete Chat</span>
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action cannot be undone. This will permanently delete your chat.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
+                                                Confirm
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{chat.name || `Chat ${chat.id.slice(0, 8)}`}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        </motion.div>
+    );
+
     const sidebarVariants = {
         open: { x: 0 },
         closed: { x: '-100%' },
@@ -208,88 +288,58 @@ export default function Sidebar({
                 className="fixed left-0 top-0 bottom-0 w-64 bg-matte text-white p-4 z-20"
             >
                 <div className="relative flex flex-col h-full">
-                    <Button
-                        onClick={handleNewChat}
-                        className="absolute right-0 top-0"
-                    >
-                        <PlusCircle className="h-4 w-4" />
-                    </Button>
-                    <div className="flex-grow mt-20 overflow-auto">
+                    <div className="mt-16">
+                        <Button
+                            onClick={handleNewChat}
+                            className="w-full"
+                            variant="default"
+                        >
+                            New Chat
+                        </Button>
+                    </div>
+                    <div className="flex-grow mt-4 overflow-auto">
                         {isLoading ? (
                             <LoadingSpinner />
                         ) : (
-                            <AnimatePresence>
-                                {chats.map((chat) => (
-                                    <motion.div
-                                        key={chat.id}
-                                        variants={chatItemVariants}
-                                        initial="hidden"
-                                        animate="visible"
-                                        exit="exit"
-                                        layout
-                                        className="mb-1 relative group"
+                            <>
+                                <div className="mb-4 px-2 flex items-center justify-between">
+                                    <h2 className="text-2xl font-bold">Chats</h2>
+                                    <Button
+                                        variant="neutral"
+                                        size="sm"
+                                        onClick={() => setIsChatsExpanded(!isChatsExpanded)}
                                     >
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button
-                                                        variant={'noShadow'}
-                                                        size="sm"
-                                                        onClick={() => onChatSelect(chat.id)}
-                                                        className={`w-full text-left px-3 rounded-lg hover:bg-white hover:transform-none transition-colors ${currentChatId === chat.id ? 'bg-white' : ''}`}
-                                                    >
-                                                        <span className="flex-grow truncate">
-                                                            {chat.name || `Chat ${chat.id.slice(0, 8)}`}
-                                                        </span>
-                                                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-0.5 bg-white rounded-md overflow-hidden">
-                                                            <Button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleRenameChat(chat);
-                                                                }}
-                                                                size="xsm"
-                                                                variant="wBg"
-                                                            >
-                                                                <Edit2 className="h-3.5 w-3.5" />
-                                                                <span className="sr-only">Rename Chat</span>
-                                                            </Button>
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <Button
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        size="xsm"
-                                                                        variant="wBg"
-                                                                    >
-                                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                                        <span className="sr-only">Delete Chat</span>
-                                                                    </Button>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                                        <AlertDialogDescription>
-                                                                            This action cannot be undone. This will permanently delete your chat.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
-                                                                            Confirm
-                                                                        </AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </div>
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>{chat.name || `Chat ${chat.id.slice(0, 8)}`}</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
+                                        {isChatsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    </Button>
+                                </div>
+
+                                {currentChatId && (
+                                    <div className="mb-4">
+                                        {renderChatItem(chats.find(chat => chat.id === currentChatId))}
+                                    </div>
+                                )}
+
+                                {isChatsExpanded && (
+                                    <AnimatePresence>
+                                        {chats.slice(0, visibleChats).map(renderChatItem)}
+                                        {chats.length > visibleChats && (
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                            >
+                                                <Button
+                                                    onClick={handleLoadMore}
+                                                    className="w-full mt-2"
+                                                    variant="neutral"
+                                                >
+                                                    Load 5 more
+                                                </Button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                )}
+                            </>
                         )}
                     </div>
 

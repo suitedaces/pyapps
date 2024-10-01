@@ -56,7 +56,9 @@ export function Chat({
     handleFileUpload,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null)
+
     const [isAtBottom, setIsAtBottom] = useState<boolean>(true)
     const [file, setFile] = useState<File | null>(null)
     const [isLoadingInternal, setIsLoadingInternal] = useState<boolean>(false)
@@ -76,6 +78,22 @@ export function Chat({
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
         }
     }, [messages, streamingMessage, streamingCodeExplanation, isAtBottom])
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [input]);
+
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        handleInputChange(e);
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    };
+
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
@@ -365,11 +383,13 @@ export function Chat({
                                 </div>
                             )}
                         </div>
-                        <Input
+                        <textarea
+                            ref={textareaRef}
                             value={input}
-                            onChange={handleInputChange}
-                            placeholder={isInputDisabled ? "File attached. Remove file to type a message." : "Type your message..."}
-                            className="relative flex w-full h-20 rounded-full text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 py-2 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light"
+                            onChange={handleTextareaChange}
+                            placeholder={file ? "File attached. Remove file to type a message." : "Type your message..."}
+                            className="relative flex w-full min-h-[80px] max-h-[200px] rounded-3xl text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 pt-6 py-3 pr-16 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light resize-none overflow-hidden"
+                            disabled={!!file}
                         />
                         <button
                             type="button"
