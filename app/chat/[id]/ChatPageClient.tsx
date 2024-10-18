@@ -14,7 +14,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 
 interface ChatPageClientProps {
     initialChat: any,
@@ -90,6 +90,10 @@ export default function ChatPageClient({
         }
     }
 
+    const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
+      }, [handleInputChange]);
+
     if (!session) {
         return <LoginPage />
     }
@@ -117,7 +121,7 @@ export default function ChatPageClient({
                             <Chat
                                 messages={messages}
                                 input={input}
-                                handleInputChange={handleInputChange}
+                                handleInputChange={handleInputChangeWrapper}
                                 handleSubmit={handleSubmit}
                                 isLoading={isLoading}
                                 streamingMessage={streamingMessage}

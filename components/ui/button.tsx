@@ -19,7 +19,9 @@ const buttonVariants = cva(
                 reverse:
                     'bg-main border-2 border-border dark:border-darkBorder hover:translate-x-reverseBoxShadowX hover:translate-y-reverseBoxShadowY hover:shadow-light dark:hover:shadow-dark',
                 noBg: 'bg-transparent border-none hover:transform-none',
-                round: 'bg-main border-2 border-border dark:border-darkBorder hover:transform-none rounded-full'
+                wBg: 'bg-white dark:bg-darkBg dark:text-darkText',
+                round: 'bg-main border-2 border-border dark:border-darkBorder hover:transform-none rounded-full',
+                outline: 'bg-bg border-2 border-border dark:border-darkBorder hover:transform-none'
             },
             size: {
                 default: 'h-10 px-4 py-2',
@@ -27,6 +29,7 @@ const buttonVariants = cva(
                 lg: 'h-11 px-8',
                 icon: 'h-10 w-10',
                 round: 'h-11 px-4',
+                xsm: 'h-8 px-3'
             },
         },
         defaultVariants: {
