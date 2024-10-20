@@ -1,4 +1,3 @@
-import React, { useEffect, useState, useMemo } from 'react'
 import {
     Card,
     CardContent,
@@ -16,15 +15,15 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
-import { PieChart, Pie, Cell, Tooltip, Legend, PieProps } from 'recharts'
+import { useEffect, useMemo, useState } from 'react'
+import { Cell, Legend, Pie, PieChart, Tooltip } from 'recharts'
 import { ScrollArea } from './ui/scroll-area'
 
 interface MetaSheetProps {
-    csvContent: any;
+    csvContent: any
 }
 
-
-export function MetaSheet({csvContent }: MetaSheetProps) {
+export function MetaSheet({ csvContent }: MetaSheetProps) {
     const [analysis, setAnalysis] = useState<CSVAnalysis | null>(null)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
 
@@ -37,7 +36,10 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
             },
             {} as { [key: string]: number }
         )
-        return Object.entries(distribution).map(([name, value]) => ({ name, value }))
+        return Object.entries(distribution).map(([name, value]) => ({
+            name,
+            value,
+        }))
     }, [analysis])
 
     useEffect(() => {
@@ -67,11 +69,19 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
     }
 
     if (isAnalyzing) {
-        return <div className="h-full flex items-center justify-center">Analyzing CSV...</div>
+        return (
+            <div className="h-full flex items-center justify-center">
+                Analyzing CSV...
+            </div>
+        )
     }
 
     if (!analysis) {
-        return <div className="h-full flex items-center justify-center">No CSV data available</div>
+        return (
+            <div className="h-full flex items-center justify-center">
+                No CSV data available
+            </div>
+        )
     }
 
     return (
@@ -84,18 +94,26 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
                             <div className="divide-y-2 divide-border">
                                 <div className="grid divide-x-2 divide-border grid-cols-2 items-center">
                                     <div className="p-4 rounded-tl-3xl">
-                                        <span className="text-md font-semibold">Total Rows</span>
+                                        <span className="text-md font-semibold">
+                                            Total Rows
+                                        </span>
                                     </div>
                                     <div className="p-4 text-right rounded-tr-3xl">
-                                        <span className="text-xl font-bold">{analysis.totalRows}</span>
+                                        <span className="text-xl font-bold">
+                                            {analysis.totalRows}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="grid divide-x-2 divide-border grid-cols-2 items-center">
                                     <div className="p-4 rounded-bl-3xl">
-                                        <span className="text-md font-semibold">Total Columns</span>
+                                        <span className="text-md font-semibold">
+                                            Total Columns
+                                        </span>
                                     </div>
                                     <div className="p-4 text-right rounded-br-3xl">
-                                        <span className="text-xl font-bold">{analysis.columns.length}</span>
+                                        <span className="text-xl font-bold">
+                                            {analysis.columns.length}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -106,7 +124,9 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
                         <Card className="flex border-border border-2 rounded-3xl flex-col mt-6 xl:w-1/2">
                             <CardHeader className="items-center pb-0">
                                 <CardTitle>Data Type Distribution</CardTitle>
-                                <CardDescription>Column Types in CSV</CardDescription>
+                                <CardDescription>
+                                    Column Types in CSV
+                                </CardDescription>
                             </CardHeader>
                             <CardContent className="flex-1 pb-0">
                                 <div className="mx-auto aspect-square max-h-[200px] mb-10">
@@ -121,11 +141,23 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
                                             dataKey="value"
                                         >
                                             {chartData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                <Cell
+                                                    key={`cell-${index}`}
+                                                    fill={
+                                                        COLORS[
+                                                            index %
+                                                                COLORS.length
+                                                        ]
+                                                    }
+                                                />
                                             ))}
                                         </Pie>
                                         <Tooltip />
-                                        <Legend layout="horizontal" align="center" verticalAlign="bottom" />
+                                        <Legend
+                                            layout="horizontal"
+                                            align="center"
+                                            verticalAlign="bottom"
+                                        />
                                     </PieChart>
                                 </div>
                             </CardContent>
@@ -133,7 +165,9 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
 
                         <Card className="flex border-border border-2 rounded-3xl flex-col mt-6 xl:w-1/2">
                             <CardHeader className="items-center pb-0">
-                                <CardTitle>CSV Column Names and Sample Data</CardTitle>
+                                <CardTitle>
+                                    CSV Column Names and Sample Data
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="flex-1 pb-0">
                                 <div className="overflow-x-auto mt-10">
@@ -143,16 +177,26 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
                                         </TableCaption>
                                         <TableHeader>
                                             <TableRow>
-                                                {analysis.columns.map((column, index) => (
-                                                    <TableHead key={index}>{column.name}</TableHead>
-                                                ))}
+                                                {analysis.columns.map(
+                                                    (column, index) => (
+                                                        <TableHead key={index}>
+                                                            {column.name}
+                                                        </TableHead>
+                                                    )
+                                                )}
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             <TableRow>
-                                                {analysis.sampleRows[0].map((value, cellIndex) => (
-                                                    <TableCell key={cellIndex}>{value}</TableCell>
-                                                ))}
+                                                {analysis.sampleRows[0].map(
+                                                    (value, cellIndex) => (
+                                                        <TableCell
+                                                            key={cellIndex}
+                                                        >
+                                                            {value}
+                                                        </TableCell>
+                                                    )
+                                                )}
                                             </TableRow>
                                         </TableBody>
                                     </Table>
@@ -162,7 +206,9 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
                     </div>
 
                     <div className="mt-10">
-                        <h2 className="text-text text-3xl font-semibold mb-6">Spreadsheet</h2>
+                        <h2 className="text-text text-3xl font-semibold mb-6">
+                            Spreadsheet
+                        </h2>
                         <div className="overflow-x-auto mt-10">
                             <Table>
                                 <TableCaption className="text-text dark:text-darkText">
@@ -170,16 +216,25 @@ export function MetaSheet({csvContent }: MetaSheetProps) {
                                 </TableCaption>
                                 <TableHeader>
                                     <TableRow>
-                                        {analysis.columns.map((column, index) => (
-                                            <TableHead key={index}>{column.name}</TableHead>
-                                        ))}
+                                        {analysis.columns.map(
+                                            (column, index) => (
+                                                <TableHead key={index}>
+                                                    {column.name}
+                                                </TableHead>
+                                            )
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {generateSampleRows(analysis.columns, analysis.sampleRows).map((row, rowIndex) => (
+                                    {generateSampleRows(
+                                        analysis.columns,
+                                        analysis.sampleRows
+                                    ).map((row, rowIndex) => (
                                         <TableRow key={rowIndex}>
                                             {row.map((value, cellIndex) => (
-                                                <TableCell key={cellIndex}>{value}</TableCell>
+                                                <TableCell key={cellIndex}>
+                                                    {value}
+                                                </TableCell>
                                             ))}
                                         </TableRow>
                                     ))}

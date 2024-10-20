@@ -1,0 +1,11 @@
+{
+    "models": [
+        {
+            "id": "claude-3-5-sonnet-20240620",
+            "provider": "Anthropic",
+            "providerId": "anthropic",
+            "name": "Claude 3.5 Sonnet",
+            "multiModal": true
+        }
+    ]
+}

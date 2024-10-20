@@ -2,17 +2,6 @@
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-import { Button } from '@/components/ui/button'
-import { motion, AnimatePresence } from 'framer-motion'
-import { PlusCircle, Settings, SidebarIcon, Trash2, Edit2, ChevronUp, ChevronDown } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -23,7 +12,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import {
     Dialog,
     DialogContent,
@@ -31,16 +21,33 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
-    TooltipTrigger
-} from "@/components/ui/tooltip"
+    TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+    ChevronDown,
+    ChevronUp,
+    Edit2,
+    Settings,
+    SidebarIcon,
+    Trash2,
+} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import LoadingSpinner from './LoadingSpinner'
 
-import { Input } from "@/components/ui/input"
+import { Input } from '@/components/ui/input'
 
 interface SidebarProps {
     isRightContentVisible: boolean
@@ -55,32 +62,33 @@ interface Chat {
     name: string | null
 }
 
-const CHATS_PER_PAGE = 9;
+const CHATS_PER_PAGE = 9
 
-export default function Sidebar({
-    isRightContentVisible,
-    setIsRightContentVisible,
-    onChatSelect,
-    onNewChat,
-    currentChatId,
-}: SidebarProps, id: string) {
+export default function Sidebar(
+    {
+        isRightContentVisible,
+        setIsRightContentVisible,
+        onChatSelect,
+        onNewChat,
+        currentChatId,
+    }: SidebarProps,
+    id: string
+) {
     const [isOpen, setIsOpen] = useState(false)
     const [chats, setChats] = useState<Chat[]>([])
-    const [isNewChat, setIsNewChat] = useState(false);
-    const [isChatsExpanded, setIsChatsExpanded] = useState(true);
+    const [isNewChat, setIsNewChat] = useState(false)
+    const [isChatsExpanded, setIsChatsExpanded] = useState(true)
     const [chatToDelete, setChatToDelete] = useState<string | null>(null)
 
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
     const [chatToRename, setChatToRename] = useState<Chat | null>(null)
     const [newChatName, setNewChatName] = useState('')
     const [isLoading, setIsLoading] = useState(true)
-    const [visibleChats, setVisibleChats] = useState(CHATS_PER_PAGE);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
+    const [visibleChats, setVisibleChats] = useState(CHATS_PER_PAGE)
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
     const router = useRouter()
     const supabase = createClientComponentClient()
-
 
     const toggleSidebar = () => {
         const sIsOpen = !isOpen
@@ -92,7 +100,6 @@ export default function Sidebar({
         fetchChats()
     }, [])
 
-
     const fetchChats = async () => {
         setIsLoading(true)
         try {
@@ -103,8 +110,7 @@ export default function Sidebar({
             const data = await response.json()
             setChats(data)
 
-            console.log(data);
-
+            console.log(data)
         } catch (error) {
             console.error('Error fetching chats:', error)
         } finally {
@@ -126,25 +132,26 @@ export default function Sidebar({
                 .eq('id', chatId)
 
             if (error) {
-                console.error('Supabase error deleting chat:', error);
-                return;
+                console.error('Supabase error deleting chat:', error)
+                return
             }
 
-            console.log('Delete response:', data);
+            console.log('Delete response:', data)
 
-            setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
+            setChats((prevChats) =>
+                prevChats.filter((chat) => chat.id !== chatId)
+            )
 
             if (chatId === currentChatId) {
-                onChatSelect('');
-                router.push('/');
+                onChatSelect('')
+                router.push('/')
             }
 
-            setChatToDelete(null);
+            setChatToDelete(null)
         } catch (error) {
-            console.error('Error deleting chat:', error);
+            console.error('Error deleting chat:', error)
         }
-    };
-
+    }
 
     const handleClearAllChats = () => {
         // client side for now
@@ -154,7 +161,6 @@ export default function Sidebar({
             onChatSelect('')
         }
     }
-
 
     const handleRenameChat = (chat: Chat) => {
         setChatToRename(chat)
@@ -174,9 +180,13 @@ export default function Sidebar({
                 if (error) throw error
 
                 // Update local state
-                setChats(chats.map(chat =>
-                    chat.id === chatToRename.id ? { ...chat, name: newChatName } : chat
-                ))
+                setChats(
+                    chats.map((chat) =>
+                        chat.id === chatToRename.id
+                            ? { ...chat, name: newChatName }
+                            : chat
+                    )
+                )
 
                 setIsRenameDialogOpen(false)
                 setChatToRename(null)
@@ -188,12 +198,12 @@ export default function Sidebar({
     }
 
     const handleLoadMore = () => {
-        setVisibleChats(prevVisible => prevVisible + 5);
-    };
+        setVisibleChats((prevVisible) => prevVisible + 5)
+    }
 
     const renderChatItem = (chat: Chat | undefined) => {
         if (!chat) {
-            return null;
+            return null
         }
 
         return (
@@ -220,36 +230,55 @@ export default function Sidebar({
                                 <div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-0.5 bg-white rounded-md overflow-hidden">
                                     <Button
                                         onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRenameChat(chat);
+                                            e.stopPropagation()
+                                            handleRenameChat(chat)
                                         }}
                                         size="xsm"
                                         variant="wBg"
                                     >
                                         <Edit2 className="h-3.5 w-3.5" />
-                                        <span className="sr-only">Rename Chat</span>
+                                        <span className="sr-only">
+                                            Rename Chat
+                                        </span>
                                     </Button>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button
-                                                onClick={(e) => e.stopPropagation()}
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
                                                 size="xsm"
                                                 variant="wBg"
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" />
-                                                <span className="sr-only">Delete Chat</span>
+                                                <span className="sr-only">
+                                                    Delete Chat
+                                                </span>
                                             </Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
                                             <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                <AlertDialogTitle>
+                                                    Are you absolutely sure?
+                                                </AlertDialogTitle>
                                                 <AlertDialogDescription>
-                                                    This action cannot be undone. This will permanently delete your chat.
+                                                    This action cannot be
+                                                    undone. This will
+                                                    permanently delete your
+                                                    chat.
                                                 </AlertDialogDescription>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteChat(chat.id)}>
+                                                <AlertDialogCancel>
+                                                    Cancel
+                                                </AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    onClick={() =>
+                                                        handleDeleteChat(
+                                                            chat.id
+                                                        )
+                                                    }
+                                                >
                                                     Confirm
                                                 </AlertDialogAction>
                                             </AlertDialogFooter>
@@ -264,7 +293,7 @@ export default function Sidebar({
                     </Tooltip>
                 </TooltipProvider>
             </motion.div>
-        );
+        )
     }
 
     const sidebarVariants = {
@@ -275,7 +304,7 @@ export default function Sidebar({
     const chatItemVariants = {
         hidden: { opacity: 0, height: 0, marginBottom: 0 },
         visible: { opacity: 1, height: 'auto', marginBottom: 4 },
-        exit: { opacity: 0, height: 0, marginBottom: 0 }
+        exit: { opacity: 0, height: 0, marginBottom: 0 },
     }
 
     return (
@@ -312,25 +341,40 @@ export default function Sidebar({
                         ) : (
                             <>
                                 <div className="mb-4 px-2 flex items-center justify-between">
-                                    <h2 className="text-2xl font-bold">Chats</h2>
+                                    <h2 className="text-2xl font-bold">
+                                        Chats
+                                    </h2>
                                     <Button
                                         variant="neutral"
                                         size="sm"
-                                        onClick={() => setIsChatsExpanded(!isChatsExpanded)}
+                                        onClick={() =>
+                                            setIsChatsExpanded(!isChatsExpanded)
+                                        }
                                     >
-                                        {isChatsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                        {isChatsExpanded ? (
+                                            <ChevronUp className="h-4 w-4" />
+                                        ) : (
+                                            <ChevronDown className="h-4 w-4" />
+                                        )}
                                     </Button>
                                 </div>
 
                                 {currentChatId && (
                                     <div className="mb-4">
-                                        {renderChatItem(chats.find(chat => chat.id === currentChatId))}
+                                        {renderChatItem(
+                                            chats.find(
+                                                (chat) =>
+                                                    chat.id === currentChatId
+                                            )
+                                        )}
                                     </div>
                                 )}
 
                                 {isChatsExpanded && (
                                     <AnimatePresence>
-                                        {chats.slice(0, visibleChats).map(renderChatItem)}
+                                        {chats
+                                            .slice(0, visibleChats)
+                                            .map(renderChatItem)}
                                         {chats.length > visibleChats && (
                                             <motion.div
                                                 initial={{ opacity: 0 }}
@@ -363,21 +407,34 @@ export default function Sidebar({
                             <DropdownMenuContent side="top">
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem className="w-52" onSelect={(e: any) => e.preventDefault()}>
+                                        <DropdownMenuItem
+                                            className="w-52"
+                                            onSelect={(e: any) =>
+                                                e.preventDefault()
+                                            }
+                                        >
                                             <Trash2 className="mr-2 h-4 w-4" />
                                             Clear All Chats
                                         </DropdownMenuItem>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
-                                            <AlertDialogTitle>Clear All Chats</AlertDialogTitle>
+                                            <AlertDialogTitle>
+                                                Clear All Chats
+                                            </AlertDialogTitle>
                                             <AlertDialogDescription>
-                                                Are you sure you want to clear all chats? This action cannot be undone.
+                                                Are you sure you want to clear
+                                                all chats? This action cannot be
+                                                undone.
                                             </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={handleClearAllChats}>
+                                            <AlertDialogCancel>
+                                                Cancel
+                                            </AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={handleClearAllChats}
+                                            >
                                                 Confirm
                                             </AlertDialogAction>
                                         </AlertDialogFooter>
@@ -389,7 +446,10 @@ export default function Sidebar({
                 </div>
             </motion.div>
 
-            <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+            <Dialog
+                open={isRenameDialogOpen}
+                onOpenChange={setIsRenameDialogOpen}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Rename Chat</DialogTitle>
@@ -403,12 +463,13 @@ export default function Sidebar({
                         placeholder="Enter new chat name"
                     />
                     <DialogFooter>
-                        <Button variant="neutral" onClick={() => setIsRenameDialogOpen(false)}>
+                        <Button
+                            variant="neutral"
+                            onClick={() => setIsRenameDialogOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={confirmRenameChat}>
-                            Rename
-                        </Button>
+                        <Button onClick={confirmRenameChat}>Rename</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

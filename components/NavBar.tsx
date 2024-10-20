@@ -1,12 +1,13 @@
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Session } from '@supabase/supabase-js'
-import { motion } from 'framer-motion'
-import Link from 'next/link'
-import Image from 'next/image'
-import { useEffect, useState } from 'react'
-import { Link as LinkIcon, Share } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -14,17 +15,15 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Session } from '@supabase/supabase-js'
+import { motion } from 'framer-motion'
+import { Share } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
 interface NavbarProps {
     isRightContentVisible: boolean
@@ -66,7 +65,9 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
 
     const generateShareUrl = () => {
         // This is a dummy function. Replace with actual URL generation logic.
-        setShareUrl(`https://grunty.com/share/${Math.random().toString(36).substr(2, 9)}`)
+        setShareUrl(
+            `https://grunty.com/share/${Math.random().toString(36).substr(2, 9)}`
+        )
     }
 
     const copyToClipboard = () => {
@@ -81,9 +82,16 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
                     <div className="flex-1 flex items-center">
                         <motion.div
                             animate={{ x: slideDistance }}
-                            transition={{ type: 'ease', stiffness: 300, damping: 30 }}
+                            transition={{
+                                type: 'ease',
+                                stiffness: 300,
+                                damping: 30,
+                            }}
                         >
-                            <Link href="/" className="font-bold text-xl text-black">
+                            <Link
+                                href="/"
+                                className="font-bold text-xl text-black"
+                            >
                                 Grunty 🧐
                             </Link>
                         </motion.div>
@@ -91,16 +99,23 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
                     <div className="flex-1 flex justify-end items-center space-x-4">
                         <Dialog>
                             <DialogTrigger asChild>
-                                <Button variant="noShadow" size="icon" onClick={generateShareUrl}>
+                                <Button
+                                    variant="noShadow"
+                                    size="icon"
+                                    onClick={generateShareUrl}
+                                >
                                     <Share className="h-5 w-5" />
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-md text-text rounded-lg p-6">
                                 <DialogHeader>
-                                    <DialogTitle className="text-xl font-semibold">Share chat link</DialogTitle>
+                                    <DialogTitle className="text-xl font-semibold">
+                                        Share chat link
+                                    </DialogTitle>
                                 </DialogHeader>
                                 <p className="text-sm text-text mb-4">
-                                    This link allows view-only access to this conversation.
+                                    This link allows view-only access to this
+                                    conversation.
                                 </p>
                                 <div className="flex items-center space-x-2 border-2 border-border rounded-full p-2">
                                     <Input
@@ -124,7 +139,11 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
                                 <DropdownMenuTrigger>
                                     <div className="w-10 h-10 border-2 border-border rounded-full overflow-hidden">
                                         <Image
-                                            src={session.user?.user_metadata?.avatar_url || '/default-avatar.png'}
+                                            src={
+                                                session.user?.user_metadata
+                                                    ?.avatar_url ||
+                                                '/default-avatar.png'
+                                            }
                                             alt="User avatar"
                                             width={40}
                                             height={40}
@@ -132,7 +151,9 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
                                     </div>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
-                                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                                    <DropdownMenuLabel>
+                                        My Account
+                                    </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem>
                                         <Link href="/settings">Settings</Link>

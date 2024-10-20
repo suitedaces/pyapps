@@ -1,41 +1,49 @@
 'use client'
 
-import React, { useEffect, useCallback, useRef, useState, ChangeEvent, FormEvent } from 'react'
+import { CircularProgress } from '@/components/CircularProgress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
 import { ClientMessage } from '@/lib/types'
 import { Code, FileIcon, Loader2, Paperclip, Send, X } from 'lucide-react'
+import React, {
+    ChangeEvent,
+    FormEvent,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { CircularProgress } from '@/components/CircularProgress'
 import Spreadsheet from './Spreadsheet'
-import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
 
 interface CodeProps {
-    node?: any;
-    inline?: boolean;
-    className?: string;
-    children?: React.ReactNode;
+    node?: any
+    inline?: boolean
+    className?: string
+    children?: React.ReactNode
 }
 
 interface ChatProps {
-    messages: ClientMessage[];
-    input: string;
-    handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-    handleSubmit: (e: FormEvent<HTMLFormElement>) => void;
-    isLoading: boolean;
-    streamingMessage: string;
-    streamingCodeExplanation: string;
-    handleFileUpload: (content: string, fileName: string) => void;
-    onChatSelect: (chatId: string) => void;
+    messages: ClientMessage[]
+    input: string
+    handleInputChange: (
+        e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => void
+    handleSubmit: (e: FormEvent<HTMLFormElement>) => void
+    isLoading: boolean
+    streamingMessage: string
+    streamingCodeExplanation: string
+    handleFileUpload: (content: string, fileName: string) => void
+    onChatSelect: (chatId: string) => void
 }
 
 interface Chat {
-    id: string;
-    name: string;
+    id: string
+    name: string
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -43,7 +51,6 @@ const formatFileSize = (bytes: number): string => {
     else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
     else return (bytes / 1048576).toFixed(1) + ' MB'
 }
-
 
 export function Chat({
     messages,
@@ -56,7 +63,7 @@ export function Chat({
     handleFileUpload,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const [isAtBottom, setIsAtBottom] = useState<boolean>(true)
@@ -70,7 +77,6 @@ export function Chat({
     const [fileContent, setFileContent] = useState<string | null>(null)
     const [fullData, setFullData] = useState<string[][] | null>(null)
 
-
     const isLoading = isLoadingProp || isLoadingInternal
 
     useEffect(() => {
@@ -81,19 +87,20 @@ export function Chat({
 
     useEffect(() => {
         if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
         }
-    }, [input]);
+    }, [input])
 
-    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        handleInputChange(e);
+    const handleTextareaChange = (
+        e: React.ChangeEvent<HTMLTextAreaElement>
+    ) => {
+        handleInputChange(e)
         if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
         }
-      };
-
+    }
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
@@ -120,8 +127,8 @@ export function Chat({
             setFileContent(content)
             setIsUploading(false)
             setUploadProgress(100)
-            const rows = content.split('\n').map(row => row.split(','));
-            setFullData(rows);
+            const rows = content.split('\n').map((row) => row.split(','))
+            setFullData(rows)
         }
         reader.onprogress = (event) => {
             if (event.lengthComputable) {
@@ -163,11 +170,16 @@ export function Chat({
         }
     }
 
-
     const renderMessage = (content: string) => (
         <ReactMarkdown
             components={{
-                code({ node, inline, className, children, ...props }: CodeProps) {
+                code({
+                    node,
+                    inline,
+                    className,
+                    children,
+                    ...props
+                }: CodeProps) {
                     const match = /language-(\w+)/.exec(className || '')
                     const lang = match && match[1] ? match[1] : ''
                     const codeString = String(children).replace(/\n$/, '')
@@ -263,7 +275,7 @@ export function Chat({
             >
                 {showSpreadsheet && csvAnalysis && (
                     <div className="relative w-full mb-10 flex justify-end">
-                        <div className='w-[80%]'>
+                        <div className="w-[80%]">
                             <Spreadsheet
                                 analysis={csvAnalysis}
                                 onClose={() => setShowSpreadsheet(false)}
@@ -345,8 +357,9 @@ export function Chat({
                 <div className="flex space-x-2">
                     <div className="relative flex-grow">
                         <div
-                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'
-                                }`}
+                            className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                                file ? 'max-h-20' : 'max-h-0'
+                            }`}
                         >
                             {file && (
                                 <div className="px-3 flex justify-start mb-2">
@@ -387,7 +400,11 @@ export function Chat({
                             ref={textareaRef}
                             value={input}
                             onChange={handleTextareaChange}
-                            placeholder={file ? "File attached. Remove file to type a message." : "Type your message..."}
+                            placeholder={
+                                file
+                                    ? 'File attached. Remove file to type a message.'
+                                    : 'Type your message...'
+                            }
                             className="relative flex w-full min-h-[80px] max-h-[200px] rounded-3xl text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 pt-6 py-3 pr-16 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light resize-none overflow-hidden"
                             disabled={!!file}
                         />
@@ -410,7 +427,11 @@ export function Chat({
                         <Button
                             type="submit"
                             variant={'noShadow'}
-                            disabled={isLoading || isUploading || (!input.trim() && !file)}
+                            disabled={
+                                isLoading ||
+                                isUploading ||
+                                (!input.trim() && !file)
+                            }
                             className="absolute rounded-full right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
                         >
                             {isLoading || isUploading ? (

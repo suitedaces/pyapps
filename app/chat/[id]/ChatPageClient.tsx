@@ -14,10 +14,10 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 interface ChatPageClientProps {
-    initialChat: any,
+    initialChat: any
     initialSession: Session
 }
 
@@ -90,9 +90,12 @@ export default function ChatPageClient({
         }
     }
 
-    const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
-      }, [handleInputChange]);
+    const handleInputChangeWrapper = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+            handleInputChange(e as React.ChangeEvent<HTMLInputElement>)
+        },
+        [handleInputChange]
+    )
 
     if (!session) {
         return <LoginPage />
@@ -115,7 +118,11 @@ export default function ChatPageClient({
                         animate={{
                             x: isRightContentVisible ? 0 : '50%',
                         }}
-                        transition={{ type: 'ease', stiffness: 300, damping: 30 }}
+                        transition={{
+                            type: 'ease',
+                            stiffness: 300,
+                            damping: 30,
+                        }}
                     >
                         {currentChatId ? (
                             <Chat
@@ -125,7 +132,9 @@ export default function ChatPageClient({
                                 handleSubmit={handleSubmit}
                                 isLoading={isLoading}
                                 streamingMessage={streamingMessage}
-                                streamingCodeExplanation={streamingCodeExplanation}
+                                streamingCodeExplanation={
+                                    streamingCodeExplanation
+                                }
                                 handleFileUpload={handleFileUpload}
                                 onChatSelect={handleChatSelect}
                             />
@@ -144,7 +153,11 @@ export default function ChatPageClient({
                         animate={{
                             x: isRightContentVisible ? 0 : '100%',
                         }}
-                        transition={{ type: 'ease', stiffness: 300, damping: 30 }}
+                        transition={{
+                            type: 'ease',
+                            stiffness: 300,
+                            damping: 30,
+                        }}
                         className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]"
                     >
                         <Tabs

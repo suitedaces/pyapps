@@ -1,5 +1,5 @@
 import { Json } from '@/lib/database.types'
-import { Anthropic } from '@anthropic-ai/sdk'
+import { z } from 'zod'
 
 export type ToolCall = {
     id?: string
@@ -44,6 +44,7 @@ export type StreamChunk = {
         | 'code_explanation'
         | 'error'
         | 'tool_use'
+        | 'text_chunk'
     message?: any
     content_block?: any
     delta?: any
@@ -65,4 +66,10 @@ export type CreateStreamlitAppTool = {
     csvAnalysis: CSVAnalysis
 }
 
-export type Tool = Anthropic.Messages.Tool
+export type Tool = {
+    name: string
+    description: string
+    inputSchema: z.ZodSchema
+    parameters: Record<string, any>
+    execute: (input: any) => Promise<any>
+}

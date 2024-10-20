@@ -1,24 +1,11 @@
 import { GruntyAgent } from '@/lib/agent'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
-import { Anthropic } from '@anthropic-ai/sdk'
+import { getModelClient, LLMModel, LLMModelConfig } from '@/lib/modelProviders'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    defaultHeaders: {
-        'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}`,
-    },
-})
-
-const agent = new GruntyAgent(
-    anthropic,
-    'claude-3-5-sonnet-20240620',
-    'AI Assistant',
-    CHAT_SYSTEM_PROMPT
-)
 
 export async function POST(
     req: NextRequest,
@@ -36,9 +23,19 @@ export async function POST(
         )
     }
 
-    const { message } = await req.json()
+    const {
+        message,
+        model,
+        config,
+    }: {
+        message: string
+        model: LLMModel
+        config: LLMModelConfig
+    } = await req.json()
 
     console.log('Received message:', message)
+    console.log('Model:', model)
+    console.log('Config:', config)
 
     // Fetch CSV analysis if it exists for this chat
     const { data: chatData, error: chatError } = await supabase
@@ -73,6 +70,13 @@ export async function POST(
     const encoder = new TextEncoder()
 
     try {
+        const agent = new GruntyAgent(
+            model,
+            'AI Assistant',
+            CHAT_SYSTEM_PROMPT,
+            config
+        )
+
         const stream = new ReadableStream({
             async start(controller) {
                 const chatGenerator = agent.chat(

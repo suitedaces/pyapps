@@ -1,39 +1,45 @@
 import { Anthropic } from '@anthropic-ai/sdk'
+import { z } from 'zod'
 import { Tool } from './types'
 
 const codeGenerationAnthropicAgent = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
+const streamlitAppSchema = z.object({
+    query: z
+        .string()
+        .min(1, 'Query cannot be empty')
+        .describe(
+            'Explain the requirements for the Streamlit code you want to generate. Include details about the data if there\'s any context and the column names VERBATIM as a list, with any spaces or special chars like this: ["col 1 ", " 2col 1"].'
+        ),
+})
+
+const jupyterNotebookSchema = z.object({
+    code: z
+        .string()
+        .describe('The Python code to execute in the Jupyter Notebook'),
+})
+
 export const tools: Tool[] = [
     {
         name: 'create_streamlit_app',
         description: 'Generates Python (Streamlit) code based on a given query',
-        input_schema: {
-            type: 'object' as const,
-            properties: {
-                query: {
-                    type: 'string',
-                    description:
-                        'Explain the requirements for the Streamlit code you want to generate. Include details about the data if there\'s any context and the column names VERBATIM as a list, with any spaces or special chars like this: ["col 1 ", " 2col 1"].',
-                },
-            },
-            required: ['query'],
+        inputSchema: streamlitAppSchema,
+        parameters: streamlitAppSchema.shape,
+        execute: async (input) => {
+            const { query } = streamlitAppSchema.parse(input)
+            return generateCode(query)
         },
     },
     // {
     //     name: 'execute_jupyter_notebook',
     //     description: 'Executes Python code in a Jupyter Notebook',
-    //     input_schema: {
-    //         type: 'object' as const,
-    //         properties: {
-    //             code: {
-    //                 type: 'string',
-    //                 description:
-    //                     'The Python code to execute in the Jupyter Notebook',
-    //             },
-    //         },
-    //         required: ['code'],
+    //     inputSchema: jupyterNotebookSchema,
+    // parameters: jupyterNotebookSchema.shape,
+    //     execute: async (input) => {
+    //         const { code } = jupyterNotebookSchema.parse(input)
+    //         return generateCode(code)
     //     },
     // },
 ]
@@ -41,13 +47,15 @@ export const tools: Tool[] = [
 export async function generateCode(
     query: string
 ): Promise<{ generatedCode: string; codeTokenCount: number }> {
-    if (!query || !query.trim()) {
-        throw new Error('Query cannot be empty or just whitespace.')
-    }
-
-    console.log('Sending query to LLM:', query)
+    const querySchema = z.object({
+        query: z.string().min(1, 'Query cannot be empty'),
+    })
 
     try {
+        querySchema.parse({ query })
+
+        console.log('Sending query to LLM:', query)
+
         const response = await codeGenerationAnthropicAgent.messages.create({
             model: 'claude-3-5-sonnet-20240620',
             max_tokens: 2000,

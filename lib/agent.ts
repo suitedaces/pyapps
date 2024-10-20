@@ -1,36 +1,41 @@
-import { Anthropic } from '@anthropic-ai/sdk'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { generateCode } from './tools'
 import {
-    CSVAnalysis,
-    Message,
-    StreamChunk,
-    Tool,
-    ToolCall,
-    ToolResult,
-} from './types'
+    generateText,
+    CoreAssistantMessage,
+    CoreMessage,
+    CoreTool,
+    CoreToolMessage,
+    CoreUserMessage,
+    TextPart,
+    ToolCallPart,
+    ToolResultPart,
+    streamText,
+} from 'ai'
+import { cookies } from 'next/headers'
 import { messageStore } from './messageStore'
+import { getModelClient, LLMModel, LLMModelConfig } from './modelProviders'
+import { generateCode } from './tools'
+import { CSVAnalysis, Message, StreamChunk, Tool, ToolResult } from './types'
 
 export class GruntyAgent {
-    private client: Anthropic
-    private model: string
+    private model: LLMModel
     private role: string
     private roleDescription: string
     private inputTokens: number
     private outputTokens: number
     private codeTokens: number
+    private config: LLMModelConfig
 
     constructor(
-        client: Anthropic,
-        model: string,
+        model: LLMModel,
         role: string,
-        roleDescription: string
+        roleDescription: string,
+        config: LLMModelConfig
     ) {
-        this.client = client
         this.model = model
         this.role = role
         this.roleDescription = roleDescription
+        this.config = config
         this.inputTokens = 0
         this.outputTokens = 0
         this.codeTokens = 0
@@ -63,130 +68,148 @@ export class GruntyAgent {
     ): AsyncGenerator<StreamChunk> {
         const chatHistory = await this.fetchChatHistory(chatId)
         console.log('Chat History for chatId:', chatId, chatHistory)
-        const userMessage: any = {
+        const userMessage: CoreUserMessage = {
             role: 'user',
             content: latestMessage,
         }
 
-        const sanitizedMessages =
-            this.prepareMessagesForAnthropicAPI(chatHistory)
+        const sanitizedMessages = this.prepareMessagesForAI(chatHistory)
         sanitizedMessages.push(userMessage)
 
         console.log('Sanitized Messages:', sanitizedMessages)
 
-        const stream = await this.client.messages.stream({
-            model: this.model,
-            system: this.roleDescription,
-            messages: sanitizedMessages,
-            max_tokens: maxTokens,
-            tools,
-        })
+        const toolsRecord: Record<string, CoreTool<any, any>> = tools.reduce(
+            (acc, tool) => {
+                acc[tool.name] = tool // Map tool name to tool
+                return acc
+            },
+            {} as Record<string, CoreTool<any, any>>
+        )
+
+        const modelClient = getModelClient(this.model, this.config)
 
         let currentMessage: any = null
         let currentContentBlock: any = null
         let accumulatedJson = ''
         let accumulatedResponse = ''
         let generatedCode = ''
-        let toolCalls: ToolCall[] | null = null
+        let toolCalls: ToolCallPart[] | null = null
         let toolResults: ToolResult[] | null = null
+        let stepResults: StreamChunk[] = []
 
-        for await (const event of stream) {
-            yield event as StreamChunk
-            if (event.type === 'message_start') {
-                currentMessage = event.message
-                if (event.message.usage) {
-                    this.inputTokens = event.message.usage.input_tokens
+        const stream = await streamText({
+            model: modelClient,
+            system: this.roleDescription,
+            messages: sanitizedMessages,
+            maxTokens: maxTokens,
+            maxSteps: 10,
+            tools: toolsRecord,
+            onStepFinish: async ({
+                text,
+                toolCalls: stepToolCalls,
+                toolResults: stepToolResults,
+            }) => {
+                if (!currentMessage) {
+                    currentMessage = {
+                        content: [],
+                    }
                 }
-            } else if (event.type === 'content_block_start') {
-                currentContentBlock = event.content_block
-                accumulatedJson = ''
-            } else if (event.type === 'content_block_delta') {
-                if (
-                    currentContentBlock.type === 'text' &&
-                    event.delta.type === 'text_delta'
-                ) {
-                    currentContentBlock.text =
-                        (currentContentBlock.text || '') + event.delta.text
-                    accumulatedResponse += event.delta.text
-                } else if (
-                    currentContentBlock.type === 'tool_use' &&
-                    event.delta.type === 'input_json_delta'
-                ) {
-                    accumulatedJson += event.delta.partial_json
+
+                // step-wise processing, handling both text and tool usage
+                if (text) {
+                    accumulatedResponse += text
+                    currentMessage.content.push({ type: 'text', text })
                 }
-            } else if (event.type === 'content_block_stop') {
-                if (currentContentBlock.type === 'tool_use') {
-                    currentContentBlock.input = accumulatedJson
-                    currentMessage.content.push(currentContentBlock)
+
+                // Handle tool calls
+                if (stepToolCalls && stepToolCalls.length > 0) {
                     toolCalls = toolCalls || []
-                    toolCalls.push(currentContentBlock)
-                    if (currentContentBlock.name === 'create_streamlit_app') {
-                        try {
-                            const toolInput = JSON.parse(accumulatedJson)
-                            const codeQuery = `
-                                ${toolInput.query}
-                                Use the following CSV analysis to inform your code:
-                                ${JSON.stringify(csvAnalysis, null, 2)}
-                            `
-                            const { generatedCode, codeTokenCount } =
-                                await generateCode(codeQuery)
-                            this.codeTokens += codeTokenCount
+                    toolCalls.push(...stepToolCalls)
+                }
 
-                            yield {
-                                type: 'generated_code',
-                                content: generatedCode,
-                            } as unknown as StreamChunk
+                // Handle tool results
+                if (stepToolResults && stepToolResults.length > 0) {
+                    toolResults = toolResults || []
+                    toolResults.push(...stepToolResults)
+                }
 
-                            toolResults = toolResults || []
-                            toolResults.push({
-                                name: 'create_streamlit_app',
-                                result: generatedCode,
-                            })
-                        } catch (error) {
-                            console.error(
-                                'Error parsing JSON or generating Streamlit code:',
-                                error
-                            )
-                            yield {
-                                type: 'error',
-                                content: 'Error in code generation process',
-                            } as unknown as StreamChunk
+                stepResults.push({
+                    type: 'text_chunk',
+                    content: accumulatedResponse.trim(),
+                } as StreamChunk)
+
+                if (toolCalls) {
+                    for (const toolCall of toolCalls) {
+                        if (toolCall.toolName === 'create_streamlit_app') {
+                            try {
+                                const toolInput = JSON.parse(accumulatedJson)
+                                const codeQuery = `
+                                    ${toolInput.query}
+                                    Use the following CSV analysis to inform your code:
+                                    ${JSON.stringify(csvAnalysis, null, 2)}
+                                `
+                                const { generatedCode, codeTokenCount } =
+                                    await generateCode(codeQuery)
+                                this.codeTokens += codeTokenCount
+
+                                stepResults.push({
+                                    type: 'generated_code',
+                                    content: generatedCode,
+                                } as StreamChunk)
+
+                                toolResults = toolResults || []
+                                toolResults.push({
+                                    name: 'create_streamlit_app',
+                                    result: generatedCode,
+                                })
+                            } catch (error) {
+                                console.error(
+                                    'Error parsing JSON or generating Streamlit code:',
+                                    error
+                                )
+                                stepResults.push({
+                                    type: 'error',
+                                    content: 'Error in code generation process',
+                                } as StreamChunk)
+                            }
                         }
                     }
                 }
-                currentContentBlock = null
-            } else if (event.type === 'message_delta') {
-                Object.assign(currentMessage, event.delta)
-                if (event.usage) {
-                    this.outputTokens = event.usage.output_tokens
-                }
-            } else if (event.type === 'message_stop') {
-                console.log('Storing Message for chatId:', chatId)
-                const totalTokenCount =
-                    this.outputTokens + this.codeTokens + this.inputTokens
-                console.log(
-                    'Total Token Count (output, code, input):',
-                    this.outputTokens,
-                    this.codeTokens,
-                    this.inputTokens
-                )
-                await this.storeMessage(
-                    chatId,
-                    userId,
-                    latestMessage,
-                    accumulatedResponse.trim(),
-                    totalTokenCount,
-                    toolCalls,
-                    toolResults
-                )
+            },
+        })
 
-                currentMessage = null
-                accumulatedResponse = ''
-                generatedCode = ''
-                toolCalls = null
-                toolResults = null
-            }
+        // Now use a loop to yield the accumulated results in stepResults
+        for (const result of stepResults) {
+            yield result
+            return stream.toTextStreamResponse()
         }
+
+        console.log('Storing Message for chatId:', chatId)
+        const totalTokenCount =
+            this.outputTokens + this.codeTokens + this.inputTokens
+        console.log(
+            'Total Token Count (output, code, input):',
+            this.outputTokens,
+            this.codeTokens,
+            this.inputTokens
+        )
+
+        await this.storeMessage(
+            chatId,
+            userId,
+            latestMessage,
+            accumulatedResponse.trim(),
+            totalTokenCount,
+            toolCalls,
+            toolResults
+        )
+
+        // Reset variables
+        currentMessage = null
+        accumulatedResponse = ''
+        generatedCode = ''
+        toolCalls = null
+        toolResults = null
     }
 
     private async storeMessage(
@@ -227,32 +250,26 @@ export class GruntyAgent {
         }
     }
 
-    private prepareMessagesForAnthropicAPI(
-        messages: Message[]
-    ): Anthropic.Messages.MessageParam[] {
-        const sanitizedMessages: Anthropic.Messages.MessageParam[] = []
+    private prepareMessagesForAI(messages: Message[]): CoreMessage[] {
+        const sanitizedMessages: CoreMessage[] = []
 
         for (const message of messages) {
             // Add user message
-            sanitizedMessages.push({
+            const userMessage: CoreUserMessage = {
                 role: 'user',
                 content: message.user_message,
-            })
+            }
+            sanitizedMessages.push(userMessage)
 
             // Add assistant message
-            const assistantMessage: Anthropic.Messages.MessageParam = {
-                role: 'assistant',
-                content: [],
-            }
+            const assistantContentParts: Array<TextPart | ToolCallPart> = []
 
             // Add text content
             if (message.assistant_message) {
-                ;(
-                    assistantMessage.content as Anthropic.Messages.ContentBlock[]
-                ).push({
+                assistantContentParts.push({
                     type: 'text',
                     text: message.assistant_message,
-                })
+                } as TextPart)
             }
 
             // Add tool calls if they exist
@@ -272,22 +289,23 @@ export class GruntyAgent {
                         'name' in callData &&
                         'parameters' in callData
                     ) {
-                        ;(
-                            assistantMessage.content as Anthropic.Messages.ContentBlock[]
-                        ).push({
-                            type: 'tool_use',
-                            id: id,
-                            name: callData.name as string,
-                            input: callData.parameters as Record<
-                                string,
-                                Record<string, any>
-                            >,
-                        })
+                        assistantContentParts.push({
+                            type: 'tool-call',
+                            toolCallId: id,
+                            toolName: callData.name as string,
+                            args: callData.parameters,
+                        } as ToolCallPart)
                     }
                 }
             }
 
-            sanitizedMessages.push(assistantMessage)
+            if (assistantContentParts.length > 0) {
+                const assistantMessage: CoreAssistantMessage = {
+                    role: 'assistant',
+                    content: assistantContentParts,
+                }
+                sanitizedMessages.push(assistantMessage)
+            }
 
             // Add tool results if they exist
             if (
@@ -297,24 +315,31 @@ export class GruntyAgent {
             ) {
                 const toolResults = message.tool_results as Record<
                     string,
-                    Record<string, any>
+                    {
+                        name: string
+                        result: any
+                    }
                 >
                 for (const [id, resultData] of Object.entries(toolResults)) {
                     if (
                         typeof resultData === 'object' &&
                         resultData !== null &&
-                        'result' in resultData
+                        'result' in resultData &&
+                        'name' in resultData
                     ) {
-                        sanitizedMessages.push({
-                            role: 'user',
+                        const toolMessage: CoreToolMessage = {
+                            role: 'tool',
                             content: [
                                 {
-                                    type: 'tool_result',
-                                    tool_use_id: id,
-                                    content: resultData.result as string,
-                                },
+                                    type: 'tool-result',
+                                    toolCallId: id,
+                                    toolName: resultData.name,
+                                    result: resultData.result,
+                                    isError: false,
+                                } as ToolResultPart,
                             ],
-                        })
+                        }
+                        sanitizedMessages.push(toolMessage)
                     }
                 }
             }
