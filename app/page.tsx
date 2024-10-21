@@ -39,9 +39,9 @@ export default function Home() {
     const {
         messages,
         input,
+        isLoading,
         handleInputChange,
         handleSubmit,
-        isLoading,
         handleFileUpload,
         csvFileName,
         csvContent,
@@ -51,7 +51,6 @@ export default function Home() {
         streamingCodeExplanation,
         isGeneratingCode,
     } = useChat(currentChatId)
-
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -130,6 +129,7 @@ export default function Home() {
                             streamingMessage={streamingMessage}
                             streamingCodeExplanation={streamingCodeExplanation}
                             handleFileUpload={handleFileUpload}
+                            currentChatId={currentChatId}
                             onChatSelect={handleChatSelect}
                         />
                     ) : (

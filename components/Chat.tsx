@@ -4,6 +4,11 @@ import { CircularProgress } from '@/components/CircularProgress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+
+import { LLMModelConfig } from '@/lib/modelProviders'
+import modelsList from '@/lib/models.json'
+import { useLocalStorage } from 'usehooks-ts'
+
 import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
 import { ClientMessage } from '@/lib/types'
 import { Code, FileIcon, Loader2, Paperclip, Send, X } from 'lucide-react'
@@ -39,6 +44,7 @@ interface ChatProps {
     streamingCodeExplanation: string
     handleFileUpload: (content: string, fileName: string) => void
     onChatSelect: (chatId: string) => void
+    currentChatId: string | null
 }
 
 interface Chat {
@@ -61,6 +67,7 @@ export function Chat({
     streamingMessage,
     streamingCodeExplanation,
     handleFileUpload,
+    currentChatId,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -78,6 +85,18 @@ export function Chat({
     const [fullData, setFullData] = useState<string[][] | null>(null)
 
     const isLoading = isLoadingProp || isLoadingInternal
+
+    const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
+        'languageModel',
+        {
+          model: 'claude-3-5-sonnet-20240620',
+        }
+      )
+
+      const currentModel = modelsList.models.find(
+        (model) => model.id === languageModel.model,
+      )
+
 
     useEffect(() => {
         if (isAtBottom) {
@@ -150,25 +169,40 @@ export function Chat({
         }
     }, [])
 
-    const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setIsLoadingInternal(true)
 
+      const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!currentChatId || !currentModel) return;
+
+        await fetch(`/api/conversations/${currentChatId}/stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: input, // User's message
+            model: currentModel, // Current selected model
+            config: languageModel, // Config data
+          }),
+        });
+
+        setIsLoadingInternal(true);
         try {
-            if (file && fileContent) {
-                const analysis = await analyzeCSV(fileContent)
-                setCsvAnalysis(analysis)
-                setShowSpreadsheet(true)
-                removeFile()
-                await handleFileUpload(fileContent, file.name)
-            }
-            await handleSubmit(e)
+          // handle CSV processing etc
+          await handleSubmit(e);
         } catch (error) {
-            console.error('Error submitting form:', error)
+          console.error('Error submitting form:', error);
         } finally {
-            setIsLoadingInternal(false)
+          setIsLoadingInternal(false);
         }
-    }
+      };
+
+      useEffect(() => {
+        if (!currentModel || !languageModel) {
+          console.error("Model or language config missing!");
+          return;
+        }
+      }, [currentModel, languageModel]);
 
     const renderMessage = (content: string) => (
         <ReactMarkdown
@@ -430,7 +464,8 @@ export function Chat({
                             disabled={
                                 isLoading ||
                                 isUploading ||
-                                (!input.trim() && !file)
+                                (!input.trim() && !file) ||
+                                !currentModel || !languageModel
                             }
                             className="absolute rounded-full right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
                         >

@@ -1,11 +1,10 @@
 import { GruntyAgent } from '@/lib/agent'
+import { LLMModel, LLMModelConfig } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
-import { getModelClient, LLMModel, LLMModelConfig } from '@/lib/modelProviders'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-
 
 export async function POST(
     req: NextRequest,
@@ -25,17 +24,38 @@ export async function POST(
 
     const {
         message,
-        model,
-        config,
+        // model,
+        // config,
     }: {
         message: string
-        model: LLMModel
-        config: LLMModelConfig
+        // model: LLMModel
+        // config: LLMModelConfig
     } = await req.json()
 
+    // if (!model || !config) {
+    //     console.error('Model or config missing in the request!')
+    //     return NextResponse.json(
+    //         { error: 'Model or config is missing.' },
+    //         { status: 400 }
+    //     )
+    // }
+
+    const model = {
+        id: 'claude-3-5-sonnet-20240620',
+        provider: 'Anthropic',
+        providerId: 'anthropic',
+        name: 'Claude 3.5 Sonnet',
+        multiModal: true,
+    }
+
+    const config: LLMModelConfig = {
+        model: 'claude-3-5-sonnet-20240620',
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        temperature: 0.5,
+        maxTokens: 1000,
+    }
+
     console.log('Received message:', message)
-    console.log('Model:', model)
-    console.log('Config:', config)
 
     // Fetch CSV analysis if it exists for this chat
     const { data: chatData, error: chatError } = await supabase
@@ -79,22 +99,27 @@ export async function POST(
 
         const stream = new ReadableStream({
             async start(controller) {
-                const chatGenerator = agent.chat(
-                    params.id,
-                    session.user.id,
-                    message,
-                    tools,
-                    0.2,
-                    4000,
-                    csvAnalysis
-                )
-                console.log('Starting chat generator...')
-                for await (const chunk of chatGenerator) {
-                    controller.enqueue(
-                        encoder.encode(JSON.stringify(chunk) + '\n')
+                try {
+                    const chatGenerator = agent.chat(
+                        params.id,
+                        session.user.id,
+                        message,
+                        tools,
+                        0.2,
+                        4000,
+                        csvAnalysis
                     )
+                    console.log('Starting chat generator...')
+                    for await (const chunk of chatGenerator) {
+                        controller.enqueue(
+                            encoder.encode(JSON.stringify(chunk) + '\n')
+                        )
+                    }
+                    controller.close()
+                } catch (err) {
+                    console.error('Error in chat generator:', err)
+                    controller.error(err)
                 }
-                controller.close()
             },
         })
 
@@ -114,4 +139,4 @@ export async function POST(
     }
 }
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'

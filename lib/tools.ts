@@ -26,7 +26,7 @@ export const tools: Tool[] = [
         name: 'create_streamlit_app',
         description: 'Generates Python (Streamlit) code based on a given query',
         inputSchema: streamlitAppSchema,
-        parameters: streamlitAppSchema.shape,
+        parameters: streamlitAppSchema,
         execute: async (input) => {
             const { query } = streamlitAppSchema.parse(input)
             return generateCode(query)
@@ -36,7 +36,7 @@ export const tools: Tool[] = [
     //     name: 'execute_jupyter_notebook',
     //     description: 'Executes Python code in a Jupyter Notebook',
     //     inputSchema: jupyterNotebookSchema,
-    // parameters: jupyterNotebookSchema.shape,
+    // parameters: jupyterNotebookSchema,
     //     execute: async (input) => {
     //         const { code } = jupyterNotebookSchema.parse(input)
     //         return generateCode(code)
