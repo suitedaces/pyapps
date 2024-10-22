@@ -169,40 +169,44 @@ export function Chat({
         }
     }, [])
 
+    const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
 
-      const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!currentChatId || !currentModel) return;
+        if (isLoadingInternal) return; // Prevent multiple submissions
 
-        await fetch(`/api/conversations/${currentChatId}/stream`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: input, // User's message
-            model: currentModel, // Current selected model
-            config: languageModel, // Config data
-          }),
-        });
+        setIsLoadingInternal(true)
 
-        setIsLoadingInternal(true);
         try {
-          // handle CSV processing etc
-          await handleSubmit(e);
-        } catch (error) {
-          console.error('Error submitting form:', error);
-        } finally {
-          setIsLoadingInternal(false);
-        }
-      };
+            // const response = await fetch(`/api/conversations/${currentChatId}/stream`, {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //     },
+            //     body: JSON.stringify({
+            //         message: input,
+            //         model: currentModel,
+            //         config: languageModel,
+            //     }),
+            // })
 
-      useEffect(() => {
-        if (!currentModel || !languageModel) {
-          console.error("Model or language config missing!");
-          return;
+            // if (!response.ok) {
+            //     throw new Error('Failed to fetch response from API')
+            // }
+
+            if (file && fileContent) {
+                const analysis = await analyzeCSV(fileContent)
+                setCsvAnalysis(analysis)
+                setShowSpreadsheet(true)
+                removeFile()
+                await handleFileUpload(fileContent, file.name)
+            }
+            await handleSubmit(e)
+        } catch (error) {
+            console.error('Error submitting form:', error)
+        } finally {
+            setIsLoadingInternal(false)
         }
-      }, [currentModel, languageModel]);
+    }
 
     const renderMessage = (content: string) => (
         <ReactMarkdown
@@ -326,7 +330,7 @@ export function Chat({
                                     <Avatar className="w-8 h-8 bg-blue border-2 border-border flex-shrink-0">
                                         <AvatarFallback>U</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                         {renderMessage(message.content)}
                                     </div>
                                 </div>
@@ -334,11 +338,11 @@ export function Chat({
                         )}
                         {message.role === 'assistant' && (
                             <div className="flex justify-start mb-4">
-                                <div className="flex flex-row items-start w-full">
+                                <div className="flex flex-row items-start max-w-[80%]">
                                     <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                         <AvatarFallback>G</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 rounded-base text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                         {renderMessage(message.content)}
                                     </div>
                                 </div>
@@ -348,11 +352,11 @@ export function Chat({
                 ))}
                 {streamingMessage && (
                     <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start w-full">
+                        <div className="flex flex-row items-start max-w-[80%]">
                             <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                 <AvatarFallback>G</AvatarFallback>
                             </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                 {renderMessage(streamingMessage)}
                             </div>
                         </div>
@@ -360,11 +364,11 @@ export function Chat({
                 )}
                 {streamingCodeExplanation && (
                     <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start w-full">
+                        <div className="flex flex-row items-start max-w-[80%]">
                             <Avatar className="w-8 bg-main h-8 flex-shrink-0">
                                 <AvatarFallback>G</AvatarFallback>
                             </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
+                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
                                 {renderMessage(streamingCodeExplanation)}
                             </div>
                         </div>
@@ -464,8 +468,7 @@ export function Chat({
                             disabled={
                                 isLoading ||
                                 isUploading ||
-                                (!input.trim() && !file) ||
-                                !currentModel || !languageModel
+                                (!input.trim() && !file)
                             }
                             className="absolute rounded-full right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
                         >

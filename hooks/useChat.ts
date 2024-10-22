@@ -10,6 +10,10 @@ import {
     Session,
 } from '@supabase/auth-helpers-nextjs'
 import { useCallback, useEffect, useState } from 'react'
+import { LLMModel, LLMModelConfig } from '@/lib/modelProviders'
+import modelsList from '@/lib/models.json'
+import { useLocalStorage } from 'usehooks-ts'
+
 
 export function useChat(chatId: string | null) {
     const [session, setSession] = useState<Session | null>(null)
@@ -26,6 +30,17 @@ export function useChat(chatId: string | null) {
     const [codeExplanation, setCodeExplanation] = useState('')
     const [sandboxErrors, setSandboxErrors] = useState<any[]>([])
     const [sandboxId, setSandboxId] = useState<string | null>(null)
+
+    const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
+        'languageModel',
+        {
+          model: 'claude-3-5-sonnet-20240620',
+        }
+      )
+
+      const currentModel = modelsList.models.find(
+        (model) => model.id === languageModel.model,
+      )
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -109,10 +124,10 @@ export function useChat(chatId: string | null) {
                         content: msg.assistant_message,
                         created_at: new Date(msg.created_at),
                         tool_calls: msg.tool_calls
-                            ? (msg.tool_calls as ToolCall[])
+                            ? (msg.tool_calls as unknown as ToolCall<any, any>[])
                             : undefined,
                         tool_results: msg.tool_results
-                            ? (msg.tool_results as ToolResult[])
+                            ? (msg.tool_results as unknown as ToolResult<any, any, any>[])
                             : undefined,
                     })
                 }

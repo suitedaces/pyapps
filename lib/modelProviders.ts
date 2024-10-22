@@ -20,7 +20,14 @@
     }
 
     export function getModelClient(model: LLMModel, config: LLMModelConfig) {
-        const { id: modelNameString, providerId } = model
+        const defaultModel: LLMModel = {
+            id: 'claude',
+            name: 'Claude',
+            provider: 'Anthropic',
+            providerId: 'anthropic'
+        }
+
+        const { id: modelNameString, providerId } = model || defaultModel
         const { apiKey, baseURL } = config
 
         const providerConfigs = {

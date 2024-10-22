@@ -1,25 +1,25 @@
 import { Json } from '@/lib/database.types'
 import { z } from 'zod'
 
-export type ToolCall = {
-    id?: string
-    name: string
-    parameters: string
+export interface ToolCall<NAME extends string, ARGS> {
+    toolCallId: string;
+    toolName: NAME;
+    args: ARGS;
 }
 
-export type ToolResult = {
-    id?: string
-    name: string
-    result: any
-    error?: any
+export interface ToolResult<NAME extends string, ARGS, RESULT> {
+    toolCallId: string;
+    toolName: NAME;
+    args: ARGS;
+    result: RESULT;
 }
 
 export interface ClientMessage {
     role: 'user' | 'assistant'
     content: string
     created_at?: Date
-    tool_calls?: ToolCall[] | Json | null
-    tool_results?: ToolResult[] | Json | null
+    tool_calls?: ToolCall<string, any>[] | Json | null
+    tool_results?: ToolResult<string, any, any>[] | Json | null
 }
 
 export interface Message {
@@ -32,25 +32,37 @@ export interface Message {
     token_count: number
     created_at: string
 }
-export type StreamChunk = {
-    type:
-        | 'message_start'
-        | 'content_block_start'
-        | 'content_block_delta'
-        | 'content_block_stop'
-        | 'message_delta'
-        | 'message_stop'
-        | 'generated_code'
-        | 'code_explanation'
-        | 'error'
-        | 'tool_use'
-        | 'text_chunk'
-    message?: any
-    content_block?: any
-    delta?: any
-    content?: string
-    name?: string
-}
+export type StreamChunk =
+    | { type: 'text'; content: string }
+    | {
+          type: 'tool-call'
+          content: { id: string; name: string; parameters: Record<string, any> }
+      }
+    | {
+          type: 'tool-result'
+          content: { id: string; name: string; result: any }
+      }
+    | { type: 'generated_code'; content: string }
+    | { type: 'error'; content: string }
+    | { type: 'text_chunk'; content: string }
+    // Keeping existing types for backward compatibility
+    | {
+          type:
+              | 'message_start'
+              | 'content_block_start'
+              | 'content_block_delta'
+              | 'content_block_stop'
+              | 'message_delta'
+              | 'message_stop'
+              | 'code_explanation'
+              | 'tool_use'
+              | 'string'
+          message?: any
+          content_block?: any
+          delta?: any
+          content?: string
+          name?: string
+    }
 
 export type CSVAnalysis = {
     totalRows: number
@@ -69,7 +81,7 @@ export type CreateStreamlitAppTool = {
 export type Tool = {
     name: string
     description: string
-    inputSchema: z.ZodSchema
-    parameters: Record<string, any>
+    inputSchema: z.ZodObject<any>
+    parameters: z.ZodObject<any>
     execute: (input: any) => Promise<any>
 }
