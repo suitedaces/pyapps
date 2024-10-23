@@ -23,7 +23,7 @@ export async function POST(
     }
 
     console.log(req.json);
-    
+
 
     const {
         message,
@@ -114,7 +114,7 @@ export async function POST(
                     )
                     console.log('Starting chat generator...')
                     for await (const chunk of chatGenerator) {
-                        console.log('Received chunk:', chunk) // Add this log
+                        // console.log('Received chunk:', chunk) // Add this log
                         controller.enqueue(
                             encoder.encode(JSON.stringify(chunk) + '\n')
                         )

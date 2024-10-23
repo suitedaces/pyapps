@@ -47,15 +47,13 @@ export const tools: Tool[] = [
 export async function generateCode(
     query: string
 ): Promise<{ generatedCode: string; codeTokenCount: number }> {
-    const querySchema = z.object({
-        query: z.string().min(1, 'Query cannot be empty'),
-    })
+    if (!query || !query.trim()) {
+        throw new Error('Query cannot be empty or just whitespace.')
+    }
+
+    console.log('Sending query to LLM:', query)
 
     try {
-        querySchema.parse({ query })
-
-        console.log('Sending query to LLM:', query)
-
         const response = await codeGenerationAnthropicAgent.messages.create({
             model: 'claude-3-5-sonnet-20240620',
             max_tokens: 2000,

@@ -1,23 +1,30 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import {
-    streamObject,
     CoreAssistantMessage,
     CoreMessage,
     CoreTool,
     CoreToolMessage,
     CoreUserMessage,
+    LanguageModelUsage,
+    LanguageModelV1,
+    streamText,
     TextPart,
     ToolCallPart,
     ToolResultPart,
-    LanguageModelUsage,
-    LanguageModelV1,
 } from 'ai'
 import { cookies } from 'next/headers'
-import { messageStore } from './messageStore'
-import { getModelClient, LLMModel, LLMModelConfig } from './modelProviders'
-import { generateCode } from './tools'
-import { CSVAnalysis, Message, StreamChunk, Tool, ToolResult, ToolCall } from './types'
 import { z } from 'zod'
+import { messageStore } from './messageStore'
+import { generateCode } from './tools'
+import { getModelClient, LLMModel, LLMModelConfig } from './modelProviders'
+import {
+    CSVAnalysis,
+    Message,
+    StreamChunk,
+    Tool,
+    ToolCall,
+    ToolResult,
+} from './types'
 
 const messageSchema = z.object({
     type: z.string(),
@@ -25,7 +32,6 @@ const messageSchema = z.object({
     toolCalls: z.array(z.any()).optional(),
     toolResults: z.array(z.any()).optional(),
 })
-
 
 export class GruntyAgent {
     private model: LLMModel
@@ -93,9 +99,9 @@ export class GruntyAgent {
             completionTokens,
             totalTokens,
         }: LanguageModelUsage) => {
-            console.log('Prompt tokens:', promptTokens);
-            console.log('Completion tokens:', completionTokens);
-            console.log('Total tokens:', totalTokens);
+            console.log('Prompt tokens:', promptTokens)
+            console.log('Completion tokens:', completionTokens)
+            console.log('Total tokens:', totalTokens)
             this.totalTokens = totalTokens
         }
 
@@ -107,15 +113,103 @@ export class GruntyAgent {
         let toolCalls: ToolCall<string, any>[] = []
         let toolResults: ToolResult<string, any, any>[] = []
 
-        const streamResult = await streamObject({
+        const Tools = tools.reduce(
+            (acc, tool) => {
+                acc[tool.name] = tool // Assuming each tool has a unique 'name' property
+                return acc
+            },
+            {} as Record<string, CoreTool<any, any>>
+        )
+
+        const stream = await streamText({
             model: modelClient as LanguageModelV1,
-            output: 'array',
+            tools: Tools,
             system: this.roleDescription,
-            schema: messageSchema,
             messages: sanitizedMessages,
             maxTokens: maxTokens,
-            onFinish: async () => {
-                await streamResult.usage.then(recordTokenUsage);
+            maxSteps: 10,
+            toolChoice: 'auto',
+            onStepFinish: (event) => {
+                if (event.stepType === 'initial') {
+                    currentMessage = event.text
+
+                    currentContentBlock = event
+                    accumulatedJson = ''
+                }
+
+                if (event.usage) {
+                    this.inputTokens = event.usage.promptTokens
+                }
+            },
+        })
+
+        for await (const event of stream.fullStream) {
+            if (event.type === 'text-delta') {
+                accumulatedResponse += event.textDelta
+            } else if (event.type === 'tool-call') {
+                toolCalls.push({
+                    toolCallId: event.toolCallId,
+                    toolName: event.toolName,
+                    args: event.args,
+                })
+
+                if (event.toolName === 'create_streamlit_app') {
+                    try {
+                        const codeQuery = `
+                            ${event.args.query}
+                            Use the following CSV analysis to inform your code:
+                            ${JSON.stringify(csvAnalysis, null, 2)}
+                        `
+                        const { generatedCode, codeTokenCount } = await generateCode(codeQuery)
+                        this.codeTokens += codeTokenCount
+
+                        yield {
+                            type: 'generated_code',
+                            content: generatedCode,
+                        } as StreamChunk
+
+                        toolResults.push({
+                            toolCallId: event.toolCallId,
+                            toolName: 'create_streamlit_app',
+                            result: generatedCode,
+                            args: {},
+                        })
+                    } catch (error) {
+                        console.error('Error generating Streamlit code:', error)
+                        yield {
+                            type: 'error',
+                            content: 'Error in code generation process'
+                        } as StreamChunk
+                    }
+                }
+            } else if (event.type === 'tool-call-delta') {
+                // Handle streaming tool call updates
+                if (event.argsTextDelta) {
+                    accumulatedJson += event.argsTextDelta
+                }
+            } else if (event.type === 'tool-call-streaming-start') {
+                // Reset accumulated JSON when a new tool call starts streaming
+                accumulatedJson = ''
+            } else if (event.type === 'step-finish') {
+                // Handle step completion if needed
+                if (event.usage) {
+                    this.inputTokens = event.usage.promptTokens
+                }
+            } else if (event.type === 'finish') {
+                if (event.usage) {
+                    this.outputTokens = event.usage.completionTokens
+                }
+
+                console.log('Storing Message for chatId:', chatId)
+                const totalTokenCount = this.outputTokens + this.codeTokens + this.inputTokens
+                console.log(
+                    'Total Token Count (output, code, input):',
+                    this.outputTokens,
+                    this.codeTokens,
+                    this.inputTokens
+                )
+
+                await stream.usage.then(recordTokenUsage)
                 await this.storeMessage(
                     chatId,
                     userId,
@@ -125,86 +219,21 @@ export class GruntyAgent {
                     toolCalls,
                     toolResults
                 )
-            }
-        })
 
-        let currentToolCall: ToolCall<string, any> | null = null
-
-        for await (const events of streamResult.partialObjectStream) {
-            for (const event of events) {
-                // Handle text content
-                if (event.type === 'text') {
-                    accumulatedResponse += event.content;
-                    yield event as StreamChunk;
-                }
-
-                // Handle tool calls
-                else if (event.type === 'tool-call' && 'toolCallId' in event && 'toolName' in event && 'args' in event) {
-                    const toolCallEvent = {
-                        toolCallId: event.toolCallId as string,
-                        toolName: event.toolName as string,
-                        args: event.args as any
-                    } as ToolCall<string, any>;
-                    currentToolCall = toolCallEvent;
-
-                    if (currentToolCall) {
-                        toolCalls.push(currentToolCall);
-                    }
-
-                    // Special handling for Streamlit app generation
-                    if (toolCallEvent.toolName === 'create_streamlit_app') {
-                        try {
-                            const codeQuery = `
-                                ${toolCallEvent.args.query}
-                                Use the following CSV analysis to inform your code:
-                                ${JSON.stringify(csvAnalysis, null, 2)}
-                            `;
-
-                            const { generatedCode, codeTokenCount } = await generateCode(codeQuery);
-                            this.codeTokens += codeTokenCount;
-
-                            // Yield the generated code
-                            yield {
-                                type: 'generated_code',
-                                content: generatedCode,
-                            } as StreamChunk;
-
-                            // Store tool result
-                            toolResults.push({
-                                toolCallId: toolCallEvent.toolCallId,
-                                toolName: 'create_streamlit_app',
-                                result: generatedCode,
-                                args: {}
-                            });
-                        } catch (error) {
-                            console.error('Error generating Streamlit code:', error);
-                            yield {
-                                type: 'error',
-                                content: 'Error in code generation process'
-                            } as StreamChunk;
-                        }
-                    }
-                }
-
-                // Handle tool results
-                else if (event.type === 'tool-result' && 'toolCallId' in event && 'toolName' in event && 'result' in event) {
-                    const toolResultEvent = {
-                        toolCallId: event.toolCallId as string,
-                        toolName: event.toolName as string,
-                        result: event.result as any,
-                        args: {}
-                    } as ToolResult<string, any, any>;
-                    toolResults.push(toolResultEvent);
-                    yield event as StreamChunk;
-                }
+                // Reset all accumulators
+                currentMessage = null
+                accumulatedResponse = ''
+                generatedCode = ''
+                toolCalls = []
+                toolResults = []
+            } else if (event.type === 'error') {
+                console.error('Stream error:', event)
+                yield {
+                    type: 'error',
+                    content: 'An error occurred during processing'
+                } as StreamChunk
             }
         }
-
-        currentMessage = null
-        accumulatedResponse = ''
-        generatedCode = ''
-        toolCalls = []
-        toolResults = []
     }
 
     private async storeMessage(
@@ -269,9 +298,16 @@ export class GruntyAgent {
 
             // Add tool calls if they exist
             if (message.tool_calls && typeof message.tool_calls === 'object') {
-                const toolCalls = message.tool_calls as Record<string, Record<string, any>>
+                const toolCalls = message.tool_calls as Record<
+                    string,
+                    Record<string, any>
+                >
                 for (const [id, callData] of Object.entries(toolCalls)) {
-                    if (callData && 'name' in callData && 'parameters' in callData) {
+                    if (
+                        callData &&
+                        'name' in callData &&
+                        'parameters' in callData
+                    ) {
                         assistantContentParts.push({
                             type: 'tool-call',
                             toolCallId: id,
@@ -283,10 +319,20 @@ export class GruntyAgent {
             }
 
             // Add tool results if they exist
-            if (message.tool_results && typeof message.tool_results === 'object') {
-                const toolResults = message.tool_results as Record<string, { name: string, result: any }>
+            if (
+                message.tool_results &&
+                typeof message.tool_results === 'object'
+            ) {
+                const toolResults = message.tool_results as Record<
+                    string,
+                    { name: string; result: any }
+                >
                 for (const [id, resultData] of Object.entries(toolResults)) {
-                    if (resultData && 'result' in resultData && 'name' in resultData) {
+                    if (
+                        resultData &&
+                        'result' in resultData &&
+                        'name' in resultData
+                    ) {
                         const toolMessage: CoreToolMessage = {
                             role: 'tool',
                             content: [
