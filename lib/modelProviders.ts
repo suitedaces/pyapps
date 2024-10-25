@@ -1,11 +1,14 @@
     import { createAnthropic } from '@ai-sdk/anthropic'
+    import { LanguageModelV1 } from 'ai'
 
-    export type LLMModel = {
+    export interface LLMModel extends LanguageModelV1 {
         id: string
         name: string
         provider: string
         providerId: string
+        multiModal?: boolean
     }
+
 
     export type LLMModelConfig = {
         model?: string
@@ -20,14 +23,7 @@
     }
 
     export function getModelClient(model: LLMModel, config: LLMModelConfig) {
-        const defaultModel: LLMModel = {
-            id: 'claude',
-            name: 'Claude',
-            provider: 'Anthropic',
-            providerId: 'anthropic'
-        }
-
-        const { id: modelNameString, providerId } = model || defaultModel
+        const { id: modelNameString, providerId } = model
         const { apiKey, baseURL } = config
 
         const providerConfigs = {

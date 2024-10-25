@@ -10,12 +10,10 @@ import {
     Session,
 } from '@supabase/auth-helpers-nextjs'
 import { useCallback, useEffect, useState } from 'react'
-import { LLMModel, LLMModelConfig } from '@/lib/modelProviders'
+
+import { LLMModelConfig } from '@/lib/modelProviders'
 import modelsList from '@/lib/models.json'
 import { useLocalStorage } from 'usehooks-ts'
-
-import { Message as VercelMessage } from 'ai'
-
 
 export function useChat(chatId: string | null) {
     const [session, setSession] = useState<Session | null>(null)
@@ -36,13 +34,16 @@ export function useChat(chatId: string | null) {
     const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
         'languageModel',
         {
-          model: 'claude-3-5-sonnet-20240620',
+            model: 'claude-3-5-sonnet-20240620',
         }
-      )
+    )
 
-      const currentModel = modelsList.models.find(
-        (model) => model.id === languageModel.model,
-      )
+    const currentModel = modelsList.models.find(
+        (model) => model.id === languageModel.model
+    )
+
+    console.log(currentModel);
+
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -112,7 +113,7 @@ export function useChat(chatId: string | null) {
             }
             const data: Message[] = await response.json()
 
-            console.log(data);
+            console.log(data)
 
             const clientMessages: ClientMessage[] = data.flatMap((msg) => {
                 const messages: ClientMessage[] = [
@@ -129,17 +130,24 @@ export function useChat(chatId: string | null) {
                         content: msg.assistant_message,
                         created_at: new Date(msg.created_at),
                         tool_calls: msg.tool_calls
-                            ? (msg.tool_calls as unknown as ToolCall<any, any>[])
+                            ? (msg.tool_calls as unknown as ToolCall<
+                                  any,
+                                  any
+                              >[])
                             : undefined,
                         tool_results: msg.tool_results
-                            ? (msg.tool_results as unknown as ToolResult<any, any, any>[])
+                            ? (msg.tool_results as unknown as ToolResult<
+                                  any,
+                                  any,
+                                  any
+                              >[])
                             : undefined,
                     })
                 }
 
                 return messages
             })
-            console.log(clientMessages);
+            console.log(clientMessages)
 
             setMessages(clientMessages)
         } catch (error) {
@@ -206,20 +214,27 @@ export function useChat(chatId: string | null) {
             accumulatedCode: string
         ) => {
             try {
-                console.log('Processing chunk:', chunk);
+                console.log('Processing chunk:', chunk)
                 const parsedChunk: StreamChunk = JSON.parse(chunk)
 
                 // Text delta handling
-                if (parsedChunk.type === 'text-delta' && parsedChunk.textDelta) {
+                if (
+                    parsedChunk.type === 'text-delta' &&
+                    parsedChunk.textDelta
+                ) {
                     setStreamingMessage((prev) => prev + parsedChunk.textDelta)
                     return {
-                        accumulatedResponse: accumulatedResponse + parsedChunk.textDelta,
+                        accumulatedResponse:
+                            accumulatedResponse + parsedChunk.textDelta,
                         accumulatedCode,
                     }
                 }
 
                 // Generated code handling
-                else if (parsedChunk.type === 'generated_code' && parsedChunk.content) {
+                else if (
+                    parsedChunk.type === 'generated_code' &&
+                    parsedChunk.content
+                ) {
                     setGeneratedCode((prev) => prev + parsedChunk.content)
                     return {
                         accumulatedResponse,
@@ -229,7 +244,10 @@ export function useChat(chatId: string | null) {
 
                 // Tool call handling
                 else if (parsedChunk.type === 'tool-call') {
-                    if (typeof parsedChunk.content === 'object' && parsedChunk.content?.name === 'create_streamlit_app') {
+                    if (
+                        typeof parsedChunk.content === 'object' &&
+                        parsedChunk.content?.name === 'create_streamlit_app'
+                    ) {
                         setIsGeneratingCode(true)
                     }
                     return { accumulatedResponse, accumulatedCode } // Added return
@@ -262,27 +280,30 @@ export function useChat(chatId: string | null) {
             let accumulatedResponse = ''
             let accumulatedCode = ''
 
-            console.log('Starting stream processing...');
+            console.log('Starting stream processing...')
 
             try {
                 while (true) {
                     const { done, value } = await reader.read()
                     if (done) {
-                        console.log('Stream completed. Final accumulated response:', accumulatedResponse);
-                        break;
+                        console.log(
+                            'Stream completed. Final accumulated response:',
+                            accumulatedResponse
+                        )
+                        break
                     }
 
                     const chunk = decoder.decode(value)
-                    console.log('Raw chunk received:', chunk);
+                    console.log('Raw chunk received:', chunk)
 
                     const lines = chunk
                         .split('\n')
                         .filter((line) => line.trim() !== '')
 
-                    console.log('Processing lines:', lines);
+                    console.log('Processing lines:', lines)
 
                     for (const line of lines) {
-                        console.log('Processing individual line:', line);
+                        console.log('Processing individual line:', line)
                         const result = processStreamChunk(
                             line,
                             accumulatedResponse,
@@ -292,23 +313,26 @@ export function useChat(chatId: string | null) {
                         accumulatedResponse = result.accumulatedResponse
                         accumulatedCode = result.accumulatedCode
 
-                        console.log('After processing line:');
-                        console.log('- Accumulated Response:', accumulatedResponse);
-                        console.log('- Accumulated Code:', accumulatedCode);
+                        console.log('After processing line:')
+                        console.log(
+                            '- Accumulated Response:',
+                            accumulatedResponse
+                        )
+                        console.log('- Accumulated Code:', accumulatedCode)
                     }
                 }
             } catch (error) {
                 console.error('Error in processStream:', error)
             }
 
-            console.log('Stream processing finished');
-            console.log('Final accumulated response:', accumulatedResponse);
-            console.log('Final accumulated code:', accumulatedCode);
+            console.log('Stream processing finished')
+            console.log('Final accumulated response:', accumulatedResponse)
+            console.log('Final accumulated code:', accumulatedCode)
 
             // Return final accumulated values
             return {
                 accumulatedResponse: accumulatedResponse || streamingMessage,
-                accumulatedCode
+                accumulatedCode,
             }
         },
         [processStreamChunk, streamingMessage]
@@ -328,13 +352,19 @@ export function useChat(chatId: string | null) {
             setCodeExplanation('')
             setSandboxErrors([])
 
+            const requestBody = JSON.stringify({
+                message: newMessage.content,
+                model: currentModel,
+                config: languageModel,
+            })
+
             try {
                 const response = await fetch(
                     `/api/conversations/${chatId}/stream`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: newMessage.content }),
+                        body: requestBody,
                     }
                 )
 
@@ -347,7 +377,7 @@ export function useChat(chatId: string | null) {
                     throw new Error('Failed to get response reader')
                 }
 
-                console.log(reader);
+                console.log(reader)
 
                 const { accumulatedResponse, accumulatedCode } =
                     await processStream(reader)
@@ -358,8 +388,7 @@ export function useChat(chatId: string | null) {
                     created_at: new Date(),
                 }
 
-                console.log(assistantMessage);
-
+                console.log(assistantMessage)
 
                 setMessages((prev) => [...prev, assistantMessage])
 

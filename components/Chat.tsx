@@ -243,14 +243,16 @@ export function Chat({
                                     </span>
                                 </div>
                             </div>
-                            <div className="overflow-x-auto">
+                            <div className="w-full">
                                 <SyntaxHighlighter
                                     style={tomorrow}
                                     language={lang || 'javascript'}
                                     PreTag="div"
                                     customStyle={{
                                         margin: 0,
-                                        padding: '1rem',
+                                        padding: '1rem 0.5rem',
+                                        overflowX: 'auto',
+                                        maxWidth: '100%',
                                     }}
                                     {...props}
                                 >
@@ -337,7 +339,7 @@ export function Chat({
                             </div>
                         )}
                         {message.role === 'assistant' && (
-                            <div className="flex justify-start mb-4">
+                            <div className="flex justify-start mb-4 w-full">
                                 <div className="flex flex-row items-start">
                                     <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                         <AvatarFallback>G</AvatarFallback>

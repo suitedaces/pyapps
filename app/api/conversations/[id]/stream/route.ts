@@ -1,8 +1,10 @@
 import { GruntyAgent } from '@/lib/agent'
 import { LLMModel, LLMModelConfig } from '@/lib/modelProviders'
+import { getModelClient, getDefaultMode } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { LanguageModelV1 } from 'ai'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -27,38 +29,46 @@ export async function POST(
 
     const {
         message,
-        // model,
-        // config,
+        model,
+        config,
     }: {
         message: string
-        // model: LLMModel
-        // config: LLMModelConfig
+        model: LLMModel
+        config: LLMModelConfig
     } = await req.json()
 
-    // if (!model || !config) {
-    //     console.error('Model or config missing in the request!')
-    //     return NextResponse.json(
-    //         { error: 'Model or config is missing.' },
-    //         { status: 400 }
-    //     )
+    if (!model || !config) {
+        console.error('Model or config missing in the request!')
+        return NextResponse.json(
+            { error: 'Model or config is missing.' },
+            { status: 400 }
+        )
+    }
+
+    const modelClient = getModelClient(model, config)
+
+    // const model = {
+    //     id: 'claude-3-5-sonnet-20240620',
+    //     provider: 'Anthropic',
+    //     providerId: 'anthropic',
+    //     name: 'Claude 3.5 Sonnet',
+    //     multiModal: true,
     // }
 
-    const model = {
-        id: 'claude-3-5-sonnet-20240620',
-        provider: 'Anthropic',
-        providerId: 'anthropic',
-        name: 'Claude 3.5 Sonnet',
-        multiModal: true,
-    }
-
-    const config: LLMModelConfig = {
-        model: 'claude-3-5-sonnet-20240620',
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        temperature: 0.5,
-        maxTokens: 1000,
-    }
+    // const config: LLMModelConfig = {
+    //     model: 'claude-3-5-sonnet-20240620',
+    //     apiKey: process.env.ANTHROPIC_API_KEY,
+    //     temperature: 0.5,
+    //     maxTokens: 1000,
+    // }
 
     console.log('Received message:', message)
+    console.log('Using model:', model)
+    console.log('With config:', config)
+
+    // Debug karne ke liye log add karein
+    console.log('Model object:', model)
+    console.log('Config object:', config)
 
     // Fetch CSV analysis if it exists for this chat
     const { data: chatData, error: chatError } = await supabase
@@ -94,7 +104,7 @@ export async function POST(
 
     try {
         const agent = new GruntyAgent(
-            model,
+            modelClient,
             'AI Assistant',
             CHAT_SYSTEM_PROMPT,
             config

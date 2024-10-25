@@ -34,7 +34,7 @@ const messageSchema = z.object({
 })
 
 export class GruntyAgent {
-    private model: LLMModel
+    private model: LanguageModelV1
     private role: string
     private roleDescription: string
     private config: LLMModelConfig
@@ -44,12 +44,12 @@ export class GruntyAgent {
     private totalTokens: number = 0
 
     constructor(
-        model: LLMModel,
+        modelClient: LanguageModelV1,
         role: string,
         roleDescription: string,
         config: LLMModelConfig
     ) {
-        this.model = model
+        this.model = modelClient
         this.role = role
         this.roleDescription = roleDescription
         this.config = config
@@ -92,8 +92,6 @@ export class GruntyAgent {
 
         console.log('Sanitized Messages:', sanitizedMessages)
 
-        const modelClient = getModelClient(this.model, this.config)
-
         const recordTokenUsage = ({
             promptTokens,
             completionTokens,
@@ -122,7 +120,7 @@ export class GruntyAgent {
         )
 
         const stream = await streamText({
-            model: modelClient as LanguageModelV1,
+            model: this.model,
             tools: Tools,
             system: this.roleDescription,
             messages: sanitizedMessages,
