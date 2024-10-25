@@ -126,6 +126,7 @@ export default function ChatPageClient({
                     >
                         {currentChatId ? (
                             <Chat
+                                currentChatId={currentChatId}
                                 messages={messages}
                                 input={input}
                                 handleInputChange={handleInputChangeWrapper}
