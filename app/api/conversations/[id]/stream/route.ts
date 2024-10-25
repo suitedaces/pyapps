@@ -112,16 +112,21 @@ export async function POST(
                         4000,
                         csvAnalysis
                     )
-                    console.log('Starting chat generator...')
+                    console.log('Chat generator initialized. Awaiting chunks...');
+
+                    // Loop through each chunk yielded by the chat generator
                     for await (const chunk of chatGenerator) {
-                        // console.log('Received chunk:', chunk) // Add this log
+                        console.log('Received chunk:', chunk); // Log each chunk received
+
+                        // Enqueue the chunk for the stream
                         controller.enqueue(
                             encoder.encode(JSON.stringify(chunk) + '\n')
                         )
                     }
+                    console.log('All chunks processed. Closing controller.');
                     controller.close()
                 } catch (err) {
-                    console.error('Error in chat generator:', err)
+                    console.error('Error in chat generator or streaming process:', err);
                     controller.error(err)
                 }
             },

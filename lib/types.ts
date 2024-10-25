@@ -35,33 +35,42 @@ export interface Message {
 export type StreamChunk =
     | { type: 'text'; content: string }
     | {
-          type: 'tool-call'
-          content: { id: string; name: string; parameters: Record<string, any> }
-      }
+        type: 'tool-call'
+        content: { id: string; name: string; parameters: Record<string, any> }
+    }
     | {
-          type: 'tool-result'
-          content: { id: string; name: string; result: any }
-      }
+        type: 'tool-result'
+        content: { id: string; name: string; result: any }
+    }
     | { type: 'generated_code'; content: string }
     | { type: 'error'; content: string }
     | { type: 'text_chunk'; content: string }
     // Keeping existing types for backward compatibility
     | {
-          type:
-              | 'message_start'
-              | 'content_block_start'
-              | 'content_block_delta'
-              | 'content_block_stop'
-              | 'message_delta'
-              | 'message_stop'
-              | 'code_explanation'
-              | 'tool_use'
-              | 'string'
-          message?: any
-          content_block?: any
-          delta?: any
-          content?: string
-          name?: string
+        type:
+        | 'text-delta'
+        | 'tool-call'
+        | 'tool-call-delta'
+        | 'tool-call-streaming-start'
+        | 'step-finish'
+        | 'finish'
+        | 'error'
+        | 'generated_code'
+        | 'message_start'
+        | 'content_block_start'
+        | 'content_block_delta'
+        | 'content_block_stop'
+        | 'message_delta'
+        | 'message_stop'
+        | 'code_explanation'
+        | 'tool_use'
+        | 'string'
+        message?: any
+        content_block?: any
+        delta?: any
+        content?: string
+        name?: string
+        textDelta?: string
     }
 
 export type CSVAnalysis = {

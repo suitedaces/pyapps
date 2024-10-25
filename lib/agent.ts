@@ -15,8 +15,8 @@ import {
 import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { messageStore } from './messageStore'
-import { generateCode } from './tools'
 import { getModelClient, LLMModel, LLMModelConfig } from './modelProviders'
+import { generateCode } from './tools'
 import {
     CSVAnalysis,
     Message,
@@ -144,8 +144,11 @@ export class GruntyAgent {
         })
 
         for await (const event of stream.fullStream) {
+            yield event as StreamChunk
+
             if (event.type === 'text-delta') {
                 accumulatedResponse += event.textDelta
+
             } else if (event.type === 'tool-call') {
                 toolCalls.push({
                     toolCallId: event.toolCallId,
@@ -160,7 +163,8 @@ export class GruntyAgent {
                             Use the following CSV analysis to inform your code:
                             ${JSON.stringify(csvAnalysis, null, 2)}
                         `
-                        const { generatedCode, codeTokenCount } = await generateCode(codeQuery)
+                        const { generatedCode, codeTokenCount } =
+                            await generateCode(codeQuery)
                         this.codeTokens += codeTokenCount
 
                         yield {
@@ -178,7 +182,7 @@ export class GruntyAgent {
                         console.error('Error generating Streamlit code:', error)
                         yield {
                             type: 'error',
-                            content: 'Error in code generation process'
+                            content: 'Error in code generation process',
                         } as StreamChunk
                     }
                 }
@@ -191,6 +195,11 @@ export class GruntyAgent {
                 // Reset accumulated JSON when a new tool call starts streaming
                 accumulatedJson = ''
             } else if (event.type === 'step-finish') {
+                yield {
+                    type: 'text_chunk',
+                    content: accumulatedResponse,
+                } as StreamChunk
+
                 // Handle step completion if needed
                 if (event.usage) {
                     this.inputTokens = event.usage.promptTokens
@@ -201,7 +210,8 @@ export class GruntyAgent {
                 }
 
                 console.log('Storing Message for chatId:', chatId)
-                const totalTokenCount = this.outputTokens + this.codeTokens + this.inputTokens
+                const totalTokenCount =
+                    this.outputTokens + this.codeTokens + this.inputTokens
                 console.log(
                     'Total Token Count (output, code, input):',
                     this.outputTokens,
@@ -230,7 +240,7 @@ export class GruntyAgent {
                 console.error('Stream error:', event)
                 yield {
                     type: 'error',
-                    content: 'An error occurred during processing'
+                    content: 'An error occurred during processing',
                 } as StreamChunk
             }
         }
@@ -290,10 +300,10 @@ export class GruntyAgent {
 
             // Add text content
             if (message.assistant_message) {
-                assistantContentParts.push({
-                    type: 'text',
-                    text: message.assistant_message,
-                } as TextPart)
+                sanitizedMessages.push({
+                    role: 'assistant',
+                    content: message.assistant_message,
+                })
             }
 
             // Add tool calls if they exist

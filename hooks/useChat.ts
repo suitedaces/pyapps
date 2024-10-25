@@ -14,6 +14,8 @@ import { LLMModel, LLMModelConfig } from '@/lib/modelProviders'
 import modelsList from '@/lib/models.json'
 import { useLocalStorage } from 'usehooks-ts'
 
+import { Message as VercelMessage } from 'ai'
+
 
 export function useChat(chatId: string | null) {
     const [session, setSession] = useState<Session | null>(null)
@@ -109,6 +111,9 @@ export function useChat(chatId: string | null) {
                 throw new Error('Failed to fetch messages')
             }
             const data: Message[] = await response.json()
+
+            console.log(data);
+
             const clientMessages: ClientMessage[] = data.flatMap((msg) => {
                 const messages: ClientMessage[] = [
                     {
@@ -134,6 +139,8 @@ export function useChat(chatId: string | null) {
 
                 return messages
             })
+            console.log(clientMessages);
+
             setMessages(clientMessages)
         } catch (error) {
             console.error('Error fetching messages:', error)
@@ -199,44 +206,52 @@ export function useChat(chatId: string | null) {
             accumulatedCode: string
         ) => {
             try {
+                console.log('Processing chunk:', chunk);
                 const parsedChunk: StreamChunk = JSON.parse(chunk)
-                if (
-                    parsedChunk.type === 'content_block_delta' &&
-                    'delta' in parsedChunk &&
-                    parsedChunk.delta?.type === 'text_delta'
-                ) {
-                    setStreamingMessage((prev) => prev + parsedChunk.delta.text)
+
+                // Text delta handling
+                if (parsedChunk.type === 'text-delta' && parsedChunk.textDelta) {
+                    setStreamingMessage((prev) => prev + parsedChunk.textDelta)
                     return {
-                        accumulatedResponse:
-                            accumulatedResponse + parsedChunk.delta.text,
+                        accumulatedResponse: accumulatedResponse + parsedChunk.textDelta,
                         accumulatedCode,
                     }
-                } else if (
-                    parsedChunk.type === 'generated_code' &&
-                    'content' in parsedChunk
-                ) {
+                }
+
+                // Generated code handling
+                else if (parsedChunk.type === 'generated_code' && parsedChunk.content) {
                     setGeneratedCode((prev) => prev + parsedChunk.content)
                     return {
                         accumulatedResponse,
                         accumulatedCode: accumulatedCode + parsedChunk.content,
                     }
-                } else if (
-                    parsedChunk.type === 'code_explanation' &&
-                    'content' in parsedChunk
-                ) {
-                    setCodeExplanation((prev) => prev + parsedChunk.content)
-                } else if (parsedChunk.type === 'message_stop') {
-                    setIsGeneratingCode(false)
-                } else if (
-                    parsedChunk.type === 'tool_use' &&
-                    parsedChunk.name === 'create_streamlit_app'
-                ) {
-                    setIsGeneratingCode(true)
                 }
+
+                // Tool call handling
+                else if (parsedChunk.type === 'tool-call') {
+                    if (typeof parsedChunk.content === 'object' && parsedChunk.content?.name === 'create_streamlit_app') {
+                        setIsGeneratingCode(true)
+                    }
+                    return { accumulatedResponse, accumulatedCode } // Added return
+                }
+
+                // Finish handling
+                else if (parsedChunk.type === 'finish') {
+                    setIsGeneratingCode(false)
+                    return { accumulatedResponse, accumulatedCode } // Added return
+                }
+
+                // Error handling
+                else if (parsedChunk.type === 'error' && parsedChunk.content) {
+                    console.error('Stream error:', parsedChunk.content)
+                    return { accumulatedResponse, accumulatedCode } // Added return
+                }
+
+                return { accumulatedResponse, accumulatedCode } // Default return
             } catch (error) {
                 console.error('Error processing stream chunk:', error)
+                return { accumulatedResponse, accumulatedCode } // Error case return
             }
-            return { accumulatedResponse, accumulatedCode }
         },
         []
     )
@@ -247,30 +262,56 @@ export function useChat(chatId: string | null) {
             let accumulatedResponse = ''
             let accumulatedCode = ''
 
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-                const chunk = decoder.decode(value)
-                const lines = chunk
-                    .split('\n')
-                    .filter((line) => line.trim() !== '')
+            console.log('Starting stream processing...');
 
-                for (const line of lines) {
-                    const result = processStreamChunk(
-                        line,
-                        accumulatedResponse,
-                        accumulatedCode
-                    )
-                    accumulatedResponse = result.accumulatedResponse
-                    accumulatedCode = result.accumulatedCode
+            try {
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) {
+                        console.log('Stream completed. Final accumulated response:', accumulatedResponse);
+                        break;
+                    }
+
+                    const chunk = decoder.decode(value)
+                    console.log('Raw chunk received:', chunk);
+
+                    const lines = chunk
+                        .split('\n')
+                        .filter((line) => line.trim() !== '')
+
+                    console.log('Processing lines:', lines);
+
+                    for (const line of lines) {
+                        console.log('Processing individual line:', line);
+                        const result = processStreamChunk(
+                            line,
+                            accumulatedResponse,
+                            accumulatedCode
+                        )
+                        // Update local variables with returned values
+                        accumulatedResponse = result.accumulatedResponse
+                        accumulatedCode = result.accumulatedCode
+
+                        console.log('After processing line:');
+                        console.log('- Accumulated Response:', accumulatedResponse);
+                        console.log('- Accumulated Code:', accumulatedCode);
+                    }
                 }
-
-                setStreamingMessage(accumulatedResponse)
+            } catch (error) {
+                console.error('Error in processStream:', error)
             }
 
-            return { accumulatedResponse, accumulatedCode }
+            console.log('Stream processing finished');
+            console.log('Final accumulated response:', accumulatedResponse);
+            console.log('Final accumulated code:', accumulatedCode);
+
+            // Return final accumulated values
+            return {
+                accumulatedResponse: accumulatedResponse || streamingMessage,
+                accumulatedCode
+            }
         },
-        [processStreamChunk]
+        [processStreamChunk, streamingMessage]
     )
 
     const handleChatOperation = useCallback(
@@ -306,6 +347,8 @@ export function useChat(chatId: string | null) {
                     throw new Error('Failed to get response reader')
                 }
 
+                console.log(reader);
+
                 const { accumulatedResponse, accumulatedCode } =
                     await processStream(reader)
 
@@ -314,6 +357,9 @@ export function useChat(chatId: string | null) {
                     content: accumulatedResponse,
                     created_at: new Date(),
                 }
+
+                console.log(assistantMessage);
+
 
                 setMessages((prev) => [...prev, assistantMessage])
 
