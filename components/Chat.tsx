@@ -338,11 +338,11 @@ export function Chat({
                         )}
                         {message.role === 'assistant' && (
                             <div className="flex justify-start mb-4">
-                                <div className="flex flex-row items-start max-w-[80%]">
+                                <div className="flex flex-row items-start">
                                     <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                         <AvatarFallback>G</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    <div className="mx-2 p-4 text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
                                         {renderMessage(message.content)}
                                     </div>
                                 </div>
