@@ -257,7 +257,7 @@ export default function AppSidebar({
         })
 
         return () => subscription.unsubscribe()
-    }, [])
+    }, [supabase.auth])
 
     // Handling Chat
 

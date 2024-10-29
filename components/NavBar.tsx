@@ -46,7 +46,7 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
         })
 
         return () => subscription.unsubscribe()
-    }, [])
+    }, [supabase.auth])
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
