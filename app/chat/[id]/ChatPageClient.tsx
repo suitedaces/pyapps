@@ -5,7 +5,6 @@ import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
 import { MetaSheet } from '@/components/MetaSheet'
 import { Navbar } from '@/components/NavBar'
-import Sidebar from '@/components/Sidebar'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -104,13 +103,6 @@ export default function ChatPageClient({
     return (
         <>
             <div className="flex flex-col min-h-screen bg-bg text-white">
-                <Sidebar
-                    isRightContentVisible={isRightContentVisible}
-                    setIsRightContentVisible={setIsRightContentVisible}
-                    onChatSelect={handleChatSelect}
-                    onNewChat={handleNewChat}
-                    currentChatId={currentChatId}
-                />
                 <Navbar isRightContentVisible={isRightContentVisible} />
                 <main className="flex-grow flex flex-col lg:flex-row overflow-hidden justify-center">
                     <motion.div
