@@ -308,7 +308,7 @@ export function Chat({
     )
 
     return (
-        <div className="flex flex-col h-full dark:border-darkBorder rounded-3xl border-2 border-border bg-darkText dark:bg-darkBg text-text dark:text-darkText">
+        <div className="flex flex-col h-full dark:border-darkBorder rounded-3xl border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
             <ScrollArea
                 className="flex-grow p-4 space-y-4"
                 onScroll={handleScroll}

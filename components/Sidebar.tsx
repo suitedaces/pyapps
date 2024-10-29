@@ -135,7 +135,7 @@ const ChatsList = ({
             {visibleChats.map((chat) => (
                 <SidebarMenuSubItem
                     key={chat.id}
-                    className="group/item relative"
+                    className="group/item relative hover:bg-white"
                 >
                     <SidebarMenuSubButton
                         className="hover:bg-accent/50 w-11/12 cursor-pointer"
@@ -175,7 +175,7 @@ const ChatsList = ({
                 <SidebarMenuSubItem className="justify-center">
                     <SidebarMenuButton
                         onClick={() => setDisplayCount(prev => prev + LOAD_MORE_COUNT)}
-                        className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50 rounded-md flex items-center justify-center gap-2"
+                        className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50 rounded-md flex items-center justify-center gap-2 border-border border"
                     >
                         {isLoadingMore ? (
                             <>
@@ -288,7 +288,7 @@ export default function AppSidebar({
                     <SidebarGroup>
                         <SidebarMenu>
                             <SidebarMenuItem>
-                                <SidebarMenuButton onClick={handleNewChat} className="w-full justify-center border">
+                                <SidebarMenuButton onClick={handleNewChat} className="w-full justify-center border border-gray-300">
                                     <BorderTrail
                                         className='bg-gradient-to-l from-gray-200 via-black to-gray-200 dark:from-gray-700 dark:via-black dark:to-gray-700'
                                         size={36}

@@ -157,7 +157,7 @@ export default function Home() {
                         {isRightContentVisible && <CustomHandle />}
 
                         {isRightContentVisible && (
-                            <ResizablePanel minSize={30} className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 border-border rounded-3xl h-[calc(100vh-4rem)]">
+                            <ResizablePanel minSize={30} className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 bg-white border-border rounded-3xl h-[calc(100vh-4rem)]">
                                 <Tabs
                                     defaultValue='file'
                                     // value={activeTab}
