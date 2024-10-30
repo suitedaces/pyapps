@@ -5,6 +5,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import { motion, AnimatePresence } from 'framer-motion'
+
 import { LLMModelConfig } from '@/lib/modelProviders'
 import modelsList from '@/lib/models.json'
 import { useLocalStorage } from 'usehooks-ts'
@@ -84,18 +86,21 @@ export function Chat({
     const [fileContent, setFileContent] = useState<string | null>(null)
     const [fullData, setFullData] = useState<string[][] | null>(null)
 
+    const [isInitial, setIsInitial] = useState(true);
+    const [isAnimating, setIsAnimating] = useState(false);
+
     const isLoading = isLoadingProp || isLoadingInternal
 
     const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
         'languageModel',
         {
-          model: 'claude-3-5-sonnet-20240620',
+            model: 'claude-3-5-sonnet-20240620',
         }
-      )
+    )
 
-      const currentModel = modelsList.models.find(
+    const currentModel = modelsList.models.find(
         (model) => model.id === languageModel.model,
-      )
+    )
 
 
     useEffect(() => {
@@ -173,6 +178,9 @@ export function Chat({
         e.preventDefault()
 
         if (isLoadingInternal) return; // Prevent multiple submissions
+
+        setIsAnimating(true);
+        setIsInitial(false);
 
         setIsLoadingInternal(true)
 
@@ -308,9 +316,39 @@ export function Chat({
     )
 
     return (
-        <div className="flex flex-col h-full dark:border-darkBorder rounded-3xl border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
+        <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
+            <div className='w-full h-full absolute'>
+                <div className='relative w-full h-full'>
+                    <AnimatePresence>
+                        {isInitial && (
+                            <motion.div
+                                initial={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className="text-center w-full absolute top-[40%] m-auto pb-4"
+                            >
+                                <motion.h1
+                                    className="text-4xl font-bold tracking-tight mb-1"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 }}
+                                >
+                                    What data can I help you analyze?
+                                </motion.h1>
+                                <motion.p
+                                    className="text-muted-foreground mt-4 text-sm"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.4 }}
+                                >
+                                    analyse and generate dashboard apps, spreadsheets and more...
+                                </motion.p>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
             <ScrollArea
-                className="flex-grow p-4 space-y-4"
+                className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto"
                 onScroll={handleScroll}
             >
                 {showSpreadsheet && csvAnalysis && (
@@ -390,16 +428,24 @@ export function Chat({
                     ↓
                 </Button>
             )}
-            <form
+            <motion.form
                 onSubmit={handleFormSubmit}
-                className="p-4 dark:border-darkBorder"
+                className="p-4 dark:border-darkBorder m-auto w-full max-w-[800px]"
+                initial={false}
+                animate={{
+                    y: isInitial ? "-30vh" : 0,
+                }}
+                transition={{
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 20,
+                }}
             >
                 <div className="flex space-x-2">
                     <div className="relative flex-grow">
                         <div
-                            className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                                file ? 'max-h-20' : 'max-h-0'
-                            }`}
+                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'
+                                }`}
                         >
                             {file && (
                                 <div className="px-3 flex justify-start mb-2">
@@ -467,12 +513,13 @@ export function Chat({
                         <Button
                             type="submit"
                             variant={'noShadow'}
+                            size={'boxy'}
                             disabled={
                                 isLoading ||
                                 isUploading ||
                                 (!input.trim() && !file)
                             }
-                            className="absolute rounded-full right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
+                            className="absolute top rounded-lg right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
                         >
                             {isLoading || isUploading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -482,7 +529,7 @@ export function Chat({
                         </Button>
                     </div>
                 </div>
-            </form>
+            </motion.form>
         </div>
     )
 }

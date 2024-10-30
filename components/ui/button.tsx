@@ -35,6 +35,7 @@ const buttonVariants = cva(
                 icon: "h-10 w-10",
                 round: 'h-11 px-4',
                 xsm: 'h-8 px-3',
+                boxy: 'p-3',
                 sidebarBg: 'h-9 rounded-md px-3'
             },
         },

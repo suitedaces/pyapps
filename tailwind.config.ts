@@ -50,7 +50,7 @@ module.exports = {
     		fontWeight: {
     			base: '500',
     			heading: '700'
-    		}
+    		},
     	}
     },
     plugins: [require('tailwindcss-animate')],

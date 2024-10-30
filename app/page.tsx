@@ -44,7 +44,7 @@ const CustomHandle = ({ ...props }) => (
 )
 
 export default function Home() {
-    const [isRightContentVisible, setIsRightContentVisible] = useState(true)
+    const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [isAtBottom, setIsAtBottom] = useState(true)
     const [session, setSession] = useState<Session | null>(null)
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
@@ -135,7 +135,7 @@ export default function Home() {
                 onNewChat={handleNewChat}
             />
             <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
-                <main className="flex-grow flex px-2 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
+                <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
                     <ResizablePanelGroup direction="horizontal" ref={resizableGroupRef}>
                         <ResizablePanel defaultSize={65} minSize={45}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
@@ -157,7 +157,7 @@ export default function Home() {
                         {isRightContentVisible && <CustomHandle />}
 
                         {isRightContentVisible && (
-                            <ResizablePanel minSize={30} className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 bg-white border-border rounded-3xl h-[calc(100vh-4rem)]">
+                            <ResizablePanel minSize={40} className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 bg-white border-border h-[calc(100vh-4rem)]">
                                 <Tabs
                                     defaultValue='file'
                                     // value={activeTab}
