@@ -91,6 +91,7 @@ interface Chat {
 interface SidebarProps {
     onChatSelect: (chatId: string) => void
     onNewChat: () => Promise<void>
+    currentChatId: string | null
 }
 
 const INITIAL_LOAD = 11
@@ -113,14 +114,28 @@ const Spinner = () => {
     )
 }
 
+interface CustomSidebarMenuSubItemProps {
+    isActive?: boolean;
+    children: React.ReactNode;
+    className?: string;
+}
+
+const CustomSidebarMenuSubItem = ({ isActive, children, className }: CustomSidebarMenuSubItemProps) => (
+    <div className={`${className} ${isActive ? 'bg-white/50' : ''}`}>
+        {children}
+    </div>
+)
+
 const ChatsList = ({
     chats = [],
     onChatSelect,
     isLoadingMore,
+    currentChatId,
 }: {
     chats: Chat[],
     onChatSelect: (chatId: string) => void,
-    isLoadingMore: boolean
+    isLoadingMore: boolean,
+    currentChatId: string | null
 }) => {
     if (!chats) return null;
 
@@ -133,12 +148,13 @@ const ChatsList = ({
     return (
         <SidebarMenuSub className="w-full">
             {visibleChats.map((chat) => (
-                <SidebarMenuSubItem
+                <CustomSidebarMenuSubItem
                     key={chat.id}
                     className="group/item relative hover:bg-white"
+                    isActive={chat.id === currentChatId}
                 >
                     <SidebarMenuSubButton
-                        className="hover:bg-accent/50 w-11/12 cursor-pointer"
+                        className={`w-11/12 cursor-pointer ${chat.id === currentChatId ? 'font-semibold' : ''}`}
                         onClick={() => onChatSelect(chat.id)}
                     >
                         <span>{chat.name || `Chat ${chat.id.slice(0, 8)}`}</span>
@@ -168,11 +184,11 @@ const ChatsList = ({
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                </SidebarMenuSubItem>
+                </CustomSidebarMenuSubItem>
             ))}
 
             {hasMoreToShow && (
-                <SidebarMenuSubItem className="justify-center">
+                <CustomSidebarMenuSubItem className="justify-center">
                     <SidebarMenuButton
                         onClick={() => setDisplayCount(prev => prev + LOAD_MORE_COUNT)}
                         className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50 rounded-md flex items-center justify-center gap-2 border-border border"
@@ -186,7 +202,7 @@ const ChatsList = ({
                             <span>Load More</span>
                         )}
                     </SidebarMenuButton>
-                </SidebarMenuSubItem>
+                </CustomSidebarMenuSubItem>
             )}
         </SidebarMenuSub>
     )
@@ -195,9 +211,8 @@ const ChatsList = ({
 export default function AppSidebar({
     onChatSelect,
     onNewChat,
-}: SidebarProps,
-    id: string
-) {
+    currentChatId,
+}: SidebarProps & { currentChatId: string | null }) {
     const [open, setOpen] = useState(false)
     const [chats, setChats] = useState<Chat[]>([])
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
@@ -262,9 +277,12 @@ export default function AppSidebar({
     // Handling Chat
 
     const handleNewChat = async () => {
-        setIsNewChat(true)
-        await onNewChat()
-        fetchChats()
+        window.location.href = '/';
+    }
+
+    const handleChatSelect = (chatId: string) => {
+        // Redirect to chat page using window.location
+        window.location.href = `/chat/${chatId}`;
     }
 
     return (
@@ -288,7 +306,10 @@ export default function AppSidebar({
                     <SidebarGroup>
                         <SidebarMenu>
                             <SidebarMenuItem>
-                                <SidebarMenuButton onClick={handleNewChat} className="w-full justify-center border border-gray-300">
+                                <SidebarMenuButton
+                                    onClick={handleNewChat}
+                                    className="w-full justify-center border border-gray-300"
+                                >
                                     <BorderTrail
                                         className='bg-gradient-to-l from-gray-200 via-black to-gray-200 dark:from-gray-700 dark:via-black dark:to-gray-700'
                                         size={36}
@@ -362,8 +383,9 @@ export default function AppSidebar({
                                         <Suspense fallback={<Spinner />}>
                                             <ChatsList
                                                 chats={chats}
-                                                onChatSelect={onChatSelect}
+                                                onChatSelect={handleChatSelect}
                                                 isLoadingMore={isLoadingMore}
+                                                currentChatId={currentChatId}
                                             />
                                         </Suspense>
                                     </CollapsibleContent>

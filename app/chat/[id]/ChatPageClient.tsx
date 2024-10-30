@@ -1,5 +1,6 @@
 'use client'
 
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { Chat } from '@/components/Chat'
 import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
@@ -13,12 +14,37 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import React, { useCallback, useEffect, useState } from 'react'
+
+import {
+    ResizableHandle,
+    ResizablePanel,
+    ResizablePanelGroup,
+} from "@/components/ui/resizable"
+
+import { SidebarProvider } from '@/components/ui/sidebar'
+import AppSidebar from '@/components/Sidebar'
 
 interface ChatPageClientProps {
     initialChat: any
     initialSession: Session
 }
+
+const truncate = (str: string) => {
+    const maxLength = 30; // Adjust this value as needed
+    if (str.length <= maxLength) return str;
+    const extension = str.slice(str.lastIndexOf('.'));
+    const nameWithoutExtension = str.slice(0, str.lastIndexOf('.'));
+    const truncatedName = nameWithoutExtension.slice(0, maxLength - 3 - extension.length);
+    return `${truncatedName}...${extension}`;
+};
+
+const CustomHandle = ({ ...props }) => (
+    <ResizableHandle {...props} withHandle className="relative">
+        <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
+            <div className="h-8 w-1 rounded-full bg-black" />
+        </div>
+    </ResizableHandle>
+)
 
 export default function ChatPageClient({
     initialChat,
@@ -47,6 +73,8 @@ export default function ChatPageClient({
         isGeneratingCode,
     } = useChat(currentChatId)
 
+    const resizableGroupRef = useRef<any>(null)
+
     useEffect(() => {
         const {
             data: { subscription },
@@ -70,123 +98,118 @@ export default function ChatPageClient({
         setCurrentChatId(chatId)
     }
 
-    const handleNewChat = async () => {
-        try {
-            const response = await fetch('/api/conversations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: 'New Chat' }),
-            })
-            if (!response.ok) {
-                throw new Error('Failed to create new chat')
-            }
-            const data = await response.json()
-            setCurrentChatId(data.id)
-        } catch (error) {
-            console.error('Error creating new chat:', error)
+    const handleNewChat = useCallback(() => {
+        if (window.location.pathname !== '/') {
+            window.location.href = '/';
         }
-    }
+        return Promise.resolve();
+    }, [])
 
-    const handleInputChangeWrapper = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-            handleInputChange(e as React.ChangeEvent<HTMLInputElement>)
-        },
-        [handleInputChange]
-    )
+    const handleSubmitWrapper = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        if (!currentChatId) {
+            try {
+                const response = await fetch('/api/conversations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: 'New Chat' }),
+                })
+                if (!response.ok) {
+                    throw new Error('Failed to create new chat')
+                }
+                const data = await response.json()
+                setCurrentChatId(data.id)
+            } catch (error) {
+                console.error('Error creating new chat:', error)
+                return
+            }
+        }
+
+        handleSubmit(e)
+    }, [currentChatId, handleSubmit])
+
+    const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
+    }, [handleInputChange]);
 
     if (!session) {
         return <LoginPage />
     }
 
     return (
-        <>
-            <div className="flex flex-col min-h-screen bg-bg text-white">
-                <Navbar isRightContentVisible={isRightContentVisible} />
-                <main className="flex-grow flex flex-col lg:flex-row overflow-hidden justify-center">
-                    <motion.div
-                        className="w-full lg:w-1/2 px-4 flex flex-col h-[calc(100vh-4rem)]"
-                        animate={{
-                            x: isRightContentVisible ? 0 : '50%',
-                        }}
-                        transition={{
-                            type: 'ease',
-                            stiffness: 300,
-                            damping: 30,
-                        }}
-                    >
-                        {currentChatId ? (
-                            <Chat
-                                currentChatId={currentChatId}
-                                messages={messages}
-                                input={input}
-                                handleInputChange={handleInputChangeWrapper}
-                                handleSubmit={handleSubmit}
-                                isLoading={isLoading}
-                                streamingMessage={streamingMessage}
-                                streamingCodeExplanation={
-                                    streamingCodeExplanation
-                                }
-                                handleFileUpload={handleFileUpload}
-                                onChatSelect={handleChatSelect}
-                            />
-                        ) : (
-                            <div className="flex items-center text-black justify-center h-full">
-                                <p>
-                                    Select a chat or create a new one to get
-                                    started!
-                                </p>
+        <SidebarProvider>
+            <AppSidebar
+                onChatSelect={handleChatSelect}
+                onNewChat={handleNewChat}
+            />
+             <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
+                <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
+                    <ResizablePanelGroup direction="horizontal" ref={resizableGroupRef}>
+                        <ResizablePanel defaultSize={65} minSize={45}>
+                            <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
+                                <Chat
+                                    messages={messages}
+                                    input={input}
+                                    handleInputChange={handleInputChangeWrapper}
+                                    handleSubmit={handleSubmitWrapper}
+                                    isLoading={isLoading}
+                                    streamingMessage={streamingMessage}
+                                    streamingCodeExplanation={streamingCodeExplanation}
+                                    handleFileUpload={handleFileUpload}
+                                    currentChatId={currentChatId}
+                                    onChatSelect={handleChatSelect}
+                                />
                             </div>
-                        )}
-                    </motion.div>
+                        </ResizablePanel>
 
-                    <motion.div
-                        initial={{ x: '100%' }}
-                        animate={{
-                            x: isRightContentVisible ? 0 : '100%',
-                        }}
-                        transition={{
-                            type: 'ease',
-                            stiffness: 300,
-                            damping: 30,
-                        }}
-                        className="w-full lg:w-1/2 p-4 flex flex-col border-2 border-border rounded-3xl h-[calc(100vh-4rem)]"
-                    >
-                        <Tabs
-                            defaultValue="preview"
-                            className="flex-grow flex flex-col h-full"
-                        >
-                            <TabsList
-                                className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}
-                            >
-                                {csvFileName && (
-                                    <TabsTrigger value="file">
-                                        {csvFileName}
-                                    </TabsTrigger>
-                                )}
-                                <TabsTrigger value="preview">App</TabsTrigger>
-                                <TabsTrigger value="code">Code</TabsTrigger>
-                            </TabsList>
-                            {csvFileName && (
-                                <TabsContent value="file" className="flex-grow">
-                                    <MetaSheet csvContent={csvContent} />
-                                </TabsContent>
-                            )}
-                            <TabsContent value="preview" className="flex-grow">
-                                <StreamlitPreview
-                                    url={streamlitUrl}
-                                    isGeneratingCode={isGeneratingCode}
-                                />
-                            </TabsContent>
-                            <TabsContent value="code" className="flex-grow">
-                                <CodeView
-                                    code={generatedCode}
-                                    isGeneratingCode={isGeneratingCode}
-                                />
-                            </TabsContent>
-                        </Tabs>
-                    </motion.div>
+                        {isRightContentVisible && <CustomHandle />}
+
+                        {isRightContentVisible && (
+                            <ResizablePanel minSize={40} className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 bg-white border-border h-[calc(100vh-4rem)]">
+                                <Tabs
+                                    defaultValue='file'
+                                    // value={activeTab}
+                                    // onValueChange={handleTabChange}
+                                    className="flex-grow flex flex-col h-full"
+                                >
+                                    <TabsList
+                                        className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}
+                                    >
+                                        {csvFileName && (
+                                            <TabsTrigger value="file">
+                                                {truncate(csvFileName)}
+                                            </TabsTrigger>
+                                        )}
+                                        <TabsTrigger value="preview">App</TabsTrigger>
+                                        <TabsTrigger value="code">Code</TabsTrigger>
+                                    </TabsList>
+                                    {csvFileName && (
+                                        <TabsContent value="file" className="flex-grow">
+                                            <MetaSheet
+                                                csvContent={csvContent}
+                                            />
+                                        </TabsContent>
+                                    )}
+                                    <TabsContent value="preview" className="flex-grow">
+                                        <StreamlitPreview
+                                            url={streamlitUrl}
+                                            isGeneratingCode={isGeneratingCode}
+                                        />
+                                    </TabsContent>
+                                    <TabsContent value="code" className="flex-grow">
+                                        <CodeView
+                                            code={generatedCode}
+                                            isGeneratingCode={isGeneratingCode}
+                                        />
+                                    </TabsContent>
+                                </Tabs>
+                            </ResizablePanel>
+                        )}
+                    </ResizablePanelGroup>
+\
 
                     <Button
                         onClick={toggleRightContent}
@@ -201,6 +224,6 @@ export default function ChatPageClient({
                     </Button>
                 </main>
             </div>
-        </>
+        </SidebarProvider>
     )
 }

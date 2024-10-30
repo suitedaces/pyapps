@@ -82,38 +82,71 @@ export default function Home() {
         return () => subscription.unsubscribe()
     }, [supabase.auth])
 
+    useEffect(() => {
+        const createInitialChat = async () => {
+            if (!currentChatId && session) {
+                try {
+                    const response = await fetch('/api/conversations', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ name: 'New Chat' }),
+                    })
+                    if (!response.ok) {
+                        throw new Error('Failed to create new chat')
+                    }
+                    const data = await response.json()
+                    setCurrentChatId(data.id)
+                } catch (error) {
+                    console.error('Error creating initial chat:', error)
+                }
+            }
+        }
+
+        createInitialChat()
+    }, [currentChatId, session])
+
     const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
     }, [])
 
     const handleNewChat = useCallback(async () => {
-        try {
-            const response = await fetch('/api/conversations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: 'New Chat' }),
-            })
-            if (!response.ok) {
-                throw new Error('Failed to create new chat')
-            }
-            const data = await response.json()
-            setCurrentChatId(data.id)
-        } catch (error) {
-            console.error('Error creating new chat:', error)
+        if (window.location.pathname !== '/') {
+            window.location.href = '/';
         }
+        return Promise.resolve();
     }, [])
 
     const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
     }, [handleInputChange]);
 
-    useEffect(() => {
-        if (session && !currentChatId) {
-            handleNewChat();
+    const handleSubmitWrapper = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        if (!currentChatId) {
+            try {
+                const response = await fetch('/api/conversations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: 'New Chat' }),
+                })
+                if (!response.ok) {
+                    throw new Error('Failed to create new chat')
+                }
+                const data = await response.json()
+                setCurrentChatId(data.id)
+            } catch (error) {
+                console.error('Error creating new chat:', error)
+                return
+            }
         }
-    }, [session, handleNewChat, currentChatId]);
+
+        handleSubmit(e)
+    }, [currentChatId, handleInputChange, handleSubmit])
 
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
@@ -133,71 +166,72 @@ export default function Home() {
             <AppSidebar
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
+                currentChatId={currentChatId}
             />
-            <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
-                <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
-                    <ResizablePanelGroup direction="horizontal" ref={resizableGroupRef}>
-                        <ResizablePanel defaultSize={65} minSize={45}>
-                            <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                <Chat
-                                    messages={messages}
-                                    input={input}
-                                    handleInputChange={handleInputChangeWrapper}
-                                    handleSubmit={handleSubmit}
-                                    isLoading={isLoading}
-                                    streamingMessage={streamingMessage}
-                                    streamingCodeExplanation={streamingCodeExplanation}
-                                    handleFileUpload={handleFileUpload}
-                                    currentChatId={currentChatId}
-                                    onChatSelect={handleChatSelect}
-                                />
-                            </div>
-                        </ResizablePanel>
+        <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
+            <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
+                <ResizablePanelGroup direction="horizontal" ref={resizableGroupRef}>
+                    <ResizablePanel defaultSize={65} minSize={45}>
+                        <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
+                            <Chat
+                                messages={messages}
+                                input={input}
+                                handleInputChange={handleInputChangeWrapper}
+                                handleSubmit={handleSubmitWrapper}
+                                isLoading={isLoading}
+                                streamingMessage={streamingMessage}
+                                streamingCodeExplanation={streamingCodeExplanation}
+                                handleFileUpload={handleFileUpload}
+                                currentChatId={currentChatId}
+                                onChatSelect={handleChatSelect}
+                            />
+                        </div>
+                    </ResizablePanel>
 
-                        {isRightContentVisible && <CustomHandle />}
+                    {isRightContentVisible && <CustomHandle />}
 
-                        {isRightContentVisible && (
-                            <ResizablePanel minSize={40} className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 bg-white border-border h-[calc(100vh-4rem)]">
-                                <Tabs
-                                    defaultValue='file'
-                                    // value={activeTab}
-                                    // onValueChange={handleTabChange}
-                                    className="flex-grow flex flex-col h-full"
+                    {isRightContentVisible && (
+                        <ResizablePanel minSize={40} className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 bg-white border-border h-[calc(100vh-4rem)]">
+                            <Tabs
+                                defaultValue='file'
+                                // value={activeTab}
+                                // onValueChange={handleTabChange}
+                                className="flex-grow flex flex-col h-full"
+                            >
+                                <TabsList
+                                    className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}
                                 >
-                                    <TabsList
-                                        className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}
-                                    >
-                                        {csvFileName && (
-                                            <TabsTrigger value="file">
-                                                {truncate(csvFileName)}
-                                            </TabsTrigger>
-                                        )}
-                                        <TabsTrigger value="preview">App</TabsTrigger>
-                                        <TabsTrigger value="code">Code</TabsTrigger>
-                                    </TabsList>
                                     {csvFileName && (
-                                        <TabsContent value="file" className="flex-grow">
-                                            <MetaSheet
-                                                csvContent={csvContent}
-                                            />
-                                        </TabsContent>
+                                        <TabsTrigger value="file">
+                                            {truncate(csvFileName)}
+                                        </TabsTrigger>
                                     )}
-                                    <TabsContent value="preview" className="flex-grow">
-                                        <StreamlitPreview
-                                            url={streamlitUrl}
-                                            isGeneratingCode={isGeneratingCode}
+                                    <TabsTrigger value="preview">App</TabsTrigger>
+                                    <TabsTrigger value="code">Code</TabsTrigger>
+                                </TabsList>
+                                {csvFileName && (
+                                    <TabsContent value="file" className="flex-grow">
+                                        <MetaSheet
+                                            csvContent={csvContent}
                                         />
                                     </TabsContent>
-                                    <TabsContent value="code" className="flex-grow">
-                                        <CodeView
-                                            code={generatedCode}
-                                            isGeneratingCode={isGeneratingCode}
-                                        />
-                                    </TabsContent>
-                                </Tabs>
-                            </ResizablePanel>
-                        )}
-                    </ResizablePanelGroup>
+                                )}
+                                <TabsContent value="preview" className="flex-grow">
+                                    <StreamlitPreview
+                                        url={streamlitUrl}
+                                        isGeneratingCode={isGeneratingCode}
+                                    />
+                                </TabsContent>
+                                <TabsContent value="code" className="flex-grow">
+                                    <CodeView
+                                        code={generatedCode}
+                                        isGeneratingCode={isGeneratingCode}
+                                    />
+                                </TabsContent>
+                            </Tabs>
+                        </ResizablePanel>
+                    )}
+                </ResizablePanelGroup>
 
                     <Button
                         onClick={toggleRightContent}

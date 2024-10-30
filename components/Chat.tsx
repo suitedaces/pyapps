@@ -86,7 +86,7 @@ export function Chat({
     const [fileContent, setFileContent] = useState<string | null>(null)
     const [fullData, setFullData] = useState<string[][] | null>(null)
 
-    const [isInitial, setIsInitial] = useState(true);
+    const [isInitial, setIsInitial] = useState(() => !currentChatId);
     const [isAnimating, setIsAnimating] = useState(false);
 
     const isLoading = isLoadingProp || isLoadingInternal
@@ -176,44 +176,33 @@ export function Chat({
 
     const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-
-        if (isLoadingInternal) return; // Prevent multiple submissions
+        if (!input.trim() || isLoading || isAnimating) return;
 
         setIsAnimating(true);
         setIsInitial(false);
 
-        setIsLoadingInternal(true)
+        if (isLoadingInternal) return; // Prevent multiple submissions
 
-        try {
-            // const response = await fetch(`/api/conversations/${currentChatId}/stream`, {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //     },
-            //     body: JSON.stringify({
-            //         message: input,
-            //         model: currentModel,
-            //         config: languageModel,
-            //     }),
-            // })
+        setTimeout(async () => {
+            setIsLoadingInternal(true);
 
-            // if (!response.ok) {
-            //     throw new Error('Failed to fetch response from API')
-            // }
+            try {
 
-            if (file && fileContent) {
-                const analysis = await analyzeCSV(fileContent)
-                setCsvAnalysis(analysis)
-                setShowSpreadsheet(true)
-                removeFile()
-                await handleFileUpload(fileContent, file.name)
+                if (file && fileContent) {
+                    const analysis = await analyzeCSV(fileContent)
+                    setCsvAnalysis(analysis)
+                    setShowSpreadsheet(true)
+                    removeFile()
+                    await handleFileUpload(fileContent, file.name)
+                }
+                await handleSubmit(e)
+            } catch (error) {
+                console.error('Error submitting form:', error)
+            } finally {
+                setIsLoadingInternal(false)
+                setIsAnimating(false);
             }
-            await handleSubmit(e)
-        } catch (error) {
-            console.error('Error submitting form:', error)
-        } finally {
-            setIsLoadingInternal(false)
-        }
+        }, 500);
     }
 
     const renderMessage = (content: string) => (
@@ -317,10 +306,10 @@ export function Chat({
 
     return (
         <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
-            <div className='w-full h-full absolute'>
-                <div className='relative w-full h-full'>
-                    <AnimatePresence>
-                        {isInitial && (
+            {isInitial && (
+                <div className='w-full h-full absolute'>
+                    <div className='relative w-full h-full'>
+                        <AnimatePresence>
                             <motion.div
                                 initial={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
@@ -343,10 +332,10 @@ export function Chat({
                                     analyse and generate dashboard apps, spreadsheets and more...
                                 </motion.p>
                             </motion.div>
-                        )}
-                    </AnimatePresence>
+                        </AnimatePresence>
+                    </div>
                 </div>
-            </div>
+            )}
             <ScrollArea
                 className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto"
                 onScroll={handleScroll}
