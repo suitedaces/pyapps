@@ -144,6 +144,7 @@ export default function ChatPageClient({
             <AppSidebar
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
+                currentChatId={currentChatId}
             />
              <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
                 <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
+import { useRouter } from "next/navigation"
 
 import {
     BadgeCheck,
@@ -30,6 +31,8 @@ import {
     MessageSquare,
     Edit2,
     Plus,
+    MoveRight,
+    MessagesSquare,
 } from "lucide-react"
 
 import {
@@ -83,19 +86,18 @@ import { BorderTrail } from '@/components/core/border-trail';
 
 
 interface Chat {
-    id: string
-    name: string | null
-    created_at?: string
+    id: string;
+    name: string;
+    created_at: string;
+    last_message?: string;
 }
 
 interface SidebarProps {
-    onChatSelect: (chatId: string) => void
-    onNewChat: () => Promise<void>
-    currentChatId: string | null
+    onChatSelect: (chatId: string) => void;
+    onNewChat: () => void;
+    currentChatId: string | null;
+    chats?: Chat[];
 }
-
-const INITIAL_LOAD = 11
-const LOAD_MORE_COUNT = 5
 
 const data = {
     user: {
@@ -129,35 +131,29 @@ const CustomSidebarMenuSubItem = ({ isActive, children, className }: CustomSideb
 const ChatsList = ({
     chats = [],
     onChatSelect,
-    isLoadingMore,
     currentChatId,
 }: {
     chats: Chat[],
     onChatSelect: (chatId: string) => void,
-    isLoadingMore: boolean,
     currentChatId: string | null
 }) => {
-    if (!chats) return null;
-
-    const [displayCount, setDisplayCount] = useState(INITIAL_LOAD)
-
-    // Only show the number of chats based on displayCount
-    const visibleChats = chats.slice(0, displayCount)
-    const hasMoreToShow = chats.length > displayCount
+    const router = useRouter()
+    const visibleChats = chats.slice(0, 10)
+    const hasMoreChats = chats.length > 10
 
     return (
-        <SidebarMenuSub className="w-full">
+        <SidebarMenuSub>
             {visibleChats.map((chat) => (
                 <CustomSidebarMenuSubItem
                     key={chat.id}
-                    className="group/item relative hover:bg-white"
-                    isActive={chat.id === currentChatId}
+                    className={`group/item relative ${currentChatId === chat.id ? 'bg-sidebar-accent' : ''}`}
                 >
                     <SidebarMenuSubButton
-                        className={`w-11/12 cursor-pointer ${chat.id === currentChatId ? 'font-semibold' : ''}`}
+                        className="w-full text-left flex items-center gap-2"
                         onClick={() => onChatSelect(chat.id)}
                     >
-                        <span>{chat.name || `Chat ${chat.id.slice(0, 8)}`}</span>
+                        <MessageSquare className="h-4 w-4" />
+                        <span className="truncate">{chat.name || `Chat ${chat.id.slice(0, 8)}`}</span>
                     </SidebarMenuSubButton>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -187,21 +183,16 @@ const ChatsList = ({
                 </CustomSidebarMenuSubItem>
             ))}
 
-            {hasMoreToShow && (
-                <CustomSidebarMenuSubItem className="justify-center">
-                    <SidebarMenuButton
-                        onClick={() => setDisplayCount(prev => prev + LOAD_MORE_COUNT)}
-                        className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50 rounded-md flex items-center justify-center gap-2 border-border border"
+            {/* View All Button - Always show if there are any chats */}
+            {chats.length > 0 && (
+                <CustomSidebarMenuSubItem className="group/item relative hover:underline mt-2">
+                    <SidebarMenuSubButton
+                        className="w-full cursor-pointer text-muted-foreground/70 hover:text-muted-foreground flex items-center gap-1 text-sm pl-2"
+                        onClick={() => router.push('/vault/chat')}
                     >
-                        {isLoadingMore ? (
-                            <>
-                                <LoadingSpinner />
-                                <span>Loading...</span>
-                            </>
-                        ) : (
-                            <span>Load More</span>
-                        )}
-                    </SidebarMenuButton>
+                        View all
+                        <MoveRight className="h-3 w-3" />
+                    </SidebarMenuSubButton>
                 </CustomSidebarMenuSubItem>
             )}
         </SidebarMenuSub>
@@ -212,20 +203,16 @@ export default function AppSidebar({
     onChatSelect,
     onNewChat,
     currentChatId,
-}: SidebarProps & { currentChatId: string | null }) {
+    chats = []
+}: SidebarProps) {
     const [open, setOpen] = useState(false)
-    const [chats, setChats] = useState<Chat[]>([])
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
     const [chatToRename, setChatToRename] = useState<Chat | null>(null)
     const [newChatName, setNewChatName] = useState('')
     const [isNewChat, setIsNewChat] = useState(false)
     const [session, setSession] = useState<Session | null>(null)
     const supabase = createClientComponentClient()
-
-    const [hasMore, setHasMore] = useState(true)
-    const [nextCursor, setNextCursor] = useState<string | undefined>()
-    const [isLoadingMore, setIsLoadingMore] = useState(false)
-    const CHATS_PER_PAGE = 11
+    const router = useRouter()
 
     const {
         state,
@@ -250,7 +237,6 @@ export default function AppSidebar({
             const response = await fetch('/api/conversations')
             if (response.ok) {
                 const data = await response.json()
-                setChats(data)
             }
         } catch (error) {
             console.error('Error fetching chats:', error)
@@ -283,6 +269,12 @@ export default function AppSidebar({
     const handleChatSelect = (chatId: string) => {
         // Redirect to chat page using window.location
         window.location.href = `/chat/${chatId}`;
+    }
+
+    // Add sign out handler
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+        router.push('/login')
     }
 
     return (
@@ -384,7 +376,6 @@ export default function AppSidebar({
                                             <ChatsList
                                                 chats={chats}
                                                 onChatSelect={handleChatSelect}
-                                                isLoadingMore={isLoadingMore}
                                                 currentChatId={currentChatId}
                                             />
                                         </Suspense>
@@ -421,7 +412,9 @@ export default function AppSidebar({
                                                 src={session?.user?.user_metadata?.avatar_url || '/default-avatar.png'}
                                                 alt={session?.user?.user_metadata?.full_name || 'User'}
                                             />
-                                            <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                                            <AvatarFallback className="rounded-lg">
+                                                {session?.user?.user_metadata?.full_name?.[0] || 'U'}
+                                            </AvatarFallback>
                                         </Avatar>
                                         <div className="grid flex-1 text-left text-sm leading-tight">
                                             <span className="truncate font-semibold">
@@ -484,7 +477,7 @@ export default function AppSidebar({
                                         </DropdownMenuItem>
                                     </DropdownMenuGroup>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleSignOut}>
                                         <LogOut />
                                         Log out
                                     </DropdownMenuItem>
