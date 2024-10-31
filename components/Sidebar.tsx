@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { useRouter } from "next/navigation"
+import Link from 'next/link'
 
 import {
     BadgeCheck,
@@ -263,7 +264,7 @@ export default function AppSidebar({
     // Handling Chat
 
     const handleNewChat = async () => {
-        window.location.href = '/';
+        router.push('/chat')
     }
 
     const handleChatSelect = (chatId: string) => {
@@ -320,10 +321,10 @@ export default function AppSidebar({
                         <SidebarMenu>
                             <SidebarMenuItem>
                                 <SidebarMenuButton asChild>
-                                    <a href="#">
+                                    <Link href="/vault/files">
                                         <File />
                                         <span>Files</span>
-                                    </a>
+                                    </Link>
                                 </SidebarMenuButton>
                                 {/* <DropdownMenu>
                                         <DropdownMenuTrigger asChild>

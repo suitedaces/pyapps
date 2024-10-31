@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { MessagesSquare, MoreVertical } from 'lucide-react'
+import { FileText, MoreVertical } from 'lucide-react'
 
 import {
     Tabs,
@@ -13,7 +13,6 @@ import {
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Avatar } from "@/components/ui/avatar"
 
 // Import pagination components
 import {
@@ -27,25 +26,25 @@ import {
 } from "@/components/ui/pagination"
 import { SidebarProvider } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/Sidebar'
-import { useChat } from '@/hooks/useChat'
 
-interface Chat {
+interface File {
     id: string
     name: string
     created_at: string
-    last_message?: string
+    type?: string
+    size?: string
 }
 
 interface PaginatedResponse {
-    chats: Chat[]
+    files: File[]
     total: number
 }
 
 const ITEMS_PER_PAGE = 15
 
-export default function VaultChat() {
-    const [chats, setChats] = useState<Chat[]>([])
-    const [totalChats, setTotalChats] = useState(0)
+function FilesList() {
+    const [files, setFiles] = useState<File[]>([])
+    const [totalFiles, setTotalFiles] = useState(0)
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -55,64 +54,53 @@ export default function VaultChat() {
     const searchParams = useSearchParams()
     const currentPage = Number(searchParams.get('page')) || 1
 
-    const {
-        handleInputChange,
-        handleSubmit,
-    } = useChat(currentChatId)
-
     // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(searchQuery)
         }, 300)
-
         return () => clearTimeout(timer)
     }, [searchQuery])
 
-    // Fetch chats with search
-    useEffect(() => {
-        const fetchChats = async () => {
-            try {
-                setIsLoading(true)
-                const response = await fetch(
-                    `/api/conversations?page=${currentPage}&limit=${ITEMS_PER_PAGE}&search=${debouncedSearch}`
-                )
-                if (!response.ok) throw new Error('Failed to fetch chats')
-                const data: PaginatedResponse = await response.json()
-                setChats(data.chats)
-                setTotalChats(data.total)
-            } catch (error) {
-                console.error('Error fetching chats:', error)
-            } finally {
-                setIsLoading(false)
-            }
-        }
-
-        fetchChats()
-    }, [currentPage, debouncedSearch])
-
-    // Reset to first page when search changes
-    useEffect(() => {
-        if (debouncedSearch) {
-            router.push(createPageURL(1))
-        }
-    }, [debouncedSearch])
-
-    // Handle chat selection
     const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
         router.push(`/?chat=${chatId}`)
     }, [router])
 
-    // Handle new chat creation
     const handleNewChat = useCallback(async () => {
         if (window.location.pathname !== '/') {
             router.push('/')
         }
-        return Promise.resolve();
-    }, [])
+        return Promise.resolve()
+    }, [router])
 
-    const totalPages = Math.ceil(totalChats / ITEMS_PER_PAGE)
+    const handleNewChatClick = () => {
+        router.push('/chat')
+    }
+
+    // Fetch files with search
+    useEffect(() => {
+        const fetchFiles = async () => {
+            try {
+                setIsLoading(true)
+                const response = await fetch(
+                    `/api/files?page=${currentPage}&limit=${ITEMS_PER_PAGE}&search=${debouncedSearch}`
+                )
+                if (!response.ok) throw new Error('Failed to fetch files')
+                const data: PaginatedResponse = await response.json()
+                setFiles(data.files)
+                setTotalFiles(data.total)
+            } catch (error) {
+                console.error('Error fetching files:', error)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        fetchFiles()
+    }, [currentPage, debouncedSearch])
+
+    const totalPages = Math.ceil(totalFiles / ITEMS_PER_PAGE)
 
     const createPageURL = (pageNumber: number | string) => {
         const params = new URLSearchParams(searchParams)
@@ -121,8 +109,8 @@ export default function VaultChat() {
     }
 
     const handleTabChange = (value: string) => {
-        if (value === 'files') {
-            router.push('/vault/files')
+        if (value === 'chats') {
+            router.push('/vault/chat')
         }
     }
 
@@ -132,14 +120,14 @@ export default function VaultChat() {
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}
-                chats={chats}
+                chats={[]}
             />
             <div className='p-7 h-screen w-full bg-bg'>
-                <div className="flex flex-col h-full w-full border-2 border-border bg-bg overflow-hidden">
+                <div className="flex flex-col h-full w-full border-2 border-border bg-white overflow-hidden">
                     <div className="border-b border-gray-500 pt-5">
                         <div className="container flex gap-5 mx-auto px-4">
                             <h3 className="text-3xl font-semibold text-gray-800 py-2 mb-2">Vault</h3>
-                            <Tabs defaultValue="chats" className="w-full" onValueChange={handleTabChange}>
+                            <Tabs defaultValue="files" className="w-full" onValueChange={handleTabChange}>
                                 <TabsList className="grid w-[400px] grid-cols-2 bg-gray-100">
                                     <TabsTrigger
                                         value="chats"
@@ -160,7 +148,7 @@ export default function VaultChat() {
 
                     <div className="container mx-auto px-4 py-4">
                         <Input
-                            placeholder="Search for a chat..."
+                            placeholder="Search for a file..."
                             className="w-full bg-white border-gray-300 focus:border-gray-400 focus:ring-gray-400"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -187,25 +175,23 @@ export default function VaultChat() {
                                                 </div>
                                             </div>
                                         ))
-                                    ) : chats.length > 0 ? (
-                                        chats.map((chat) => (
+                                    ) : Array.isArray(files) && files.length > 0 ? (
+                                        files.map((file) => (
                                             <div
-                                                key={chat.id}
-                                                className={`flex items-start gap-4 p-4 rounded-lg hover:bg-gray-100 cursor-pointer border border-gray-500 transition-colors ${currentChatId === chat.id ? 'bg-gray-50 border-gray-300' : ''
-                                                    }`}
-                                                onClick={() => handleChatSelect(chat.id)}
+                                                key={file.id}
+                                                className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-100 cursor-pointer border border-gray-500 transition-colors"
                                             >
                                                 <div className="flex-shrink-0">
-                                                    <MessagesSquare className="h-8 w-8 text-gray-400" />
+                                                    <FileText className="h-8 w-8 text-gray-400" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between">
                                                         <h3 className="text-sm font-medium text-gray-800 truncate">
-                                                            {chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                                                            {file.name}
                                                         </h3>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-xs text-gray-500">
-                                                                {new Date(chat.created_at).toLocaleDateString()}
+                                                                {new Date(file.created_at).toLocaleDateString()}
                                                             </span>
                                                             <Button
                                                                 variant="ghost"
@@ -216,15 +202,25 @@ export default function VaultChat() {
                                                             </Button>
                                                         </div>
                                                     </div>
-                                                    <p className="text-sm text-gray-500 truncate">
-                                                        {chat.last_message || "No messages yet"}
+                                                    <p className="text-sm text-gray-500">
+                                                        {file.type} • {file.size}
                                                     </p>
                                                 </div>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="text-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200">
-                                            No chats found
+                                        <div className="flex flex-col items-center justify-center h-[calc(100vh-250px)]">
+                                            <div className="h-12 w-12 bg-[#E5E6E9] rounded-full flex items-center justify-center mb-4">
+                                                <FileText className="h-6 w-6 text-gray-500" />
+                                            </div>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-1">No Files Created</h3>
+                                            <Button
+                                                variant="outline"
+                                                className="mt-4 bg-white hover:bg-gray-50 border-gray-300"
+                                                onClick={handleNewChatClick}
+                                            >
+                                                New Chat
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -232,7 +228,7 @@ export default function VaultChat() {
                         </div>
 
                         {totalPages > 1 && (
-                            <div className="border-t border-gray-500 py-4 bg-bg mt-auto">
+                            <div className="border-t border-gray-500 py-4 bg-white mt-auto">
                                 <div className="container mx-auto px-4">
                                     <Pagination>
                                         <PaginationContent className="flex justify-center">
@@ -245,7 +241,6 @@ export default function VaultChat() {
 
                                             {[...Array(totalPages)].map((_, i) => {
                                                 const page = i + 1
-
                                                 if (
                                                     page === 1 ||
                                                     page === totalPages ||
@@ -269,7 +264,7 @@ export default function VaultChat() {
                                                 ) {
                                                     return (
                                                         <PaginationItem key={page}>
-                                                            <PaginationEllipsis className='text-black' />
+                                                            <PaginationEllipsis className="text-black" />
                                                         </PaginationItem>
                                                     )
                                                 }
@@ -292,5 +287,55 @@ export default function VaultChat() {
                 </div>
             </div>
         </SidebarProvider>
+    )
+}
+
+function LoadingSkeleton() {
+    return (
+        <div className='p-7 h-screen w-full bg-bg'>
+            <div className="flex flex-col h-full w-full border-2 border-border bg-white overflow-hidden">
+                {/* Header Skeleton */}
+                <div className="border-b border-gray-500 pt-5">
+                    <div className="container flex gap-5 mx-auto px-4">
+                        <div className="h-8 w-32 bg-gray-200 rounded animate-pulse" />
+                    </div>
+                </div>
+
+                {/* Search Skeleton */}
+                <div className="container mx-auto px-4 py-4">
+                    <div className="w-full h-10 bg-gray-200 rounded animate-pulse" />
+                </div>
+
+                {/* Files Skeleton */}
+                <div className="flex-1 overflow-hidden">
+                    <div className="container mx-auto px-4">
+                        <div className="space-y-2 pb-4">
+                            {Array.from({ length: 5 }).map((_, index) => (
+                                <div
+                                    key={index}
+                                    className="flex items-start gap-4 p-4 rounded-lg bg-[#F4F4F4] border border-gray-200 animate-pulse"
+                                >
+                                    <div className="flex-shrink-0">
+                                        <div className="h-8 w-8 bg-bg rounded" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="h-4 w-1/4 bg-bg rounded mb-2" />
+                                        <div className="h-3 w-3/4 bg-bg rounded" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default function FilesPage() {
+    return (
+        <Suspense fallback={<LoadingSkeleton />}>
+            <FilesList />
+        </Suspense>
     )
 }
