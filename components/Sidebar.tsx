@@ -1,53 +1,38 @@
-"use client"
+'use client'
 
-import { useState, useEffect, Suspense } from "react"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
-import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
 
 import {
     BadgeCheck,
     Bell,
-    BookOpen,
-    Bot,
     ChevronRight,
     ChevronsUpDown,
-    Origami,
     CreditCard,
-    Folder,
-    Frame,
-    LifeBuoy,
-    LogOut,
     File,
-    Map,
+    Folder,
+    LogOut,
+    MessageSquare,
     MoreHorizontal,
-    PieChart,
-    Send,
-    Settings2,
+    MoveRight,
+    Origami,
+    Plus,
     Share,
     Sparkles,
-    SquareTerminal,
     Trash2,
-    MessageSquare,
-    Edit2,
-    Plus,
-    MoveRight,
-    MessagesSquare,
-} from "lucide-react"
+} from 'lucide-react'
 
-import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from '@/components/ui/collapsible'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -56,10 +41,8 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Separator } from "@/components/ui/separator"
+} from '@/components/ui/dropdown-menu'
 import {
-    useSidebar,
     Sidebar,
     SidebarContent,
     SidebarFooter,
@@ -73,38 +56,36 @@ import {
     SidebarMenuItem,
     SidebarMenuSub,
     SidebarMenuSubButton,
-    SidebarMenuSubItem,
     SidebarProvider,
-    SidebarTrigger,
     SidebarRail,
-} from "@/components/ui/sidebar"
-
-import { Input } from '@/components/ui/input'
+    SidebarTrigger,
+    useSidebar,
+} from '@/components/ui/sidebar'
 
 import LoadingSpinner from './LoadingSpinner'
 
-import { BorderTrail } from '@/components/core/border-trail';
+import { BorderTrail } from '@/components/core/border-trail'
 
 interface Chat {
-    id: string;
-    name: string;
-    created_at: string;
-    last_message?: string;
+    id: string
+    name: string
+    created_at: string
+    last_message?: string
 }
 
 interface SidebarProps {
-    onChatSelect: (chatId: string) => void;
-    onNewChat: () => void;
-    currentChatId: string | null;
-    chats?: Chat[];
-    isCreatingChat: boolean;
+    onChatSelect: (chatId: string) => void
+    onNewChat: () => void
+    currentChatId: string | null
+    chats?: Chat[]
+    isCreatingChat: boolean
 }
 
 const data = {
     user: {
-        name: "shadcn",
-        email: "m@example.com",
-        avatar: "/avatars/shadcn.jpg",
+        name: 'shadcn',
+        email: 'm@example.com',
+        avatar: '/avatars/shadcn.jpg',
     },
     chats: [] as Chat[],
 }
@@ -118,12 +99,16 @@ const Spinner = () => {
 }
 
 interface CustomSidebarMenuSubItemProps {
-    isActive?: boolean;
-    children: React.ReactNode;
-    className?: string;
+    isActive?: boolean
+    children: React.ReactNode
+    className?: string
 }
 
-const CustomSidebarMenuSubItem = ({ isActive, children, className }: CustomSidebarMenuSubItemProps) => (
+const CustomSidebarMenuSubItem = ({
+    isActive,
+    children,
+    className,
+}: CustomSidebarMenuSubItemProps) => (
     <div className={`${className} ${isActive ? 'bg-white/50' : ''}`}>
         {children}
     </div>
@@ -138,10 +123,10 @@ const TypewriterText = ({ text }: { text: string }) => {
                 opacity: 1,
                 transition: {
                     duration: 0.2,
-                }
+                },
             }}
         >
-            {text.split("").map((char, index) => (
+            {text.split('').map((char, index) => (
                 <motion.span
                     key={index}
                     initial={{ opacity: 0 }}
@@ -149,15 +134,15 @@ const TypewriterText = ({ text }: { text: string }) => {
                     transition={{
                         duration: 0.1,
                         delay: index * 0.05,
-                        ease: "easeInOut"
+                        ease: 'easeInOut',
                     }}
                 >
                     {char}
                 </motion.span>
             ))}
         </motion.span>
-    );
-};
+    )
+}
 
 const ChatsList = ({
     chats = [],
@@ -165,16 +150,16 @@ const ChatsList = ({
     currentChatId,
     isCreatingChat,
 }: {
-    chats: Chat[],
-    onChatSelect: (chatId: string) => void,
-    currentChatId: string | null,
+    chats: Chat[]
+    onChatSelect: (chatId: string) => void
+    currentChatId: string | null
     isCreatingChat: boolean
 }) => {
     const router = useRouter()
     const visibleChats = chats.slice(0, 10)
 
     // Get the most recent chat title
-    const mostRecentChat = chats[0]?.name || "New Chat"
+    const mostRecentChat = chats[0]?.name || 'New Chat'
 
     return (
         <SidebarMenuSub>
@@ -204,9 +189,9 @@ const ChatsList = ({
                         transition={{
                             duration: 0.3,
                             delay: index * 0.1,
-                            type: "spring",
+                            type: 'spring',
                             stiffness: 200,
-                            damping: 20
+                            damping: 20,
                         }}
                     >
                         <CustomSidebarMenuSubItem
@@ -217,17 +202,21 @@ const ChatsList = ({
                                 onClick={() => onChatSelect(chat.id)}
                             >
                                 <MessageSquare className="h-4 w-4" />
-                                <span className="truncate">{chat.name || `Chat ${chat.id.slice(0, 8)}`}</span>
+                                <span className="truncate">
+                                    {chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                                </span>
                             </SidebarMenuSubButton>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <SidebarMenuAction
-                                        className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible">
+                                    <SidebarMenuAction className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible">
                                         <MoreHorizontal />
                                         <span className="sr-only">More</span>
                                     </SidebarMenuAction>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent className="w-48" side="right" align="start"
+                                <DropdownMenuContent
+                                    className="w-48"
+                                    side="right"
+                                    align="start"
                                 >
                                     <DropdownMenuItem>
                                         <Folder className="text-muted-foreground" />
@@ -281,13 +270,8 @@ export default function AppSidebar({
     const supabase = createClientComponentClient()
     const router = useRouter()
 
-    const {
-        state,
-        openMobile,
-        setOpenMobile,
-        isMobile,
-        toggleSidebar,
-    } = useSidebar()
+    const { state, openMobile, setOpenMobile, isMobile, toggleSidebar } =
+        useSidebar()
 
     // Add isOpen state
     const [isChatsOpen, setIsChatsOpen] = useState(true)
@@ -334,9 +318,7 @@ export default function AppSidebar({
                                     <Origami className="size-4" />
                                 </div>
                             </a>
-                            {open && (
-                                <SidebarTrigger className="ml-auto" />
-                            )}
+                            {open && <SidebarTrigger className="ml-auto" />}
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarHeader>
@@ -349,13 +331,13 @@ export default function AppSidebar({
                                     className="w-full justify-center border border-gray-300"
                                 >
                                     <BorderTrail
-                                        className='bg-gradient-to-l from-gray-200 via-black to-gray-200 dark:from-gray-700 dark:via-black dark:to-gray-700'
+                                        className="bg-gradient-to-l from-gray-200 via-black to-gray-200 dark:from-gray-700 dark:via-black dark:to-gray-700"
                                         size={36}
                                     />
-                                    {!open && (
-                                        <Plus />
-                                    )}
-                                    <span className="group-data-[collapsible=icon]:hidden text-center">New Chat</span>
+                                    {!open && <Plus />}
+                                    <span className="group-data-[collapsible=icon]:hidden text-center">
+                                        New Chat
+                                    </span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                         </SidebarMenu>
@@ -413,7 +395,9 @@ export default function AppSidebar({
                                         <span>Chats</span>
                                     </SidebarMenuButton>
                                     <CollapsibleTrigger asChild>
-                                        <SidebarMenuAction className={`transition-transform duration-200 ${isChatsOpen ? 'rotate-90' : ''}`}>
+                                        <SidebarMenuAction
+                                            className={`transition-transform duration-200 ${isChatsOpen ? 'rotate-90' : ''}`}
+                                        >
                                             <ChevronRight />
                                         </SidebarMenuAction>
                                     </CollapsibleTrigger>
@@ -456,19 +440,29 @@ export default function AppSidebar({
                                     >
                                         <Avatar className="h-8 w-8 rounded-lg">
                                             <AvatarImage
-                                                src={session?.user?.user_metadata?.avatar_url || '/default-avatar.png'}
-                                                alt={session?.user?.user_metadata?.full_name || 'User'}
+                                                src={
+                                                    session?.user?.user_metadata
+                                                        ?.avatar_url ||
+                                                    '/default-avatar.png'
+                                                }
+                                                alt={
+                                                    session?.user?.user_metadata
+                                                        ?.full_name || 'User'
+                                                }
                                             />
                                             <AvatarFallback className="rounded-lg">
-                                                {session?.user?.user_metadata?.full_name?.[0] || 'U'}
+                                                {session?.user?.user_metadata
+                                                    ?.full_name?.[0] || 'U'}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="grid flex-1 text-left text-sm leading-tight">
                                             <span className="truncate font-semibold">
-                                                {session?.user?.user_metadata?.full_name || 'Guest User'}
+                                                {session?.user?.user_metadata
+                                                    ?.full_name || 'Guest User'}
                                             </span>
                                             <span className="truncate text-xs">
-                                                {session?.user?.email || 'Not signed in'}
+                                                {session?.user?.email ||
+                                                    'Not signed in'}
                                             </span>
                                         </div>
                                         <ChevronsUpDown className="ml-auto size-4" />
@@ -484,8 +478,18 @@ export default function AppSidebar({
                                         <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                             <Avatar className="h-8 w-8 rounded-lg">
                                                 <AvatarImage
-                                                    src={session?.user?.user_metadata?.avatar_url || '/default-avatar.png'}
-                                                    alt={session?.user?.user_metadata?.full_name || 'User'}
+                                                    src={
+                                                        session?.user
+                                                            ?.user_metadata
+                                                            ?.avatar_url ||
+                                                        '/default-avatar.png'
+                                                    }
+                                                    alt={
+                                                        session?.user
+                                                            ?.user_metadata
+                                                            ?.full_name ||
+                                                        'User'
+                                                    }
                                                 />
                                                 <AvatarFallback className="rounded-lg">
                                                     CN
@@ -493,10 +497,14 @@ export default function AppSidebar({
                                             </Avatar>
                                             <div className="grid flex-1 text-left text-sm leading-tight">
                                                 <span className="truncate font-semibold">
-                                                    {session?.user?.user_metadata?.full_name || 'Guest User'}
+                                                    {session?.user
+                                                        ?.user_metadata
+                                                        ?.full_name ||
+                                                        'Guest User'}
                                                 </span>
                                                 <span className="truncate text-xs">
-                                                    {session?.user?.email || 'Not signed in'}
+                                                    {session?.user?.email ||
+                                                        'Not signed in'}
                                                 </span>
                                             </div>
                                         </div>

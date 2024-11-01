@@ -15,7 +15,7 @@ import {
 import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { messageStore } from './messageStore'
-import { getModelClient, LLMModel, LLMModelConfig } from './modelProviders'
+import { LLMModelConfig } from './modelProviders'
 import { generateCode } from './tools'
 import {
     CSVAnalysis,
@@ -146,7 +146,6 @@ export class GruntyAgent {
 
             if (event.type === 'text-delta') {
                 accumulatedResponse += event.textDelta
-
             } else if (event.type === 'tool-call') {
                 toolCalls.push({
                     toolCallId: event.toolCallId,

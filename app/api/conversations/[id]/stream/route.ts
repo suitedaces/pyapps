@@ -1,10 +1,8 @@
 import { GruntyAgent } from '@/lib/agent'
-import { LLMModel, LLMModelConfig } from '@/lib/modelProviders'
-import { getModelClient, getDefaultMode } from '@/lib/modelProviders'
+import { getModelClient, LLMModel, LLMModelConfig } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { LanguageModelV1 } from 'ai'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -24,8 +22,7 @@ export async function POST(
         )
     }
 
-    console.log(req.json);
-
+    console.log(req.json)
 
     const {
         message,
@@ -122,21 +119,26 @@ export async function POST(
                         4000,
                         csvAnalysis
                     )
-                    console.log('Chat generator initialized. Awaiting chunks...');
+                    console.log(
+                        'Chat generator initialized. Awaiting chunks...'
+                    )
 
                     // Loop through each chunk yielded by the chat generator
                     for await (const chunk of chatGenerator) {
-                        console.log('Received chunk:', chunk); // Log each chunk received
+                        console.log('Received chunk:', chunk) // Log each chunk received
 
                         // Enqueue the chunk for the stream
                         controller.enqueue(
                             encoder.encode(JSON.stringify(chunk) + '\n')
                         )
                     }
-                    console.log('All chunks processed. Closing controller.');
+                    console.log('All chunks processed. Closing controller.')
                     controller.close()
                 } catch (err) {
-                    console.error('Error in chat generator or streaming process:', err);
+                    console.error(
+                        'Error in chat generator or streaming process:',
+                        err
+                    )
                     controller.error(err)
                 }
             },

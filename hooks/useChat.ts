@@ -1,10 +1,4 @@
-import {
-    ClientMessage,
-    Message,
-    StreamChunk,
-    ToolCall,
-    ToolResult,
-} from '@/lib/types'
+import { ClientMessage, Message, StreamChunk } from '@/lib/types'
 import {
     createClientComponentClient,
     Session,
@@ -44,8 +38,7 @@ export function useChat(chatId: string | null) {
         (model) => model.id === languageModel.model
     )
 
-    console.log(currentModel);
-
+    console.log(currentModel)
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -110,9 +103,9 @@ export function useChat(chatId: string | null) {
     }, [])
 
     const fetchMessages = async (id: string) => {
-        if (isMessagesLoading) return;
+        if (isMessagesLoading) return
 
-        setIsMessagesLoading(true);
+        setIsMessagesLoading(true)
         try {
             const response = await fetch(`/api/conversations/${id}/messages`)
             if (!response.ok) {
@@ -352,8 +345,8 @@ export function useChat(chatId: string | null) {
             setCodeExplanation('')
             setSandboxErrors([])
 
-            const currentMessages = [...messages, newMessage];
-            setMessages(currentMessages);
+            const currentMessages = [...messages, newMessage]
+            setMessages(currentMessages)
 
             try {
                 setIsCreatingChat(true)
@@ -411,11 +404,14 @@ export function useChat(chatId: string | null) {
                 }
             } catch (error) {
                 console.error('Error in chat operation:', error)
-                setMessages([...currentMessages, {
-                    role: 'assistant',
-                    content: 'An error occurred during the operation.',
-                    created_at: new Date()
-                }])
+                setMessages([
+                    ...currentMessages,
+                    {
+                        role: 'assistant',
+                        content: 'An error occurred during the operation.',
+                        created_at: new Date(),
+                    },
+                ])
             } finally {
                 setIsCreatingChat(false)
             }
@@ -424,7 +420,10 @@ export function useChat(chatId: string | null) {
     )
 
     const handleSubmit = useCallback(
-        async (e: React.FormEvent<HTMLFormElement>, newChatId?: string | null) => {
+        async (
+            e: React.FormEvent<HTMLFormElement>,
+            newChatId?: string | null
+        ) => {
             e.preventDefault()
             if (!input.trim()) return
 
@@ -435,7 +434,7 @@ export function useChat(chatId: string | null) {
             }
 
             // Store the message first
-            setMessages(prev => [...prev, newUserMessage])
+            setMessages((prev) => [...prev, newUserMessage])
             setInput('')
 
             const chatIdToUse = newChatId || chatId
@@ -450,7 +449,7 @@ export function useChat(chatId: string | null) {
             } catch (error) {
                 console.error('Error in submit:', error)
                 // If error occurs, keep the user message in state
-                setMessages(prev => [
+                setMessages((prev) => [
                     ...prev,
                     {
                         role: 'assistant',
@@ -472,46 +471,51 @@ export function useChat(chatId: string | null) {
     const handleFileUpload = useCallback(
         async (content: string, fileName: string) => {
             // First ensure we have a chat ID
-            let activeChatId = chatId;
+            let activeChatId = chatId
 
             if (!activeChatId) {
                 try {
-                    console.log('Creating new chat for file upload...');
+                    console.log('Creating new chat for file upload...')
                     const response = await fetch('/api/conversations', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             name: `CSV Analysis: ${fileName}`,
-                            created_at: new Date().toISOString()
+                            created_at: new Date().toISOString(),
                         }),
-                    });
+                    })
 
                     if (!response.ok) {
-                        throw new Error('Failed to create new chat');
+                        throw new Error('Failed to create new chat')
                     }
 
-                    const data = await response.json();
-                    activeChatId = data.id;
-                    console.log('Created new chat with ID:', activeChatId);
+                    const data = await response.json()
+                    activeChatId = data.id
+                    console.log('Created new chat with ID:', activeChatId)
                 } catch (error) {
-                    console.error('Error creating chat:', error);
-                    throw new Error('Failed to create chat for file upload');
+                    console.error('Error creating chat:', error)
+                    throw new Error('Failed to create chat for file upload')
                 }
             }
 
             // Then initialize sandbox if needed
-            let currentSandboxId = sandboxId;
+            let currentSandboxId = sandboxId
             if (!currentSandboxId) {
                 try {
-                    console.log('Initializing sandbox...');
-                    currentSandboxId = await initializeSandbox();
+                    console.log('Initializing sandbox...')
+                    currentSandboxId = await initializeSandbox()
                     if (!currentSandboxId) {
-                        throw new Error('Failed to get sandbox ID after initialization');
+                        throw new Error(
+                            'Failed to get sandbox ID after initialization'
+                        )
                     }
-                    console.log('Sandbox initialized with ID:', currentSandboxId);
+                    console.log(
+                        'Sandbox initialized with ID:',
+                        currentSandboxId
+                    )
                 } catch (error) {
-                    console.error('Failed to initialize sandbox:', error);
-                    throw new Error('Failed to initialize sandbox');
+                    console.error('Failed to initialize sandbox:', error)
+                    throw new Error('Failed to initialize sandbox')
                 }
             }
 
@@ -519,19 +523,19 @@ export function useChat(chatId: string | null) {
                 return content
                     .split('\n')
                     .map((row) => row.replace(/[\r\n]+/g, ''))
-                    .join('\n');
-            };
+                    .join('\n')
+            }
 
-            const sanitizedContent = sanitizeCSVContent(content);
-            setCsvContent(sanitizedContent);
-            setCsvFileName(fileName);
+            const sanitizedContent = sanitizeCSVContent(content)
+            setCsvContent(sanitizedContent)
+            setCsvFileName(fileName)
 
             try {
                 console.log('Uploading file with params:', {
                     chatId: activeChatId,
                     sandboxId: currentSandboxId,
-                    fileName
-                });
+                    fileName,
+                })
 
                 const response = await fetch('/api/files', {
                     method: 'POST',
@@ -548,14 +552,14 @@ export function useChat(chatId: string | null) {
                         sandbox_id: currentSandboxId,
                         expires_at: new Date(Date.now() + 1 * 60 * 1000),
                     }),
-                });
+                })
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(`HTTP error! status: ${response.status}`)
                 }
 
-                const data = await response.json();
-                console.log('File uploaded successfully:', data);
+                const data = await response.json()
+                console.log('File uploaded successfully:', data)
 
                 // Continue with analysis and message handling
                 const analysisResponse = await fetch(
@@ -565,43 +569,44 @@ export function useChat(chatId: string | null) {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ fileContent: sanitizedContent }),
                     }
-                );
+                )
 
                 if (!analysisResponse.ok) {
-                    throw new Error(`Analysis failed with status: ${analysisResponse.status}`);
+                    throw new Error(
+                        `Analysis failed with status: ${analysisResponse.status}`
+                    )
                 }
 
-                const analysisData = await analysisResponse.json();
-                console.log('CSV analyzed:', analysisData);
+                const analysisData = await analysisResponse.json()
+                console.log('CSV analyzed:', analysisData)
 
                 const newUserMessage: ClientMessage = {
                     role: 'user',
                     content: `I've uploaded a CSV file named "${fileName}". Can you analyze it and create a complex, aesthetic Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code. The file is located at '/home/user/${fileName}' in the sandbox. CSV Analysis: ${analysisData}`,
                     created_at: new Date(),
-                };
+                }
 
-                setMessages(prev => [...prev, newUserMessage]);
-                await handleChatOperation(newUserMessage, activeChatId);
-
+                setMessages((prev) => [...prev, newUserMessage])
+                await handleChatOperation(newUserMessage, activeChatId)
             } catch (error) {
-                console.error('Error in file upload:', error);
-                setMessages(prev => [
+                console.error('Error in file upload:', error)
+                setMessages((prev) => [
                     ...prev,
                     {
                         role: 'assistant',
                         content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
                         created_at: new Date(),
                     },
-                ]);
+                ])
                 setSandboxErrors((prev) => [
                     ...prev,
                     { message: 'Error uploading file' },
-                ]);
-                throw error;
+                ])
+                throw error
             }
         },
         [chatId, sandboxId, initializeSandbox, handleChatOperation, setMessages]
-    );
+    )
 
     return {
         messages,

@@ -1,21 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { MessagesSquare, MoreVertical } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Avatar } from "@/components/ui/avatar"
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 // Import pagination components
+import AppSidebar from '@/components/Sidebar'
 import {
     Pagination,
     PaginationContent,
@@ -24,9 +19,8 @@ import {
     PaginationLink,
     PaginationNext,
     PaginationPrevious,
-} from "@/components/ui/pagination"
+} from '@/components/ui/pagination'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import AppSidebar from '@/components/Sidebar'
 
 interface Chat {
     id: string
@@ -94,17 +88,20 @@ export default function VaultChat() {
     }, [debouncedSearch])
 
     // Handle chat selection
-    const handleChatSelect = useCallback((chatId: string) => {
-        setCurrentChatId(chatId)
-        router.push(`/?chat=${chatId}`)
-    }, [router])
+    const handleChatSelect = useCallback(
+        (chatId: string) => {
+            setCurrentChatId(chatId)
+            router.push(`/?chat=${chatId}`)
+        },
+        [router]
+    )
 
     // Handle new chat creation
     const handleNewChat = useCallback(async () => {
         if (window.location.pathname !== '/') {
             router.push('/')
         }
-        return Promise.resolve();
+        return Promise.resolve()
     }, [])
 
     const totalPages = Math.ceil(totalChats / ITEMS_PER_PAGE)
@@ -130,12 +127,18 @@ export default function VaultChat() {
                 chats={chats}
                 isCreatingChat={isCreatingChat}
             />
-            <div className='p-7 h-screen w-full bg-bg'>
+            <div className="p-7 h-screen w-full bg-bg">
                 <div className="flex flex-col h-full w-full border-2 border-border bg-bg overflow-hidden">
                     <div className="border-b border-gray-500 pt-5">
                         <div className="container flex gap-5 mx-auto px-4">
-                            <h3 className="text-3xl font-semibold text-gray-800 py-2 mb-2">Vault</h3>
-                            <Tabs defaultValue="chats" className="w-full" onValueChange={handleTabChange}>
+                            <h3 className="text-3xl font-semibold text-gray-800 py-2 mb-2">
+                                Vault
+                            </h3>
+                            <Tabs
+                                defaultValue="chats"
+                                className="w-full"
+                                onValueChange={handleTabChange}
+                            >
                                 <TabsList className="grid w-[400px] grid-cols-2 bg-gray-100">
                                     <TabsTrigger
                                         value="chats"
@@ -169,27 +172,34 @@ export default function VaultChat() {
                                 <div className="space-y-2 pb-4">
                                     {isLoading ? (
                                         // Loading skeleton
-                                        Array.from({ length: 5 }).map((_, index) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-start gap-4 p-4 rounded-lg bg-[#F4F4F4] border border-gray-200 animate-pulse"
-                                            >
-                                                <div className="flex-shrink-0">
-                                                    <div className="h-8 w-8 bg-bg rounded" />
+                                        Array.from({ length: 5 }).map(
+                                            (_, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="flex items-start gap-4 p-4 rounded-lg bg-[#F4F4F4] border border-gray-200 animate-pulse"
+                                                >
+                                                    <div className="flex-shrink-0">
+                                                        <div className="h-8 w-8 bg-bg rounded" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="h-4 w-1/4 bg-bg rounded mb-2" />
+                                                        <div className="h-3 w-3/4 bg-bg rounded" />
+                                                    </div>
                                                 </div>
-                                                <div className="flex-1">
-                                                    <div className="h-4 w-1/4 bg-bg rounded mb-2" />
-                                                    <div className="h-3 w-3/4 bg-bg rounded" />
-                                                </div>
-                                            </div>
-                                        ))
+                                            )
+                                        )
                                     ) : chats.length > 0 ? (
                                         chats.map((chat) => (
                                             <div
                                                 key={chat.id}
-                                                className={`flex items-start gap-4 p-4 rounded-lg hover:bg-gray-100 cursor-pointer border border-gray-500 transition-colors ${currentChatId === chat.id ? 'bg-gray-50 border-gray-300' : ''
-                                                    }`}
-                                                onClick={() => handleChatSelect(chat.id)}
+                                                className={`flex items-start gap-4 p-4 rounded-lg hover:bg-gray-100 cursor-pointer border border-gray-500 transition-colors ${
+                                                    currentChatId === chat.id
+                                                        ? 'bg-gray-50 border-gray-300'
+                                                        : ''
+                                                }`}
+                                                onClick={() =>
+                                                    handleChatSelect(chat.id)
+                                                }
                                             >
                                                 <div className="flex-shrink-0">
                                                     <MessagesSquare className="h-8 w-8 text-gray-400" />
@@ -197,11 +207,14 @@ export default function VaultChat() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between">
                                                         <h3 className="text-sm font-medium text-gray-800 truncate">
-                                                            {chat.name || `Chat ${chat.id.slice(0, 8)}`}
+                                                            {chat.name ||
+                                                                `Chat ${chat.id.slice(0, 8)}`}
                                                         </h3>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-xs text-gray-500">
-                                                                {new Date(chat.created_at).toLocaleDateString()}
+                                                                {new Date(
+                                                                    chat.created_at
+                                                                ).toLocaleDateString()}
                                                             </span>
                                                             <Button
                                                                 variant="ghost"
@@ -213,7 +226,8 @@ export default function VaultChat() {
                                                         </div>
                                                     </div>
                                                     <p className="text-sm text-gray-500 truncate">
-                                                        {chat.last_message || "No messages yet"}
+                                                        {chat.last_message ||
+                                                            'No messages yet'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -234,48 +248,67 @@ export default function VaultChat() {
                                         <PaginationContent className="flex justify-center">
                                             <PaginationItem>
                                                 <PaginationPrevious
-                                                    href={createPageURL(currentPage - 1)}
+                                                    href={createPageURL(
+                                                        currentPage - 1
+                                                    )}
                                                     className={`transition-opacity ${currentPage <= 1 ? 'pointer-events-none opacity-50' : ''}`}
                                                 />
                                             </PaginationItem>
 
-                                            {[...Array(totalPages)].map((_, i) => {
-                                                const page = i + 1
+                                            {[...Array(totalPages)].map(
+                                                (_, i) => {
+                                                    const page = i + 1
 
-                                                if (
-                                                    page === 1 ||
-                                                    page === totalPages ||
-                                                    (page >= currentPage - 1 && page <= currentPage + 1)
-                                                ) {
-                                                    return (
-                                                        <PaginationItem key={page}>
-                                                            <PaginationLink
-                                                                href={createPageURL(page)}
-                                                                isActive={page === currentPage}
+                                                    if (
+                                                        page === 1 ||
+                                                        page === totalPages ||
+                                                        (page >=
+                                                            currentPage - 1 &&
+                                                            page <=
+                                                                currentPage + 1)
+                                                    ) {
+                                                        return (
+                                                            <PaginationItem
+                                                                key={page}
                                                             >
-                                                                {page}
-                                                            </PaginationLink>
-                                                        </PaginationItem>
-                                                    )
-                                                }
+                                                                <PaginationLink
+                                                                    href={createPageURL(
+                                                                        page
+                                                                    )}
+                                                                    isActive={
+                                                                        page ===
+                                                                        currentPage
+                                                                    }
+                                                                >
+                                                                    {page}
+                                                                </PaginationLink>
+                                                            </PaginationItem>
+                                                        )
+                                                    }
 
-                                                if (
-                                                    page === currentPage - 2 ||
-                                                    page === currentPage + 2
-                                                ) {
-                                                    return (
-                                                        <PaginationItem key={page}>
-                                                            <PaginationEllipsis className='text-black' />
-                                                        </PaginationItem>
-                                                    )
-                                                }
+                                                    if (
+                                                        page ===
+                                                            currentPage - 2 ||
+                                                        page === currentPage + 2
+                                                    ) {
+                                                        return (
+                                                            <PaginationItem
+                                                                key={page}
+                                                            >
+                                                                <PaginationEllipsis className="text-black" />
+                                                            </PaginationItem>
+                                                        )
+                                                    }
 
-                                                return null
-                                            })}
+                                                    return null
+                                                }
+                                            )}
 
                                             <PaginationItem>
                                                 <PaginationNext
-                                                    href={createPageURL(currentPage + 1)}
+                                                    href={createPageURL(
+                                                        currentPage + 1
+                                                    )}
                                                     className={`transition-opacity ${currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''}`}
                                                 />
                                             </PaginationItem>

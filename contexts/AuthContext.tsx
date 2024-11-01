@@ -1,7 +1,10 @@
-"use client"
+'use client'
 
+import {
+    createClientComponentClient,
+    Session,
+} from '@supabase/auth-helpers-nextjs'
 import { createContext, useContext, useEffect, useState } from 'react'
-import { createClientComponentClient, Session } from '@supabase/auth-helpers-nextjs'
 
 interface AuthContextType {
     session: Session | null
@@ -10,23 +13,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
     session: null,
-    isLoading: true
+    isLoading: true,
 })
 
-export function AuthProvider({
-    children
-}: {
-    children: React.ReactNode
-}) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const supabase = createClientComponentClient()
 
     useEffect(() => {
-        console.log('Auth Provider: Checking session...');
+        console.log('Auth Provider: Checking session...')
 
         supabase.auth.getSession().then(({ data: { session } }) => {
-            console.log('Auth Provider: Session status:', !!session);
+            console.log('Auth Provider: Session status:', !!session)
             setSession(session)
             setIsLoading(false)
         })
@@ -34,7 +33,7 @@ export function AuthProvider({
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
-            console.log('Auth Provider: Auth state changed:', !!session);
+            console.log('Auth Provider: Auth state changed:', !!session)
             setSession(session)
             setIsLoading(false)
         })

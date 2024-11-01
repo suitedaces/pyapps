@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 
 import { LLMModelConfig } from '@/lib/modelProviders'
 import modelsList from '@/lib/models.json'
@@ -86,8 +86,8 @@ export function Chat({
     const [fileContent, setFileContent] = useState<string | null>(null)
     const [fullData, setFullData] = useState<string[][] | null>(null)
 
-    const [isInitial, setIsInitial] = useState(() => !currentChatId);
-    const [isAnimating, setIsAnimating] = useState(false);
+    const [isInitial, setIsInitial] = useState(() => !currentChatId)
+    const [isAnimating, setIsAnimating] = useState(false)
 
     const isLoading = isLoadingProp || isLoadingInternal
 
@@ -99,9 +99,8 @@ export function Chat({
     )
 
     const currentModel = modelsList.models.find(
-        (model) => model.id === languageModel.model,
+        (model) => model.id === languageModel.model
     )
-
 
     useEffect(() => {
         if (isAtBottom) {
@@ -177,15 +176,15 @@ export function Chat({
     const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
 
-        if ((!input.trim() && !file) || isLoading || isAnimating) return;
+        if ((!input.trim() && !file) || isLoading || isAnimating) return
 
-        setIsAnimating(true);
-        setIsInitial(false);
+        setIsAnimating(true)
+        setIsInitial(false)
 
-        if (isLoadingInternal) return;
+        if (isLoadingInternal) return
 
         try {
-            setIsLoadingInternal(true);
+            setIsLoadingInternal(true)
             if (file && fileContent) {
                 const analysis = await analyzeCSV(fileContent)
                 setCsvAnalysis(analysis)
@@ -198,7 +197,7 @@ export function Chat({
             console.error('Error submitting form:', error)
         } finally {
             setIsLoadingInternal(false)
-            setIsAnimating(false);
+            setIsAnimating(false)
         }
     }
 
@@ -304,8 +303,8 @@ export function Chat({
     return (
         <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
             {isInitial && (
-                <div className='w-full h-full absolute'>
-                    <div className='relative w-full h-full'>
+                <div className="w-full h-full absolute">
+                    <div className="relative w-full h-full">
                         <AnimatePresence>
                             <motion.div
                                 initial={{ opacity: 1, y: 0 }}
@@ -326,7 +325,8 @@ export function Chat({
                                     animate={{ opacity: 1 }}
                                     transition={{ delay: 0.4 }}
                                 >
-                                    analyse and generate dashboard apps, spreadsheets and more...
+                                    analyse and generate dashboard apps,
+                                    spreadsheets and more...
                                 </motion.p>
                             </motion.div>
                         </AnimatePresence>
@@ -419,10 +419,10 @@ export function Chat({
                 className="p-4 dark:border-darkBorder m-auto w-full max-w-[800px]"
                 initial={false}
                 animate={{
-                    y: isInitial ? "-30vh" : 0,
+                    y: isInitial ? '-30vh' : 0,
                 }}
                 transition={{
-                    type: "spring",
+                    type: 'spring',
                     stiffness: 200,
                     damping: 20,
                 }}
@@ -430,8 +430,9 @@ export function Chat({
                 <div className="flex space-x-2">
                     <div className="relative flex-grow">
                         <div
-                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'
-                                }`}
+                            className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                                file ? 'max-h-20' : 'max-h-0'
+                            }`}
                         >
                             {file && (
                                 <div className="px-3 flex justify-start mb-2">

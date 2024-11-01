@@ -46,28 +46,29 @@ export async function GET(req: NextRequest) {
         }
 
         // Format the response
-        const formattedChats = chats?.map(chat => ({
-            id: chat.id,
-            name: chat.name || `Chat ${chat.id.slice(0, 8)}`,
-            created_at: chat.created_at,
-            last_message: chat.last_message,
-            app_id: chat.app_id
-        })) || []
+        const formattedChats =
+            chats?.map((chat) => ({
+                id: chat.id,
+                name: chat.name || `Chat ${chat.id.slice(0, 8)}`,
+                created_at: chat.created_at,
+                last_message: chat.last_message,
+                app_id: chat.app_id,
+            })) || []
 
         return NextResponse.json({
             chats: formattedChats,
             total: count,
             page,
             limit,
-            totalPages: Math.ceil(count / limit)
+            totalPages: Math.ceil(count / limit),
         })
-
     } catch (error) {
         console.error('Error in conversations route:', error)
         return NextResponse.json(
             {
                 error: 'Failed to fetch conversations',
-                details: error instanceof Error ? error.message : 'Unknown error'
+                details:
+                    error instanceof Error ? error.message : 'Unknown error',
             },
             { status: 500 }
         )
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
                 user_id: session.user.id,
                 name,
                 app_id: appId,
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
             })
             .select()
             .single()
@@ -104,7 +105,10 @@ export async function POST(req: NextRequest) {
         if (error) {
             console.error('Database error:', error)
             return NextResponse.json(
-                { error: 'Failed to create conversation', details: error.message },
+                {
+                    error: 'Failed to create conversation',
+                    details: error.message,
+                },
                 { status: 500 }
             )
         }
@@ -115,7 +119,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
             {
                 error: 'Failed to create conversation',
-                details: error instanceof Error ? error.message : 'Unknown error'
+                details:
+                    error instanceof Error ? error.message : 'Unknown error',
             },
             { status: 500 }
         )

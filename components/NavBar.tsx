@@ -1,28 +1,7 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
-import { motion } from 'framer-motion'
-import { Share } from 'lucide-react'
-import Image from 'next/image'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 interface NavbarProps {
@@ -75,7 +54,5 @@ export function Navbar({ isRightContentVisible }: NavbarProps) {
         // You might want to add a toast notification here
     }
 
-    return (
-        <></>
-    )
+    return <></>
 }
