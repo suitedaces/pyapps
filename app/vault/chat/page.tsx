@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/pagination"
 import { SidebarProvider } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/Sidebar'
-import { useChat } from '@/hooks/useChat'
 
 interface Chat {
     id: string
@@ -50,15 +49,11 @@ export default function VaultChat() {
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+    const [isCreatingChat, setIsCreatingChat] = useState(false)
 
     const router = useRouter()
     const searchParams = useSearchParams()
     const currentPage = Number(searchParams.get('page')) || 1
-
-    const {
-        handleInputChange,
-        handleSubmit,
-    } = useChat(currentChatId)
 
     // Debounce search
     useEffect(() => {
@@ -133,6 +128,7 @@ export default function VaultChat() {
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}
                 chats={chats}
+                isCreatingChat={isCreatingChat}
             />
             <div className='p-7 h-screen w-full bg-bg'>
                 <div className="flex flex-col h-full w-full border-2 border-border bg-bg overflow-hidden">

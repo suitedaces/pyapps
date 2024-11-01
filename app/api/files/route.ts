@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
         sandbox_id,
     } = await req.json()
 
+    console.log('Received sandbox_id:', sandbox_id)
+
     console.log(
         `Inserting file metadata for user ID: ${session.user.id}, file name: ${file_name}`
     )

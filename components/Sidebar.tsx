@@ -5,6 +5,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { useRouter } from "next/navigation"
 import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 
 import {
     BadgeCheck,
@@ -84,8 +85,6 @@ import LoadingSpinner from './LoadingSpinner'
 
 import { BorderTrail } from '@/components/core/border-trail';
 
-
-
 interface Chat {
     id: string;
     name: string;
@@ -98,6 +97,7 @@ interface SidebarProps {
     onNewChat: () => void;
     currentChatId: string | null;
     chats?: Chat[];
+    isCreatingChat: boolean;
 }
 
 const data = {
@@ -129,60 +129,125 @@ const CustomSidebarMenuSubItem = ({ isActive, children, className }: CustomSideb
     </div>
 )
 
+// Add this new component for typewriter effect
+const TypewriterText = ({ text }: { text: string }) => {
+    return (
+        <motion.span
+            initial={{ opacity: 0 }}
+            animate={{
+                opacity: 1,
+                transition: {
+                    duration: 0.2,
+                }
+            }}
+        >
+            {text.split("").map((char, index) => (
+                <motion.span
+                    key={index}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{
+                        duration: 0.1,
+                        delay: index * 0.05,
+                        ease: "easeInOut"
+                    }}
+                >
+                    {char}
+                </motion.span>
+            ))}
+        </motion.span>
+    );
+};
+
 const ChatsList = ({
     chats = [],
     onChatSelect,
     currentChatId,
+    isCreatingChat,
 }: {
     chats: Chat[],
     onChatSelect: (chatId: string) => void,
-    currentChatId: string | null
+    currentChatId: string | null,
+    isCreatingChat: boolean
 }) => {
     const router = useRouter()
     const visibleChats = chats.slice(0, 10)
-    const hasMoreChats = chats.length > 10
+
+    // Get the most recent chat title
+    const mostRecentChat = chats[0]?.name || "New Chat"
 
     return (
         <SidebarMenuSub>
-            {visibleChats.map((chat) => (
-                <CustomSidebarMenuSubItem
-                    key={chat.id}
-                    className={`group/item relative ${currentChatId === chat.id ? 'bg-sidebar-accent' : ''}`}
-                >
-                    <SidebarMenuSubButton
-                        className="w-full text-left flex items-center gap-2"
-                        onClick={() => onChatSelect(chat.id)}
+            <AnimatePresence>
+                {isCreatingChat && (
+                    <motion.div
+                        initial={{ y: -20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -20, opacity: 0 }}
                     >
-                        <MessageSquare className="h-4 w-4" />
-                        <span className="truncate">{chat.name || `Chat ${chat.id.slice(0, 8)}`}</span>
-                    </SidebarMenuSubButton>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <SidebarMenuAction
-                                className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible">
-                                <MoreHorizontal />
-                                <span className="sr-only">More</span>
-                            </SidebarMenuAction>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-48" side="right" align="start"
+                        <CustomSidebarMenuSubItem className="group/item relative bg-sidebar-accent">
+                            <SidebarMenuSubButton className="w-full text-left flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 animate-pulse" />
+                                <TypewriterText text={mostRecentChat} />
+                                <span className="ml-2 h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                            </SidebarMenuSubButton>
+                        </CustomSidebarMenuSubItem>
+                    </motion.div>
+                )}
+
+                {visibleChats.map((chat, index) => (
+                    <motion.div
+                        key={chat.id}
+                        initial={{ y: -20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -20, opacity: 0 }}
+                        transition={{
+                            duration: 0.3,
+                            delay: index * 0.1,
+                            type: "spring",
+                            stiffness: 200,
+                            damping: 20
+                        }}
+                    >
+                        <CustomSidebarMenuSubItem
+                            className={`group/item relative ${currentChatId === chat.id ? 'bg-sidebar-accent' : ''}`}
                         >
-                            <DropdownMenuItem>
-                                <Folder className="text-muted-foreground" />
-                                <span>View Project</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Share className="text-muted-foreground" />
-                                <span>Share Project</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                                <Trash2 className="text-muted-foreground" />
-                                <span>Delete Project</span>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </CustomSidebarMenuSubItem>
-            ))}
+                            <SidebarMenuSubButton
+                                className="w-full text-left flex items-center gap-2"
+                                onClick={() => onChatSelect(chat.id)}
+                            >
+                                <MessageSquare className="h-4 w-4" />
+                                <span className="truncate">{chat.name || `Chat ${chat.id.slice(0, 8)}`}</span>
+                            </SidebarMenuSubButton>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <SidebarMenuAction
+                                        className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible">
+                                        <MoreHorizontal />
+                                        <span className="sr-only">More</span>
+                                    </SidebarMenuAction>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-48" side="right" align="start"
+                                >
+                                    <DropdownMenuItem>
+                                        <Folder className="text-muted-foreground" />
+                                        <span>View Project</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                        <Share className="text-muted-foreground" />
+                                        <span>Share Project</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem>
+                                        <Trash2 className="text-muted-foreground" />
+                                        <span>Delete Project</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </CustomSidebarMenuSubItem>
+                    </motion.div>
+                ))}
+            </AnimatePresence>
 
             {/* View All Button - Always show if there are any chats */}
             {chats.length > 0 && (
@@ -204,7 +269,8 @@ export default function AppSidebar({
     onChatSelect,
     onNewChat,
     currentChatId,
-    chats = []
+    chats = [],
+    isCreatingChat,
 }: SidebarProps) {
     const [open, setOpen] = useState(false)
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
@@ -222,27 +288,6 @@ export default function AppSidebar({
         isMobile,
         toggleSidebar,
     } = useSidebar()
-
-    console.log({
-        state,
-        open,
-        isMobile
-    });
-
-    useEffect(() => {
-        fetchChats()
-    }, [])
-
-    const fetchChats = async () => {
-        try {
-            const response = await fetch('/api/conversations')
-            if (response.ok) {
-                const data = await response.json()
-            }
-        } catch (error) {
-            console.error('Error fetching chats:', error)
-        }
-    }
 
     // Add isOpen state
     const [isChatsOpen, setIsChatsOpen] = useState(true)
@@ -269,7 +314,7 @@ export default function AppSidebar({
 
     const handleChatSelect = (chatId: string) => {
         // Redirect to chat page using window.location
-        window.location.href = `/chat/${chatId}`;
+        router.push(`/chat/${chatId}`)
     }
 
     // Add sign out handler
@@ -378,6 +423,7 @@ export default function AppSidebar({
                                                 chats={chats}
                                                 onChatSelect={handleChatSelect}
                                                 currentChatId={currentChatId}
+                                                isCreatingChat={isCreatingChat}
                                             />
                                         </Suspense>
                                     </CollapsibleContent>

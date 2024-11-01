@@ -176,33 +176,30 @@ export function Chat({
 
     const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        if (!input.trim() || isLoading || isAnimating) return;
+
+        if ((!input.trim() && !file) || isLoading || isAnimating) return;
 
         setIsAnimating(true);
         setIsInitial(false);
 
-        if (isLoadingInternal) return; // Prevent multiple submissions
+        if (isLoadingInternal) return;
 
-        setTimeout(async () => {
+        try {
             setIsLoadingInternal(true);
-
-            try {
-
-                if (file && fileContent) {
-                    const analysis = await analyzeCSV(fileContent)
-                    setCsvAnalysis(analysis)
-                    setShowSpreadsheet(true)
-                    removeFile()
-                    await handleFileUpload(fileContent, file.name)
-                }
-                await handleSubmit(e)
-            } catch (error) {
-                console.error('Error submitting form:', error)
-            } finally {
-                setIsLoadingInternal(false)
-                setIsAnimating(false);
+            if (file && fileContent) {
+                const analysis = await analyzeCSV(fileContent)
+                setCsvAnalysis(analysis)
+                setShowSpreadsheet(true)
+                await handleFileUpload(fileContent, file.name)
+                removeFile()
             }
-        }, 500);
+            await handleSubmit(e)
+        } catch (error) {
+            console.error('Error submitting form:', error)
+        } finally {
+            setIsLoadingInternal(false)
+            setIsAnimating(false);
+        }
     }
 
     const renderMessage = (content: string) => (

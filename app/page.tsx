@@ -1,7 +1,5 @@
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -27,6 +25,8 @@ import { MetaSheet } from '@/components/MetaSheet'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/Sidebar'
 
+import { useAuth } from '@/contexts/AuthContext'
+
 const truncate = (str: string) => {
     const maxLength = 30; // Adjust this value as needed
     if (str.length <= maxLength) return str;
@@ -48,19 +48,19 @@ export default function Home() {
     const router = useRouter()
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [isAtBottom, setIsAtBottom] = useState(true)
-    const [session, setSession] = useState<Session | null>(null)
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
-    const [activeTab, setActiveTab] = useState('preview')
     const resizableGroupRef = useRef<any>(null)
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
+    const [isCreatingChat, setIsCreatingChat] = useState(false)
 
-    const supabase = createClientComponentClient()
+    const { session, isLoading: isAuthLoading } = useAuth()
+
     const {
         messages,
         input,
-        isLoading,
         handleInputChange,
         handleSubmit,
+        isLoading,
         handleFileUpload,
         csvFileName,
         csvContent,
@@ -71,67 +71,37 @@ export default function Home() {
         isGeneratingCode,
     } = useChat(currentChatId)
 
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-        })
-
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session)
-        })
-
-        return () => subscription.unsubscribe()
-    }, [supabase.auth])
-
-    useEffect(() => {
-        const createInitialChat = async () => {
-            if (!currentChatId && session) {
-                try {
-                    const response = await fetch('/api/conversations', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ name: 'New Chat' }),
-                    })
-                    if (!response.ok) {
-                        throw new Error('Failed to create new chat')
-                    }
-                    const data = await response.json()
-                    setCurrentChatId(data.id)
-                } catch (error) {
-                    console.error('Error creating initial chat:', error)
-                }
-            }
-        }
-
-        createInitialChat()
-    }, [currentChatId, session])
-
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search)
-        const chatId = params.get('chat')
-        if (chatId) {
-            setCurrentChatId(chatId)
-        }
-    }, [])
-
-    useEffect(() => {
-        const fetchChats = async () => {
-            try {
-                const response = await fetch('/api/conversations?page=1&limit=10')
-                if (!response.ok) throw new Error('Failed to fetch chats')
+    const fetchAndSetChats = useCallback(async () => {
+        try {
+            const response = await fetch('/api/conversations?page=1&limit=10')
+            if (response.ok) {
                 const data = await response.json()
                 setSidebarChats(data.chats)
-            } catch (error) {
-                console.error('Error fetching sidebar chats:', error)
             }
+        } catch (error) {
+            console.error('Error fetching chats:', error)
         }
-
-        fetchChats()
     }, [])
+
+    useEffect(() => {
+        if (session) {
+            fetchAndSetChats()
+        }
+    }, [session, fetchAndSetChats])
+
+    useEffect(() => {
+        console.log("Current URL:", window.location.search);
+
+        const params = new URLSearchParams(window.location.search);
+        const chatId = params.get('chat');
+
+        console.log("Parsed chatId from URL:", chatId);
+
+        if (chatId) {
+            setCurrentChatId(chatId);
+            console.log("Setting currentChatId to:", chatId);
+        }
+    }, []);
 
     const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
@@ -139,41 +109,70 @@ export default function Home() {
     }, [router])
 
     const handleNewChat = useCallback(async () => {
-        if (window.location.pathname !== '/') {
-            router.push('/')
-        }
+        setCurrentChatId(null);
+        router.push('/', { scroll: false });
         return Promise.resolve();
-    }, [])
+    }, [router]);
 
     const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
     }, [handleInputChange]);
 
+    const createInitialChat = async () => {
+        try {
+            const response = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: 'New Chat' }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create new chat');
+            }
+
+            const data = await response.json();
+            console.log("New chat created with ID:", data.id);
+
+            setCurrentChatId(data.id);
+            router.push(`/?chat=${data.id}`, { scroll: false });
+
+            return data.id;
+        } catch (error) {
+            console.error('Error creating chat:', error);
+            return null;
+        }
+    };
+
     const handleSubmitWrapper = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!currentChatId) {
-            try {
-                const response = await fetch('/api/conversations', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name: 'New Chat' }),
-                })
-                if (!response.ok) {
-                    throw new Error('Failed to create new chat')
-                }
-                const data = await response.json()
-                setCurrentChatId(data.id)
-            } catch (error) {
-                console.error('Error creating new chat:', error)
-                return
-            }
-        }
+        if (!session || isAuthLoading || !input.trim()) return;
 
-        handleSubmit(e)
-    }, [currentChatId, handleInputChange, handleSubmit])
+        try {
+            let chatIdToUse = currentChatId;
+            console.log("Current chatId before submit:", chatIdToUse);
+
+            if (!chatIdToUse) {
+                const newChatId = await createInitialChat();
+                console.log("Created new chatId:", newChatId);
+
+                if (!newChatId) {
+                    console.error('Failed to create new chat');
+                    return;
+                }
+                chatIdToUse = newChatId;
+            }
+
+            console.log("Using chatId for submission:", chatIdToUse);
+            await handleSubmit(e, chatIdToUse);
+
+            await fetchAndSetChats();
+        } catch (error) {
+            console.error('Error in submit:', error);
+        }
+    }, [currentChatId, session, isAuthLoading, handleSubmit, input, fetchAndSetChats]);
 
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
@@ -184,8 +183,16 @@ export default function Home() {
         }
     }, [])
 
+    if (isAuthLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div>Loading authentication...</div>
+            </div>
+        );
+    }
+
     if (!session) {
-        return <LoginPage />
+        return <LoginPage />;
     }
 
     return (
@@ -195,13 +202,14 @@ export default function Home() {
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}
                 chats={sidebarChats}
+                isCreatingChat={isCreatingChat}
             />
             <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
                 <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
                     <ResizablePanelGroup direction="horizontal" ref={resizableGroupRef}>
                         <ResizablePanel defaultSize={65} minSize={45}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                <Chat
+                            <Chat
                                     messages={messages}
                                     input={input}
                                     handleInputChange={handleInputChangeWrapper}

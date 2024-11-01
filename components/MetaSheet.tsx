@@ -49,7 +49,6 @@ export function MetaSheet({ csvContent }: MetaSheetProps) {
                 try {
                     const result = await analyzeCSV(csvContent)
                     setAnalysis(result)
-                    console.log('Analysis result:', result)
                 } catch (error) {
                     console.error('Error analyzing CSV:', error)
                 } finally {

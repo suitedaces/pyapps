@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import ChatPageClient from './ChatPageClient'
 
-export default async function ChatPage({
+export default async function ChatIdPage({
     params: { id },
 }: {
     params: { id: string }

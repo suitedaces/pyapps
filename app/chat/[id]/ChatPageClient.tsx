@@ -14,6 +14,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 import {
     ResizableHandle,
@@ -56,6 +57,8 @@ export default function ChatPageClient({
     const [currentChatId, setCurrentChatId] = useState<string | null>(
         initialChat.id
     )
+    const [isCreatingChat, setIsCreatingChat] = useState(false)
+    
     const supabase = createClientComponentClient()
     const {
         messages,
@@ -74,8 +77,15 @@ export default function ChatPageClient({
     } = useChat(currentChatId)
 
     const resizableGroupRef = useRef<any>(null)
+    const [sidebarChats, setSidebarChats] = useState<any[]>([])
+
+    const router = useRouter()
 
     useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session)
+        })
+
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -85,25 +95,47 @@ export default function ChatPageClient({
         return () => subscription.unsubscribe()
     }, [supabase.auth])
 
-    const toggleRightContent = () => {
-        setIsRightContentVisible(!isRightContentVisible)
-    }
+    const fetchAndSetChats = useCallback(async () => {
+        try {
+            const response = await fetch('/api/conversations?page=1&limit=10')
+            if (response.ok) {
+                const data = await response.json()
+                setSidebarChats(data.chats)
+            }
+        } catch (error) {
+            console.error('Error fetching chats:', error)
+        }
+    }, [])
 
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-        setIsAtBottom(scrollHeight - scrollTop === clientHeight)
-    }
+    useEffect(() => {
+        if (session) {
+            fetchAndSetChats()
+        }
+    }, [session, fetchAndSetChats])
 
-    const handleChatSelect = (chatId: string) => {
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const chatId = params.get('chat')
+        if (chatId) {
+            setCurrentChatId(chatId)
+        }
+    }, [])
+
+    const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-    }
+        router.push(`/?chat=${chatId}`, { scroll: false })
+    }, [router])
 
-    const handleNewChat = useCallback(() => {
+    const handleNewChat = useCallback(async () => {
         if (window.location.pathname !== '/') {
-            window.location.href = '/';
+            router.push('/')
         }
         return Promise.resolve();
     }, [])
+
+    const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
+    }, [handleInputChange]);
 
     const handleSubmitWrapper = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -122,6 +154,7 @@ export default function ChatPageClient({
                 }
                 const data = await response.json()
                 setCurrentChatId(data.id)
+                await fetchAndSetChats()
             } catch (error) {
                 console.error('Error creating new chat:', error)
                 return
@@ -129,11 +162,16 @@ export default function ChatPageClient({
         }
 
         handleSubmit(e)
-    }, [currentChatId, handleSubmit])
+    }, [currentChatId, handleSubmit, fetchAndSetChats])
 
-    const handleInputChangeWrapper = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        handleInputChange(e as React.ChangeEvent<HTMLInputElement>);
-    }, [handleInputChange]);
+    const toggleRightContent = useCallback(() => {
+        setIsRightContentVisible((prev) => !prev)
+        if (resizableGroupRef.current) {
+            setTimeout(() => {
+                resizableGroupRef.current.resetLayout()
+            }, 0)
+        }
+    }, [])
 
     if (!session) {
         return <LoginPage />
@@ -145,6 +183,8 @@ export default function ChatPageClient({
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}
+                chats={sidebarChats}
+                isCreatingChat={isCreatingChat}
             />
              <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
                 <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
