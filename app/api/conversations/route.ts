@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
         const limit = Number(searchParams.get('limit')) || 15
         const offset = (page - 1) * limit
         const search = searchParams.get('search') || ''
+        const chatId = searchParams.get('chatId')
 
         const supabase = createRouteHandlerClient({ cookies })
         const {
@@ -20,6 +21,28 @@ export async function GET(req: NextRequest) {
                 { error: 'Not authenticated' },
                 { status: 401 }
             )
+        }
+
+        if (chatId) {
+            console.log("Fetching messages for chatId:", chatId)
+
+            const { data: messages, error: messagesError } = await supabase
+                .from('messages')
+                .select('*')
+                .eq('chat_id', chatId)
+                .order('created_at', { ascending: true })
+
+            console.log("DB Query result:", { messages, error: messagesError })
+
+            if (messagesError) {
+                console.error('Error fetching messages:', messagesError)
+                return NextResponse.json(
+                    { error: 'Failed to fetch messages' },
+                    { status: 500 }
+                )
+            }
+
+            return NextResponse.json({ messages })
         }
 
         // Get total count

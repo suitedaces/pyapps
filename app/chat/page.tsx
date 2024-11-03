@@ -156,14 +156,20 @@ export default function ChatPage() {
     const handleSubmitWrapper = useCallback(
         async (e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault()
+            console.log('handleSubmitWrapper called')
 
-            if (!session || isAuthLoading || !input.trim()) return
+            if (!session || isAuthLoading || !input.trim()) {
+                console.log('Submit conditions not met:', { session, isAuthLoading, input })
+                return
+            }
 
             try {
                 let chatIdToUse = currentChatId
+                console.log('Current chatId:', chatIdToUse)
 
                 if (!chatIdToUse) {
                     const newChatId = await createInitialChat()
+                    console.log('Created new chat:', newChatId)
                     if (!newChatId) {
                         console.error('Failed to create new chat')
                         return
@@ -172,20 +178,13 @@ export default function ChatPage() {
                     router.replace(`/chat?chat=${newChatId}`)
                 }
 
-                await handleSubmit(e, chatIdToUse)
+                await handleSubmit(e)
                 await fetchAndSetChats()
             } catch (error) {
                 console.error('Error in submit:', error)
             }
         },
-        [
-            currentChatId,
-            session,
-            isAuthLoading,
-            handleSubmit,
-            input,
-            fetchAndSetChats,
-        ]
+        [currentChatId, session, isAuthLoading, handleSubmit, input, fetchAndSetChats]
     )
 
     const toggleRightContent = useCallback(() => {

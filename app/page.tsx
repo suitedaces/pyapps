@@ -53,6 +53,7 @@ export default function Home() {
     const resizableGroupRef = useRef<any>(null)
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
     const [isCreatingChat, setIsCreatingChat] = useState(false)
+    const [isInitializing, setIsInitializing] = useState(true)
 
     const { session, isLoading: isAuthLoading } = useAuth()
 
@@ -70,6 +71,7 @@ export default function Home() {
         streamingMessage,
         streamingCodeExplanation,
         isGeneratingCode,
+        setMessages,
     } = useChat(currentChatId)
 
     const fetchAndSetChats = useCallback(async () => {
@@ -107,14 +109,14 @@ export default function Home() {
     const handleChatSelect = useCallback(
         (chatId: string) => {
             setCurrentChatId(chatId)
-            router.push(`/?chat=${chatId}`, { scroll: false })
+            router.replace(`/?chat=${chatId}`, { scroll: false })
         },
         [router]
     )
 
     const handleNewChat = useCallback(async () => {
         setCurrentChatId(null)
-        router.push('/', { scroll: false })
+        router.replace('/', { scroll: false })
         return Promise.resolve()
     }, [router])
 
@@ -125,72 +127,6 @@ export default function Home() {
         [handleInputChange]
     )
 
-    const createInitialChat = async () => {
-        try {
-            const response = await fetch('/api/conversations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: 'New Chat' }),
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to create new chat')
-            }
-
-            const data = await response.json()
-            console.log('New chat created with ID:', data.id)
-
-            setCurrentChatId(data.id)
-            router.push(`/?chat=${data.id}`, { scroll: false })
-
-            return data.id
-        } catch (error) {
-            console.error('Error creating chat:', error)
-            return null
-        }
-    }
-
-    const handleSubmitWrapper = useCallback(
-        async (e: React.FormEvent<HTMLFormElement>) => {
-            e.preventDefault()
-
-            if (!session || isAuthLoading || !input.trim()) return
-
-            try {
-                let chatIdToUse = currentChatId
-                console.log('Current chatId before submit:', chatIdToUse)
-
-                if (!chatIdToUse) {
-                    const newChatId = await createInitialChat()
-                    console.log('Created new chatId:', newChatId)
-
-                    if (!newChatId) {
-                        console.error('Failed to create new chat')
-                        return
-                    }
-                    chatIdToUse = newChatId
-                }
-
-                console.log('Using chatId for submission:', chatIdToUse)
-                await handleSubmit(e, chatIdToUse)
-
-                await fetchAndSetChats()
-            } catch (error) {
-                console.error('Error in submit:', error)
-            }
-        },
-        [
-            currentChatId,
-            session,
-            isAuthLoading,
-            handleSubmit,
-            input,
-            fetchAndSetChats,
-        ]
-    )
-
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
         if (resizableGroupRef.current) {
@@ -199,6 +135,83 @@ export default function Home() {
             }, 0)
         }
     }, [])
+
+    const createInitialChat = useCallback(async () => {
+        if (!session) return null
+
+        setIsCreatingChat(true)
+        try {
+            const response = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'New Chat' })
+            })
+
+            if (!response.ok) throw new Error('Failed to create chat')
+
+            const data = await response.json()
+            return data.id
+        } catch (error) {
+            console.error('Error creating chat:', error)
+            return null
+        } finally {
+            setIsCreatingChat(false)
+        }
+    }, [session])
+
+    const handleSubmitWrapper = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        console.log('handleSubmitWrapper called')
+
+        if (!session || isAuthLoading) {
+            console.log('No session or still loading auth')
+            return
+        }
+
+        try {
+            // If no currentChatId, create new chat first
+            if (!currentChatId) {
+                console.log('No current chat, creating new one')
+                const newChatId = await createInitialChat()
+                if (!newChatId) {
+                    console.error('Failed to create new chat')
+                    return
+                }
+                setCurrentChatId(newChatId)
+                router.replace(`/chat?chat=${newChatId}`)
+                // Wait a bit for chat creation to propagate
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+
+            await handleSubmit(e)
+            await fetchAndSetChats()
+        } catch (error) {
+            console.error('Error in submit:', error)
+        }
+    }, [currentChatId, session, isAuthLoading, createInitialChat, handleSubmit, fetchAndSetChats, router])
+
+    // Initialize chat on first load
+    useEffect(() => {
+        const initializeChat = async () => {
+            if (!session || !isInitializing) return
+
+            const params = new URLSearchParams(window.location.search)
+            const chatId = params.get('chat')
+
+            if (chatId) {
+                setCurrentChatId(chatId)
+            } else {
+                const newChatId = await createInitialChat()
+                if (newChatId) {
+                    setCurrentChatId(newChatId)
+                    router.replace(`/chat?chat=${newChatId}`)
+                }
+            }
+            setIsInitializing(false)
+        }
+
+        initializeChat()
+    }, [session, isInitializing, createInitialChat, router])
 
     if (isAuthLoading) {
         return (
@@ -230,15 +243,18 @@ export default function Home() {
                         <ResizablePanel defaultSize={65} minSize={45}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
                                 <Chat
-                                    messages={messages}
+                                    messages={messages.map(msg => ({
+                                        ...msg,
+                                        created_at: new Date(msg.createdAt || Date.now()),
+                                        tool_calls: Array.isArray(msg.tool_calls) ? msg.tool_calls : null,
+                                        tool_results: null
+                                    } as ClientMessage))}
                                     input={input}
                                     handleInputChange={handleInputChangeWrapper}
                                     handleSubmit={handleSubmitWrapper}
                                     isLoading={isLoading}
                                     streamingMessage={streamingMessage}
-                                    streamingCodeExplanation={
-                                        streamingCodeExplanation
-                                    }
+                                    streamingCodeExplanation=""
                                     handleFileUpload={handleFileUpload}
                                     currentChatId={currentChatId}
                                     onChatSelect={handleChatSelect}

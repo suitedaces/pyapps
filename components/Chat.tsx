@@ -45,8 +45,8 @@ interface ChatProps {
     streamingMessage: string
     streamingCodeExplanation: string
     handleFileUpload: (content: string, fileName: string) => void
-    onChatSelect: (chatId: string) => void
     currentChatId: string | null
+    onChatSelect: (chatId: string) => void
 }
 
 interface Chat {
@@ -70,6 +70,7 @@ export function Chat({
     streamingCodeExplanation,
     handleFileUpload,
     currentChatId,
+    onChatSelect,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -349,14 +350,14 @@ export function Chat({
                     </div>
                 )}
                 {messages.map((message, index) => (
-                    <React.Fragment key={index}>
+                    <React.Fragment key={message.created_at?.getTime() || index}>
                         {message.role === 'user' && (
                             <div className="flex justify-end mb-4">
                                 <div className="flex flex-row-reverse items-start max-w-[80%]">
                                     <Avatar className="w-8 h-8 bg-blue border-2 border-border flex-shrink-0">
                                         <AvatarFallback>U</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark">
                                         {renderMessage(message.content)}
                                     </div>
                                 </div>
@@ -368,7 +369,7 @@ export function Chat({
                                     <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                         <AvatarFallback>G</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                    <div className="mx-2 p-4 text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark">
                                         {renderMessage(message.content)}
                                     </div>
                                 </div>
@@ -376,13 +377,13 @@ export function Chat({
                         )}
                     </React.Fragment>
                 ))}
-                {streamingMessage && (
+                {isLoading && streamingMessage && (
                     <div className="flex justify-start mb-4">
                         <div className="flex flex-row items-start max-w-[80%]">
                             <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                 <AvatarFallback>G</AvatarFallback>
                             </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark">
                                 {renderMessage(streamingMessage)}
                             </div>
                         </div>
