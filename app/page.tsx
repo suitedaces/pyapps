@@ -24,6 +24,7 @@ import AppSidebar from '@/components/Sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { ClientMessage } from '@/lib/types'
 
 const truncate = (str: string) => {
     const maxLength = 30 // Adjust this value as needed
@@ -69,7 +70,6 @@ export default function Home() {
         streamlitUrl,
         generatedCode,
         streamingMessage,
-        streamingCodeExplanation,
         isGeneratingCode,
         setMessages,
     } = useChat(currentChatId)
@@ -137,7 +137,7 @@ export default function Home() {
     }, [])
 
     const createInitialChat = useCallback(async () => {
-        if (!session) return null
+        if (!session || isCreatingChat) return null
 
         setIsCreatingChat(true)
         try {
@@ -157,61 +157,47 @@ export default function Home() {
         } finally {
             setIsCreatingChat(false)
         }
-    }, [session])
+    }, [session, isCreatingChat])
 
     const handleSubmitWrapper = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        console.log('handleSubmitWrapper called')
+        console.log('Submit wrapper called, currentChatId:', currentChatId)
 
         if (!session || isAuthLoading) {
-            console.log('No session or still loading auth')
+            console.log('No session or auth loading')
             return
         }
 
         try {
-            // If no currentChatId, create new chat first
+            // Always create a new chat if there isn't one
             if (!currentChatId) {
-                console.log('No current chat, creating new one')
+                console.log('Creating new chat...')
                 const newChatId = await createInitialChat()
                 if (!newChatId) {
                     console.error('Failed to create new chat')
                     return
                 }
+
+                // Update state and URL
                 setCurrentChatId(newChatId)
-                router.replace(`/chat?chat=${newChatId}`)
-                // Wait a bit for chat creation to propagate
+                router.replace(`/?chat=${newChatId}`, { scroll: false })
+
+                // Wait for state updates to propagate
                 await new Promise(resolve => setTimeout(resolve, 100))
+
+                // Refresh the page to ensure proper initialization
+                window.location.reload()
+                return
             }
 
+            // Only proceed with submit if we have a valid chatId
+            console.log('Proceeding with submit for chat:', currentChatId)
             await handleSubmit(e)
             await fetchAndSetChats()
         } catch (error) {
             console.error('Error in submit:', error)
         }
     }, [currentChatId, session, isAuthLoading, createInitialChat, handleSubmit, fetchAndSetChats, router])
-
-    // Initialize chat on first load
-    useEffect(() => {
-        const initializeChat = async () => {
-            if (!session || !isInitializing) return
-
-            const params = new URLSearchParams(window.location.search)
-            const chatId = params.get('chat')
-
-            if (chatId) {
-                setCurrentChatId(chatId)
-            } else {
-                const newChatId = await createInitialChat()
-                if (newChatId) {
-                    setCurrentChatId(newChatId)
-                    router.replace(`/chat?chat=${newChatId}`)
-                }
-            }
-            setIsInitializing(false)
-        }
-
-        initializeChat()
-    }, [session, isInitializing, createInitialChat, router])
 
     if (isAuthLoading) {
         return (
@@ -245,8 +231,9 @@ export default function Home() {
                                 <Chat
                                     messages={messages.map(msg => ({
                                         ...msg,
+                                        createdAt: new Date(msg.createdAt || Date.now()),
                                         created_at: new Date(msg.createdAt || Date.now()),
-                                        tool_calls: Array.isArray(msg.tool_calls) ? msg.tool_calls : null,
+                                        tool_calls: msg.toolInvocations ? [msg.toolInvocations] : undefined,
                                         tool_results: null
                                     } as ClientMessage))}
                                     input={input}
@@ -254,7 +241,6 @@ export default function Home() {
                                     handleSubmit={handleSubmitWrapper}
                                     isLoading={isLoading}
                                     streamingMessage={streamingMessage}
-                                    streamingCodeExplanation=""
                                     handleFileUpload={handleFileUpload}
                                     currentChatId={currentChatId}
                                     onChatSelect={handleChatSelect}

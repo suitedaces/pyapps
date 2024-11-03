@@ -1,4 +1,4 @@
-import { Message as VercelMessage } from 'ai'
+import { Message } from 'ai'
 import { Json } from '@/lib/database.types'
 import { z } from 'zod'
 
@@ -9,30 +9,33 @@ export interface ModelProvider {
 }
 
 export interface StreamParams {
-    messages: VercelMessage[]
+    messages: Message[]
     tools?: Tool[]
     stream?: boolean
     onToken: (token: string) => void
-    onToolCall?: (tool: ToolCallPayload) => Promise<void>
+    onToolCall?: (toolInvocation: ToolInvocation) => Promise<void>
 }
 
+// Tool types aligned with Vercel AI SDK
 export interface ToolCallPayload {
     id: string
     name: string
-    arguments: Record<string, any>
-}
-
-// Message types
-export interface ClientMessage extends Omit<VercelMessage, 'tool_calls'> {
-    created_at: Date
-    tool_calls?: ToolCallPayload[] | null
-    tool_results?: ToolResultPayload[] | null
+    parameters: Record<string, any>
 }
 
 export interface ToolResultPayload {
-    toolCallId: string
+    id: string
     name: string
     content: string
+}
+
+// Message types aligned with Vercel AI SDK
+export interface ClientMessage {
+    id: string
+    role: 'system' | 'user' | 'assistant' | 'tool'
+    content: string
+    createdAt: Date
+    toolInvocations?: ToolInvocation[]
 }
 
 // Database message type
@@ -40,21 +43,21 @@ export interface DatabaseMessage {
     id: string
     user_id: string
     chat_id: string
+    role: 'system' | 'user' | 'assistant' | 'tool'
     user_message: string
     assistant_message: string
     tool_calls: Json | null
     tool_results: Json | null
     token_count: number
     created_at: string
-    role: 'function' | 'system' | 'user' | 'assistant' | 'data' | 'tool'
 }
 
-// Tool types
+// Tool definition aligned with Vercel AI SDK
 export interface Tool {
     name: string
     description: string
     parameters: z.ZodObject<any>
-    execute: (input: any) => Promise<any>
+    execute: (parameters: Record<string, any>) => Promise<any>
 }
 
 // Model configuration
@@ -65,4 +68,21 @@ export interface LLMModelConfig {
     topP?: number
     frequencyPenalty?: number
     presencePenalty?: number
+}
+
+// Add this to your types.ts
+export interface ModelConfig {
+    id: string
+    provider: string
+    name: string
+    temperature?: number
+    maxTokens?: number
+}
+
+export interface ToolInvocation {
+    state: 'call' | 'result'
+    toolCallId: string
+    toolName: string
+    args: Record<string, any>
+    result?: any
 }

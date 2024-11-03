@@ -4,27 +4,15 @@ import { CircularProgress } from '@/components/CircularProgress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-
 import { AnimatePresence, motion } from 'framer-motion'
-
-import { LLMModelConfig } from '@/lib/modelProviders'
-import modelsList from '@/lib/models.json'
-import { useLocalStorage } from 'usehooks-ts'
-
-import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
 import { ClientMessage } from '@/lib/types'
 import { Code, FileIcon, Loader2, Paperclip, Send, X } from 'lucide-react'
-import React, {
-    ChangeEvent,
-    FormEvent,
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-} from 'react'
-import ReactMarkdown from 'react-markdown'
+import React, { ChangeEvent, FormEvent, useEffect, useRef, useState, HTMLAttributes } from 'react'
+import ReactMarkdown, { Components } from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
+
+import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
 import Spreadsheet from './Spreadsheet'
 
 interface CodeProps {
@@ -34,30 +22,20 @@ interface CodeProps {
     children?: React.ReactNode
 }
 
+interface MarkdownComponentProps {
+    children?: React.ReactNode
+}
+
 interface ChatProps {
     messages: ClientMessage[]
     input: string
-    handleInputChange: (
-        e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-    ) => void
+    handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
     handleSubmit: (e: FormEvent<HTMLFormElement>) => void
     isLoading: boolean
     streamingMessage: string
-    streamingCodeExplanation: string
     handleFileUpload: (content: string, fileName: string) => void
     currentChatId: string | null
     onChatSelect: (chatId: string) => void
-}
-
-interface Chat {
-    id: string
-    name: string
-}
-
-const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' bytes'
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-    else return (bytes / 1048576).toFixed(1) + ' MB'
 }
 
 export function Chat({
@@ -65,56 +43,61 @@ export function Chat({
     input,
     handleInputChange,
     handleSubmit,
-    isLoading: isLoadingProp,
+    isLoading,
     streamingMessage,
-    streamingCodeExplanation,
     handleFileUpload,
-    currentChatId,
-    onChatSelect,
+    currentChatId
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const [isAtBottom, setIsAtBottom] = useState<boolean>(true)
-    const [file, setFile] = useState<File | null>(null)
-    const [isLoadingInternal, setIsLoadingInternal] = useState<boolean>(false)
     const [isInputDisabled, setIsInputDisabled] = useState<boolean>(false)
-    const [uploadProgress, setUploadProgress] = useState<number>(0)
-    const [isUploading, setIsUploading] = useState<boolean>(false)
+    const [isAtBottom, setIsAtBottom] = useState(true)
+    const [isInitial, setIsInitial] = useState(true)
     const [csvAnalysis, setCsvAnalysis] = useState<CSVAnalysis | null>(null)
     const [showSpreadsheet, setShowSpreadsheet] = useState(false)
+    const [file, setFile] = useState<File | null>(null)
+    const [isUploading, setIsUploading] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState(0)
     const [fileContent, setFileContent] = useState<string | null>(null)
     const [fullData, setFullData] = useState<string[][] | null>(null)
 
-    const [isInitial, setIsInitial] = useState(() => !currentChatId)
-    const [isAnimating, setIsAnimating] = useState(false)
-
-    const isLoading = isLoadingProp || isLoadingInternal
-
-    const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
-        'languageModel',
-        {
-            model: 'claude-3-5-sonnet-20240620',
-        }
-    )
-
-    const currentModel = modelsList.models.find(
-        (model) => model.id === languageModel.model
-    )
-
+    // Scroll to bottom when messages change
     useEffect(() => {
-        if (isAtBottom) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-        }
-    }, [messages, streamingMessage, streamingCodeExplanation, isAtBottom])
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [messages, streamingMessage])
 
+    // Add scroll listener to track bottom position
     useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+        const handleScroll = () => {
+            if (messagesEndRef.current) {
+                const { scrollHeight, scrollTop, clientHeight } = messagesEndRef.current
+                setIsAtBottom(Math.abs(scrollHeight - scrollTop - clientHeight) < 10)
+            }
         }
-    }, [input])
+        const messagesContainer = messagesEndRef.current?.parentElement
+        messagesContainer?.addEventListener('scroll', handleScroll)
+        return () => messagesContainer?.removeEventListener('scroll', handleScroll)
+    }, [])
+
+    // Set isInitial to false after mount
+    useEffect(() => {
+        setIsInitial(false)
+    }, [])
+
+    // File upload handlers
+    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = event.target.files?.[0]
+        if (selectedFile && selectedFile.name.endsWith('.csv')) {
+            setFile(selectedFile)
+            setIsInputDisabled(true)
+            setUploadProgress(0)
+            readFile(selectedFile)
+        } else {
+            alert('Please select a CSV file.')
+        }
+    }
 
     const handleTextareaChange = (
         e: React.ChangeEvent<HTMLTextAreaElement>
@@ -131,15 +114,10 @@ export function Chat({
         setIsAtBottom(scrollHeight - scrollTop === clientHeight)
     }
 
-    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = event.target.files?.[0]
-        if (selectedFile && selectedFile.name.endsWith('.csv')) {
-            setFile(selectedFile)
-            setIsInputDisabled(true)
-            setUploadProgress(0)
-            readFile(selectedFile)
-        } else {
-            alert('Please select a CSV file.')
+    const removeFile = () => {
+        setFile(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
         }
     }
 
@@ -163,143 +141,120 @@ export function Chat({
         reader.readAsText(file)
     }
 
-    const removeFile = useCallback(() => {
-        setFile(null)
-        setFileContent(null)
-        setIsInputDisabled(false)
-        setUploadProgress(0)
-        setIsUploading(false)
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''
-        }
-    }, [])
-
     const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-
-        if ((!input.trim() && !file) || isLoading || isAnimating) return
-
-        setIsAnimating(true)
-        setIsInitial(false)
-
-        if (isLoadingInternal) return
-
-        try {
-            setIsLoadingInternal(true)
-            if (file && fileContent) {
-                const analysis = await analyzeCSV(fileContent)
-                setCsvAnalysis(analysis)
+        if (file) {
+            setIsUploading(true)
+            try {
+                const reader = new FileReader()
+                reader.onload = async (event) => {
+                    const content = event.target?.result as string
+                    await handleFileUpload(content, file.name)
+                    setFile(null)
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = ''
+                    }
+                }
+                reader.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const progress = (event.loaded / event.total) * 100
+                        setUploadProgress(progress)
+                    }
+                }
+                reader.readAsText(file)
                 setShowSpreadsheet(true)
-                await handleFileUpload(fileContent, file.name)
-                removeFile()
+            } catch (error) {
+                console.error('Error uploading file:', error)
+            } finally {
+                setIsUploading(false)
+                setUploadProgress(0)
             }
-            await handleSubmit(e)
-        } catch (error) {
-            console.error('Error submitting form:', error)
-        } finally {
-            setIsLoadingInternal(false)
-            setIsAnimating(false)
+        } else {
+            handleSubmit(e)
         }
     }
 
-    const renderMessage = (content: string) => (
-        <ReactMarkdown
-            components={{
-                code({
-                    node,
-                    inline,
-                    className,
-                    children,
-                    ...props
-                }: CodeProps) {
-                    const match = /language-(\w+)/.exec(className || '')
-                    const lang = match && match[1] ? match[1] : ''
-                    const codeString = String(children).replace(/\n$/, '')
+    const formatFileSize = (bytes: number): string => {
+        if (bytes < 1024) return bytes + ' bytes'
+        else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+        else return (bytes / 1048576).toFixed(1) + ' MB'
+    }
 
-                    if (inline) {
-                        return (
-                            <code
-                                className="px-1 py-0.5 rounded-base bg-bg dark:bg-darkBg text-text dark:text-darkText text-sm font-mono"
-                                {...props}
-                            >
-                                {codeString}
-                            </code>
-                        )
-                    }
+    const markdownComponents: Partial<Components> = {
+        code({ node, inline, className, children, ...props }: CodeProps) {
+            const match = /language-(\w+)/.exec(className || '')
+            const lang = match && match[1] ? match[1] : ''
+            const codeString = String(children).replace(/\n$/, '')
 
-                    return (
-                        <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 border-border border-2 dark:shadow-dark w-full">
-                            <div className="flex items-center justify-between px-4 py-2 bg-bg">
-                                <div className="flex items-center">
-                                    <Code className="w-5 h-5 mr-2 text-text dark:text-darkText" />
-                                    <span className="text-sm font-medium text-text dark:text-darkText">
-                                        {lang.toUpperCase() || 'Code'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="w-full">
-                                <SyntaxHighlighter
-                                    style={tomorrow}
-                                    language={lang || 'javascript'}
-                                    PreTag="div"
-                                    customStyle={{
-                                        margin: 0,
-                                        padding: '1rem 0.5rem',
-                                        overflowX: 'auto',
-                                        maxWidth: '100%',
-                                    }}
-                                    {...props}
-                                >
-                                    {codeString}
-                                </SyntaxHighlighter>
-                            </div>
+            if (inline) {
+                return (
+                    <code
+                        className="px-1 py-0.5 rounded-base bg-bg dark:bg-darkBg text-text dark:text-darkText text-sm font-mono"
+                        {...props}
+                    >
+                        {codeString}
+                    </code>
+                )
+            }
+
+            return (
+                <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 border-border border-2 dark:shadow-dark w-full">
+                    <div className="flex items-center justify-between px-4 py-2 bg-bg">
+                        <div className="flex items-center">
+                            <Code className="w-5 h-5 mr-2 text-text dark:text-darkText" />
+                            <span className="text-sm font-medium text-text dark:text-darkText">
+                                {lang.toUpperCase() || 'Code'}
+                            </span>
                         </div>
-                    )
-                },
-                p: ({ children }) => (
-                    <p className="mb-2 break-words">{children}</p>
-                ),
-                h1: ({ children }) => (
-                    <h1 className="text-2xl font-bold mb-3">{children}</h1>
-                ),
-                h2: ({ children }) => (
-                    <h2 className="text-xl font-bold mb-2">{children}</h2>
-                ),
-                h3: ({ children }) => (
-                    <h3 className="text-lg font-bold mb-2">{children}</h3>
-                ),
-                ul: ({ children }) => (
-                    <ul className="list-disc list-outside pl-6 mb-2">
-                        {children}
-                    </ul>
-                ),
-                ol: ({ children }) => (
-                    <ol className="list-decimal list-outside pl-6 mb-2">
-                        {children}
-                    </ol>
-                ),
-                li: ({ children }) => (
-                    <li className="mb-1">
-                        {React.Children.map(children, (child) =>
-                            typeof child === 'string' ? (
-                                <span>{child}</span>
-                            ) : (
-                                child
-                            )
-                        )}
-                    </li>
-                ),
-                blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-main pl-4 italic mb-2">
-                        {children}
-                    </blockquote>
-                ),
-            }}
-            className="prose prose-invert max-w-none"
-        >
-            {content}
-        </ReactMarkdown>
-    )
+                    </div>
+                    <div className="overflow-x-auto">
+                        <SyntaxHighlighter
+                            style={tomorrow}
+                            language={lang || 'javascript'}
+                            PreTag="div"
+                            customStyle={{
+                                margin: 0,
+                                padding: '1rem',
+                            }}
+                            {...props}
+                        >
+                            {codeString}
+                        </SyntaxHighlighter>
+                    </div>
+                </div>
+            )
+        },
+        p: ({ children, ...props }: HTMLAttributes<HTMLParagraphElement>) => (
+            <p className="mb-2 break-words" {...props}>{children}</p>
+        ),
+        h1: ({ children }: MarkdownComponentProps) => (
+            <h1 className="text-2xl font-bold mb-3">{children}</h1>
+        ),
+        h2: ({ children }: MarkdownComponentProps) => (
+            <h2 className="text-xl font-bold mb-2">{children}</h2>
+        ),
+        h3: ({ children }: MarkdownComponentProps) => (
+            <h3 className="text-lg font-bold mb-2">{children}</h3>
+        ),
+        ul: ({ children }: MarkdownComponentProps) => (
+            <ul className="list-disc list-outside pl-6 mb-2">{children}</ul>
+        ),
+        ol: ({ children }: MarkdownComponentProps) => (
+            <ol className="list-decimal list-outside pl-6 mb-2">{children}</ol>
+        ),
+        li: ({ children }: MarkdownComponentProps) => (
+            <li className="mb-1">
+                {React.Children.map(children, (child) =>
+                    typeof child === 'string' ? <span>{child}</span> : child
+                )}
+            </li>
+        ),
+        blockquote: ({ children, ...props }: any) => (
+            <blockquote className="border-l-4 border-main pl-4 italic mb-2" {...props}>
+                {children}
+            </blockquote>
+        ),
+    }
 
     return (
         <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
@@ -349,59 +304,57 @@ export function Chat({
                         </div>
                     </div>
                 )}
-                {messages.map((message, index) => (
-                    <React.Fragment key={message.created_at?.getTime() || index}>
-                        {message.role === 'user' && (
-                            <div className="flex justify-end mb-4">
-                                <div className="flex flex-row-reverse items-start max-w-[80%]">
-                                    <Avatar className="w-8 h-8 bg-blue border-2 border-border flex-shrink-0">
-                                        <AvatarFallback>U</AvatarFallback>
-                                    </Avatar>
-                                    <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark">
-                                        {renderMessage(message.content)}
+                <div className="flex flex-col gap-4 p-4">
+                    <AnimatePresence initial={false}>
+                        {messages.map((message) => (
+                            <React.Fragment key={message.id}>
+                                {message.role === 'user' && (
+                                    <div className="flex justify-end mb-4">
+                                        <div className="flex flex-row-reverse items-start max-w-[80%]">
+                                            <Avatar className="w-8 h-8 bg-blue border-2 border-border flex-shrink-0">
+                                                <AvatarFallback>U</AvatarFallback>
+                                            </Avatar>
+                                            <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                                <ReactMarkdown components={markdownComponents}>
+                                                    {message.content}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        )}
-                        {message.role === 'assistant' && (
-                            <div className="flex justify-start mb-4 w-full">
+                                )}
+                                {message.role === 'assistant' && (
+                                    <div className="flex justify-start mb-4 w-full">
+                                        <div className="flex flex-row items-start">
+                                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
+                                                <AvatarFallback>G</AvatarFallback>
+                                            </Avatar>
+                                            <div className="mx-2 p-4 text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                                <ReactMarkdown components={markdownComponents}>
+                                                    {message.content}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </React.Fragment>
+                        ))}
+                        {streamingMessage && (
+                            <div className="flex justify-start mb-4">
                                 <div className="flex flex-row items-start">
                                     <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
                                         <AvatarFallback>G</AvatarFallback>
                                     </Avatar>
-                                    <div className="mx-2 p-4 text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark">
-                                        {renderMessage(message.content)}
+                                    <div className="mx-2 px-4 text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
+                                        <ReactMarkdown components={markdownComponents}>
+                                            {streamingMessage}
+                                        </ReactMarkdown>
                                     </div>
                                 </div>
                             </div>
                         )}
-                    </React.Fragment>
-                ))}
-                {isLoading && streamingMessage && (
-                    <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start max-w-[80%]">
-                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
-                                <AvatarFallback>G</AvatarFallback>
-                            </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark">
-                                {renderMessage(streamingMessage)}
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {streamingCodeExplanation && (
-                    <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start max-w-[80%]">
-                            <Avatar className="w-8 bg-main h-8 flex-shrink-0">
-                                <AvatarFallback>G</AvatarFallback>
-                            </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
-                                {renderMessage(streamingCodeExplanation)}
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
+                    </AnimatePresence>
+                    <div ref={messagesEndRef} />
+                </div>
             </ScrollArea>
             {!isAtBottom && (
                 <Button
@@ -431,9 +384,8 @@ export function Chat({
                 <div className="flex space-x-2">
                     <div className="relative flex-grow">
                         <div
-                            className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                                file ? 'max-h-20' : 'max-h-0'
-                            }`}
+                            className={`transition-all duration-300 ease-in-out overflow-hidden ${file ? 'max-h-20' : 'max-h-0'
+                                }`}
                         >
                             {file && (
                                 <div className="px-3 flex justify-start mb-2">

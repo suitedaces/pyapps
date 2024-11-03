@@ -2,6 +2,7 @@ import { Anthropic } from '@anthropic-ai/sdk'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { CHAT_TITLE_PROMPT } from './prompts'
+import { DatabaseMessage } from './types'
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -13,31 +14,36 @@ const anthropic = new Anthropic({
 interface MessageState {
     messageStoredChatId: string | null
     processedChatIds: Set<string>
-}
-
-interface ChatMessage {
-    id: string
-    user_id: string
-    user_message: string
-    assistant_message: string
-    tool_calls: any
-    tool_results: any
-    token_count: number
-    created_at: string
+    toolInvocations: Map<string, Array<{
+        state: 'call' | 'result'
+        toolCallId: string
+        toolName: string
+        args: Record<string, any>
+        result?: any
+    }>>
 }
 
 class MessageStore {
     private state: MessageState = {
         messageStoredChatId: null,
         processedChatIds: new Set(),
+        toolInvocations: new Map()
     }
 
-    setMessageStored(chatId: string) {
+    setMessageStored(chatId: string, toolInvocations?: any[]) {
         this.state.messageStoredChatId = chatId
+        if (toolInvocations?.length) {
+            this.state.toolInvocations.set(chatId, toolInvocations)
+        }
+
         if (!this.state.processedChatIds.has(chatId)) {
             this.fetchTitle(chatId)
             this.state.processedChatIds.add(chatId)
         }
+    }
+
+    getToolInvocations(chatId: string) {
+        return this.state.toolInvocations.get(chatId) || []
     }
 
     async fetchTitle(chatId: string) {
@@ -63,7 +69,7 @@ class MessageStore {
 
             console.log('Fetched data to generate title:', data)
 
-            const messages = data as ChatMessage[]
+            const messages = data as DatabaseMessage[]
             const userMessage = messages[0]?.user_message || ''
             const assistantMessage = messages[0]?.assistant_message || ''
 
