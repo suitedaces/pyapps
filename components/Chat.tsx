@@ -128,9 +128,11 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
 
     // Simplified form submission handler
     const handleSubmit = useCallback(
-        async (e: React.FormEvent<HTMLFormElement>) => {
-            e.preventDefault()
-            e.stopPropagation()
+        async (e?: React.FormEvent<HTMLFormElement>) => {
+            if (e) {
+                e.preventDefault()
+                e.stopPropagation()
+            }
 
             const trimmedInput = input.trim()
             if (!trimmedInput) return
@@ -138,24 +140,15 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             try {
                 if (!chatId) {
                     const newChatId = await createNewChat()
-                    if (!newChatId) {
-                        throw new Error('Failed to create chat')
-                    }
+                    if (!newChatId) throw new Error('Failed to create chat')
+
+                    // Wait for chat creation to complete
+                    await new Promise(resolve => setTimeout(resolve, 100))
                     onChatCreated?.(newChatId)
                     return
                 }
 
-                // Single state update for user message
-                const userMessage = {
-                    id: generateUUID(),
-                    role: 'user' as const,
-                    content: trimmedInput,
-                    createdAt: new Date()
-                }
-
-                setMessages(prev => [...prev, userMessage])
-
-                // Call submit without event object
+                // Let useChat handle the message creation
                 await originalHandleSubmit(undefined as any)
             } catch (error) {
                 console.error('Error handling submit:', error)
@@ -220,11 +213,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
 
             {/* Add onSubmit directly to form and prevent default */}
             <form
-                onSubmit={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleSubmit(e)
-                }}
+                onSubmit={handleSubmit}
                 className="p-4 m-auto w-full max-w-[800px]"
             >
                 <div className="flex space-x-2">
@@ -238,13 +227,12 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault()
-                                    handleSubmit(e as any)
+                                    handleSubmit()
                                 }
                             }}
                         />
                         <Button
-                            type="button" // Change to button type
-                            onClick={(e) => handleSubmit(e as any)}
+                            type="submit"
                             disabled={isLoading || !input.trim()}
                             className="absolute right-2 bottom-2"
                         >
@@ -261,7 +249,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             {error && (
                 <div className="p-4 text-center">
                     <p className="text-red-500">An error occurred. Please try again.</p>
-                    <Button onClick={() => reload()} className="mt-2">
+                    <Button disabled={isLoading} className="mt-2">
                         Retry
                     </Button>
                 </div>
