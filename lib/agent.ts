@@ -166,8 +166,7 @@ export class GruntyAgent {
                 console.log('📝 Starting text stream processing')
                 for await (const chunk of textStream) {
                     collectedContent += chunk
-                    const text = `0:${JSON.stringify(chunk)}\n`
-                    writer.write(encoder.encode(text))
+                    writer.write(encoder.encode(chunk))
                     console.log('📤 Streamed chunk:', chunk.substring(0, 50) + '...')
                 }
 

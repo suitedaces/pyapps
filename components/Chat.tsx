@@ -109,12 +109,23 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
         id: chatId ?? undefined,
         initialMessages: allMessages,
+        streamProtocol: 'text',
         body: {
             model: currentModel,
             config: languageModel,
         },
         onResponse: (response) => {
             if (!response.ok) {
+                // Check specific error cases
+                if (response.status === 429) {
+                    setErrorState(new Error("Rate limit exceeded. Please wait a moment before trying again."))
+                } else if (response.status === 413) {
+                    setErrorState(new Error("Message too long. Please try a shorter message."))
+                } else if (response.status >= 500) {
+                    setErrorState(new Error("Server error. Please try again later."))
+                } else {
+                    setErrorState(new Error(`Request failed with status: ${response.status}`))
+                }
                 throw new Error(`HTTP error! status: ${response.status}`)
             }
         },
@@ -149,7 +160,14 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         },
         onError: (error) => {
             console.error('Chat Error:', error)
-            setErrorState(error)
+            // Only set error if it's not already set by onResponse
+            if (!errorState) {
+                if (error.message.includes('Failed to fetch')) {
+                    setErrorState(new Error('Network error. Please check your connection.'))
+                } else {
+                    setErrorState(error)
+                }
+            }
         }
     })
 
@@ -200,6 +218,13 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         }
     }, [messages])
 
+    // Add error cleanup on component unmount
+    useEffect(() => {
+        return () => {
+            setErrorState(null)
+        }
+    }, [])
+
     // Textarea handler
     const handleTextareaChange = useCallback((
         e: React.ChangeEvent<HTMLTextAreaElement>
@@ -242,7 +267,9 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
                     exit={{ opacity: 0, y: 10 }}
                     className="p-4 text-center"
                 >
-                    <p className="text-red-500 mb-2">An error occurred. Please try again.</p>
+                    <p className="text-red-500 mb-2">
+                    An error occurred. Please try again. {errorState.message}
+                    </p>
                     <Button
                         onClick={handleRetry}
                         disabled={isLoading}
