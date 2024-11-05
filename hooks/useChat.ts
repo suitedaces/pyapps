@@ -418,9 +418,16 @@ export function useChat(chatId: string | null) {
                 const analysisData = await analysisResponse.json()
                 console.log('CSV analyzed:', analysisData)
 
+                const rows = sanitizedContent.split('\n')
+                const columnNames = rows[0]
+                const previewRows = rows.slice(1, 6).join('\n')
+                const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
                 const newUserMessage: ClientMessage = {
                     role: 'user',
-                    content: `I've uploaded a CSV file named "${fileName}". Can you analyze it and create a complex, aesthetic Streamlit app to visualize the data? Make sure to use the exact column names when reading the CSV in your code. The file is located at '/home/user/${fileName}' in the sandbox. CSV Analysis: ${analysisData}`,
+                    content: `I've uploaded "${fileName}". Create a Streamlit app to visualize this data. The file is at '/home/user/${fileName}'.
+${dataPreview}
+Create a complex, aesthetic visualization using these exact column names.`,
                     created_at: new Date(),
                 }
 
