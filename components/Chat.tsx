@@ -32,6 +32,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
     const [currentChatId, setCurrentChatId] = useState<string | null>(chatId)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const queryClient = useQueryClient()
+    const [errorState, setErrorState] = useState<Error | null>(null)
 
     // Get model configuration from localStorage
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -102,8 +103,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         handleInputChange,
         handleSubmit: originalHandleSubmit,
         isLoading,
-        error,
-        reload,
+        error: chatError,
         setMessages
     } = useChat({
         api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
@@ -141,13 +141,32 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
                 }
             }
 
+            // Clear any existing errors
+            setErrorState(null)
+
             // Invalidate queries
             queryClient.invalidateQueries({ queryKey: ['chat-messages', chatId] })
         },
         onError: (error) => {
             console.error('Chat Error:', error)
+            setErrorState(error)
         }
     })
+
+    // Handle retry
+    const handleRetry = useCallback(async () => {
+        setErrorState(null)
+        if (messages.length > 0) {
+            const lastUserMessage = messages[messages.length - 1]
+            if (lastUserMessage.role === 'user') {
+                try {
+                    await originalHandleSubmit(undefined as any)
+                } catch (e) {
+                    console.error('Retry failed:', e)
+                }
+            }
+        }
+    }, [messages, originalHandleSubmit])
 
     // Simplified form submission handler
     const handleSubmit = useCallback(
@@ -165,18 +184,10 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
                 await originalHandleSubmit(undefined as any)
             } catch (error) {
                 console.error('Error handling submit:', error)
-                setMessages(prev => [
-                    ...prev,
-                    {
-                        id: generateUUID(),
-                        role: 'system' as const,
-                        content: 'Failed to send message. Please try again.',
-                        createdAt: new Date()
-                    }
-                ])
+                setErrorState(new Error('Failed to send message. Please try again.'))
             }
         },
-        [originalHandleSubmit, input, setMessages]
+        [originalHandleSubmit, input]
     )
 
     // Update scroll effect to be more efficient
@@ -224,48 +235,58 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
                 <div ref={messagesEndRef} />
             </ScrollArea>
 
-            {/* Add onSubmit directly to form and prevent default */}
-            <form
-                onSubmit={handleSubmit}
-                className="p-4 m-auto w-full max-w-[800px]"
-            >
-                <div className="flex space-x-2">
-                    <div className="relative flex-grow">
-                        <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={handleTextareaChange}
-                            placeholder="Type your message..."
-                            className="relative flex w-full min-h-[80px] max-h-[200px] bg-bg rounded-3xl px-4 py-3 text-sm resize-none"
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    handleSubmit()
-                                }
-                            }}
-                        />
-                        <Button
-                            type="submit"
-                            disabled={isLoading || !input.trim()}
-                            className="absolute right-2 bottom-2"
-                        >
-                            {isLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Send className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </div>
-                </div>
-            </form>
-
-            {error && (
-                <div className="p-4 text-center">
-                    <p className="text-red-500">An error occurred. Please try again.</p>
-                    <Button disabled={isLoading} className="mt-2">
+            {errorState ? (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="p-4 text-center"
+                >
+                    <p className="text-red-500 mb-2">An error occurred. Please try again.</p>
+                    <Button
+                        onClick={handleRetry}
+                        disabled={isLoading}
+                        variant="secondary"
+                        size="sm"
+                    >
                         Retry
                     </Button>
-                </div>
+                </motion.div>
+            ) : (
+                <form
+                    onSubmit={handleSubmit}
+                    className="p-4 m-auto w-full max-w-[800px]"
+                >
+                    <div className="flex space-x-2">
+                        <div className="relative flex-grow">
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={handleTextareaChange}
+                                placeholder="Type your message..."
+                                className="relative flex w-full min-h-[80px] max-h-[200px] bg-bg rounded-3xl px-4 py-3 text-sm resize-none"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        handleSubmit()
+                                    }
+                                }}
+                                disabled={isLoading}
+                            />
+                            <Button
+                                type="submit"
+                                disabled={isLoading || !input.trim()}
+                                className="absolute right-2 bottom-2"
+                            >
+                                {isLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </form>
             )}
         </div>
     )

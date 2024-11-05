@@ -28,8 +28,23 @@ export async function POST(req: NextRequest) {
             return new Response('No messages provided', { status: 400 })
         }
 
-        // Generate a temporary chat ID for processing
-        const tempChatId = generateUUID()
+        // Generate a new chat ID
+        const chatId = generateUUID()
+
+        // Create the chat first
+        const { error: chatError } = await supabase
+            .from('chats')
+            .insert([
+                {
+                    id: chatId,
+                    user_id: session.user.id,
+                    name: messages[0].content.slice(0, 50) + '...',
+                }
+            ])
+
+        if (chatError) {
+            throw new Error(`Failed to create chat: ${chatError.message}`)
+        }
 
         const coreMessages = convertToCoreMessages(messages)
         const modelClient = getModelClient(model, {
@@ -50,80 +65,34 @@ export async function POST(req: NextRequest) {
 
         // Get the stream response
         const stream = await agent.streamResponse(
-            tempChatId,
+            chatId,
             session.user.id,
             coreMessages,
             tools,
             null
         )
 
-        // Create a transform stream to collect the entire response
+        // Create a transform stream to add the chat ID at the end
         const { readable, writable } = new TransformStream()
-        let assistantResponse = ''
+        const textDecoder = new TextDecoderStream()
+        const textEncoder = new TextEncoderStream()
 
-        // Create a new TextDecoderStream to decode the chunks
-        const decoder = new TextDecoderStream()
-        const encoder = new TextEncoderStream()
-
-        // Chain the streams together
         stream.body
-            ?.pipeThrough(decoder)
+            ?.pipeThrough(textDecoder)
             .pipeThrough(new TransformStream({
                 transform(chunk, controller) {
-                    assistantResponse += chunk
                     controller.enqueue(chunk)
                 },
-                flush: async (controller) => {
-                    // Create the actual chat after we have the full response
-                    const finalChatId = generateUUID()
-                    const { error: chatError } = await supabase
-                        .from('chats')
-                        .insert([
-                            {
-                                id: finalChatId,
-                                user_id: session.user.id,
-                                name: messages[0].content.slice(0, 50) + '...',
-                            }
-                        ])
-
-                    if (chatError) {
-                        console.error('Failed to create chat:', chatError)
-                        controller.error(chatError)
-                        return
-                    }
-
-                    // Store the message pair
-                    const { error: messageError } = await supabase
-                        .from('messages')
-                        .insert([
-                            {
-                                chat_id: finalChatId,
-                                user_id: session.user.id,
-                                user_message: messages[0].content,
-                                assistant_message: assistantResponse,
-                                token_count: 0, // You might want to calculate this
-                            }
-                        ])
-
-                    if (messageError) {
-                        console.error('Failed to store message:', messageError)
-                        controller.error(messageError)
-                        return
-                    }
-
-                    // Add a special marker to indicate the end of the stream
-                    controller.enqueue(`\n__CHAT_ID__${finalChatId}__`)
+                flush(controller) {
+                    // Add the chat ID marker at the end
+                    controller.enqueue(`\n__CHAT_ID__${chatId}__`)
                 }
             }))
-            .pipeThrough(encoder)
+            .pipeThrough(textEncoder)
             .pipeTo(writable)
 
-        // Add headers
-        const headers = new Headers(stream.headers)
-        headers.set('Content-Type', 'text/plain; charset=utf-8')
-
         return new Response(readable, {
-            headers,
+            headers: stream.headers,
             status: 200,
         })
 
