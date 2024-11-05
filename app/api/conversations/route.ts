@@ -99,53 +99,49 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    console.log('📝 Creating new chat')
+
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+        console.log('❌ No session found')
+        return new Response('Unauthorized', { status: 401 })
+    }
+
     try {
-        const supabase = createRouteHandlerClient({ cookies })
-        const {
-            data: { session },
-        } = await supabase.auth.getSession()
+        const { chatId } = await req.json() // Get the generated UUID from request body
 
-        if (!session) {
-            return NextResponse.json(
-                { error: 'Not authenticated' },
-                { status: 401 }
-            )
-        }
-
-        const { name, appId } = await req.json()
-
-        const { data, error } = await supabase
+        // Create a new chat with the provided UUID
+        const { data: newChat, error } = await supabase
             .from('chats')
-            .insert({
+            .insert([{
+                id: chatId, // Use the provided UUID
                 user_id: session.user.id,
-                name,
-                app_id: appId,
+                name: 'New Chat',
                 created_at: new Date().toISOString(),
-            })
+            }])
             .select()
             .single()
 
-        if (error) {
-            console.error('Database error:', error)
-            return NextResponse.json(
-                {
-                    error: 'Failed to create conversation',
-                    details: error.message,
-                },
-                { status: 500 }
-            )
-        }
+        if (error) throw error
 
-        return NextResponse.json(data)
+        console.log('✨ Created new chat:', newChat.id)
+        return new Response(JSON.stringify({ chatId: newChat.id }), {
+            headers: { 'Content-Type': 'application/json' }
+        })
+
     } catch (error) {
-        console.error('Error in POST conversations:', error)
-        return NextResponse.json(
+        console.error('❌ Error creating chat:', error)
+        return new Response(
+            JSON.stringify({
+                error: 'Failed to create chat',
+                details: error instanceof Error ? error.message : 'Unknown error'
+            }),
             {
-                error: 'Failed to create conversation',
-                details:
-                    error instanceof Error ? error.message : 'Unknown error',
-            },
-            { status: 500 }
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            }
         )
     }
 }

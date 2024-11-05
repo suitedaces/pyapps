@@ -1,5 +1,5 @@
-import { Message as VercelMessage } from 'ai'
-import { DatabaseMessage, ClientMessage, ToolInvocation } from './types'
+import { Message as VercelMessage, ToolInvocation as VercelToolInvocation } from 'ai'
+import { DatabaseMessage, ClientMessage } from './types'
 
 export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMessage[] {
     const messages: VercelMessage[] = []
@@ -16,7 +16,7 @@ export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMe
 
     // Map assistant message with tool invocations if exists
     if (dbMessage.assistant_message) {
-        const toolInvocations: ToolInvocation[] = []
+        const toolInvocations: VercelToolInvocation[] = []
 
         // Add tool calls if they exist
         if (dbMessage.tool_calls) {
@@ -60,10 +60,10 @@ export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMe
 export function mapVercelToClientMessage(vercelMessage: VercelMessage): ClientMessage {
     return {
         id: vercelMessage.id,
-        role: vercelMessage.role,
+        role: vercelMessage.role as ClientMessage['role'],
         content: vercelMessage.content,
-        createdAt: new Date(vercelMessage.createdAt),
-        toolInvocations: vercelMessage.toolInvocations
+        createdAt: vercelMessage.createdAt ? new Date(vercelMessage.createdAt) : new Date(),
+        toolInvocations: vercelMessage.toolInvocations as unknown as ClientMessage['toolInvocations']
     }
 }
 
@@ -96,7 +96,7 @@ export function mapVercelToDatabaseMessage(
         assistant_message: vercelMessage.role === 'assistant' ? vercelMessage.content : '',
         tool_calls: toolCalls,
         tool_results: toolResults,
-        created_at: new Date(vercelMessage.createdAt).toISOString(),
-        role: vercelMessage.role
+        created_at: vercelMessage.createdAt ? new Date(vercelMessage.createdAt).toISOString() : new Date().toISOString(),
+        role: vercelMessage.role as DatabaseMessage['role']
     }
 }

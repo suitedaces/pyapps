@@ -1,6 +1,6 @@
 import { mapVercelToClientMessage } from '@/lib/mappers'
 import modelsList from '@/lib/models.json'
-import { DatabaseMessage, LLMModelConfig } from '@/lib/types'
+import { DatabaseMessage, LLMModelConfig, ToolCall } from '@/lib/types'
 import {
     createClientComponentClient,
     Session,
@@ -10,11 +10,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 
 // Define type for tool calls to fix the map error
-interface ToolCallData {
-    id: string
-    name: string
-    parameters: Record<string, unknown>
-}
 
 export function useChat(chatId: string | null) {
     const [session, setSession] = useState<Session | null>(null)
@@ -75,9 +70,12 @@ export function useChat(chatId: string | null) {
             model: currentModel,
             config: languageModel,
         },
+        keepLastMessageOnError: true,
         onResponse: (response) => {
             const reader = response.body?.getReader()
             if (!reader) return
+
+            setStreamingMessage('')
 
             const processStream = async () => {
                 const decoder = new TextDecoder()
@@ -97,27 +95,19 @@ export function useChat(chatId: string | null) {
 
                             switch (parsed.type) {
                                 case 'text-delta':
-                                    setStreamingMessage((prev) => {
-                                        const newContent =
-                                            parsed.content || parsed.delta || ''
-                                        return prev + newContent
-                                    })
+                                    setStreamingMessage((prev) => prev + (parsed.content || parsed.delta || ''))
                                     break
                                 case 'generated_code':
                                     setGeneratedCode(parsed.content)
                                     setIsGeneratingCode(true)
                                     break
                                 case 'tool-call':
-                                    if (
-                                        parsed.name === 'create_streamlit_app'
-                                    ) {
+                                    if (parsed.name === 'create_streamlit_app') {
                                         setIsGeneratingCode(true)
                                     }
                                     break
                                 case 'tool-result':
-                                    if (
-                                        parsed.name === 'create_streamlit_app'
-                                    ) {
+                                    if (parsed.name === 'create_streamlit_app') {
                                         setGeneratedCode(parsed.content)
                                         setIsGeneratingCode(false)
                                     }
@@ -204,38 +194,35 @@ export function useChat(chatId: string | null) {
             const mappedMessages = dbMessages.flatMap((msg: DatabaseMessage) => {
                 const messages = []
 
-                // Add user message if it exists
-                if (msg.user_message) {
-                    messages.push({
-                        id: `${msg.id}-user`,
-                        role: 'user',
-                        content: msg.user_message,
-                        createdAt: new Date(msg.created_at)
-                    })
+                // Always add messages in pairs to maintain sequence
+                if (msg.user_message || msg.assistant_message) {
+                    if (msg.user_message) {
+                        messages.push({
+                            id: `${msg.id}-user`,
+                            role: 'user',
+                            content: msg.user_message,
+                            createdAt: new Date(msg.created_at)
+                        });
+                    }
+
+                    if (msg.assistant_message) {
+                        messages.push({
+                            id: `${msg.id}-assistant`,
+                            role: 'assistant',
+                            content: msg.assistant_message,
+                            createdAt: new Date(msg.created_at),
+                            toolInvocations: msg.tool_calls && Array.isArray(msg.tool_calls) ? (msg.tool_calls as ToolCall[]).map((call: ToolCall) => ({
+                                state: 'call',
+                                toolCallId: call.id,
+                                toolName: call.name,
+                                args: call.parameters
+                            })) : undefined
+                        });
+                    }
                 }
 
-                // Add assistant message if it exists
-                if (msg.assistant_message) {
-                    messages.push({
-                        id: `${msg.id}-assistant`,
-                        role: 'assistant',
-                        content: msg.assistant_message,
-                        createdAt: new Date(msg.created_at),
-                        toolInvocations: msg.tool_calls
-                            ? (msg.tool_calls as unknown as ToolCallData[]).map(
-                                  (call) => ({
-                                      state: 'call' as const,
-                                      toolCallId: call.id,
-                                      toolName: call.name,
-                                      args: call.parameters,
-                                  })
-                              )
-                            : undefined,
-                    })
-                }
-
-                return messages
-            })
+                return messages;
+            });
 
             console.log('📊 Mapped messages:', mappedMessages)
             setVercelMessages(mappedMessages)

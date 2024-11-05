@@ -24,7 +24,7 @@ const jupyterNotebookSchema = z.object({
 
 export const tools: Tool[] = [
     {
-        name: 'create_streamlit_app',
+        toolName: 'create_streamlit_app',
         description: 'Generates Python (Streamlit) code based on a given query',
         parameters: streamlitAppSchema,
         execute: async (input) => {
@@ -90,7 +90,7 @@ export async function generateCode(
 
 // Helper functions for tool management
 export function getToolByName(name: string): Tool | undefined {
-    return tools.find((tool) => tool.name === name)
+    return tools.find((tool) => tool.toolName === name)
 }
 
 export async function executeToolCall(

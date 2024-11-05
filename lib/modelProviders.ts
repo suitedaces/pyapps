@@ -1,100 +1,106 @@
-import { Anthropic } from '@anthropic-ai/sdk'
-import { ModelProvider, StreamParams } from './types'
+import { createAnthropic } from '@ai-sdk/anthropic'
+import { ModelProvider } from './types'
 
-export class AnthropicProvider implements ModelProvider {
-    private client: Anthropic
-    private modelId: string
-
-    constructor(apiKey: string, modelId: string) {
-        console.log('🔧 Initializing AnthropicProvider with model:', modelId)
-        this.client = new Anthropic({ apiKey })
-        this.modelId = modelId
-    }
-
-    get id(): string {
-        return this.modelId
-    }
-
-    async streamText(params: StreamParams): Promise<void> {
-        console.log('📡 AnthropicProvider.streamText called with:', {
-            modelId: this.modelId,
-            messageCount: params.messages.length,
-            hasTools: Boolean(params.tools?.length)
-        })
-
-        try {
-            const formattedTools = params.tools?.length ? params.tools.map(tool => ({
-                name: tool.name,
-                description: tool.description,
-                input_schema: {
-                    type: 'object',
-                    properties: tool.parameters.shape,
-                    required: Object.keys(tool.parameters.shape)
-                }
-            })) : undefined
-
-            if (formattedTools) {
-                console.log('🛠 Formatted tools:', JSON.stringify(formattedTools, null, 2))
-            }
-
-            const stream = await this.client.messages.create({
-                model: this.modelId,
-                messages: params.messages.map(msg => ({
-                    role: msg.role === 'user' ? 'user' : 'assistant',
-                    content: msg.content
-                })),
-                stream: true,
-                max_tokens: 4096,
-                temperature: 0.7,
-                system: params.messages.find(m => m.role === 'system')?.content,
-                ...(formattedTools && { tools: formattedTools })
-            })
-
-            console.log('🌊 Stream created successfully')
-
-            for await (const chunk of stream) {
-                console.log('📦 Received chunk:', chunk.type)
-
-                if (chunk.type === 'content_block_delta' && chunk.delta.text) {
-                    console.log('📝 Processing text delta:', chunk.delta.text.substring(0, 50) + '...')
-                    params.onToken(chunk.delta.text)
-                } else if (chunk.type === 'tool_call') {
-                    console.log('🔧 Processing tool call:', chunk.tool_call)
-                    if (params.onToolCall) {
-                        await params.onToolCall({
-                            id: chunk.tool_call.id,
-                            name: chunk.tool_call.type === 'function' ? chunk.tool_call.function.name : '',
-                            parameters: chunk.tool_call.type === 'function' ?
-                                JSON.parse(chunk.tool_call.function.arguments) : {}
-                        })
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('❌ Error in AnthropicProvider.streamText:', error)
-            throw error
-        }
-    }
+export interface LLMModel {
+  id: string
+  name: string
+  provider: string
+  providerId: string
 }
 
-export function getModelClient(model: any, config: any): ModelProvider {
-    console.log('🎯 getModelClient called with:', {
-        modelId: model?.id,
-        config: config
+export interface LLMModelConfig {
+  model?: string
+  apiKey?: string
+  baseURL?: string
+  temperature?: number
+  maxTokens?: number
+}
+
+// Provider factory functions with additional methods and properties
+export interface AnthropicProvider {
+  (modelId: string, settings?: any): ModelProvider
+  chat(modelId: string, settings?: any): ModelProvider
+}
+
+// Provider settings
+export interface AnthropicProviderSettings {
+  /**
+   * Use a different URL prefix for API calls
+   */
+  baseURL?: string
+
+  /**
+   * API key
+   */
+  apiKey?: string
+
+  /**
+   * Custom headers
+   */
+  headers?: Record<string, string>
+}
+
+// Provider factory function
+export function createAnthropicProvider(
+  options: AnthropicProviderSettings = {}
+): AnthropicProvider {
+  const anthropic = createAnthropic({
+    apiKey: options.apiKey || process.env.ANTHROPIC_API_KEY,
+    baseURL: options.baseURL,
+    headers: options.headers
+  })
+
+  const provider = function(modelId: string, settings?: any) {
+    if (new.target) {
+      throw new Error('Provider factory cannot be called with new')
+    }
+    return anthropic(modelId)
+  }
+
+  provider.chat = anthropic
+
+  return provider as unknown as AnthropicProvider
+}
+
+// Default provider instance
+export const anthropicProvider = createAnthropicProvider()
+
+export function getModelClient(model: LLMModel, config: LLMModelConfig): ModelProvider {
+  console.log('🎯 getModelClient called with:', {
+    modelId: model?.id,
+    config: config
+  })
+
+  if (!model?.id) {
+    console.error('❌ No model ID provided')
+    throw new Error('Model ID is required')
+  }
+
+  const { id: modelId, providerId } = model
+  const { apiKey, baseURL } = config
+
+  // Provider configurations
+  const providers = {
+    anthropic: () => anthropicProvider(modelId, {
+      apiKey,
+      baseURL
     })
+    // Add other providers here as needed
+  }
 
-    if (!model?.id) {
-        console.error('❌ No model ID provided')
-        throw new Error('Model ID is required')
-    }
+  const createClient = providers[providerId as keyof typeof providers]
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-        console.error('❌ ANTHROPIC_API_KEY not found in environment')
-        throw new Error('ANTHROPIC_API_KEY is required')
-    }
+  if (!createClient) {
+    throw new Error(`Unsupported provider: ${providerId}`)
+  }
 
-    const modelId = typeof model === 'string' ? model : model.id
-    console.log('🔑 Creating AnthropicProvider with modelId:', modelId)
+  return createClient()
+}
 
-    return new AnthropicProvider(process.env.ANTHROPIC_API_KEY, modelId)
+// Helper function to get default mode for providers
+export function getDefaultMode(model: LLMModel) {
+  const { providerId } = model
+
+  // Default to 'auto' for most providers
+  return 'auto'
 }

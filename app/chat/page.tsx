@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChat } from '@/hooks/useChat'
 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ClientMessage } from '@/lib/types'
 
 import {
     ResizableHandle,
@@ -69,8 +70,8 @@ export default function ChatPage() {
         streamlitUrl,
         generatedCode,
         streamingMessage,
-        streamingCodeExplanation,
         isGeneratingCode,
+        setMessages,
     } = useChat(currentChatId)
 
     const fetchAndSetChats = useCallback(async () => {
@@ -153,39 +154,53 @@ export default function ChatPage() {
         }
     }
 
-    const handleSubmitWrapper = useCallback(
-        async (e: React.FormEvent<HTMLFormElement>) => {
-            e.preventDefault()
-            console.log('handleSubmitWrapper called')
+    const handleSubmitWrapper = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        console.log('Submit wrapper called, currentChatId:', currentChatId)
 
-            if (!session || isAuthLoading || !input.trim()) {
-                console.log('Submit conditions not met:', { session, isAuthLoading, input })
-                return
-            }
+        if (!session) {
+            console.log('No session')
+            return
+        }
 
-            try {
-                let chatIdToUse = currentChatId
-                console.log('Current chatId:', chatIdToUse)
-
-                if (!chatIdToUse) {
-                    const newChatId = await createInitialChat()
-                    console.log('Created new chat:', newChatId)
-                    if (!newChatId) {
-                        console.error('Failed to create new chat')
-                        return
+        try {
+            // Always create a new chat if there isn't one
+            if (!currentChatId) {
+                console.log('Creating new chat...')
+                try {
+                    const response = await fetch('/api/conversations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: 'New Chat' })
+                    })
+                    if (!response.ok) {
+                        throw new Error('Failed to create new chat')
                     }
-                    chatIdToUse = newChatId
-                    router.replace(`/chat?chat=${newChatId}`)
-                }
+                    const data = await response.json()
+                    setCurrentChatId(data.id)
+                    router.replace(`/?chat=${data.id}`, { scroll: false })
+                    await fetchAndSetChats()
 
-                await handleSubmit(e)
-                await fetchAndSetChats()
-            } catch (error) {
-                console.error('Error in submit:', error)
+                    // Wait for state updates to propagate
+                    await new Promise(resolve => setTimeout(resolve, 100))
+
+                    // Refresh the page to ensure proper initialization
+                    window.location.reload()
+                    return
+                } catch (error) {
+                    console.error('Error creating new chat:', error)
+                    return
+                }
             }
-        },
-        [currentChatId, session, isAuthLoading, handleSubmit, input, fetchAndSetChats]
-    )
+
+            // Only proceed with submit if we have a valid chatId
+            console.log('Proceeding with submit for chat:', currentChatId)
+            await handleSubmit(e)
+            await fetchAndSetChats()
+        } catch (error) {
+            console.error('Error in submit:', error)
+        }
+    }, [currentChatId, session, handleSubmit, fetchAndSetChats, router])
 
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
@@ -218,15 +233,18 @@ export default function ChatPage() {
                         <ResizablePanel defaultSize={65} minSize={45}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
                                 <Chat
-                                    messages={messages}
+                                    messages={messages.map(msg => ({
+                                        ...msg,
+                                        createdAt: new Date(msg.createdAt || Date.now()),
+                                        created_at: new Date(msg.createdAt || Date.now()),
+                                        tool_calls: msg.toolInvocations ? [msg.toolInvocations] : undefined,
+                                        tool_results: null
+                                    } as ClientMessage))}
                                     input={input}
                                     handleInputChange={handleInputChangeWrapper}
                                     handleSubmit={handleSubmitWrapper}
                                     isLoading={isLoading}
                                     streamingMessage={streamingMessage}
-                                    streamingCodeExplanation={
-                                        streamingCodeExplanation
-                                    }
                                     handleFileUpload={handleFileUpload}
                                     currentChatId={currentChatId}
                                     onChatSelect={handleChatSelect}

@@ -21,11 +21,23 @@ export async function GET(
             throw error
         }
 
-        console.log('📬 Fetched messages:', messages.length)
-        return NextResponse.json({ messages })
+        // Transform messages to the expected format
+        const formattedMessages = messages.map(msg => ({
+            id: msg.id,
+            role: msg.role || 'assistant',
+            content: msg.user_message || msg.assistant_message,
+            created_at: msg.created_at,
+            tool_calls: msg.tool_calls,
+            tool_results: msg.tool_results
+        }))
+
+        return NextResponse.json({ messages: formattedMessages })
     } catch (error) {
         console.error('Error in GET /messages:', error)
-        return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
+        return NextResponse.json(
+            { error: 'Failed to fetch messages' },
+            { status: 500 }
+        )
     }
 }
 

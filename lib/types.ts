@@ -1,5 +1,5 @@
-import { Message } from 'ai'
 import { Json } from '@/lib/database.types'
+import { Message } from 'ai'
 import { z } from 'zod'
 
 // Model types
@@ -46,7 +46,7 @@ export interface DatabaseMessage {
     role: 'system' | 'user' | 'assistant' | 'tool'
     user_message: string
     assistant_message: string
-    tool_calls: Json | null
+    tool_calls: ToolCall[] | Json
     tool_results: Json | null
     token_count: number
     created_at: string
@@ -54,7 +54,7 @@ export interface DatabaseMessage {
 
 // Tool definition aligned with Vercel AI SDK
 export interface Tool {
-    name: string
+    toolName: string
     description: string
     parameters: z.ZodObject<any>
     execute: (parameters: Record<string, any>) => Promise<any>
@@ -71,12 +71,11 @@ export interface LLMModelConfig {
 }
 
 // Add this to your types.ts
-export interface ModelConfig {
+export type LLMModel = {
     id: string
-    provider: string
     name: string
-    temperature?: number
-    maxTokens?: number
+    provider: string
+    providerId: string
 }
 
 export interface ToolInvocation {
@@ -85,4 +84,10 @@ export interface ToolInvocation {
     toolName: string
     args: Record<string, any>
     result?: any
+}
+
+export interface ToolCall {
+    id: string
+    name: string
+    parameters: any
 }
