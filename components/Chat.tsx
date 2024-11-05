@@ -106,7 +106,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         reload,
         setMessages
     } = useChat({
-        api: chatId ? `/api/conversations/${chatId}/stream` : undefined,
+        api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
         id: chatId ?? undefined,
         initialMessages: allMessages,
         body: {
@@ -120,6 +120,29 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         },
         onFinish: async (message) => {
             console.log('Chat Finished:', message)
+
+            // Check if this was a new chat by looking for the chat ID marker
+            if (!chatId && message.content) {
+                const match = message.content.match(/__CHAT_ID__(.+)__/)
+                if (match) {
+                    const newChatId = match[1]
+                    // Remove the marker from the message content
+                    const cleanContent = message.content.replace(/__CHAT_ID__(.+)__/, '')
+
+                    // Update the message content
+                    setMessages(prev => prev.map(msg =>
+                        msg.id === message.id
+                            ? { ...msg, content: cleanContent }
+                            : msg
+                    ))
+
+                    // Now update the URL and notify parent
+                    onChatCreated?.(newChatId)
+                }
+            }
+
+            // Invalidate queries
+            queryClient.invalidateQueries({ queryKey: ['chat-messages', chatId] })
         },
         onError: (error) => {
             console.error('Chat Error:', error)
@@ -138,17 +161,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             if (!trimmedInput) return
 
             try {
-                if (!chatId) {
-                    const newChatId = await createNewChat()
-                    if (!newChatId) throw new Error('Failed to create chat')
-
-                    // Wait for chat creation to complete
-                    await new Promise(resolve => setTimeout(resolve, 100))
-                    onChatCreated?.(newChatId)
-                    return
-                }
-
-                // Let useChat handle the message creation
+                // We can now directly submit since the stream endpoint handles both cases
                 await originalHandleSubmit(undefined as any)
             } catch (error) {
                 console.error('Error handling submit:', error)
@@ -163,7 +176,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
                 ])
             }
         },
-        [chatId, createNewChat, originalHandleSubmit, onChatCreated, input, setMessages]
+        [originalHandleSubmit, input, setMessages]
     )
 
     // Update scroll effect to be more efficient

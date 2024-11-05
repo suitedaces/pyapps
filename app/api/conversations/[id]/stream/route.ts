@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Validate chat ID
     if (!params.id || params.id === 'null' || params.id === 'undefined') {
-        console.log('❌ Invalid chat ID:', params.id)
+        console.log('❌ Invalid chat ID:', params.id) 
         return new Response('Invalid chat ID', { status: 400 })
     }
 
