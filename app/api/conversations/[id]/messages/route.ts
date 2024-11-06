@@ -7,9 +7,14 @@ export async function GET(
     req: Request,
     { params }: { params: { id: string } }
 ) {
+    console.log('📥 GET /api/conversations/[id]/messages', {
+        chatId: params.id
+    })
+
     const supabase = createRouteHandlerClient({ cookies })
 
     try {
+        console.log('🔍 Querying Supabase for messages')
         const { data: messages, error } = await supabase
             .from('messages')
             .select('*')
@@ -17,23 +22,19 @@ export async function GET(
             .order('created_at', { ascending: true })
 
         if (error) {
-            console.error('Error fetching messages:', error)
+            console.error('❌ Supabase error:', error)
             throw error
         }
 
-        // Transform messages to the expected format
-        const formattedMessages = messages.map(msg => ({
-            id: msg.id,
-            role: msg.role || 'assistant',
-            content: msg.user_message || msg.assistant_message,
-            created_at: msg.created_at,
-            tool_calls: msg.tool_calls,
-            tool_results: msg.tool_results
-        }))
+        console.log('✅ Messages retrieved:', {
+            count: messages.length,
+            firstMessage: messages[0],
+            lastMessage: messages[messages.length - 1]
+        })
 
-        return NextResponse.json({ messages: formattedMessages })
+        return NextResponse.json({ messages })
     } catch (error) {
-        console.error('Error in GET /messages:', error)
+        console.error('🚨 Error in GET /messages:', error)
         return NextResponse.json(
             { error: 'Failed to fetch messages' },
             { status: 500 }

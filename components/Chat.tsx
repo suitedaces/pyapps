@@ -26,7 +26,6 @@ interface ChatProps {
 }
 
 export function Chat({ chatId = null, initialMessages = [], onChatCreated }: ChatProps) {
-    const router = useRouter()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [currentChatId, setCurrentChatId] = useState<string | null>(chatId)
@@ -43,133 +42,158 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         (model) => model.id === languageModel.model
     )
 
-    // Create a new chat when needed
-    const createNewChat = useCallback(async () => {
-        try {
-            setIsCreatingChat(true)
-            const newChatId = generateUUID()
+    // Add debug logging for props and state
+    useEffect(() => {
+        console.log('🔄 Chat Component Props:', {
+            chatId,
+            initialMessagesLength: initialMessages.length,
+        })
+        console.log('🏷️ Current Chat ID:', currentChatId)
+    }, [chatId, initialMessages, currentChatId])
 
-            const response = await fetch('/api/conversations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ chatId: newChatId })
-            })
-
-            if (!response.ok) throw new Error('Failed to create chat')
-
-            setCurrentChatId(newChatId)
-            onChatCreated?.(newChatId)
-            return newChatId
-        } catch (error) {
-            console.error('Error creating chat:', error)
-            return null
-        } finally {
-            setIsCreatingChat(false)
-        }
-    }, [onChatCreated])
-
-    // Fetch messages using React Query
-    const { data: chatMessages, isLoading: isLoadingMessages } = useQuery({
+    // Enhanced message fetching with debug logs
+    const { data: fetchedMessages, isLoading: isLoadingMessages } = useQuery({
         queryKey: ['chat-messages', chatId],
         queryFn: async () => {
-            if (!chatId) return []
-            const response = await fetch(`/api/conversations/${chatId}/messages`)
-            if (!response.ok) throw new Error('Failed to fetch messages')
-            const data = await response.json()
-            return data.messages.map((msg: any) => ({
-                id: msg.id,
-                role: msg.role || (msg.user_message ? 'user' : 'assistant'),
-                content: msg.user_message || msg.assistant_message,
-                createdAt: new Date(msg.created_at),
-                toolCalls: msg.tool_calls,
-                toolResults: msg.tool_results
-            }))
+            console.log('📥 Fetching messages for chatId:', chatId)
+            if (!chatId) {
+                console.log('⚠️ No chatId available, returning empty array')
+                return []
+            }
+
+            try {
+                const response = await fetch(`/api/conversations/${chatId}/messages`)
+                console.log('🌐 API Response status:', response.status)
+
+                if (!response.ok) {
+                    console.error('❌ Failed to fetch messages:', response.statusText)
+                    throw new Error('Failed to fetch messages')
+                }
+
+                const data = await response.json()
+                console.log('📦 Raw messages from API:', data)
+
+                const mappedMessages = data.messages.map((msg: any) => {
+                    console.log('🔄 Processing message:', msg)
+                    return {
+                        id: msg.id,
+                        role: msg.role || (msg.user_message ? 'user' : 'assistant'),
+                        content: msg.user_message || msg.assistant_message,
+                        createdAt: new Date(msg.created_at),
+                        toolCalls: msg.tool_calls,
+                        toolResults: msg.tool_results
+                    }
+                })
+
+                console.log('✨ Mapped messages:', mappedMessages)
+                return mappedMessages
+            } catch (error) {
+                console.error('🚨 Error in fetchMessages:', error)
+                throw error
+            }
         },
         enabled: !!chatId,
-        staleTime: 1000 * 60, // Consider messages fresh for 1 minute
+        retry: 2,
+        staleTime: 1000 * 60,
     })
 
-    // Combine messages for chat
-    const allMessages = useMemo(() => {
-        if (!chatMessages) return initialMessages
-        return chatMessages
-    }, [chatMessages, initialMessages])
-
+    // Initialize Vercel AI SDK chat with proper message handling
     const {
         messages,
         input,
         handleInputChange,
         handleSubmit: originalHandleSubmit,
         isLoading,
-        error: chatError,
+        error,
         setMessages
     } = useChat({
         api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
         id: chatId ?? undefined,
-        initialMessages: allMessages,
-        streamProtocol: 'text',
+        initialMessages: fetchedMessages || [],
         body: {
             model: currentModel,
             config: languageModel,
         },
+        streamProtocol: 'text',
         onResponse: (response) => {
+            console.log('🎯 Stream Response:', {
+                status: response.status,
+                ok: response.ok
+            })
             if (!response.ok) {
-                // Check specific error cases
-                if (response.status === 429) {
-                    setErrorState(new Error("Rate limit exceeded. Please wait a moment before trying again."))
-                } else if (response.status === 413) {
-                    setErrorState(new Error("Message too long. Please try a shorter message."))
-                } else if (response.status >= 500) {
-                    setErrorState(new Error("Server error. Please try again later."))
-                } else {
-                    setErrorState(new Error(`Request failed with status: ${response.status}`))
-                }
-                throw new Error(`HTTP error! status: ${response.status}`)
+                handleResponseError(response)
             }
         },
         onFinish: async (message) => {
-            console.log('Chat Finished:', message)
+            console.log('✅ Message finished:', message)
 
-            // Check if this was a new chat by looking for the chat ID marker
             if (!chatId && message.content) {
+                console.log('🔍 Checking for chat ID in message')
                 const match = message.content.match(/__CHAT_ID__(.+)__/)
                 if (match) {
                     const newChatId = match[1]
-                    // Remove the marker from the message content
+                    console.log('🆕 New chat ID found:', newChatId)
                     const cleanContent = message.content.replace(/__CHAT_ID__(.+)__/, '')
 
-                    // Update the message content
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === message.id
-                            ? { ...msg, content: cleanContent }
-                            : msg
-                    ))
+                    console.log('🧹 Cleaned message content:', cleanContent)
+                    setMessages(prev => {
+                        console.log('📝 Updating messages with clean content')
+                        return prev.map(msg =>
+                            msg.id === message.id ? { ...msg, content: cleanContent } : msg
+                        )
+                    })
 
-                    // Now update the URL and notify parent
                     onChatCreated?.(newChatId)
                 }
             }
 
-            // Clear any existing errors
-            setErrorState(null)
-
-            // Invalidate queries
+            console.log('🔄 Invalidating messages query for chatId:', chatId)
             queryClient.invalidateQueries({ queryKey: ['chat-messages', chatId] })
+            setErrorState(null)
         },
         onError: (error) => {
-            console.error('Chat Error:', error)
-            // Only set error if it's not already set by onResponse
-            if (!errorState) {
-                if (error.message.includes('Failed to fetch')) {
-                    setErrorState(new Error('Network error. Please check your connection.'))
-                } else {
-                    setErrorState(error)
-                }
-            }
+            console.error('❌ Chat Error:', error)
+            handleChatError(error)
         }
     })
+
+    // Enhanced effect for message updates
+    useEffect(() => {
+        console.log('📨 Fetched Messages Changed:', {
+            hasMessages: !!fetchedMessages?.length,
+            messageCount: fetchedMessages?.length
+        })
+        if (fetchedMessages?.length) {
+            console.log('🔄 Updating messages with fetched data')
+            setMessages(fetchedMessages)
+        }
+    }, [fetchedMessages, setMessages])
+
+    // Log current messages state
+    useEffect(() => {
+        console.log('📊 Current Messages State:', messages)
+    }, [messages])
+
+    // Helper function to handle response errors
+    const handleResponseError = (response: Response) => {
+        const errorMessage = response.status === 429
+            ? "Rate limit exceeded. Please wait a moment."
+            : response.status === 413
+                ? "Message too long. Please try a shorter message."
+                : "An error occurred. Please try again."
+
+        setErrorState(new Error(errorMessage))
+    }
+
+    // Helper function to handle chat errors
+    const handleChatError = (error: Error) => {
+        if (!errorState) {
+            const errorMessage = error.message.includes('Failed to fetch')
+                ? 'Network error. Please check your connection.'
+                : error.message
+            setErrorState(new Error(errorMessage))
+        }
+    }
 
     // Handle retry
     const handleRetry = useCallback(async () => {
@@ -236,14 +260,21 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         }
     }, [handleInputChange])
 
-    // Show loading state
+    // Enhanced loading state
     if (isLoadingMessages) {
+        console.log('⌛ Loading messages...')
         return (
             <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-6 w-6 animate-spin" />
             </div>
         )
     }
+
+    console.log('🎨 Rendering Chat Component:', {
+        messageCount: messages.length,
+        isLoading,
+        hasError: !!error || !!errorState
+    })
 
     return (
         <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">

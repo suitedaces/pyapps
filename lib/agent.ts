@@ -290,8 +290,8 @@ export class GruntyAgent {
             chatId,
             userId,
             messagePreview: {
-                user: message.user_message.substring(0, 50) + '...',
-                assistant: message.assistant_message.substring(0, 50) + '...',
+                user: message.user_message,
+                assistant: message.assistant_message,
                 toolCalls: message.tool_calls.length,
                 toolResults: message.tool_results.length
             }

@@ -43,14 +43,14 @@ export default function Home() {
     // Handle chat creation callback
     const handleChatCreated = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-        window.history.replaceState(null, '', `/?chat=${chatId}`)
-    }, [])
+        router.replace(`/chat/${chatId}`)
+    }, [router])
 
     // Handle chat selection
     const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-        window.history.replaceState(null, '', `/?chat=${chatId}`)
-    }, [])
+        router.replace(`/chat/${chatId}`)
+    }, [router])
 
     // Handle new chat creation
     const handleNewChat = useCallback(async () => {
