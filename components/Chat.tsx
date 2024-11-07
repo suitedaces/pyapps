@@ -27,8 +27,6 @@ interface ChatProps {
 export function Chat({ chatId = null, initialMessages = [], onChatCreated }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
-    const [currentChatId, setCurrentChatId] = useState<string | null>(chatId)
-    const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [errorState, setErrorState] = useState<Error | null>(null)
 
     // Get model configuration from localStorage
@@ -40,18 +38,9 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         (model) => model.id === languageModel.model
     )
 
-    // Add debug logging for props and state
-    useEffect(() => {
-        console.log('🔄 Chat Component Props:', {
-            chatId,
-            initialMessagesLength: initialMessages.length,
-        })
-        console.log('🏷️ Current Chat ID:', currentChatId)
-    }, [chatId, initialMessages, currentChatId])
-
-    // Initialize Vercel AI SDK chat with simplified configuration
+    // Initialize Vercel AI SDK chat with initialMessages
     const {
-        messages,
+        messages: aiMessages,
         input,
         handleInputChange,
         handleSubmit: originalHandleSubmit,
@@ -62,15 +51,10 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
         id: chatId ?? undefined,
         initialMessages,
+        streamProtocol: 'text',
         body: {
             model: currentModel,
             config: languageModel,
-        },
-        streamProtocol: 'text',
-        experimental_onFunctionCall: async (message, functionCall) => {
-            // Handle function/tool calls if needed
-            console.log('Function called:', functionCall)
-            return undefined // or handle the function call result
         },
         onResponse: (response) => {
             console.log('🎯 Stream Response:', {
@@ -112,6 +96,18 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             handleChatError(error)
         }
     })
+
+    // Combine initialMessages with AI messages
+    const messages = useMemo(() => {
+        const allMessages = [...initialMessages, ...aiMessages]
+        const uniqueMessages = Array.from(new Map(allMessages.map(msg => [msg.id, msg])).values())
+        console.log('Combining messages:', {
+            initialMessages: initialMessages.length,
+            aiMessages: aiMessages.length,
+            uniqueMessages: uniqueMessages.length
+        })
+        return uniqueMessages
+    }, [initialMessages, aiMessages])
 
     // Log current messages state
     useEffect(() => {

@@ -11,8 +11,10 @@ import { useChat } from '@/hooks/useChat'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+
+import { Message } from 'ai'
 
 import {
     ResizableHandle,
@@ -22,7 +24,6 @@ import {
 
 import AppSidebar from '@/components/Sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { ClientMessage } from '@/lib/types'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -56,10 +57,11 @@ export default function ChatPageClient({
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [isAtBottom, setIsAtBottom] = useState(true)
     const [session, setSession] = useState<Session | null>(initialSession)
-    const [currentChatId, setCurrentChatId] = useState<string | null>(
-        initialChat.id
-    )
+    const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat.id)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
+    const [initialMessages, setInitialMessages] = useState<Message[]>([])
+    const [isLoading, setIsLoading] = useState(false)
+
 
     const supabase = createClientComponentClient()
     const {
@@ -67,7 +69,6 @@ export default function ChatPageClient({
         input,
         handleInputChange,
         handleSubmit,
-        isLoading,
         handleFileUpload,
         csvFileName,
         csvContent,
@@ -81,6 +82,47 @@ export default function ChatPageClient({
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
 
     const router = useRouter()
+    const { id } = useParams()
+
+    useEffect(() => {
+        async function fetchMessages() {
+            try {
+                const response = await fetch(`/api/conversations/${id}/messages`)
+                if (!response.ok) throw new Error('Failed to fetch messages')
+                const data = await response.json()
+
+                // Transform messages to the format expected by the AI SDK
+                const messages: Message[] = data.messages.flatMap((msg: any) => {
+                    const messages: Message[] = []
+                    if (msg.user_message) {
+                        messages.push({
+                            id: `${msg.id}-user`,
+                            role: 'user',
+                            content: msg.user_message,
+                        })
+                    }
+                    if (msg.assistant_message) {
+                        messages.push({
+                            id: `${msg.id}-assistant`,
+                            role: 'assistant',
+                            content: msg.assistant_message,
+                        })
+                    }
+                    return messages
+                })
+
+                setInitialMessages(messages)
+            } catch (error) {
+                console.error('Error fetching messages:', error)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        if (id) {
+            fetchMessages()
+        }
+    }, [id])
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -174,7 +216,7 @@ export default function ChatPageClient({
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
                                 <Chat
                                     chatId={currentChatId}
-                                    initialMessages={[]}
+                                    initialMessages={initialMessages}
                                     onChatCreated={handleChatCreated}
                                 />
                             </div>
