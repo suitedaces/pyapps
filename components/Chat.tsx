@@ -17,7 +17,6 @@ import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
 import { generateUUID } from '@/lib/utils'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 interface ChatProps {
     chatId?: string | null
@@ -30,7 +29,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [currentChatId, setCurrentChatId] = useState<string | null>(chatId)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
-    const queryClient = useQueryClient()
     const [errorState, setErrorState] = useState<Error | null>(null)
 
     // Get model configuration from localStorage
@@ -51,53 +49,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         console.log('🏷️ Current Chat ID:', currentChatId)
     }, [chatId, initialMessages, currentChatId])
 
-    // Enhanced message fetching with debug logs
-    const { data: fetchedMessages, isLoading: isLoadingMessages } = useQuery({
-        queryKey: ['chat-messages', chatId],
-        queryFn: async () => {
-            console.log('📥 Fetching messages for chatId:', chatId)
-            if (!chatId) {
-                console.log('⚠️ No chatId available, returning empty array')
-                return []
-            }
-
-            try {
-                const response = await fetch(`/api/conversations/${chatId}/messages`)
-                console.log('🌐 API Response status:', response.status)
-
-                if (!response.ok) {
-                    console.error('❌ Failed to fetch messages:', response.statusText)
-                    throw new Error('Failed to fetch messages')
-                }
-
-                const data = await response.json()
-                console.log('📦 Raw messages from API:', data)
-
-                const mappedMessages = data.messages.map((msg: any) => {
-                    console.log('🔄 Processing message:', msg)
-                    return {
-                        id: msg.id,
-                        role: msg.role || (msg.user_message ? 'user' : 'assistant'),
-                        content: msg.user_message || msg.assistant_message,
-                        createdAt: new Date(msg.created_at),
-                        toolCalls: msg.tool_calls,
-                        toolResults: msg.tool_results
-                    }
-                })
-
-                console.log('✨ Mapped messages:', mappedMessages)
-                return mappedMessages
-            } catch (error) {
-                console.error('🚨 Error in fetchMessages:', error)
-                throw error
-            }
-        },
-        enabled: !!chatId,
-        retry: 2,
-        staleTime: 1000 * 60,
-    })
-
-    // Initialize Vercel AI SDK chat with proper message handling
+    // Initialize Vercel AI SDK chat with simplified configuration
     const {
         messages,
         input,
@@ -109,12 +61,17 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
     } = useChat({
         api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
         id: chatId ?? undefined,
-        initialMessages: fetchedMessages || [],
+        initialMessages,
         body: {
             model: currentModel,
             config: languageModel,
         },
         streamProtocol: 'text',
+        experimental_onFunctionCall: async (message, functionCall) => {
+            // Handle function/tool calls if needed
+            console.log('Function called:', functionCall)
+            return undefined // or handle the function call result
+        },
         onResponse: (response) => {
             console.log('🎯 Stream Response:', {
                 status: response.status,
@@ -127,28 +84,27 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         onFinish: async (message) => {
             console.log('✅ Message finished:', message)
 
-            if (!chatId && message.content) {
-                console.log('🔍 Checking for chat ID in message')
-                const match = message.content.match(/__CHAT_ID__(.+)__/)
-                if (match) {
-                    const newChatId = match[1]
-                    console.log('🆕 New chat ID found:', newChatId)
-                    const cleanContent = message.content.replace(/__CHAT_ID__(.+)__/, '')
+            if (message.content) {
+                if (!chatId && message.content) {
+                    console.log('🔍 Checking for chat ID in message')
+                    const match = message.content.match(/__CHAT_ID__(.+)__/)
+                    if (match) {
+                        const newChatId = match[1]
+                        console.log('🆕 New chat ID found:', newChatId)
+                        const finalContent = message.content.replace(/__CHAT_ID__(.+)__/, '')
 
-                    console.log('🧹 Cleaned message content:', cleanContent)
-                    setMessages(prev => {
-                        console.log('📝 Updating messages with clean content')
-                        return prev.map(msg =>
-                            msg.id === message.id ? { ...msg, content: cleanContent } : msg
-                        )
-                    })
+                        console.log('🧹 Cleaned message content:', finalContent)
+                        setMessages(prev => {
+                            console.log('📝 Updating messages with clean content')
+                            return prev.map(msg =>
+                                msg.id === message.id ? { ...msg, content: finalContent } : msg
+                            )
+                        })
 
-                    onChatCreated?.(newChatId)
+                        onChatCreated?.(newChatId)
+                    }
                 }
             }
-
-            console.log('🔄 Invalidating messages query for chatId:', chatId)
-            queryClient.invalidateQueries({ queryKey: ['chat-messages', chatId] })
             setErrorState(null)
         },
         onError: (error) => {
@@ -156,18 +112,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             handleChatError(error)
         }
     })
-
-    // Enhanced effect for message updates
-    useEffect(() => {
-        console.log('📨 Fetched Messages Changed:', {
-            hasMessages: !!fetchedMessages?.length,
-            messageCount: fetchedMessages?.length
-        })
-        if (fetchedMessages?.length) {
-            console.log('🔄 Updating messages with fetched data')
-            setMessages(fetchedMessages)
-        }
-    }, [fetchedMessages, setMessages])
 
     // Log current messages state
     useEffect(() => {
@@ -259,16 +203,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
         }
     }, [handleInputChange])
-
-    // Enhanced loading state
-    if (isLoadingMessages) {
-        console.log('⌛ Loading messages...')
-        return (
-            <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-        )
-    }
 
     console.log('🎨 Rendering Chat Component:', {
         messageCount: messages.length,

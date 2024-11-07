@@ -43,13 +43,13 @@ export default function Home() {
     // Handle chat creation callback
     const handleChatCreated = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-        router.replace(`/chat/${chatId}`)
+        router.push(`/chat/${chatId}`)
     }, [router])
 
     // Handle chat selection
     const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-        router.replace(`/chat/${chatId}`)
+        router.push(`/chat/${chatId}`)
     }, [router])
 
     // Handle new chat creation
