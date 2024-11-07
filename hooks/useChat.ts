@@ -1,6 +1,9 @@
+// Legacy hook just solved errors to keep the app running
+
 import {
     ClientMessage,
     ToolCall,
+    DatabaseMessage,
 } from '@/lib/types'
 import {
     createClientComponentClient,
@@ -23,6 +26,29 @@ export function useChat(chatId: string | null) {
     const [codeExplanation, setCodeExplanation] = useState('')
     const [sandboxErrors, setSandboxErrors] = useState<any[]>([])
     const [sandboxId, setSandboxId] = useState<string | null>(null)
+
+    const initializeSandbox = useCallback(async () => {
+        try {
+            const response = await fetch('/api/sandbox/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            const data = await response.json()
+            setSandboxId(data.sandboxId)
+            console.log('Sandbox initialized with ID:', data.sandboxId)
+        } catch (error) {
+            console.error('Error initializing sandbox:', error)
+            setSandboxErrors((prev) => [
+                ...prev,
+                { message: 'Error initializing sandbox' },
+            ])
+        }
+    }, [])
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -61,36 +87,13 @@ export function useChat(chatId: string | null) {
         setSandboxId(null)
     }
 
-    const initializeSandbox = useCallback(async () => {
-        try {
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
-            }
-
-            const data = await response.json()
-            setSandboxId(data.sandboxId)
-            console.log('Sandbox initialized with ID:', data.sandboxId)
-        } catch (error) {
-            console.error('Error initializing sandbox:', error)
-            setSandboxErrors((prev) => [
-                ...prev,
-                { message: 'Error initializing sandbox' },
-            ])
-        }
-    }, [])
-
     const fetchMessages = async (id: string) => {
         try {
             const response = await fetch(`/api/conversations/${id}/messages`)
             if (!response.ok) {
                 throw new Error('Failed to fetch messages')
             }
-            const data: ServerMessage[] = await response.json()
+            const data: DatabaseMessage[] = await response.json()
             const clientMessages: ClientMessage[] = data.flatMap((msg) => {
                 const messages: ClientMessage[] = [
                     {
@@ -107,8 +110,6 @@ export function useChat(chatId: string | null) {
                         role: 'assistant',
                         content: msg.assistant_message,
                         createdAt: new Date(msg.created_at),
-                        tool_calls: msg.tool_calls ? msg.tool_calls as ToolCall[] : undefined,
-                        tool_results: msg.tool_results ? msg.tool_results as ServerToolResult[] : undefined,
                     })
                 }
 
@@ -179,7 +180,7 @@ export function useChat(chatId: string | null) {
             accumulatedCode: string
         ) => {
             try {
-                const parsedChunk: ServerStreamChunk = JSON.parse(chunk)
+                const parsedChunk = JSON.parse(chunk)
                 if (
                     parsedChunk.type === 'content_block_delta' &&
                     'delta' in parsedChunk &&

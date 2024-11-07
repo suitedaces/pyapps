@@ -71,7 +71,6 @@ export default function ChatPage() {
         generatedCode,
         streamingMessage,
         isGeneratingCode,
-        setMessages,
     } = useChat(currentChatId)
 
     const fetchAndSetChats = useCallback(async () => {

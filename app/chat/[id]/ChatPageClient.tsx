@@ -75,7 +75,6 @@ export default function ChatPageClient({
         generatedCode,
         streamingMessage,
         isGeneratingCode,
-        setMessages,
     } = useChat(currentChatId)
 
     const resizableGroupRef = useRef<any>(null)
