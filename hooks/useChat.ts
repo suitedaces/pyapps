@@ -1,319 +1,464 @@
-import { mapVercelToClientMessage } from '@/lib/mappers'
-import modelsList from '@/lib/models.json'
-import { DatabaseMessage, LLMModelConfig, ToolCall } from '@/lib/types'
+import {
+    ClientMessage,
+    ToolCall,
+} from '@/lib/types'
 import {
     createClientComponentClient,
     Session,
 } from '@supabase/auth-helpers-nextjs'
-import { Message, useChat as useVercelChat } from 'ai/react'
 import { useCallback, useEffect, useState } from 'react'
-import { useLocalStorage } from 'usehooks-ts'
-
-// Define type for tool calls to fix the map error
 
 export function useChat(chatId: string | null) {
     const [session, setSession] = useState<Session | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
     const supabase = createClientComponentClient()
-    const [initialMessagesLoaded, setInitialMessagesLoaded] = useState(false)
-
-    // States
+    const [input, setInput] = useState('')
     const [csvContent, setCsvContent] = useState<string | null>(null)
     const [csvFileName, setCsvFileName] = useState<string | null>(null)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
     const [generatedCode, setGeneratedCode] = useState('')
-    const [streamingMessage, setStreamingMessage] = useState('')
+    const [messages, setMessages] = useState<ClientMessage[]>([])
+    const [streamingMessage, setStreamingMessage] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
+    const [codeExplanation, setCodeExplanation] = useState('')
+    const [sandboxErrors, setSandboxErrors] = useState<any[]>([])
     const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [localMessages, setLocalMessages] = useState<Message[]>([])
 
-    // Language model configuration
-    const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
-        model: 'claude-3-5-sonnet-20240620',
-    })
-
-    const currentModel = modelsList.models.find(
-        (model) => model.id === languageModel.model
-    )
-
-    // Initialize Supabase session
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session)
+            setIsLoading(false)
         })
 
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session)
+            setIsLoading(false)
         })
 
         return () => subscription.unsubscribe()
     }, [supabase.auth])
 
-    // Initialize Vercel AI SDK chat
-    const {
-        messages: vercelMessages,
-        input,
-        handleInputChange,
-        handleSubmit: vercelHandleSubmit,
-        isLoading,
-        error,
-        append,
-        reload,
-        stop,
-        setMessages: setVercelMessages,
-    } = useVercelChat({
-        api: `/api/conversations/${chatId}/stream`,
-        id: chatId || undefined,
-        initialMessages: [],
-        body: {
-            model: currentModel,
-            config: languageModel,
-        },
-        keepLastMessageOnError: true,
-        onResponse: (response) => {
-            const reader = response.body?.getReader()
-            if (!reader) return
+    useEffect(() => {
+        if (chatId) {
+            initializeSandbox()
+            fetchMessages(chatId)
+        } else {
+            resetState()
+        }
+    }, [chatId, initializeSandbox])
 
-            setStreamingMessage('')
+    const resetState = () => {
+        setMessages([])
+        setCsvContent(null)
+        setCsvFileName(null)
+        setStreamlitUrl(null)
+        setGeneratedCode('')
+        setStreamingMessage('')
+        setCodeExplanation('')
+        setSandboxErrors([])
+        setSandboxId(null)
+    }
 
-            const processStream = async () => {
-                const decoder = new TextDecoder()
-                try {
-                    console.log('🔄 Starting stream processing')
-                    while (true) {
-                        const { done, value } = await reader.read()
-                        if (done) {
-                            console.log('✅ Stream complete')
-                            break
-                        }
+    const initializeSandbox = useCallback(async () => {
+        try {
+            const response = await fetch('/api/sandbox/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            })
 
-                        const chunk = decoder.decode(value)
-                        try {
-                            const parsed = JSON.parse(chunk)
-                            console.log('🔍 Parsed chunk type:', parsed.type)
-
-                            switch (parsed.type) {
-                                case 'text-delta':
-                                    setStreamingMessage((prev) => prev + (parsed.content || parsed.delta || ''))
-                                    break
-                                case 'generated_code':
-                                    setGeneratedCode(parsed.content)
-                                    setIsGeneratingCode(true)
-                                    break
-                                case 'tool-call':
-                                    if (parsed.name === 'create_streamlit_app') {
-                                        setIsGeneratingCode(true)
-                                    }
-                                    break
-                                case 'tool-result':
-                                    if (parsed.name === 'create_streamlit_app') {
-                                        setGeneratedCode(parsed.content)
-                                        setIsGeneratingCode(false)
-                                    }
-                                    break
-                            }
-                        } catch (e) {
-                            console.log('📄 Raw text chunk:', chunk)
-                            setStreamingMessage((prev) => prev + chunk)
-                        }
-                    }
-                } catch (error) {
-                    console.error('❌ Error processing stream:', error)
-                } finally {
-                    console.log('🏁 Stream processing complete')
-                    setIsGeneratingCode(false)
-                }
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
             }
 
-            processStream()
+            const data = await response.json()
+            setSandboxId(data.sandboxId)
+            console.log('Sandbox initialized with ID:', data.sandboxId)
+        } catch (error) {
+            console.error('Error initializing sandbox:', error)
+            setSandboxErrors((prev) => [
+                ...prev,
+                { message: 'Error initializing sandbox' },
+            ])
+        }
+    }, [])
+
+    const fetchMessages = async (id: string) => {
+        try {
+            const response = await fetch(`/api/conversations/${id}/messages`)
+            if (!response.ok) {
+                throw new Error('Failed to fetch messages')
+            }
+            const data: ServerMessage[] = await response.json()
+            const clientMessages: ClientMessage[] = data.flatMap((msg) => {
+                const messages: ClientMessage[] = [
+                    {
+                        id: `${msg.id}-user`,
+                        role: 'user',
+                        content: msg.user_message,
+                        createdAt: new Date(msg.created_at),
+                    },
+                ]
+
+                if (msg.assistant_message) {
+                    messages.push({
+                        id: `${msg.id}-assistant`,
+                        role: 'assistant',
+                        content: msg.assistant_message,
+                        createdAt: new Date(msg.created_at),
+                        tool_calls: msg.tool_calls ? msg.tool_calls as ToolCall[] : undefined,
+                        tool_results: msg.tool_results ? msg.tool_results as ServerToolResult[] : undefined,
+                    })
+                }
+
+                return messages
+            })
+            setMessages(clientMessages)
+        } catch (error) {
+            console.error('Error fetching messages:', error)
+        }
+    }
+
+    const handleInputChange = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            setInput(e.target.value)
         },
-        onFinish: async (message) => {
-            if (!chatId || !session?.user?.id) return
+        []
+    )
+
+    const updateStreamlitApp = useCallback(
+        async (code: string) => {
+            if (code && sandboxId) {
+                try {
+                    console.log('Updating Streamlit app with code:', code)
+                    const response = await fetch(
+                        `/api/sandbox/${sandboxId}/execute`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code }),
+                        }
+                    )
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `HTTP error! status: ${response.status}`
+                        )
+                    }
+
+                    const data = await response.json()
+                    if (data.url) {
+                        setStreamlitUrl(data.url)
+                        console.log('Streamlit URL updated:', data.url)
+                    } else {
+                        throw new Error('No URL returned from sandbox API')
+                    }
+                } catch (error) {
+                    console.error('Error updating Streamlit app:', error)
+                    setSandboxErrors((prev) => [
+                        ...prev,
+                        { message: 'Error updating Streamlit app' },
+                    ])
+                } finally {
+                    setIsGeneratingCode(false)
+                }
+            } else {
+                console.error(
+                    'Generated code not available or sandbox not initialized'
+                )
+            }
+        },
+        [sandboxId]
+    )
+
+    const processStreamChunk = useCallback(
+        (
+            chunk: string,
+            accumulatedResponse: string,
+            accumulatedCode: string
+        ) => {
+            try {
+                const parsedChunk: ServerStreamChunk = JSON.parse(chunk)
+                if (
+                    parsedChunk.type === 'content_block_delta' &&
+                    'delta' in parsedChunk &&
+                    parsedChunk.delta?.type === 'text_delta'
+                ) {
+                    setStreamingMessage((prev) => prev + parsedChunk.delta.text)
+                    return {
+                        accumulatedResponse:
+                            accumulatedResponse + parsedChunk.delta.text,
+                        accumulatedCode,
+                    }
+                } else if (
+                    parsedChunk.type === 'generated_code' &&
+                    'content' in parsedChunk
+                ) {
+                    setGeneratedCode((prev) => prev + parsedChunk.content)
+                    return {
+                        accumulatedResponse,
+                        accumulatedCode: accumulatedCode + parsedChunk.content,
+                    }
+                } else if (
+                    parsedChunk.type === 'code_explanation' &&
+                    'content' in parsedChunk
+                ) {
+                    setCodeExplanation((prev) => prev + parsedChunk.content)
+                } else if (parsedChunk.type === 'message_stop') {
+                    setIsGeneratingCode(false)
+                } else if (
+                    parsedChunk.type === 'tool_use' &&
+                    parsedChunk.name === 'create_streamlit_app'
+                ) {
+                    setIsGeneratingCode(true)
+                }
+            } catch (error) {
+                console.error('Error processing stream chunk:', error)
+            }
+            return { accumulatedResponse, accumulatedCode }
+        },
+        []
+    )
+
+    const processStream = useCallback(
+        async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+            const decoder = new TextDecoder()
+            let accumulatedResponse = ''
+            let accumulatedCode = ''
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                const chunk = decoder.decode(value)
+                const lines = chunk
+                    .split('\n')
+                    .filter((line) => line.trim() !== '')
+
+                for (const line of lines) {
+                    const result = processStreamChunk(
+                        line,
+                        accumulatedResponse,
+                        accumulatedCode
+                    )
+                    accumulatedResponse = result.accumulatedResponse
+                    accumulatedCode = result.accumulatedCode
+                }
+
+                setStreamingMessage(accumulatedResponse)
+            }
+
+            return { accumulatedResponse, accumulatedCode }
+        },
+        [processStreamChunk]
+    )
+
+    const handleChatOperation = useCallback(
+        async (newMessage: ClientMessage) => {
+            if (isLoading || !session || !chatId) {
+                console.error(
+                    'User not authenticated, session is loading, or no chat selected'
+                )
+                return
+            }
+
+            setStreamingMessage('')
+            setGeneratedCode('')
+            setCodeExplanation('')
+            setSandboxErrors([])
 
             try {
-                const clientMessage = mapVercelToClientMessage(message)
                 const response = await fetch(
-                    `/api/conversations/${chatId}/messages`,
+                    `/api/conversations/${chatId}/stream`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: chatId,
-                            user_id: session.user.id,
-                            role: message.role,
-                            user_message:
-                                message.role === 'user' ? message.content : '',
-                            assistant_message:
-                                message.role === 'assistant'
-                                    ? message.content
-                                    : '',
-                            tool_calls: clientMessage.toolInvocations?.filter(
-                                (t) => t.state === 'call'
-                            ),
-                            tool_results: clientMessage.toolInvocations?.filter(
-                                (t) => t.state === 'result'
-                            ),
-                            created_at: new Date().toISOString(),
-                        }),
+                        body: JSON.stringify({ message: newMessage.content }),
                     }
                 )
 
                 if (!response.ok) {
-                    throw new Error('Failed to store message')
+                    throw new Error(`HTTP error! status: ${response.status}`)
                 }
+
+                const reader = response.body?.getReader()
+                if (!reader) {
+                    throw new Error('Failed to get response reader')
+                }
+
+                const { accumulatedResponse, accumulatedCode } =
+                    await processStream(reader)
+
+                const assistantMessage: ClientMessage = {
+                    id: `${Date.now()}-assistant`,
+                    role: 'assistant',
+                    content: accumulatedResponse,
+                    createdAt: new Date(),
+                }
+
+                setMessages((prev) => [...prev, assistantMessage])
 
                 setStreamingMessage('')
-                await fetchMessages()
-            } catch (error) {
-                console.error('Error handling message:', error)
-            }
-        },
-    })
 
-    // Function to fetch messages from database
-    const fetchMessages = async () => {
-        if (!chatId) {
-            console.log('❌ No chatId available for fetching messages')
-            return
-        }
-
-        try {
-            console.log('🔍 Fetching messages for chat:', chatId)
-            const response = await fetch(
-                `/api/conversations/${chatId}/messages`
-            )
-            if (!response.ok) {
-                throw new Error('Failed to fetch messages')
-            }
-
-            const { messages: dbMessages } = await response.json()
-            console.log('📦 Raw messages from database:', dbMessages)
-
-            // Map each database message to user and assistant messages
-            const mappedMessages = dbMessages.flatMap((msg: DatabaseMessage) => {
-                const messages = []
-
-                // Always add messages in pairs to maintain sequence
-                if (msg.user_message || msg.assistant_message) {
-                    if (msg.user_message) {
-                        messages.push({
-                            id: `${msg.id}-user`,
-                            role: 'user',
-                            content: msg.user_message,
-                            createdAt: new Date(msg.created_at)
-                        });
-                    }
-
-                    if (msg.assistant_message) {
-                        messages.push({
-                            id: `${msg.id}-assistant`,
-                            role: 'assistant',
-                            content: msg.assistant_message,
-                            createdAt: new Date(msg.created_at),
-                            toolInvocations: msg.tool_calls && Array.isArray(msg.tool_calls) ? (msg.tool_calls as ToolCall[]).map((call: ToolCall) => ({
-                                state: 'call',
-                                toolCallId: call.id,
-                                toolName: call.name,
-                                args: call.parameters
-                            })) : undefined
-                        });
-                    }
+                if (accumulatedCode) {
+                    setGeneratedCode(accumulatedCode)
+                    console.log('Generated code:', accumulatedCode)
+                    await updateStreamlitApp(accumulatedCode)
                 }
 
-                return messages;
-            });
-
-            console.log('📊 Mapped messages:', mappedMessages)
-            setVercelMessages(mappedMessages)
-            setInitialMessagesLoaded(true)
-
-        } catch (error) {
-            console.error('❌ Error in fetchMessages:', error)
-        }
-    }
-
-    // Load initial messages with debounce
-    useEffect(() => {
-        let timeoutId: NodeJS.Timeout
-
-        if (chatId && !initialMessagesLoaded) {
-            console.log('🔄 Initializing message fetch for chat:', chatId)
-            timeoutId = setTimeout(() => {
-                fetchMessages()
-            }, 100)
-        }
-
-        return () => {
-            if (timeoutId) {
-                clearTimeout(timeoutId)
+                if (codeExplanation) {
+                    const explanationMessage: ClientMessage = {
+                        id: `${Date.now()}-explanation`,
+                        role: 'assistant',
+                        content: codeExplanation,
+                        createdAt: new Date(),
+                    }
+                    setMessages((prev) => [...prev, explanationMessage])
+                }
+            } catch (error) {
+                console.error('Error in chat operation:', error)
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        id: `${Date.now()}-error`,
+                        role: 'assistant',
+                        content: 'An error occurred. Please try again.',
+                        createdAt: new Date(),
+                    },
+                ])
+                setSandboxErrors((prev) => [
+                    ...prev,
+                    { message: 'Error in chat operation' },
+                ])
+            } finally {
+                setIsLoading(false)
+                setStreamingMessage('')
+                setIsGeneratingCode(false)
             }
-        }
-    }, [chatId, initialMessagesLoaded])
+        },
+        [
+            session,
+            isLoading,
+            chatId,
+            processStream,
+            updateStreamlitApp,
+            codeExplanation,
+        ]
+    )
 
-    // Custom submit handler with better error handling
     const handleSubmit = useCallback(
         async (e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault()
-            if (!chatId) {
-                console.warn('No chat ID available')
-                return
-            }
+            if (!input.trim()) return
 
-            try {
-                // Remove the local message addition since it will be handled by the API
-                await vercelHandleSubmit(e)
-            } catch (error) {
-                console.error('Error in submit:', error)
+            const newUserMessage: ClientMessage = {
+                id: `${Date.now()}-user`,
+                role: 'user',
+                content: input,
+                createdAt: new Date(),
             }
+            setMessages((prev) => [...prev, newUserMessage])
+            setInput('')
+
+            await handleChatOperation(newUserMessage)
         },
-        [chatId, vercelHandleSubmit]
+        [input, handleChatOperation]
     )
 
-    // File upload handler
     const handleFileUpload = useCallback(
         async (content: string, fileName: string) => {
-            if (!chatId || !sandboxId || !session?.user?.id) return
+            const sanitizeCSVContent = (content: string): string => {
+                return content
+                    .split('\n')
+                    .map((row) => row.replace(/[\r\n]+/g, ''))
+                    .join('\n')
+            }
+
+            const sanitizedContent = sanitizeCSVContent(content)
+            setCsvContent(sanitizedContent)
+            setCsvFileName(fileName)
 
             try {
-                const fileData = await uploadAndAnalyzeFile(
-                    content,
-                    fileName,
-                    chatId,
-                    sandboxId
-                )
-
-                await append({
-                    role: 'user',
-                    content: `I've uploaded a CSV file named "${fileName}". Can you analyze it and create a Streamlit app? CSV Analysis: ${JSON.stringify(fileData.analysis)}`,
-                    id: Date.now().toString(),
-                    createdAt: new Date(),
+                const response = await fetch('/api/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        file_name: fileName,
+                        file_type: 'csv',
+                        file_url: `/home/user/${fileName}`,
+                        backup_url: 'placeholder_url',
+                        file_size: sanitizedContent.length,
+                        content_hash: sanitizedContent,
+                        analysis: null,
+                        sandbox_id: sandboxId,
+                        expires_at: new Date(Date.now() + 1 * 60 * 1000),
+                    }),
                 })
 
-                setCsvContent(content)
-                setCsvFileName(fileName)
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`)
+                }
+
+                const data = await response.json()
+                console.log('CSV uploaded and stored:', data)
+
+                const analysisResponse = await fetch(
+                    `/api/files/${data.id}/analyze`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileContent: sanitizedContent }),
+                    }
+                )
+
+                if (!analysisResponse.ok) {
+                    throw new Error(
+                        `HTTP error! status: ${analysisResponse.status}`
+                    )
+                }
+
+                const analysisData = await analysisResponse.json()
+                console.log('CSV analyzed:', analysisData)
+
+                const rows = sanitizedContent.split('\n')
+                const columnNames = rows[0]
+                const previewRows = rows.slice(1, 6).join('\n')
+                const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+                const newUserMessage: ClientMessage = {
+                    id: `${Date.now()}-upload`,
+                    role: 'user',
+                    content: `I've uploaded "${fileName}". Create a Streamlit app to visualize this data. The file is at '/home/user/${fileName}'.
+${dataPreview}
+Create a complex, aesthetic visualization using these exact column names.`,
+                    createdAt: new Date(),
+                }
+
+                setMessages((prev) => [...prev, newUserMessage])
+                await handleChatOperation(newUserMessage)
             } catch (error) {
                 console.error('Error in file upload:', error)
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        id: `${Date.now()}-error`,
+                        role: 'assistant',
+                        content: `There was an error uploading the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+                        createdAt: new Date(),
+                    },
+                ])
+                setSandboxErrors((prev) => [
+                    ...prev,
+                    { message: 'Error uploading file' },
+                ])
             }
         },
-        [chatId, sandboxId, session?.user?.id, append]
+        [chatId, handleChatOperation, sandboxId]
     )
 
-    // Initialize sandbox
-    useEffect(() => {
-        if (chatId) {
-            fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
-                .then((res) => res.json())
-                .then((data) => setSandboxId(data.sandboxId))
-                .catch(console.error)
-        }
-    }, [chatId])
-
     return {
-        messages: vercelMessages,
+        messages,
         input,
         handleInputChange,
         handleSubmit,
@@ -325,41 +470,8 @@ export function useChat(chatId: string | null) {
         generatedCode,
         streamingMessage,
         isGeneratingCode,
-        sandboxErrors: [],
+        streamingCodeExplanation: codeExplanation,
+        sandboxErrors,
         sandboxId,
-        error,
-        stop,
-        reload,
-        setMessages: setVercelMessages,
     }
-}
-
-// Helper function for file upload and analysis
-async function uploadAndAnalyzeFile(
-    content: string,
-    fileName: string,
-    chatId: string,
-    sandboxId: string
-) {
-    const fileResponse = await fetch('/api/files', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            chat_id: chatId,
-            file_name: fileName,
-            content: content,
-            sandbox_id: sandboxId,
-        }),
-    })
-
-    if (!fileResponse.ok) throw new Error('Failed to upload file')
-    const fileData = await fileResponse.json()
-
-    const analysisResponse = await fetch(`/api/files/${fileData.id}/analyze`, {
-        method: 'POST',
-        body: JSON.stringify({ fileContent: content }),
-    })
-
-    if (!analysisResponse.ok) throw new Error('Failed to analyze file')
-    return await analysisResponse.json()
 }
