@@ -12,6 +12,7 @@ import {
 } from './types'
 import { encode } from 'gpt-tokenizer'
 
+// AI Agent that handles message streaming, tool execution, and conversation management
 export class GruntyAgent {
     private model: ModelProvider
     private role: string
@@ -31,6 +32,7 @@ export class GruntyAgent {
         this.config = config
     }
 
+    // Main method to handle streaming responses and tool execution
     async streamResponse(
         chatId: string,
         userId: string,
@@ -162,11 +164,13 @@ export class GruntyAgent {
                     maxTokens: this.config.maxTokens || 4096
                 })
 
-                // Handle text stream
+                // Handle text stream with proper data protocol formatting
                 console.log('📝 Starting text stream processing')
                 for await (const chunk of textStream) {
                     collectedContent += chunk
-                    writer.write(encoder.encode(chunk))
+                    // Format as data stream text part
+                    const textPart = `0:${JSON.stringify(chunk)}\n`
+                    writer.write(encoder.encode(textPart))
                     console.log('📤 Streamed chunk:', chunk.substring(0, 50) + '...')
                 }
 
@@ -224,13 +228,7 @@ export class GruntyAgent {
                                 .filter(msg => msg.role === 'user')
                                 .pop()
 
-                            console.log('💾 Storing final message pair:', {
-                                userMessage: typeof latestUserMessage?.content === 'string'
-                                    ? latestUserMessage.content.substring(0, 50) + '...'
-                                    : 'No user message',
-                                assistantMessage: collectedContent.substring(0, 50) + '...'
-                            })
-
+                            console.log('💾 Storing final message pair')
                             await this.storeMessage(chatId, userId, {
                                 user_message: typeof latestUserMessage?.content === 'string'
                                     ? latestUserMessage.content
@@ -239,14 +237,18 @@ export class GruntyAgent {
                                 tool_calls: [],
                                 tool_results: []
                             })
-                        }
 
-                        const finishData = `d:${JSON.stringify({
-                            finishReason: 'stop',
-                            usage: step.usage || { promptTokens: 0, completionTokens: 0 }
-                        })}\n`
-                        writer.write(encoder.encode(finishData))
-                        console.log('✅ Finish message sent')
+                            // Send finish metadata using data stream protocol
+                            const finishData = `d:${JSON.stringify({
+                                finishReason: step.finishReason || 'stop',
+                                usage: {
+                                    promptTokens: step.usage?.promptTokens || 0,
+                                    completionTokens: step.usage?.completionTokens || 0,
+                                    totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
+                                }
+                            })}\n`
+                            writer.write(encoder.encode(finishData))
+                        }
                     }
                 }
 
@@ -300,8 +302,14 @@ export class GruntyAgent {
         const supabase = createRouteHandlerClient({ cookies })
 
         try {
+            // Clean the assistant message by removing the metadata
+            const cleanedAssistantMessage = message.assistant_message.replace(
+                /d:{"finishReason":"[^"]+","usage":{[^}]+}}$/,
+                ''
+            )
+
             const userTokens = this.calculateTokenCount(message.user_message)
-            const assistantTokens = this.calculateTokenCount(message.assistant_message)
+            const assistantTokens = this.calculateTokenCount(cleanedAssistantMessage)
             const toolCallTokens = message.tool_calls?.length
                 ? this.calculateTokenCount(JSON.stringify(message.tool_calls))
                 : 0
@@ -323,7 +331,7 @@ export class GruntyAgent {
                 chat_id: chatId,
                 user_id: userId,
                 user_message: message.user_message,
-                assistant_message: message.assistant_message,
+                assistant_message: cleanedAssistantMessage,
                 tool_calls: message.tool_calls.length > 0 ? message.tool_calls : null,
                 tool_results: message.tool_results.length > 0 ? message.tool_results : null,
                 created_at: new Date().toISOString(),

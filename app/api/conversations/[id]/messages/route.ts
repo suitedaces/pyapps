@@ -3,38 +3,24 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { encode } from 'gpt-tokenizer'
 
+// Fetch messages for a specific conversation
 export async function GET(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    console.log('📥 GET /api/conversations/[id]/messages', {
-        chatId: params.id
-    })
-
     const supabase = createRouteHandlerClient({ cookies })
 
     try {
-        console.log('🔍 Querying Supabase for messages')
         const { data: messages, error } = await supabase
             .from('messages')
             .select('*')
             .eq('chat_id', params.id)
             .order('created_at', { ascending: true })
 
-        if (error) {
-            console.error('❌ Supabase error:', error)
-            throw error
-        }
-
-        console.log('✅ Messages retrieved:', {
-            count: messages.length,
-            firstMessage: messages[0],
-            lastMessage: messages[messages.length - 1]
-        })
+        if (error) throw error
 
         return NextResponse.json({ messages })
     } catch (error) {
-        console.error('🚨 Error in GET /messages:', error)
         return NextResponse.json(
             { error: 'Failed to fetch messages' },
             { status: 500 }
@@ -42,6 +28,7 @@ export async function GET(
     }
 }
 
+// Store a new message in the conversation
 export async function POST(
     req: Request,
     { params }: { params: { id: string } }
@@ -50,7 +37,7 @@ export async function POST(
     const body = await req.json()
 
     try {
-        // Calculate token count
+        // Calculate token counts for different message components
         const userTokens = encode(body.user_message || '').length
         const assistantTokens = encode(body.assistant_message || '').length
         const toolCallTokens = body.tool_calls ? encode(JSON.stringify(body.tool_calls)).length : 0
@@ -58,14 +45,7 @@ export async function POST(
 
         const totalTokens = userTokens + assistantTokens + toolCallTokens + toolResultTokens
 
-        console.log('🔢 Token counts:', {
-            userTokens,
-            assistantTokens,
-            toolCallTokens,
-            toolResultTokens,
-            totalTokens
-        })
-
+        // Prepare message data for storage
         const messageData = {
             chat_id: params.id,
             user_id: body.user_id,
@@ -78,22 +58,15 @@ export async function POST(
             created_at: body.created_at || new Date().toISOString()
         }
 
-        console.log('📝 Storing message:', messageData)
-
         const { data, error } = await supabase
             .from('messages')
             .insert(messageData)
             .select()
 
-        if (error) {
-            console.error('Error storing message:', error)
-            throw error
-        }
+        if (error) throw error
 
-        console.log('✅ Message stored successfully:', data)
         return NextResponse.json(data)
     } catch (error) {
-        console.error('Error in POST /messages:', error)
         return NextResponse.json(
             { error: 'Failed to store message' },
             { status: 500 }
@@ -101,6 +74,7 @@ export async function POST(
     }
 }
 
+// Update an existing message
 export async function PUT(
     req: Request,
     { params }: { params: { id: string } }
@@ -121,15 +95,10 @@ export async function PUT(
             .eq('id', params.id)
             .select()
 
-        if (error) {
-            console.error('Error updating message:', error)
-            throw error
-        }
+        if (error) throw error
 
-        console.log('✅ Message updated successfully:', data)
         return NextResponse.json(data)
     } catch (error) {
-        console.error('Error in PUT /messages:', error)
         return NextResponse.json(
             { error: 'Failed to update message' },
             { status: 500 }
@@ -137,6 +106,7 @@ export async function PUT(
     }
 }
 
+// Delete a message
 export async function DELETE(
     req: Request,
     { params }: { params: { id: string } }
@@ -149,15 +119,10 @@ export async function DELETE(
             .delete()
             .eq('id', params.id)
 
-        if (error) {
-            console.error('Error deleting message:', error)
-            throw error
-        }
+        if (error) throw error
 
-        console.log('✅ Message deleted successfully')
         return NextResponse.json({ success: true })
     } catch (error) {
-        console.error('Error in DELETE /messages:', error)
         return NextResponse.json(
             { error: 'Failed to delete message' },
             { status: 500 }

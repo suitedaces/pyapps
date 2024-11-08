@@ -9,6 +9,7 @@ import { LLMModel, LLMModelConfig } from '@/lib/types'
 import { Message, convertToCoreMessages } from 'ai'
 import { generateUUID } from '@/lib/utils'
 
+// Handle streaming responses for new conversations
 export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
     const { data: { session } } = await supabase.auth.getSession()
@@ -28,25 +29,16 @@ export async function POST(req: NextRequest) {
             return new Response('No messages provided', { status: 400 })
         }
 
-        // Generate a new chat ID
+        // Create new chat and get stream response
         const chatId = generateUUID()
-
-        // Create the chat first
-        const { error: chatError } = await supabase
+        await supabase
             .from('chats')
-            .insert([
-                {
-                    id: chatId,
-                    user_id: session.user.id,
-                    name: messages[0].content.slice(0, 50) + '...',
-                }
-            ])
+            .insert([{
+                id: chatId,
+                user_id: session.user.id,
+                name: messages[0].content.slice(0, 50) + '...',
+            }])
 
-        if (chatError) {
-            throw new Error(`Failed to create chat: ${chatError.message}`)
-        }
-
-        const coreMessages = convertToCoreMessages(messages)
         const modelClient = getModelClient(model, {
             apiKey: process.env.ANTHROPIC_API_KEY,
             temperature: config?.temperature || 0.7,
@@ -63,16 +55,15 @@ export async function POST(req: NextRequest) {
             }
         )
 
-        // Get the stream response
+        // Transform stream to include chat ID
         const stream = await agent.streamResponse(
             chatId,
             session.user.id,
-            coreMessages,
+            convertToCoreMessages(messages),
             tools,
             null
         )
 
-        // Create a transform stream to add the chat ID at the end
         const { readable, writable } = new TransformStream()
         const textDecoder = new TextDecoderStream()
         const textEncoder = new TextEncoderStream()
@@ -84,7 +75,6 @@ export async function POST(req: NextRequest) {
                     controller.enqueue(chunk)
                 },
                 flush(controller) {
-                    // Add the chat ID marker at the end
                     controller.enqueue(`\n__CHAT_ID__${chatId}__`)
                 }
             }))
@@ -97,16 +87,12 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error) {
-        console.error('❌ Error in stream handler:', error)
         return new Response(
             JSON.stringify({
                 error: 'Failed to process stream request',
                 details: error instanceof Error ? error.message : 'Unknown error'
             }),
-            {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' }
-            }
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
         )
     }
 }

@@ -16,7 +16,6 @@ import { useRouter } from 'next/navigation'
 import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
-import { generateUUID } from '@/lib/utils'
 
 interface ChatProps {
     chatId?: string | null
@@ -24,6 +23,7 @@ interface ChatProps {
     onChatCreated?: (chatId: string) => void
 }
 
+// Core chat component that handles message streaming, UI rendering, and error states
 export function Chat({ chatId = null, initialMessages = [], onChatCreated }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -38,7 +38,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         (model) => model.id === languageModel.model
     )
 
-    // Initialize Vercel AI SDK chat with initialMessages
+    // Initialize chat with Vercel AI SDK
     const {
         messages: aiMessages,
         input,
@@ -46,75 +46,48 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         handleSubmit: originalHandleSubmit,
         isLoading,
         error,
-        setMessages
+        setMessages,
     } = useChat({
         api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
         id: chatId ?? undefined,
         initialMessages,
-        streamProtocol: 'text',
+        streamProtocol: 'data',
         body: {
             model: currentModel,
             config: languageModel,
         },
         onResponse: (response) => {
-            console.log('🎯 Stream Response:', {
-                status: response.status,
-                ok: response.ok
-            })
             if (!response.ok) {
                 handleResponseError(response)
             }
         },
+        // Extract chat ID from initial message and clean up content
         onFinish: async (message) => {
-            console.log('✅ Message finished:', message)
+            if (message.content && !chatId) {
+                const match = message.content.match(/__CHAT_ID__(.+)__/)
+                if (match) {
+                    const newChatId = match[1]
+                    const finalContent = message.content.replace(/__CHAT_ID__(.+)__/, '')
 
-            if (message.content) {
-                if (!chatId && message.content) {
-                    console.log('🔍 Checking for chat ID in message')
-                    const match = message.content.match(/__CHAT_ID__(.+)__/)
-                    if (match) {
-                        const newChatId = match[1]
-                        console.log('🆕 New chat ID found:', newChatId)
-                        const finalContent = message.content.replace(/__CHAT_ID__(.+)__/, '')
+                    setMessages(prev => prev.map(msg =>
+                        msg.id === message.id ? { ...msg, content: finalContent } : msg
+                    ))
 
-                        console.log('🧹 Cleaned message content:', finalContent)
-                        setMessages(prev => {
-                            console.log('📝 Updating messages with clean content')
-                            return prev.map(msg =>
-                                msg.id === message.id ? { ...msg, content: finalContent } : msg
-                            )
-                        })
-
-                        onChatCreated?.(newChatId)
-                    }
+                    onChatCreated?.(newChatId)
                 }
             }
             setErrorState(null)
         },
-        onError: (error) => {
-            console.error('❌ Chat Error:', error)
-            handleChatError(error)
-        }
+        onError: (error) => handleChatError(error)
     })
 
-    // Combine initialMessages with AI messages
+    // Combine and deduplicate messages from different sources
     const messages = useMemo(() => {
         const allMessages = [...initialMessages, ...aiMessages]
-        const uniqueMessages = Array.from(new Map(allMessages.map(msg => [msg.id, msg])).values())
-        console.log('Combining messages:', {
-            initialMessages: initialMessages.length,
-            aiMessages: aiMessages.length,
-            uniqueMessages: uniqueMessages.length
-        })
-        return uniqueMessages
+        return Array.from(new Map(allMessages.map(msg => [msg.id, msg])).values())
     }, [initialMessages, aiMessages])
 
-    // Log current messages state
-    useEffect(() => {
-        console.log('📊 Current Messages State:', messages)
-    }, [messages])
-
-    // Helper function to handle response errors
+    // Error handling functions
     const handleResponseError = (response: Response) => {
         const errorMessage = response.status === 429
             ? "Rate limit exceeded. Please wait a moment."
@@ -125,7 +98,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         setErrorState(new Error(errorMessage))
     }
 
-    // Helper function to handle chat errors
     const handleChatError = (error: Error) => {
         if (!errorState) {
             const errorMessage = error.message.includes('Failed to fetch')
@@ -135,22 +107,19 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         }
     }
 
-    // Handle retry
+    // Retry last message if error occurs
     const handleRetry = useCallback(async () => {
         setErrorState(null)
-        if (messages.length > 0) {
-            const lastUserMessage = messages[messages.length - 1]
-            if (lastUserMessage.role === 'user') {
-                try {
-                    await originalHandleSubmit(undefined as any)
-                } catch (e) {
-                    console.error('Retry failed:', e)
-                }
+        if (messages.length > 0 && messages[messages.length - 1].role === 'user') {
+            try {
+                await originalHandleSubmit(undefined as any)
+            } catch (e) {
+                console.error('Retry failed:', e)
             }
         }
     }, [messages, originalHandleSubmit])
 
-    // Simplified form submission handler
+    // Handle form submission with input validation
     const handleSubmit = useCallback(
         async (e?: React.FormEvent<HTMLFormElement>) => {
             if (e) {
@@ -162,17 +131,15 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             if (!trimmedInput) return
 
             try {
-                // We can now directly submit since the stream endpoint handles both cases
                 await originalHandleSubmit(undefined as any)
             } catch (error) {
-                console.error('Error handling submit:', error)
                 setErrorState(new Error('Failed to send message. Please try again.'))
             }
         },
         [originalHandleSubmit, input]
     )
 
-    // Update scroll effect to be more efficient
+    // Auto-scroll to latest message
     useEffect(() => {
         if (messages.length > 0) {
             const timeoutId = setTimeout(() => {
@@ -182,14 +149,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         }
     }, [messages])
 
-    // Add error cleanup on component unmount
-    useEffect(() => {
-        return () => {
-            setErrorState(null)
-        }
-    }, [])
-
-    // Textarea handler
+    // Auto-resize textarea based on content
     const handleTextareaChange = useCallback((
         e: React.ChangeEvent<HTMLTextAreaElement>
     ) => {
