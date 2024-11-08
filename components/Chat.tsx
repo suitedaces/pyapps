@@ -56,36 +56,49 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             model: currentModel,
             config: languageModel,
         },
-        onResponse: (response) => {
+        onResponse: async (response) => {
             if (!response.ok) {
                 handleResponseError(response)
+                return;
             }
-        },
-        // Extract chat ID from initial message and clean up content
-        onFinish: async (message) => {
-            if (message.content && !chatId) {
-                const match = message.content.match(/__CHAT_ID__(.+)__/)
-                if (match) {
-                    const newChatId = match[1]
-                    const finalContent = message.content.replace(/__CHAT_ID__(.+)__/, '')
 
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === message.id ? { ...msg, content: finalContent } : msg
-                    ))
-
-                    onChatCreated?.(newChatId)
+            if (!chatId) {
+                const newChatId = response.headers.get('x-chat-id');
+                if (newChatId) {
+                    onChatCreated?.(newChatId);
                 }
             }
-            setErrorState(null)
         },
-        onError: (error) => handleChatError(error)
+        onFinish: async (message) => {
+            setErrorState(null);
+        },
+        onError: (error) => {
+            handleChatError(error)
+        }
     })
 
-    // Combine and deduplicate messages from different sources
+    // Combine messages with proper deduplication and sorting
     const messages = useMemo(() => {
-        const allMessages = [...initialMessages, ...aiMessages]
-        return Array.from(new Map(allMessages.map(msg => [msg.id, msg])).values())
-    }, [initialMessages, aiMessages])
+        const messageMap = new Map();
+
+        [...initialMessages, ...aiMessages].forEach(msg => {
+            const key = `${msg.role}:${msg.content}`;
+            if (!messageMap.has(key) ||
+                (msg.createdAt && (!messageMap.get(key).createdAt ||
+                 new Date(msg.createdAt) > new Date(messageMap.get(key).createdAt)))) {
+                messageMap.set(key, msg);
+            }
+        });
+
+        const dedupedMessages = Array.from(messageMap.values())
+            .sort((a, b) => {
+                const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return timeA - timeB;
+            });
+
+        return dedupedMessages;
+    }, [initialMessages, aiMessages]);
 
     // Error handling functions
     const handleResponseError = (response: Response) => {
@@ -159,12 +172,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
             textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
         }
     }, [handleInputChange])
-
-    console.log('🎨 Rendering Chat Component:', {
-        messageCount: messages.length,
-        isLoading,
-        hasError: !!error || !!errorState
-    })
 
     return (
         <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">

@@ -68,7 +68,6 @@ export const anthropicProvider = createAnthropicProvider()
 export function getModelClient(model: LLMModel, config: LLMModelConfig): ModelProvider {
   console.log('🎯 getModelClient called with:', {
     modelId: model?.id,
-    config: config
   })
 
   if (!model?.id) {

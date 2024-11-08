@@ -3,7 +3,7 @@ import { CoreMessage as VercelMessage } from 'ai'
 import { cookies } from 'next/headers'
 import { messageStore } from './messageStore'
 import { generateCode } from './tools'
-import { streamText, LanguageModelV1, CoreMessage, CoreUserMessage, CoreAssistantMessage, CoreToolMessage, TextPart, ToolCallPart, ToolResultPart } from 'ai'
+import { streamText, LanguageModelV1, CoreMessage } from 'ai'
 import {
     ModelProvider,
     Tool,
@@ -168,8 +168,13 @@ export class GruntyAgent {
                 console.log('📝 Starting text stream processing')
                 for await (const chunk of textStream) {
                     collectedContent += chunk
-                    // Format as data stream text part
-                    const textPart = `0:${JSON.stringify(chunk)}\n`
+                    // Format as data stream text part with double newline
+                    const textPart = `0:${JSON.stringify(chunk)}\n\n`
+                    console.log('📤 Streaming text chunk:', {
+                        raw: textPart,
+                        content: chunk,
+                        hasNewlines: textPart.endsWith('\n\n')
+                    });
                     writer.write(encoder.encode(textPart))
                     console.log('📤 Streamed chunk:', chunk.substring(0, 50) + '...')
                 }
@@ -184,12 +189,26 @@ export class GruntyAgent {
                             toolName: step.toolName,
                             toolCallId: step.toolCallId
                         })
+                        console.log('🔧 Streaming tool call:', {
+                            type: 'tool-call',
+                            toolName: step.toolName,
+                            toolCallId: step.toolCallId,
+                            args: step.args
+                        });
 
+                        // Tool call streaming start
+                        const toolCallStartData = `b:${JSON.stringify({
+                            toolCallId: step.toolCallId,
+                            toolName: step.toolName
+                        })}\n\n`
+                        writer.write(encoder.encode(toolCallStartData))
+
+                        // Tool call data
                         const toolCallData = `9:${JSON.stringify({
                             toolCallId: step.toolCallId,
                             toolName: step.toolName,
                             args: step.args
-                        })}\n`
+                        })}\n\n`
                         writer.write(encoder.encode(toolCallData))
 
                         if (step.toolName === 'create_streamlit_app') {
@@ -217,7 +236,7 @@ export class GruntyAgent {
                             const toolResultData = `a:${JSON.stringify({
                                 toolCallId: step.toolCallId,
                                 result: generatedCode
-                            })}\n`
+                            })}\n\n`
                             writer.write(encoder.encode(toolResultData))
                             console.log('✅ Tool execution complete')
                         }
@@ -238,7 +257,7 @@ export class GruntyAgent {
                                 tool_results: []
                             })
 
-                            // Send finish metadata using data stream protocol
+                            // Send finish metadata without chat ID
                             const finishData = `d:${JSON.stringify({
                                 finishReason: step.finishReason || 'stop',
                                 usage: {
@@ -246,15 +265,22 @@ export class GruntyAgent {
                                     completionTokens: step.usage?.completionTokens || 0,
                                     totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
                                 }
-                            })}\n`
+                            })}\n\n`
                             writer.write(encoder.encode(finishData))
+
+                            console.log('🏁 Streaming finish:', {
+                                type: 'finish',
+                                finishReason: step.finishReason,
+                                usage: step.usage
+                            });
                         }
                     }
                 }
 
             } catch (error) {
                 console.error('❌ Error in stream process:', error)
-                const errorData = `3:${JSON.stringify(String(error))}\n`
+                // Error part with double newline
+                const errorData = `3:${JSON.stringify(String(error))}\n\n`
                 writer.write(encoder.encode(errorData))
             } finally {
                 console.log('👋 Closing stream writer')
@@ -269,7 +295,8 @@ export class GruntyAgent {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
-                'x-vercel-ai-data-stream': 'v1'
+                'x-vercel-ai-data-stream': 'v1',
+                'x-chat-id': chatId
             },
         })
     }
