@@ -7,7 +7,7 @@ import { MetaSheet } from '@/components/MetaSheet'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useChat } from '@/hooks/useChat'
+import { useChat } from 'ai/react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -60,8 +60,13 @@ export default function ChatPageClient({
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat.id)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
-    const [isLoading, setIsLoading] = useState(false)
+    const [loading, setLoading] = useState(false)
 
+    const [generatedCode, setGeneratedCode] = useState('')
+    const [isGeneratingCode, setIsGeneratingCode] = useState(false)
+    const [csvFileName, setCsvFileName] = useState<string | null>(null)
+    const [csvContent, setCsvContent] = useState<string | null>(null)
+    const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
 
     const supabase = createClientComponentClient()
     const {
@@ -69,14 +74,35 @@ export default function ChatPageClient({
         input,
         handleInputChange,
         handleSubmit,
-        handleFileUpload,
-        csvFileName,
-        csvContent,
-        streamlitUrl,
-        generatedCode,
-        streamingMessage,
-        isGeneratingCode,
-    } = useChat(currentChatId)
+        isLoading,
+    } = useChat({
+        api: currentChatId ? `/api/conversations/${currentChatId}/stream` : '/api/conversations/stream',
+        id: currentChatId ?? undefined,
+        initialMessages,
+        onResponse: (response) => {
+            console.log('🔄 Stream response received:', {
+                status: response.status,
+                headers: Object.fromEntries(response.headers.entries())
+            })
+
+            if (!currentChatId) {
+                const newChatId = response.headers.get('x-chat-id')
+                if (newChatId) {
+                    console.log('📝 New chat created:', newChatId)
+                    setCurrentChatId(newChatId)
+                }
+            }
+        },
+        onFinish: (message) => {
+            console.log('✨ Stream finished, processing message:', {
+                contentLength: message.content.length,
+                preview: message.content.substring(0, 100)
+            })
+        },
+        body: {
+            fileId: currentChatId
+        }
+    })
 
     const resizableGroupRef = useRef<any>(null)
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
@@ -87,6 +113,7 @@ export default function ChatPageClient({
     useEffect(() => {
         async function fetchMessages() {
             try {
+                setLoading(true)
                 const response = await fetch(`/api/conversations/${id}/messages`)
                 if (!response.ok) throw new Error('Failed to fetch messages')
                 const data = await response.json()
@@ -115,7 +142,7 @@ export default function ChatPageClient({
             } catch (error) {
                 console.error('Error fetching messages:', error)
             } finally {
-                setIsLoading(false)
+                setLoading(false)
             }
         }
 
@@ -193,6 +220,15 @@ export default function ChatPageClient({
         }
     }, [])
 
+    // Add effect to monitor code state changes
+    useEffect(() => {
+        console.log('💾 Generated code state updated:', {
+            length: generatedCode.length,
+            preview: generatedCode.substring(0, 100),
+            isGenerating: isGeneratingCode
+        })
+    }, [generatedCode, isGeneratingCode])
+
     if (!session) {
         return <LoginPage />
     }
@@ -236,7 +272,8 @@ export default function ChatPageClient({
                                     className="flex-grow flex flex-col h-full"
                                 >
                                     <TabsList
-                                        className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}
+                                        // className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}
+                                        className="grid w-full grid-cols-2 mb-4"
                                     >
                                         {csvFileName && (
                                             <TabsTrigger value="file">
@@ -282,7 +319,6 @@ export default function ChatPageClient({
                             </ResizablePanel>
                         )}
                     </ResizablePanelGroup>
-                    \
                     <Button
                         onClick={toggleRightContent}
                         className="absolute top-2 right-4 z-10 bg-main text-text"

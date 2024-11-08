@@ -27,7 +27,7 @@ const buttonVariants = cva(
                 wBg: 'bg-white dark:bg-darkBg dark:text-darkText',
                 round: 'bg-main border-2 border-border dark:border-darkBorder hover:transform-none rounded-full',
                 outline:
-                    'bg-bg border-2 border-border dark:border-darkBorder hover:transform-none',
+                    'bg-bg border border-[#b2b2b2] rounded-xl dark:bg-neutral-800 dark:border-neutral-700 hover:bg-white hover:border-black',
             },
             size: {
                 default: 'h-10 px-4 py-2',

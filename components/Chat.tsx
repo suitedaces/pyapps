@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Code, Loader2, Send } from 'lucide-react'
+import { Code, Loader2, Send, Paperclip } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,18 +16,22 @@ import { useRouter } from 'next/navigation'
 import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
+import { FilePreview } from './FilePreview'
 
 interface ChatProps {
     chatId?: string | null
     initialMessages?: Message[]
     onChatCreated?: (chatId: string) => void
+    onFileSelect?: (file: File) => void
 }
 
 // Core chat component that handles message streaming, UI rendering, and error states
-export function Chat({ chatId = null, initialMessages = [], onChatCreated }: ChatProps) {
+export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [errorState, setErrorState] = useState<Error | null>(null)
+    const [attachedFile, setAttachedFile] = useState<File | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Get model configuration from localStorage
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -173,6 +177,26 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
         }
     }, [handleInputChange])
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            setAttachedFile(file)
+            onFileSelect?.(file)
+        }
+    }
+
+    const handleRemoveFile = () => {
+        setAttachedFile(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+    const isInputDisabled = !!attachedFile
+    const placeholderText = attachedFile
+        ? "File attached. Remove file to type a message."
+        : "Type your message..."
+
     return (
         <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
             <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
@@ -212,33 +236,55 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated }: Cha
                     onSubmit={handleSubmit}
                     className="p-4 m-auto w-full max-w-[800px]"
                 >
+                    {attachedFile && (
+                        <div className="-mb-5">
+                            <FilePreview file={attachedFile} onRemove={handleRemoveFile} />
+                        </div>
+                    )}
                     <div className="flex space-x-2">
                         <div className="relative flex-grow">
                             <textarea
                                 ref={textareaRef}
                                 value={input}
                                 onChange={handleTextareaChange}
-                                placeholder="Type your message..."
-                                className="relative flex w-full min-h-[80px] max-h-[200px] bg-bg rounded-3xl px-4 py-3 text-sm resize-none"
+                                placeholder={placeholderText}
+                                className="relative flex w-full min-h-[80px] max-h-[200px] bg-bg rounded-3xl px-4 py-3 text-sm resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault()
                                         handleSubmit()
                                     }
                                 }}
-                                disabled={isLoading}
+                                disabled={isInputDisabled}
                             />
-                            <Button
-                                type="submit"
-                                disabled={isLoading || !input.trim()}
-                                className="absolute right-2 bottom-2"
-                            >
-                                {isLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Send className="h-4 w-4" />
-                                )}
-                            </Button>
+                            <div className="absolute right-2 bottom-2 flex gap-2">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileSelect}
+                                    className="hidden"
+                                    accept=".csv,.txt,.json"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isLoading || !!attachedFile}
+                                >
+                                    <Paperclip className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isLoading || (!input.trim() && !attachedFile)}
+                                >
+                                    {isLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </form>

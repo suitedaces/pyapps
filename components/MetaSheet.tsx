@@ -14,7 +14,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
+import { csvAnalyzer } from '@/lib/csvAnalyzer'
 import { useEffect, useMemo, useState } from 'react'
 import { Cell, Legend, Pie, PieChart, Tooltip } from 'recharts'
 import { ScrollArea } from './ui/scroll-area'
