@@ -19,10 +19,54 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { messages, model, config } = await req.json() as {
+        const { messages, model, config, options } = await req.json() as {
             messages: Message[]
             model: LLMModel
             config: LLMModelConfig
+            options?: {
+                body?: {
+                    fileContent?: string
+                    fileName?: string
+                }
+            }
+        }
+
+        let csvAnalysis = null
+        if (options?.body?.fileContent) {
+            // Create detailed analysis from file content
+            const rows = options.body.fileContent.split('\n')
+            const columns = rows[0].split(',')
+            const dataRows = rows.slice(1)
+
+            // Create more comprehensive analysis
+            csvAnalysis = {
+                fileId: generateUUID(), // Generate a unique ID for the file
+                fileName: options.body.fileName,
+                columns: columns,
+                rowCount: dataRows.length,
+                preview: rows.slice(1, 6),
+                summary: {
+                    totalRows: dataRows.length,
+                    columnCount: columns.length,
+                    columnNames: columns,
+                    sampleData: dataRows.slice(0, 5).map(row => row.split(',')),
+                    columnTypes: columns.map(col => {
+                        // Try to determine column type from data
+                        const sampleValues = dataRows.slice(0, 5).map(row => row.split(',')[columns.indexOf(col)])
+                        return {
+                            name: col,
+                            type: sampleValues.every(val => !isNaN(Number(val))) ? 'numeric' : 'categorical'
+                        }
+                    })
+                }
+            }
+
+            console.log('📊 Created CSV Analysis:', {
+                fileName: csvAnalysis.fileName,
+                columnCount: csvAnalysis.columns.length,
+                rowCount: csvAnalysis.rowCount,
+                preview: csvAnalysis.preview.length
+            })
         }
 
         if (!messages?.length) {
@@ -55,45 +99,42 @@ export async function POST(req: NextRequest) {
             }
         )
 
-        // Transform stream to include chat ID
-        const stream = await agent.streamResponse(
+        console.log('🚀 Initializing stream with:', {
+            chatId,
+            messageCount: messages.length,
+            hasAnalysis: !!csvAnalysis,
+            analysisPreview: csvAnalysis ? {
+                columns: csvAnalysis.columns.length,
+                rows: csvAnalysis.rowCount,
+                fileName: csvAnalysis.fileName
+            } : null
+        })
+
+        const agentResponse = await agent.streamResponse(
             chatId,
             session.user.id,
             convertToCoreMessages(messages),
             tools,
-            null
+            csvAnalysis // Now passing the detailed analysis
         )
 
-        const { readable, writable } = new TransformStream()
-        const textDecoder = new TextDecoderStream()
-        const textEncoder = new TextEncoderStream()
+        // Get the readable stream from the agent's response
+        if (!agentResponse.body) {
+            throw new Error('No stream body returned from agent')
+        }
 
-        stream.body
-            ?.pipeThrough(textDecoder)
-            .pipeThrough(new TransformStream({
-                transform(chunk, controller) {
-                    controller.enqueue(chunk)
-                },
-                flush(controller) {
-                    controller.enqueue(`\n__CHAT_ID__${chatId}__`)
-                }
-            }))
-            .pipeThrough(textEncoder)
-            .pipeTo(writable)
-
-        return new Response(readable, {
-            headers: stream.headers,
-            status: 200,
+        return new Response(agentResponse.body, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'x-chat-id': chatId
+            }
         })
 
     } catch (error) {
-        return new Response(
-            JSON.stringify({
-                error: 'Failed to process stream request',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
-        )
+        console.error('💥 Error in stream processing:', error)
+        throw error
     }
 }
 

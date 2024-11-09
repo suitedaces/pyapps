@@ -40,10 +40,10 @@ export class GruntyAgent {
         tools: Tool[],
         csvAnalysis?: any
     ) {
-        console.log('🚀 Starting stream response in GruntyAgent', {
+        console.log('🤖 Agent stream starting:', {
             chatId,
-            userId,
-            messagesCount: messages.length
+            messageCount: messages.length,
+            hasAnalysis: !!csvAnalysis
         })
 
         // Reset sanitizedMessages for each new conversation turn
@@ -127,6 +127,7 @@ export class GruntyAgent {
 
         const streamProcess = async () => {
             try {
+                console.log('🌊 Stream process initiated')
                 let collectedContent = ''
                 console.log('🔄 Starting stream process')
 
@@ -168,16 +169,28 @@ export class GruntyAgent {
                 console.log('📝 Starting text stream processing')
                 for await (const chunk of textStream) {
                     collectedContent += chunk
+                    console.log('📤 Processing stream chunk:', {
+                        chunkSize: chunk.length,
+                        totalCollected: collectedContent.length,
+                        chunkPreview: chunk.substring(0, 50) + '...'
+                    })
+
                     // Format as data stream text part with double newline
                     const textPart = `0:${JSON.stringify(chunk)}\n\n`
-                    console.log('📤 Streaming text chunk:', {
+                    console.log('📤 Formatting chunk:', {
                         raw: textPart,
                         content: chunk,
                         hasNewlines: textPart.endsWith('\n\n')
                     });
+
                     writer.write(encoder.encode(textPart))
-                    console.log('📤 Streamed chunk:', chunk.substring(0, 50) + '...')
+                    console.log('📤 Chunk written to stream')
                 }
+
+                console.log('📝 Complete assistant response:', {
+                    length: collectedContent.length,
+                    preview: collectedContent.substring(0, 100) + '...'
+                })
 
                 // Handle full stream
                 console.log('🔄 Processing full stream')
@@ -278,10 +291,8 @@ export class GruntyAgent {
                 }
 
             } catch (error) {
-                console.error('❌ Error in stream process:', error)
-                // Error part with double newline
-                const errorData = `3:${JSON.stringify(String(error))}\n\n`
-                writer.write(encoder.encode(errorData))
+                console.error('🔥 Stream process error:', error)
+                throw error
             } finally {
                 console.log('👋 Closing stream writer')
                 writer.close()

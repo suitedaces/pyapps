@@ -42,25 +42,28 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         (model) => model.id === languageModel.model
     )
 
-    // Initialize chat with Vercel AI SDK
+    // Initialize chat with Vercel AI SDK with experimental attachments
     const {
         messages: aiMessages,
         input,
         handleInputChange,
         handleSubmit: originalHandleSubmit,
         isLoading,
-        error,
-        setMessages,
+        setMessages: setAiMessages,
+        append,
     } = useChat({
         api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
         id: chatId ?? undefined,
         initialMessages,
-        streamProtocol: 'data',
         body: {
             model: currentModel,
             config: languageModel,
         },
         onResponse: async (response) => {
+            console.log('🔄 Stream response initiated:', {
+                status: response.status,
+                headers: Array.from(response.headers.entries())
+            })
             if (!response.ok) {
                 handleResponseError(response)
                 return;
@@ -74,9 +77,18 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             }
         },
         onFinish: async (message) => {
+            console.log('✅ Stream finished:', {
+                messageLength: message.content.length,
+                hasToolCalls: !!message.toolInvocations?.length
+            })
             setErrorState(null);
+            setAttachedFile(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         },
         onError: (error) => {
+            console.error('❌ Stream error:', error)
             handleChatError(error)
         }
     })
@@ -139,21 +151,62 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
     // Handle form submission with input validation
     const handleSubmit = useCallback(
         async (e?: React.FormEvent<HTMLFormElement>) => {
+            console.log('🔄 Starting submit process')
             if (e) {
                 e.preventDefault()
                 e.stopPropagation()
             }
 
-            const trimmedInput = input.trim()
-            if (!trimmedInput) return
-
             try {
-                await originalHandleSubmit(undefined as any)
+                if (attachedFile) {
+                    const fileContent = await attachedFile.text()
+                    const sanitizedContent = fileContent
+                        .split('\n')
+                        .map((row) => row.replace(/[\r\n]+/g, ''))
+                        .join('\n')
+
+                    const rows = sanitizedContent.split('\n')
+                    const columnNames = rows[0]
+                    const previewRows = rows.slice(1, 6).join('\n')
+                    const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+                    const message = `I've uploaded "${attachedFile.name}". Create a Streamlit app to visualize this data. The file is at '/home/user/${attachedFile.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+
+                    // Clear file immediately
+                    const fileToSubmit = attachedFile
+                    setAttachedFile(null)
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = ''
+                    }
+
+                    // Use append to send message and file content
+                    await append({
+                        content: message,
+                        role: 'user',
+                        createdAt: new Date(),
+                    }, {
+                        options: {
+                            body: {
+                                fileContent: sanitizedContent,
+                                fileName: fileToSubmit.name
+                            }
+                        }
+                    })
+                } else {
+                    const trimmedInput = input.trim()
+                    if (!trimmedInput) return
+                    await append({
+                        content: trimmedInput,
+                        role: 'user',
+                        createdAt: new Date()
+                    })
+                }
             } catch (error) {
-                setErrorState(new Error('Failed to send message. Please try again.'))
+                console.error('❌ Submit error:', error)
+                setErrorState(new Error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`))
             }
         },
-        [originalHandleSubmit, input]
+        [append, attachedFile]
     )
 
     // Auto-scroll to latest message
@@ -202,11 +255,12 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
                 <AnimatePresence initial={false}>
                     {messages.map((message, index) => (
-                        <AIMessage
-                            key={message.id}
-                            {...message}
-                            isLastMessage={index === messages.length - 1}
-                        />
+                        <div key={message.id}>
+                            <AIMessage
+                                {...message}
+                                isLastMessage={index === messages.length - 1}
+                            />
+                        </div>
                     ))}
                 </AnimatePresence>
                 <div ref={messagesEndRef} />
