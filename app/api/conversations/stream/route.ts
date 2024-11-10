@@ -5,11 +5,37 @@ import { GruntyAgent } from '@/lib/agent'
 import { getModelClient } from '@/lib/modelProviders'
 import { tools } from '@/lib/tools'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
-import { LLMModel, LLMModelConfig } from '@/lib/types'
+import { FileContext, LLMModel, LLMModelConfig } from '@/lib/types'
 import { Message, convertToCoreMessages } from 'ai'
 import { generateUUID } from '@/lib/utils'
+import { z } from 'zod'
 
-// Handle streaming responses for new conversations
+// Validation schema for request body
+const RequestSchema = z.object({
+    messages: z.array(z.object({
+        content: z.string(),
+        role: z.enum(['user', 'assistant', 'system']),
+        createdAt: z.date().optional(),
+    })),
+    model: z.object({
+        id: z.string(),
+        provider: z.string(),
+        providerId: z.string(),
+        name: z.string(),
+    }),
+    config: z.object({
+        model: z.string(),
+        temperature: z.number().optional(),
+        maxTokens: z.number().optional(),
+    }),
+    options: z.object({
+        body: z.object({
+            fileId: z.string().optional(),
+            fileName: z.string().optional(),
+        }).optional(),
+    }).optional(),
+})
+
 export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
     const { data: { session } } = await supabase.auth.getSession()
@@ -19,72 +45,90 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { messages, model, config, options } = await req.json() as {
-            messages: Message[]
-            model: LLMModel
-            config: LLMModelConfig
-            options?: {
-                body?: {
-                    fileContent?: string
-                    fileName?: string
-                }
-            }
-        }
+        const body = await req.json()
+        const { messages, model, config, options } = await RequestSchema.parseAsync(body)
 
-        let csvAnalysis = null
-        if (options?.body?.fileContent) {
-            // Create detailed analysis from file content
-            const rows = options.body.fileContent.split('\n')
-            const columns = rows[0].split(',')
-            const dataRows = rows.slice(1)
+        let fileContext: FileContext | undefined = undefined
+        if (options?.body?.fileId) {
+            console.log('🔍 Fetching file data:', { fileId: options.body.fileId })
 
-            // Create more comprehensive analysis
-            csvAnalysis = {
-                fileId: generateUUID(), // Generate a unique ID for the file
-                fileName: options.body.fileName,
-                columns: columns,
-                rowCount: dataRows.length,
-                preview: rows.slice(1, 6),
-                summary: {
-                    totalRows: dataRows.length,
-                    columnCount: columns.length,
-                    columnNames: columns,
-                    sampleData: dataRows.slice(0, 5).map(row => row.split(',')),
-                    columnTypes: columns.map(col => {
-                        // Try to determine column type from data
-                        const sampleValues = dataRows.slice(0, 5).map(row => row.split(',')[columns.indexOf(col)])
-                        return {
-                            name: col,
-                            type: sampleValues.every(val => !isNaN(Number(val))) ? 'numeric' : 'categorical'
-                        }
-                    })
-                }
+            const { data: fileData, error: fileError } = await supabase
+                .from('files')
+                .select('*')
+                .eq('id', options.body.fileId)
+                .eq('user_id', session.user.id)
+                .single()
+
+            if (fileError) {
+                console.error('❌ Error fetching file:', fileError)
+                return new Response('File not found', { status: 404 })
             }
 
-            console.log('📊 Created CSV Analysis:', {
-                fileName: csvAnalysis.fileName,
-                columnCount: csvAnalysis.columns.length,
-                rowCount: csvAnalysis.rowCount,
-                preview: csvAnalysis.preview.length
+            fileContext = {
+                id: fileData.id,
+                fileName: fileData.file_name,
+                fileType: fileData.file_type as 'csv' | 'json',
+                content: fileData.content,
+                analysis: fileData.analysis,
+            }
+
+            console.log('📄 File context created:', {
+                fileId: fileData.id,
+                fileName: fileData.file_name,
+                fileType: fileData.file_type,
+                hasAnalysis: !!fileData.analysis
             })
+
+            await supabase
+                .from('files')
+                .update({ last_accessed: new Date().toISOString() })
+                .eq('id', fileData.id)
         }
 
-        if (!messages?.length) {
-            return new Response('No messages provided', { status: 400 })
-        }
-
-        // Create new chat and get stream response
         const chatId = generateUUID()
-        await supabase
+        const { error: chatError } = await supabase
             .from('chats')
             .insert([{
                 id: chatId,
                 user_id: session.user.id,
                 name: messages[0].content.slice(0, 50) + '...',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             }])
 
-        const modelClient = getModelClient(model, {
-            apiKey: process.env.ANTHROPIC_API_KEY,
+        if (chatError) {
+            console.error('❌ Error creating chat:', chatError)
+            return new Response('Failed to create chat', { status: 500 })
+        }
+
+        if (fileContext?.id) {
+            console.log('🔄 Updating file with chat ID:', {
+                fileId: fileContext.id,
+                chatId
+            })
+
+            const { error: fileUpdateError } = await supabase
+                .from('files')
+                .update({ chat_id: chatId })
+                .eq('id', fileContext.id)
+
+            if (fileUpdateError) {
+                console.error('❌ Error updating file with chat_id:', fileUpdateError)
+            }
+        }
+
+        console.log('🎯 Initializing model client:', {
+            modelId: model.id,
+            provider: model.provider
+        })
+
+        const modelClient = getModelClient({
+            id: model.id,
+            provider: model.provider,
+            name: model.name,
+            providerId: model.providerId
+        }, {
+            apiKey: process.env.ANTHROPIC_API_KEY || '',
             temperature: config?.temperature || 0.7,
             maxTokens: config?.maxTokens || 4096
         })
@@ -102,11 +146,12 @@ export async function POST(req: NextRequest) {
         console.log('🚀 Initializing stream with:', {
             chatId,
             messageCount: messages.length,
-            hasAnalysis: !!csvAnalysis,
-            analysisPreview: csvAnalysis ? {
-                columns: csvAnalysis.columns.length,
-                rows: csvAnalysis.rowCount,
-                fileName: csvAnalysis.fileName
+            hasFile: !!fileContext,
+            fileInfo: fileContext ? {
+                id: fileContext.id,
+                name: fileContext.fileName,
+                type: fileContext.fileType,
+                hasAnalysis: !!fileContext.analysis
             } : null
         })
 
@@ -115,10 +160,9 @@ export async function POST(req: NextRequest) {
             session.user.id,
             convertToCoreMessages(messages),
             tools,
-            csvAnalysis // Now passing the detailed analysis
+            fileContext
         )
 
-        // Get the readable stream from the agent's response
         if (!agentResponse.body) {
             throw new Error('No stream body returned from agent')
         }
@@ -128,13 +172,24 @@ export async function POST(req: NextRequest) {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
-                'x-chat-id': chatId
+                'x-chat-id': chatId,
+                'x-file-id': fileContext?.id || '',
             }
         })
 
     } catch (error) {
-        console.error('💥 Error in stream processing:', error)
-        throw error
+        console.error('❌ Error in stream processing:', error)
+        return new Response(
+            JSON.stringify({
+                error: error instanceof z.ZodError
+                    ? 'Invalid request format'
+                    : 'Internal server error'
+            }),
+            {
+                status: error instanceof z.ZodError ? 400 : 500,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        )
     }
 }
 

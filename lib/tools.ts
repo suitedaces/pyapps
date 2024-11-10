@@ -6,7 +6,7 @@ const codeGenerationAnthropicAgent = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-// Define tool schemas using Zod
+// Define tool schema using Zod
 const streamlitAppSchema = z.object({
     query: z
         .string()
@@ -14,76 +14,99 @@ const streamlitAppSchema = z.object({
         .describe(
             'Explain the requirements for the Streamlit code you want to generate. Include details about the data if there\'s any context and the column names VERBATIM as a list, with any spaces or special chars like this: ["col 1 ", " 2col 1"].'
         ),
-})
-
-const jupyterNotebookSchema = z.object({
-    code: z
-        .string()
-        .describe('The Python code to execute in the Jupyter Notebook'),
+    fileContext: z.object({
+        fileName: z.string(),
+        fileType: z.enum(['csv', 'json']),
+        analysis: z.any().optional(),
+    }).optional(),
 })
 
 export const tools: Tool[] = [
     {
         toolName: 'create_streamlit_app',
-        description: 'Generates Python (Streamlit) code based on a given query',
+        description: 'Generates Python (Streamlit) code based on a given query and file context',
         parameters: streamlitAppSchema,
         execute: async (input) => {
-            const { query } = streamlitAppSchema.parse(input)
-            return generateCode(query)
+            const { query, fileContext } = streamlitAppSchema.parse(input)
+            return generateCode(query, fileContext)
         },
-
-        // {
-        //     name: 'execute_jupyter_notebook',
-        //     description: 'Executes Python code in a Jupyter Notebook',
-        //     inputSchema: jupyterNotebookSchema,
-        // parameters: jupyterNotebookSchema,
-        //     execute: async (input) => {
-        //         const { code } = jupyterNotebookSchema.parse(input)
-        //         return generateCode(code)
-        //     },
-        // },
     },
 ]
 
-// Improved code generation with better error handling
+// Code generation with file context handling
 export async function generateCode(
-    query: string
+    query: string,
+    fileContext?: {
+        fileName: string;
+        fileType: string;
+        analysis?: any;
+    }
 ): Promise<{ generatedCode: string; codeTokenCount: number }> {
+    console.log('💻 Starting code generation:', {
+        queryLength: query.length,
+        hasFileContext: !!fileContext,
+        fileType: fileContext?.fileType
+    })
+
     if (!query?.trim()) {
+        console.error('❌ Empty query provided')
         throw new Error('Query cannot be empty')
     }
 
-    console.log('🔍 Generating code for query:', query)
-
     try {
+        const systemPrompt = `You are a Python code generation assistant specializing in Streamlit apps.
+These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly].
+${fileContext ? `You are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}".` : ''}
+Generate a complete, runnable Streamlit app based on the given query.
+DO NOT use "st.experimental_rerun()" at any cost.
+Only respond with the code, no potential errors, no explanations!`
+
+        console.log('🤖 Sending request to Anthropic:', {
+            model: 'claude-3-5-sonnet-20240620',
+            systemPromptLength: systemPrompt.length,
+            hasAnalysis: !!fileContext?.analysis
+        })
+
         const response = await codeGenerationAnthropicAgent.messages.create({
             model: 'claude-3-5-sonnet-20240620',
             max_tokens: 2000,
             temperature: 0.7,
-            system: 'You are a Python code generation assistant specializing in Streamlit apps. These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly]. Generate a complete, runnable Streamlit app based on the given query. DO NOT use "st.experimental_rerun()" at any cost. Only respond with the code, no potential errors, no explanations!',
-            messages: [{ role: 'user', content: query }],
+            system: systemPrompt,
+            messages: [
+                {
+                    role: 'user',
+                    content: `${query}${fileContext?.analysis ? `\n\nFile Analysis:\n${JSON.stringify(fileContext.analysis, null, 2)}` : ''}`
+                }
+            ],
+        })
+
+        console.log('✅ Code generation completed:', {
+            responseType: typeof response.content,
+            contentLength: response.content.length,
+            tokenUsage: response.usage
         })
 
         if (Array.isArray(response.content) && response.content.length > 0) {
-            const generatedCode =
-                response.content[0].type === 'text'
-                    ? response.content[0].text
-                          .replace(/^```python/, '')
-                          .replace(/```$/, '')
-                          .trim()
-                    : ''
+            const generatedCode = response.content[0].type === 'text'
+                ? response.content[0].text
+                    .replace(/^```python/, '')
+                    .replace(/```$/, '')
+                    .trim()
+                : ''
 
             console.log('✨ Code generated successfully')
             return {
                 generatedCode,
-                codeTokenCount:
-                    response.usage.input_tokens + response.usage.output_tokens,
+                codeTokenCount: response.usage.input_tokens + response.usage.output_tokens,
             }
         }
 
         throw new Error('Unexpected response format from code generation')
     } catch (error) {
-        console.error('❌ Error generating code:', error)
+        console.error('❌ Code generation failed:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            query: query.substring(0, 100) + '...'
+        })
         throw error
     }
 }
@@ -94,62 +117,44 @@ export function getToolByName(name: string): Tool | undefined {
 }
 
 export async function executeToolCall(
-    toolInvocation: ToolInvocation
+    toolInvocation: ToolInvocation,
+    fileContext?: any
 ): Promise<any> {
+    console.log('🔧 Tool execution started:', {
+        toolName: toolInvocation.toolName,
+        hasFileContext: !!fileContext
+    })
+
     const tool = getToolByName(toolInvocation.toolName)
     if (!tool) {
+        console.error('❌ Tool not found:', toolInvocation.toolName)
         throw new Error(`Tool not found: ${toolInvocation.toolName}`)
     }
 
     try {
-        console.log(`🔧 Executing tool: ${toolInvocation.toolName}`)
-        const result = await tool.execute(toolInvocation.args)
-        console.log(`✅ Tool execution completed: ${toolInvocation.toolName}`)
+        const args = toolInvocation.toolName === 'create_streamlit_app'
+            ? { ...toolInvocation.args, fileContext }
+            : toolInvocation.args
+
+        console.log('🔨 Executing tool with args:', {
+            toolName: toolInvocation.toolName,
+            args
+        })
+
+        const result = await tool.execute(args)
+
+        console.log('✅ Tool execution completed:', {
+            toolName: toolInvocation.toolName,
+            resultType: typeof result,
+            resultLength: typeof result === 'string' ? result.length : null
+        })
+
         return result
     } catch (error) {
-        console.error(
-            `❌ Error executing tool ${toolInvocation.toolName}:`,
-            error
-        )
+        console.error('❌ Tool execution failed:', {
+            toolName: toolInvocation.toolName,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        })
         throw error
     }
 }
-
-// Type guard for tool validation
-export function isValidTool(tool: any): tool is Tool {
-    return (
-        typeof tool === 'object' &&
-        tool !== null &&
-        'name' in tool &&
-        'description' in tool &&
-        'parameters' in tool &&
-        'execute' in tool &&
-        typeof tool.execute === 'function'
-    )
-}
-
-
-// create_streamlit_app: async (input: { query: string }): Promise<string> => {
-//     try {
-//         const { generatedCode, codeTokenCount } = await generateCode(
-//             input.query
-//         )
-
-//         return generatedCode
-//     } catch (err) {
-//         console.error(`Error generating Streamlit app:`, err)
-//         return `Error generating Streamlit app for query: ${input.query}`
-//     }
-// },
-// execute_jupyter_notebook: async (input: {
-//     code: string
-// }): Promise<string> => {
-//     try {
-//         const results = await runNotebook(input.code)
-//         return JSON.stringify(results)
-//     } catch (err) {
-//         console.error(`Error executing Jupyter Notebook:`, err)
-//         return `Error executing Jupyter Notebook for code: ${input.code}`
-//     }
-// },
-// }

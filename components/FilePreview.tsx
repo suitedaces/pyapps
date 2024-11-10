@@ -8,31 +8,103 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { motion, AnimatePresence } from 'framer-motion'
+import { z } from 'zod'
+
+// File validation schema
+const FileValidationSchema = z.object({
+  file: z.instanceof(File).refine(
+    (file) => {
+      const validTypes = ['text/csv', 'application/json', 'text/plain']
+      const validExtensions = ['.csv', '.json', '.txt']
+      return validTypes.includes(file.type) ||
+             validExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+    },
+    { message: 'Invalid file type. Please upload a CSV, JSON, or TXT file.' }
+  ).refine(
+    (file) => file.size <= 5 * 1024 * 1024,
+    { message: 'File size must be less than 5MB.' }
+  )
+})
 
 interface FilePreviewProps {
   file: File
   onRemove: () => void
+  onError?: (error: string) => void
 }
 
-export function FilePreview({ file, onRemove }: FilePreviewProps) {
+export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
   const [preview, setPreview] = useState<string>('')
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const loadPreview = async () => {
+    const validateAndLoadFile = async () => {
+      setIsLoading(true)
+      setError(null)
+
       try {
-        const text = await file.text()
+        // Validate file
+        await FileValidationSchema.parseAsync({ file })
+
+        // Read file content
+        const text = await readFileContent(file)
         setPreview(text)
-      } catch (error) {
-        console.error('Error reading file:', error)
-        setPreview('Error loading file preview')
+      } catch (err) {
+        const errorMessage = err instanceof z.ZodError
+          ? err.errors[0].message
+          : 'Error loading file preview'
+        setError(errorMessage)
+        onError?.(errorMessage)
+      } finally {
+        setIsLoading(false)
       }
     }
 
     if (file) {
-      loadPreview()
+      validateAndLoadFile()
     }
-  }, [file])
+  }, [file, onError])
+
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+
+      reader.onload = (e) => {
+        const content = e.target?.result as string
+
+        // Basic content validation
+        if (!content.trim()) {
+          reject(new Error('File appears to be empty'))
+          return
+        }
+
+        // For CSV files, validate structure
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          const lines = content.split('\n')
+          if (lines.length < 2) {
+            reject(new Error('CSV file must contain headers and at least one data row'))
+            return
+          }
+
+          const headerCount = lines[0].split(',').length
+          const isValid = lines.every(line =>
+            line.trim() && line.split(',').length === headerCount
+          )
+
+          if (!isValid) {
+            reject(new Error('CSV file appears to be malformed'))
+            return
+          }
+        }
+
+        resolve(content)
+      }
+
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsText(file)
+    })
+  }
 
   const isPreviewable = (file: File) => {
     const previewableTypes = [
@@ -60,12 +132,12 @@ export function FilePreview({ file, onRemove }: FilePreviewProps) {
         >
           <div className="p-2 pb-7">
             <motion.div
-              className="relative bg-white dark:bg-slate-800 rounded-lg border p-3 w-44 cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => isPreviewable(file) && setIsPreviewOpen(true)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              className={`relative bg-white dark:bg-slate-800 rounded-lg border p-3 w-44 cursor-pointer
+                ${error ? 'border-red-500' : 'hover:border-primary/50'} transition-colors`}
+              onClick={() => isPreviewable(file) && !error && setIsPreviewOpen(true)}
+              whileHover={{ scale: error ? 1 : 1.02 }}
+              whileTap={{ scale: error ? 1 : 0.98 }}
             >
-              {/* Close button */}
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
@@ -78,24 +150,26 @@ export function FilePreview({ file, onRemove }: FilePreviewProps) {
                 <X className="h-3 w-3" />
               </motion.button>
 
-              {/* File info - centered layout */}
               <div className="flex flex-col items-center gap-1.5">
-                {/* File name */}
                 <div className="text-center">
                   <span className="text-sm font-medium line-clamp-2 text-center">
                     {file.name}
                   </span>
                 </div>
 
-                {/* File size */}
                 <span className="text-xs text-muted-foreground">
                   {Math.round(file.size / 1024)}KB
                 </span>
 
-                {/* File type */}
-                <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-1 rounded w-full text-center">
-                  {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
-                </span>
+                {error ? (
+                  <span className="text-xs font-semibold bg-red-100 text-red-600 px-2 py-1 rounded w-full text-center">
+                    {error}
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-1 rounded w-full text-center">
+                    {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                  </span>
+                )}
               </div>
             </motion.div>
           </div>
@@ -112,14 +186,18 @@ export function FilePreview({ file, onRemove }: FilePreviewProps) {
           </DialogHeader>
           <ScrollArea className="flex-1 h-[calc(80vh-100px)] mt-4 border rounded-md bg-slate-100">
             <div className="p-4">
-              {preview ? (
-                <pre className="text-sm whitespace-pre-wrap font-mono overflow-x-auto">
-                  {preview}
-                </pre>
-              ) : (
+              {isLoading ? (
                 <div className="text-center text-muted-foreground">
                   Loading preview...
                 </div>
+              ) : error ? (
+                <div className="text-center text-red-500">
+                  {error}
+                </div>
+              ) : (
+                <pre className="text-sm whitespace-pre-wrap font-mono overflow-x-auto">
+                  {preview}
+                </pre>
               )}
             </div>
           </ScrollArea>
