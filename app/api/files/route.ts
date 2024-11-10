@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { generateUUID } from '@/lib/utils'
 import { analyzeFile } from '@/lib/fileAnalyzer'
-import { createHash } from 'crypto'
 
 // File metadata validation schema
 const FileMetadataSchema = z.object({
@@ -88,13 +87,12 @@ export async function POST(req: NextRequest) {
             chatId: formData.get('chatId')?.toString(),
         })
 
-        // Read file content
+        // Read and sanitize file content
         const fileContent = await file.text()
-
-        // Generate content hash
-        const contentHash = createHash('sha256')
-            .update(fileContent)
-            .digest('hex')
+        const sanitizedContent = fileContent
+            .split('\n')
+            .map((row) => row.replace(/[\r\n]+/g, ''))
+            .join('\n')
 
         // Generate file URLs
         const fileId = generateUUID()
@@ -121,7 +119,7 @@ export async function POST(req: NextRequest) {
                 file_size: metadata.fileSize,
                 file_url: fileUrl,
                 backup_url: backupUrl,
-                content_hash: contentHash,
+                content_hash: sanitizedContent,  // Store sanitized content directly
                 analysis,
                 created_at: new Date().toISOString(),
                 expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours expiry

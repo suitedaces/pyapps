@@ -27,12 +27,9 @@ const RequestSchema = z.object({
         temperature: z.number().optional(),
         maxTokens: z.number().optional(),
     }),
-    options: z.object({
-        body: z.object({
-            fileId: z.string().optional(),
-            fileName: z.string().optional(),
-        }).optional(),
-    }).optional(),
+    fileId: z.string().optional(),
+    fileName: z.string().optional(),
+    fileContent: z.string().optional(),
 })
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -49,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     try {
         const body = await req.json()
-        const { messages, model, config, options } = await RequestSchema.parseAsync(body)
+        const { messages, model, config, fileId, fileName, fileContent } = await RequestSchema.parseAsync(body)
 
         console.log('🔍 Fetching chat data:', { chatId: params.id })
 
@@ -70,7 +67,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         let fileContext: FileContext | undefined = undefined
 
         // Check for file in request or existing chat
-        const fileId = options?.body?.fileId || chatData.file_id
         if (fileId) {
             console.log('🔍 Fetching file data:', { fileId })
 
@@ -87,10 +83,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             }
 
             fileContext = {
-                id: fileData.id,
                 fileName: fileData.file_name,
                 fileType: fileData.file_type as 'csv' | 'json',
-                content: fileData.content,
+                content: fileContent,
                 analysis: fileData.analysis,
             }
 

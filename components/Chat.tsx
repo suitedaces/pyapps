@@ -199,11 +199,10 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                         role: 'user',
                         createdAt: new Date(),
                     }, {
-                        options: {
-                            body: {
-                                fileId,
-                                fileName: attachedFile.name
-                            }
+                        body: {
+                            fileId,
+                            fileName: attachedFile.name,
+                            fileContent: sanitizedContent
                         }
                     })
                 } else {

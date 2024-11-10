@@ -28,34 +28,44 @@ const RequestSchema = z.object({
         temperature: z.number().optional(),
         maxTokens: z.number().optional(),
     }),
-    options: z.object({
-        body: z.object({
-            fileId: z.string().optional(),
-            fileName: z.string().optional(),
-        }).optional(),
-    }).optional(),
+    fileId: z.string().optional(),
+    fileName: z.string().optional(),
+    fileContent: z.string().optional(),
 })
 
 export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
     const { data: { session } } = await supabase.auth.getSession()
-
+    const chatId = generateUUID()
     if (!session) {
         return new Response('Unauthorized', { status: 401 })
     }
 
     try {
         const body = await req.json()
-        const { messages, model, config, options } = await RequestSchema.parseAsync(body)
+
+        console.log('🔍 Raw request body:', {
+            hasBody: !!body,
+            bodyKeys: Object.keys(body),
+            requestBody: body.body,
+        })
+
+        const { messages, model, config, fileId, fileName, fileContent } = await RequestSchema.parseAsync(body)
+
+        console.log('🔍 Parsed request body:', {
+            hasFileId: !!fileId,
+            hasFileName: !!fileName,
+            hasFileContent: !!fileContent,
+        })
 
         let fileContext: FileContext | undefined = undefined
-        if (options?.body?.fileId) {
-            console.log('🔍 Fetching file data:', { fileId: options.body.fileId })
+        if (fileId) {
+            console.log('🔍 Fetching file data:', { fileId })
 
             const { data: fileData, error: fileError } = await supabase
                 .from('files')
                 .select('*')
-                .eq('id', options.body.fileId)
+                .eq('id', fileId)
                 .eq('user_id', session.user.id)
                 .single()
 
@@ -64,28 +74,30 @@ export async function POST(req: NextRequest) {
                 return new Response('File not found', { status: 404 })
             }
 
+            console.log('📄 File data fetched:', fileData);
+
             fileContext = {
-                id: fileData.id,
                 fileName: fileData.file_name,
                 fileType: fileData.file_type as 'csv' | 'json',
-                content: fileData.content,
+                content: fileContent,
                 analysis: fileData.analysis,
             }
 
             console.log('📄 File context created:', {
                 fileId: fileData.id,
                 fileName: fileData.file_name,
-                fileType: fileData.file_type,
                 hasAnalysis: !!fileData.analysis
             })
 
             await supabase
                 .from('files')
-                .update({ last_accessed: new Date().toISOString() })
+                .update({
+                    last_accessed: new Date().toISOString(),
+                    chat_id: chatId
+                })
                 .eq('id', fileData.id)
         }
 
-        const chatId = generateUUID()
         const { error: chatError } = await supabase
             .from('chats')
             .insert([{
@@ -154,6 +166,8 @@ export async function POST(req: NextRequest) {
                 hasAnalysis: !!fileContext.analysis
             } : null
         })
+
+        console.log("🚀 ~ fileContext", fileContext);
 
         const agentResponse = await agent.streamResponse(
             chatId,
