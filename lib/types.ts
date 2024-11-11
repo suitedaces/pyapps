@@ -91,3 +91,11 @@ export interface ToolCall {
     name: string
     parameters: any
 }
+
+export interface FileContext {
+    id: string;
+    fileName: string;
+    fileType: 'csv' | 'json' | 'txt';
+    content?: string;
+    analysis?: any;
+}

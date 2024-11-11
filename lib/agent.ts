@@ -12,6 +12,13 @@ import {
 } from './types'
 import { encode } from 'gpt-tokenizer'
 
+interface FileContext {
+    fileName: string;
+    fileType: string;
+    content?: string;
+    analysis?: any;
+}
+
 // AI Agent that handles message streaming, tool execution, and conversation management
 export class GruntyAgent {
     private model: ModelProvider
@@ -19,6 +26,7 @@ export class GruntyAgent {
     private roleDescription: string
     private config: LLMModelConfig
     private sanitizedMessages: CoreMessage[] = []
+    private fileContext?: FileContext
 
     constructor(
         modelClient: ModelProvider,
@@ -38,27 +46,29 @@ export class GruntyAgent {
         userId: string,
         messages: CoreMessage[],
         tools: Tool[],
-        csvAnalysis?: any
+        fileContext?: FileContext
     ) {
         console.log('🤖 Agent stream starting:', {
             chatId,
             messageCount: messages.length,
-            hasAnalysis: !!csvAnalysis
+            hasFileContext: !!fileContext
         })
 
-        // Reset sanitizedMessages for each new conversation turn
+        this.fileContext = fileContext
         this.sanitizedMessages = []
 
-        // Add system message
+        // Add system message with file context if available
+        const systemMessage = fileContext
+            ? `${this.roleDescription}\n\nYou are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}".`
+            : this.roleDescription
+
         this.sanitizedMessages.push({
             role: 'system',
-            content: this.roleDescription
+            content: systemMessage
         })
-        console.log('➕ Added system message to sanitizedMessages')
 
-        // Fetch complete conversation history from database
+        // Fetch complete conversation history
         const supabase = createRouteHandlerClient({ cookies })
-        console.log('📥 Fetching message history for chat:', chatId)
         const { data: messageHistory, error: historyError } = await supabase
             .from('messages')
             .select('*')
@@ -69,237 +79,27 @@ export class GruntyAgent {
             console.error('❌ Error fetching message history:', historyError)
         }
 
-        // Add messages in chronological order
+        // Process message history
         if (messageHistory) {
-            console.log('📚 Processing message history:', {
-                historyLength: messageHistory.length,
-                firstMessage: messageHistory[0]?.created_at,
-                lastMessage: messageHistory[messageHistory.length - 1]?.created_at
-            })
-
-            for (const msg of messageHistory) {
-                if (msg.user_message) {
-                    this.sanitizedMessages.push({
-                        role: 'user',
-                        content: msg.user_message
-                    })
-                    console.log('➕ Added historical user message:', {
-                        timestamp: msg.created_at,
-                        contentPreview: msg.user_message.substring(0, 50) + '...'
-                    })
-                }
-                if (msg.assistant_message) {
-                    this.sanitizedMessages.push({
-                        role: 'assistant',
-                        content: msg.assistant_message
-                    })
-                    console.log('➕ Added historical assistant message:', {
-                        timestamp: msg.created_at,
-                        contentPreview: msg.assistant_message.substring(0, 50) + '...'
-                    })
-                }
-            }
+            this.processMessageHistory(messageHistory)
         }
 
-        // Add the latest user message if it's not in the database yet
+        // Add the latest user message
         const latestUserMessage = messages[messages.length - 1]
         if (latestUserMessage.role === 'user') {
             this.sanitizedMessages.push({
                 role: 'user',
                 content: latestUserMessage.content
             })
-            console.log('➕ Added latest user message:', {
-                content: typeof latestUserMessage.content === 'string'
-                    ? latestUserMessage.content.substring(0, 50) + '...'
-                    : 'Complex content structure'
-            })
         }
 
-        console.log('📨 Final conversation state:', {
-            messageCount: this.sanitizedMessages.length,
-            roles: this.sanitizedMessages.map(m => m.role),
-            lastMessage: this.sanitizedMessages[this.sanitizedMessages.length - 1]
-        })
-
+        // Set up streaming
         const encoder = new TextEncoder()
         const stream = new TransformStream()
         const writer = stream.writable.getWriter()
 
-        const streamProcess = async () => {
-            try {
-                console.log('🌊 Stream process initiated')
-                let collectedContent = ''
-                console.log('🔄 Starting stream process')
-
-                // Format tools
-                const formattedTools = tools?.reduce((acc, tool) => {
-                    acc[tool.toolName] = {
-                        description: tool.description,
-                        parameters: tool.parameters,
-                        execute: async (args: any) => {
-                            console.log('🔧 Executing tool:', {
-                                toolName: tool.toolName,
-                                args
-                            })
-                            if (tool.toolName === 'create_streamlit_app') {
-                                const { generatedCode } = await generateCode(
-                                    `${args.query}\nCSV Analysis: ${JSON.stringify(csvAnalysis)}`
-                                )
-                                return generatedCode
-                            }
-                            return undefined
-                        }
-                    }
-                    return acc
-                }, {} as Record<string, any>)
-
-                console.log('🛠️ Formatted tools:', Object.keys(formattedTools))
-
-                // Stream setup
-                console.log('📡 Initializing stream with model:', this.config.model)
-                const { textStream, fullStream } = await streamText({
-                    model: this.model as unknown as LanguageModelV1,
-                    messages: this.sanitizedMessages,
-                    tools: formattedTools,
-                    temperature: this.config.temperature || 0.7,
-                    maxTokens: this.config.maxTokens || 4096
-                })
-
-                // Handle text stream with proper data protocol formatting
-                console.log('📝 Starting text stream processing')
-                for await (const chunk of textStream) {
-                    collectedContent += chunk
-                    console.log('📤 Processing stream chunk:', {
-                        chunkSize: chunk.length,
-                        totalCollected: collectedContent.length,
-                        chunkPreview: chunk.substring(0, 50) + '...'
-                    })
-
-                    // Format as data stream text part with double newline
-                    const textPart = `0:${JSON.stringify(chunk)}\n\n`
-                    console.log('📤 Formatting chunk:', {
-                        raw: textPart,
-                        content: chunk,
-                        hasNewlines: textPart.endsWith('\n\n')
-                    });
-
-                    writer.write(encoder.encode(textPart))
-                    console.log('📤 Chunk written to stream')
-                }
-
-                console.log('📝 Complete assistant response:', {
-                    length: collectedContent.length,
-                    preview: collectedContent.substring(0, 100) + '...'
-                })
-
-                // Handle full stream
-                console.log('🔄 Processing full stream')
-                for await (const step of fullStream) {
-                    console.log('📦 Stream step:', { type: step.type })
-
-                    if (step.type === 'tool-call') {
-                        console.log('🔧 Processing tool call:', {
-                            toolName: step.toolName,
-                            toolCallId: step.toolCallId
-                        })
-                        console.log('🔧 Streaming tool call:', {
-                            type: 'tool-call',
-                            toolName: step.toolName,
-                            toolCallId: step.toolCallId,
-                            args: step.args
-                        });
-
-                        // Tool call streaming start
-                        const toolCallStartData = `b:${JSON.stringify({
-                            toolCallId: step.toolCallId,
-                            toolName: step.toolName
-                        })}\n\n`
-                        writer.write(encoder.encode(toolCallStartData))
-
-                        // Tool call data
-                        const toolCallData = `9:${JSON.stringify({
-                            toolCallId: step.toolCallId,
-                            toolName: step.toolName,
-                            args: step.args
-                        })}\n\n`
-                        writer.write(encoder.encode(toolCallData))
-
-                        if (step.toolName === 'create_streamlit_app') {
-                            console.log('🎨 Generating Streamlit code')
-                            const { generatedCode } = await generateCode(
-                                `${step.args.query}\nCSV Analysis: ${JSON.stringify(csvAnalysis)}`
-                            )
-
-                            console.log('💾 Storing tool interaction')
-                            await this.storeMessage(chatId, userId, {
-                                user_message: '',
-                                assistant_message: generatedCode,
-                                tool_calls: [{
-                                    id: step.toolCallId,
-                                    name: step.toolName,
-                                    parameters: step.args
-                                }],
-                                tool_results: [{
-                                    id: step.toolCallId,
-                                    name: step.toolName,
-                                    content: generatedCode
-                                }]
-                            })
-
-                            const toolResultData = `a:${JSON.stringify({
-                                toolCallId: step.toolCallId,
-                                result: generatedCode
-                            })}\n\n`
-                            writer.write(encoder.encode(toolResultData))
-                            console.log('✅ Tool execution complete')
-                        }
-                    } else if (step.type === 'finish') {
-                        console.log('🏁 Stream finished, storing conversation')
-                        if (collectedContent) {
-                            const latestUserMessage = this.sanitizedMessages
-                                .filter(msg => msg.role === 'user')
-                                .pop()
-
-                            console.log('💾 Storing final message pair')
-                            await this.storeMessage(chatId, userId, {
-                                user_message: typeof latestUserMessage?.content === 'string'
-                                    ? latestUserMessage.content
-                                    : '',
-                                assistant_message: collectedContent,
-                                tool_calls: [],
-                                tool_results: []
-                            })
-
-                            // Send finish metadata without chat ID
-                            const finishData = `d:${JSON.stringify({
-                                finishReason: step.finishReason || 'stop',
-                                usage: {
-                                    promptTokens: step.usage?.promptTokens || 0,
-                                    completionTokens: step.usage?.completionTokens || 0,
-                                    totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
-                                }
-                            })}\n\n`
-                            writer.write(encoder.encode(finishData))
-
-                            console.log('🏁 Streaming finish:', {
-                                type: 'finish',
-                                finishReason: step.finishReason,
-                                usage: step.usage
-                            });
-                        }
-                    }
-                }
-
-            } catch (error) {
-                console.error('🔥 Stream process error:', error)
-                throw error
-            } finally {
-                console.log('👋 Closing stream writer')
-                writer.close()
-            }
-        }
-
-        streamProcess()
+        // Start streaming process
+        this.handleStreamProcess(writer, encoder, tools, chatId, userId)
 
         return new Response(stream.readable, {
             headers: {
@@ -310,6 +110,75 @@ export class GruntyAgent {
                 'x-chat-id': chatId
             },
         })
+    }
+
+    private async handleStreamProcess(
+        writer: WritableStreamDefaultWriter,
+        encoder: TextEncoder,
+        tools: Tool[],
+        chatId: string,
+        userId: string
+    ) {
+        try {
+            let collectedContent = ''
+
+            // Format tools with file context
+            const formattedTools = this.formatTools(tools)
+
+            // Initialize stream
+            const { textStream, fullStream } = await streamText({
+                model: this.model as unknown as LanguageModelV1,
+                messages: this.sanitizedMessages,
+                tools: formattedTools,
+                temperature: this.config.temperature || 0.7,
+                maxTokens: this.config.maxTokens || 4096
+            })
+
+            // Process text stream
+            for await (const chunk of textStream) {
+                collectedContent += chunk
+                const textPart = `0:${JSON.stringify(chunk)}\n\n`
+                writer.write(encoder.encode(textPart))
+            }
+
+            // Process full stream
+            await this.processFullStream(
+                fullStream,
+                writer,
+                encoder,
+                collectedContent,
+                chatId,
+                userId
+            )
+
+        } catch (error) {
+            console.error('🔥 Stream process error:', error)
+            throw error
+        } finally {
+            writer.close()
+        }
+    }
+
+    private formatTools(tools: Tool[]) {
+        return tools.reduce((acc, tool) => {
+            acc[tool.toolName] = {
+                description: tool.description,
+                parameters: tool.parameters,
+                execute: async (args: any) => {
+                    if (tool.toolName === 'create_streamlit_app') {
+                        return this.handleStreamlitCodeGeneration(args)
+                    }
+                    return tool.execute(args)
+                }
+            }
+            return acc
+        }, {} as Record<string, any>)
+    }
+
+    private async handleStreamlitCodeGeneration(args: any) {
+        const query = `${args.query}\n${this.fileContext ? `Using file: ${this.fileContext.fileName}` : ''}`
+        const { generatedCode } = await generateCode(query, this.fileContext)
+        return generatedCode
     }
 
     private calculateTokenCount(text: string): number {
@@ -394,6 +263,144 @@ export class GruntyAgent {
         } catch (error) {
             console.error('❌ Error in storeMessage:', error)
             throw error
+        }
+    }
+
+    private processMessageHistory(messageHistory: any[]) {
+        console.log('📝 Processing message history:', {
+            messageCount: messageHistory.length
+        })
+
+        messageHistory.forEach(msg => {
+            if (msg.user_message) {
+                this.sanitizedMessages.push({
+                    role: 'user',
+                    content: msg.user_message
+                })
+                console.log('➕ Added user message:', {
+                    timestamp: msg.created_at,
+                    contentPreview: msg.user_message.substring(0, 50) + '...'
+                })
+            }
+            if (msg.assistant_message) {
+                this.sanitizedMessages.push({
+                    role: 'assistant',
+                    content: msg.assistant_message
+                })
+                console.log('➕ Added assistant message:', {
+                    timestamp: msg.created_at,
+                    contentPreview: msg.assistant_message.substring(0, 50) + '...'
+                })
+            }
+        })
+
+        console.log('✅ Message history processed:', {
+            totalMessages: this.sanitizedMessages.length
+        })
+    }
+
+    private async processFullStream(
+        fullStream: any,
+        writer: WritableStreamDefaultWriter,
+        encoder: TextEncoder,
+        collectedContent: string,
+        chatId: string,
+        userId: string
+    ) {
+        for await (const step of fullStream) {
+            console.log('📦 Processing stream step:', { type: step.type })
+
+            if (step.type === 'tool-call') {
+                console.log('🔧 Processing tool call:', {
+                    toolName: step.toolName,
+                    toolCallId: step.toolCallId
+                })
+
+                if (step.toolName === 'create_streamlit_app') {
+                    try {
+                        const toolInput = step.args
+                        const codeQuery = `${toolInput.query}\n${
+                            this.fileContext ? `Using file: ${this.fileContext.fileName}` : ''
+                        }`
+                        const { generatedCode } = await generateCode(codeQuery, this.fileContext)
+
+                        // Tool call start
+                        const toolCallStartData = `b:${JSON.stringify({
+                            toolCallId: step.toolCallId,
+                            toolName: step.toolName
+                        })}\n\n`
+
+                        // Tool call
+                        const toolCallData = `9:${JSON.stringify({
+                            toolCallId: step.toolCallId,
+                            toolName: step.toolName,
+                            args: step.args || {} // Ensure args is never undefined
+                        })}\n\n`
+
+                        // Tool result - ensure we're sending a valid JSON string
+                        if (generatedCode) {
+                            const toolResultData = `a:${JSON.stringify({
+                                toolCallId: step.toolCallId,
+                                result: generatedCode
+                            })}\n\n`
+
+                            // Write all events in sequence
+                            writer.write(encoder.encode(toolCallStartData))
+                            writer.write(encoder.encode(toolCallData))
+                            writer.write(encoder.encode(toolResultData))
+
+                            console.log('🛠️ Tool events sent:', {
+                                callId: step.toolCallId,
+                                resultLength: generatedCode.length,
+                                preview: generatedCode.substring(0, 100) + '...'
+                            })
+                        } else {
+                            console.error('❌ No code generated')
+                            throw new Error('No code generated')
+                        }
+                    } catch (error) {
+                        console.error('❌ Code generation failed:', error)
+                        // Send error result
+                        const toolResultData = `a:${JSON.stringify({
+                            toolCallId: step.toolCallId,
+                            result: `Error generating code: ${error instanceof Error ? error.message : 'Unknown error'}`
+                        })}\n\n`
+                        writer.write(encoder.encode(toolResultData))
+                    }
+                }
+            } else if (step.type === 'text-delta') {
+                if (step.content) { // Ensure content is not undefined
+                    const textData = `0:${JSON.stringify(step.content)}\n\n`
+                    writer.write(encoder.encode(textData))
+                }
+            } else if (step.type === 'finish') {
+                console.log('🏁 Stream finished, storing conversation')
+                if (collectedContent) {
+                    const latestUserMessage = this.sanitizedMessages
+                        .filter(msg => msg.role === 'user')
+                        .pop()
+
+                    await this.storeMessage(chatId, userId, {
+                        user_message: typeof latestUserMessage?.content === 'string'
+                            ? latestUserMessage.content
+                            : '',
+                        assistant_message: collectedContent,
+                        tool_calls: [],
+                        tool_results: []
+                    })
+
+                    // Finish part format - ensure all values are defined
+                    const finishData = `d:${JSON.stringify({
+                        finishReason: step.finishReason || 'stop',
+                        usage: {
+                            promptTokens: step.usage?.promptTokens || 0,
+                            completionTokens: step.usage?.completionTokens || 0,
+                            totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
+                        }
+                    })}\n\n`
+                    writer.write(encoder.encode(finishData))
+                }
+            }
         }
     }
 }

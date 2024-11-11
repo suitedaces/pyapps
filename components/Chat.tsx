@@ -4,15 +4,10 @@ import { useChat } from 'ai/react'
 import { Message } from 'ai'
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import ReactMarkdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Code, Loader2, Send, Paperclip } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import modelsList from '@/lib/models.json'
-import { useRouter } from 'next/navigation'
 import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
@@ -25,13 +20,25 @@ interface ChatProps {
     onFileSelect?: (file: File) => void
 }
 
+// File upload state interface
+interface FileUploadState {
+    isUploading: boolean
+    progress: number
+    error: string | null
+}
+
 // Core chat component that handles message streaming, UI rendering, and error states
 export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const [errorState, setErrorState] = useState<Error | null>(null)
     const [attachedFile, setAttachedFile] = useState<File | null>(null)
-    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
+        isUploading: false,
+        progress: 0,
+        error: null
+    })
 
     // Get model configuration from localStorage
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -42,7 +49,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         (model) => model.id === languageModel.model
     )
 
-    // Initialize chat with Vercel AI SDK with experimental attachments
+    // Initialize chat with Vercel AI SDK
     const {
         messages: aiMessages,
         input,
@@ -60,38 +67,185 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             config: languageModel,
         },
         onResponse: async (response) => {
-            console.log('🔄 Stream response initiated:', {
-                status: response.status,
-                headers: Array.from(response.headers.entries())
-            })
             if (!response.ok) {
                 handleResponseError(response)
-                return;
+                return
             }
 
             if (!chatId) {
-                const newChatId = response.headers.get('x-chat-id');
+                const newChatId = response.headers.get('x-chat-id')
                 if (newChatId) {
-                    onChatCreated?.(newChatId);
+                    onChatCreated?.(newChatId)
                 }
             }
         },
         onFinish: async (message) => {
-            console.log('✅ Stream finished:', {
-                messageLength: message.content.length,
-                hasToolCalls: !!message.toolInvocations?.length
-            })
-            setErrorState(null);
-            setAttachedFile(null);
+            setErrorState(null)
+            setAttachedFile(null)
+            resetFileUploadState()
             if (fileInputRef.current) {
-                fileInputRef.current.value = '';
+                fileInputRef.current.value = ''
             }
         },
         onError: (error) => {
-            console.error('❌ Stream error:', error)
+            console.error('Stream error:', error)
             handleChatError(error)
         }
     })
+
+    const resetFileUploadState = () => {
+        setFileUploadState({
+            isUploading: false,
+            progress: 0,
+            error: null
+        })
+    }
+
+    // File upload handling
+    const uploadFile = async (file: File): Promise<string> => {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        try {
+            setFileUploadState(prev => ({ ...prev, isUploading: true }))
+
+            const response = await fetch('/api/files', {
+                method: 'POST',
+                body: formData
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to upload file')
+            }
+
+            const data = await response.json()
+            return data.id
+        } catch (error) {
+            console.error('File upload error:', error)
+            setFileUploadState(prev => ({
+                ...prev,
+                error: error instanceof Error ? error.message : 'Upload failed'
+            }))
+            throw error
+        } finally {
+            setFileUploadState(prev => ({ ...prev, isUploading: false }))
+        }
+    }
+
+    // Handle file selection
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        // Reset any previous errors
+        resetFileUploadState()
+
+        // Basic file type validation
+        const validExtensions = ['.csv', '.json', '.txt']
+        const isValidType = validExtensions.some(ext =>
+            file.name.toLowerCase().endsWith(ext)
+        )
+
+        if (!isValidType) {
+            setFileUploadState(prev => ({
+                ...prev,
+                error: 'Invalid file type. Please upload a CSV, JSON, or TXT file.'
+            }))
+            return
+        }
+
+        // Basic size validation (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setFileUploadState(prev => ({
+                ...prev,
+                error: 'File size must be less than 5MB.'
+            }))
+            return
+        }
+
+        try {
+            setAttachedFile(file)
+            onFileSelect?.(file)
+        } catch (error) {
+            console.error('File selection error:', error)
+            setFileUploadState(prev => ({
+                ...prev,
+                error: error instanceof Error ? error.message : 'File selection failed'
+            }))
+        }
+    }
+
+    // Handle file removal
+    const handleRemoveFile = () => {
+        setAttachedFile(null)
+        resetFileUploadState()
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+    // Handle form submission with file upload
+    const handleSubmit = useCallback(
+        async (e?: React.FormEvent<HTMLFormElement>) => {
+            if (e) {
+                e.preventDefault()
+                e.stopPropagation()
+            }
+
+            try {
+                let fileId: string | undefined
+                const currentFile = attachedFile // Store reference to current file
+
+                // Clear the file attachment immediately
+                handleRemoveFile()
+
+                if (currentFile) {
+                    // First upload the file
+                    fileId = await uploadFile(currentFile)
+
+                    // Read and format file content for the message
+                    const fileContent = await currentFile.text()
+                    const sanitizedContent = fileContent
+                        .split('\n')
+                        .map((row) => row.replace(/[\r\n]+/g, ''))
+                        .join('\n')
+
+                    const rows = sanitizedContent.split('\n')
+                    const columnNames = rows[0]
+                    const previewRows = rows.slice(1, 6).join('\n')
+                    const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+                    const message = `I've uploaded "${currentFile.name}". Create a Streamlit app to visualize this data. The file is at '/home/user/${currentFile.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+
+                    await append({
+                        content: message,
+                        role: 'user',
+                        createdAt: new Date(),
+                    }, {
+                        body: {
+                            fileId,
+                            fileName: currentFile.name,
+                            fileContent: sanitizedContent
+                        }
+                    })
+                } else {
+                    // Regular message without file
+                    const message = input.trim()
+                    if (!message) return
+
+                    await append({
+                        content: message,
+                        role: 'user',
+                        createdAt: new Date(),
+                    })
+                }
+            } catch (error) {
+                console.error('Submit error:', error)
+                setErrorState(new Error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`))
+            }
+        },
+        [append, input, attachedFile]
+    )
 
     // Combine messages with proper deduplication and sorting
     const messages = useMemo(() => {
@@ -148,67 +302,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         }
     }, [messages, originalHandleSubmit])
 
-    // Handle form submission with input validation
-    const handleSubmit = useCallback(
-        async (e?: React.FormEvent<HTMLFormElement>) => {
-            console.log('🔄 Starting submit process')
-            if (e) {
-                e.preventDefault()
-                e.stopPropagation()
-            }
-
-            try {
-                if (attachedFile) {
-                    const fileContent = await attachedFile.text()
-                    const sanitizedContent = fileContent
-                        .split('\n')
-                        .map((row) => row.replace(/[\r\n]+/g, ''))
-                        .join('\n')
-
-                    const rows = sanitizedContent.split('\n')
-                    const columnNames = rows[0]
-                    const previewRows = rows.slice(1, 6).join('\n')
-                    const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
-
-                    const message = `I've uploaded "${attachedFile.name}". Create a Streamlit app to visualize this data. The file is at '/home/user/${attachedFile.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
-
-                    // Clear file immediately
-                    const fileToSubmit = attachedFile
-                    setAttachedFile(null)
-                    if (fileInputRef.current) {
-                        fileInputRef.current.value = ''
-                    }
-
-                    // Use append to send message and file content
-                    await append({
-                        content: message,
-                        role: 'user',
-                        createdAt: new Date(),
-                    }, {
-                        options: {
-                            body: {
-                                fileContent: sanitizedContent,
-                                fileName: fileToSubmit.name
-                            }
-                        }
-                    })
-                } else {
-                    const trimmedInput = input.trim()
-                    if (!trimmedInput) return
-                    await append({
-                        content: trimmedInput,
-                        role: 'user',
-                        createdAt: new Date()
-                    })
-                }
-            } catch (error) {
-                console.error('❌ Submit error:', error)
-                setErrorState(new Error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`))
-            }
-        },
-        [append, attachedFile]
-    )
-
     // Auto-scroll to latest message
     useEffect(() => {
         if (messages.length > 0) {
@@ -229,21 +322,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
         }
     }, [handleInputChange])
-
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            setAttachedFile(file)
-            onFileSelect?.(file)
-        }
-    }
-
-    const handleRemoveFile = () => {
-        setAttachedFile(null)
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''
-        }
-    }
 
     const isInputDisabled = !!attachedFile
     const placeholderText = attachedFile
@@ -266,83 +344,98 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 <div ref={messagesEndRef} />
             </ScrollArea>
 
-            {errorState ? (
+            {errorState && (
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     className="p-4 text-center"
                 >
-                    <p className="text-red-500 mb-2">
-                    An error occurred. Please try again. {errorState.message}
-                    </p>
+                    <p className="text-red-500 mb-2">{errorState.message}</p>
                     <Button
-                        onClick={handleRetry}
-                        disabled={isLoading}
+                        onClick={() => setErrorState(null)}
                         variant="secondary"
                         size="sm"
                     >
-                        Retry
+                        Dismiss
                     </Button>
                 </motion.div>
-            ) : (
-                <form
-                    onSubmit={handleSubmit}
-                    className="p-4 m-auto w-full max-w-[800px]"
+            )}
+
+            {fileUploadState.error && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="p-4 text-center"
                 >
-                    {attachedFile && (
-                        <div className="-mb-5">
-                            <FilePreview file={attachedFile} onRemove={handleRemoveFile} />
-                        </div>
-                    )}
-                    <div className="flex space-x-2">
-                        <div className="relative flex-grow">
-                            <textarea
-                                ref={textareaRef}
-                                value={input}
-                                onChange={handleTextareaChange}
-                                placeholder={placeholderText}
-                                className="relative flex w-full min-h-[80px] max-h-[200px] bg-bg rounded-3xl px-4 py-3 text-sm resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault()
-                                        handleSubmit()
-                                    }
-                                }}
-                                disabled={isInputDisabled}
+                    <p className="text-red-500 mb-2">{fileUploadState.error}</p>
+                    <Button
+                        onClick={resetFileUploadState}
+                        variant="secondary"
+                        size="sm"
+                    >
+                        Dismiss
+                    </Button>
+                </motion.div>
+            )}
+
+            <form
+                onSubmit={handleSubmit}
+                className="p-4 m-auto w-full max-w-[800px]"
+            >
+                {attachedFile && (
+                    <div className="-mb-5">
+                        <FilePreview
+                            file={attachedFile}
+                            onRemove={handleRemoveFile}
+                            onError={(error) => setFileUploadState(prev => ({ ...prev, error }))}
+                        />
+                    </div>
+                )}
+
+                <div className="flex space-x-2">
+                    <div className="relative flex-grow">
+                        <textarea
+                            ref={textareaRef}
+                            value={input}
+                            onChange={handleTextareaChange}
+                            placeholder={attachedFile ? "Add a message or press Send" : "Type your message..."}
+                            className="relative flex w-full min-h-[80px] max-h-[200px] bg-bg rounded-3xl px-4 py-3 text-sm resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={fileUploadState.isUploading}
+                        />
+                        <div className="absolute right-2 bottom-2 flex gap-2">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileSelect}
+                                className="hidden"
+                                accept=".csv,.txt,.json"
+                                disabled={fileUploadState.isUploading}
                             />
-                            <div className="absolute right-2 bottom-2 flex gap-2">
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileSelect}
-                                    className="hidden"
-                                    accept=".csv,.txt,.json"
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={isLoading || !!attachedFile}
-                                >
-                                    <Paperclip className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={isLoading || (!input.trim() && !attachedFile)}
-                                >
-                                    {isLoading ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Send className="h-4 w-4" />
-                                    )}
-                                </Button>
-                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isLoading || !!attachedFile || fileUploadState.isUploading}
+                            >
+                                <Paperclip className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={isLoading || fileUploadState.isUploading || (!input.trim() && !attachedFile)}
+                            >
+                                {isLoading || fileUploadState.isUploading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="h-4 w-4" />
+                                )}
+                            </Button>
                         </div>
                     </div>
-                </form>
-            )}
+                </div>
+            </form>
         </div>
     )
 }
