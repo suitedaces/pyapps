@@ -50,10 +50,7 @@ export async function POST(
         // Perform analysis based on file type
         let analysis = null
         if (fileData.file_type === 'csv') {
-            analysis = await analyzeCSV(fileContent, {
-                detailed: options?.detailed ?? false,
-                maxRows: options?.maxRows ?? 100,
-            })
+            analysis = await analyzeCSV(fileContent)
         } else {
             return NextResponse.json(
                 { error: 'File type not supported for analysis' },

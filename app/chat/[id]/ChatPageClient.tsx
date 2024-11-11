@@ -403,16 +403,6 @@ export default function ChatPageClient({
                                             Code
                                         </TabsTrigger>
                                     </TabsList>
-                                    {csvFileName && (
-                                        <TabsContent
-                                            value="file"
-                                            className="flex-grow"
-                                        >
-                                            <MetaSheet
-                                                csvContent={csvContent}
-                                            />
-                                        </TabsContent>
-                                    )}
                                     <TabsContent
                                         value="preview"
                                         className="flex-grow"

@@ -14,13 +14,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { csvAnalyzer } from '@/lib/csvAnalyzer'
+import { analyzeCSV, type CSVAnalysis, type CSVColumn } from '@/lib/csvAnalyzer'
 import { useEffect, useMemo, useState } from 'react'
 import { Cell, Legend, Pie, PieChart, Tooltip } from 'recharts'
 import { ScrollArea } from './ui/scroll-area'
 
 interface MetaSheetProps {
-    csvContent: any
+    csvContent: string
 }
 
 export function MetaSheet({ csvContent }: MetaSheetProps) {
@@ -30,11 +30,11 @@ export function MetaSheet({ csvContent }: MetaSheetProps) {
     const chartData = useMemo(() => {
         if (!analysis) return []
         const distribution = analysis.columns.reduce(
-            (acc, col) => {
+            (acc: Record<string, number>, col: CSVColumn) => {
                 acc[col.type] = (acc[col.type] || 0) + 1
                 return acc
             },
-            {} as { [key: string]: number }
+            {}
         )
         return Object.entries(distribution).map(([name, value]) => ({
             name,
@@ -62,7 +62,7 @@ export function MetaSheet({ csvContent }: MetaSheetProps) {
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
-    const generateSampleRows = (columns: any[], existingRows: any[][]) => {
+    const generateSampleRows = (columns: CSVColumn[], existingRows: string[][]) => {
         const targetRowCount = Math.min(20, existingRows.length)
         return existingRows.slice(0, targetRowCount)
     }

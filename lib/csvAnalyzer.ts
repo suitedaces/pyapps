@@ -1,12 +1,14 @@
 import { parse } from 'papaparse'
 
+export interface CSVColumn {
+    name: string;
+    type: string;
+}
+
 export interface CSVAnalysis {
-    totalRows: number
-    columns: {
-        name: string
-        type: string
-    }[]
-    sampleRows: string[][]
+    columns: CSVColumn[];
+    totalRows: number;
+    sampleRows: string[][];
 }
 
 export async function analyzeCSV(csvContent: string): Promise<CSVAnalysis> {
