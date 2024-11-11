@@ -308,9 +308,7 @@ export class GruntyAgent {
         userId: string
     ) {
         for await (const step of fullStream) {
-            console.log('📦 Processing stream step:', {
-                type: step.type
-            })
+            console.log('📦 Processing stream step:', { type: step.type })
 
             if (step.type === 'tool-call') {
                 console.log('🔧 Processing tool call:', {
@@ -318,25 +316,7 @@ export class GruntyAgent {
                     toolCallId: step.toolCallId
                 })
 
-                // Tool call streaming start
-                const toolCallStartData = `b:${JSON.stringify({
-                    toolCallId: step.toolCallId,
-                    toolName: step.toolName
-                })}\n\n`
-                writer.write(encoder.encode(toolCallStartData))
-
-                // Tool call data
-                const toolCallData = `9:${JSON.stringify({
-                    toolCallId: step.toolCallId,
-                    toolName: step.toolName,
-                    args: step.args
-                })}\n\n`
-                writer.write(encoder.encode(toolCallData))
-
                 if (step.toolName === 'create_streamlit_app') {
-                    console.log('🎨 Generating Streamlit code', {
-                        args: step.args
-                    })
                     try {
                         const toolInput = step.args
                         const codeQuery = `${toolInput.query}\n${
@@ -344,16 +324,54 @@ export class GruntyAgent {
                         }`
                         const { generatedCode } = await generateCode(codeQuery, this.fileContext)
 
-                        const toolResultData = `a:${JSON.stringify({
+                        // Tool call start
+                        const toolCallStartData = `b:${JSON.stringify({
                             toolCallId: step.toolCallId,
-                            result: generatedCode
+                            toolName: step.toolName
                         })}\n\n`
-                        writer.write(encoder.encode(toolResultData))
-                        console.log('✅ Code generation complete')
+
+                        // Tool call
+                        const toolCallData = `9:${JSON.stringify({
+                            toolCallId: step.toolCallId,
+                            toolName: step.toolName,
+                            args: step.args || {} // Ensure args is never undefined
+                        })}\n\n`
+
+                        // Tool result - ensure we're sending a valid JSON string
+                        if (generatedCode) {
+                            const toolResultData = `a:${JSON.stringify({
+                                toolCallId: step.toolCallId,
+                                result: generatedCode
+                            })}\n\n`
+
+                            // Write all events in sequence
+                            writer.write(encoder.encode(toolCallStartData))
+                            writer.write(encoder.encode(toolCallData))
+                            writer.write(encoder.encode(toolResultData))
+
+                            console.log('🛠️ Tool events sent:', {
+                                callId: step.toolCallId,
+                                resultLength: generatedCode.length,
+                                preview: generatedCode.substring(0, 100) + '...'
+                            })
+                        } else {
+                            console.error('❌ No code generated')
+                            throw new Error('No code generated')
+                        }
                     } catch (error) {
                         console.error('❌ Code generation failed:', error)
-                        throw error
+                        // Send error result
+                        const toolResultData = `a:${JSON.stringify({
+                            toolCallId: step.toolCallId,
+                            result: `Error generating code: ${error instanceof Error ? error.message : 'Unknown error'}`
+                        })}\n\n`
+                        writer.write(encoder.encode(toolResultData))
                     }
+                }
+            } else if (step.type === 'text-delta') {
+                if (step.content) { // Ensure content is not undefined
+                    const textData = `0:${JSON.stringify(step.content)}\n\n`
+                    writer.write(encoder.encode(textData))
                 }
             } else if (step.type === 'finish') {
                 console.log('🏁 Stream finished, storing conversation')
@@ -371,6 +389,7 @@ export class GruntyAgent {
                         tool_results: []
                     })
 
+                    // Finish part format - ensure all values are defined
                     const finishData = `d:${JSON.stringify({
                         finishReason: step.finishReason || 'stop',
                         usage: {

@@ -77,8 +77,9 @@ export async function POST(req: NextRequest) {
             console.log('📄 File data fetched:', fileData);
 
             fileContext = {
+                id: fileData.id,
                 fileName: fileData.file_name,
-                fileType: fileData.file_type as 'csv' | 'json',
+                fileType: fileData.file_type as 'csv' | 'json' | 'txt',
                 content: fileContent,
                 analysis: fileData.analysis,
             }

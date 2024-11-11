@@ -4,20 +4,14 @@ import { useChat } from 'ai/react'
 import { Message } from 'ai'
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import ReactMarkdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Code, Loader2, Send, Paperclip } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import modelsList from '@/lib/models.json'
-import { useRouter } from 'next/navigation'
 import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
 import { FilePreview } from './FilePreview'
-import { z } from 'zod'
 
 interface ChatProps {
     chatId?: string | null
@@ -143,10 +137,35 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         const file = e.target.files?.[0]
         if (!file) return
 
+        // Reset any previous errors
+        resetFileUploadState()
+
+        // Basic file type validation
+        const validExtensions = ['.csv', '.json', '.txt']
+        const isValidType = validExtensions.some(ext =>
+            file.name.toLowerCase().endsWith(ext)
+        )
+
+        if (!isValidType) {
+            setFileUploadState(prev => ({
+                ...prev,
+                error: 'Invalid file type. Please upload a CSV, JSON, or TXT file.'
+            }))
+            return
+        }
+
+        // Basic size validation (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setFileUploadState(prev => ({
+                ...prev,
+                error: 'File size must be less than 5MB.'
+            }))
+            return
+        }
+
         try {
             setAttachedFile(file)
             onFileSelect?.(file)
-            resetFileUploadState()
         } catch (error) {
             console.error('File selection error:', error)
             setFileUploadState(prev => ({
@@ -175,13 +194,17 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
 
             try {
                 let fileId: string | undefined
+                const currentFile = attachedFile // Store reference to current file
 
-                if (attachedFile) {
+                // Clear the file attachment immediately
+                handleRemoveFile()
+
+                if (currentFile) {
                     // First upload the file
-                    fileId = await uploadFile(attachedFile)
+                    fileId = await uploadFile(currentFile)
 
                     // Read and format file content for the message
-                    const fileContent = await attachedFile.text()
+                    const fileContent = await currentFile.text()
                     const sanitizedContent = fileContent
                         .split('\n')
                         .map((row) => row.replace(/[\r\n]+/g, ''))
@@ -192,7 +215,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                     const previewRows = rows.slice(1, 6).join('\n')
                     const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
 
-                    const message = `I've uploaded "${attachedFile.name}". Create a Streamlit app to visualize this data. The file is at '/home/user/${attachedFile.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+                    const message = `I've uploaded "${currentFile.name}". Create a Streamlit app to visualize this data. The file is at '/home/user/${currentFile.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
 
                     await append({
                         content: message,
@@ -201,7 +224,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                     }, {
                         body: {
                             fileId,
-                            fileName: attachedFile.name,
+                            fileName: currentFile.name,
                             fileContent: sanitizedContent
                         }
                     })
@@ -216,8 +239,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                         createdAt: new Date(),
                     })
                 }
-
-                handleRemoveFile()
             } catch (error) {
                 console.error('Submit error:', error)
                 setErrorState(new Error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`))

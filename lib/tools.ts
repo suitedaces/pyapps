@@ -42,10 +42,15 @@ export async function generateCode(
         analysis?: any;
     }
 ): Promise<{ generatedCode: string; codeTokenCount: number }> {
-    console.log('💻 Starting code generation:', {
+    console.log('💻 Starting code generation with:', {
         queryLength: query.length,
         hasFileContext: !!fileContext,
-        fileType: fileContext?.fileType
+        fileContextDetails: fileContext ? {
+            fileName: fileContext.fileName,
+            fileType: fileContext.fileType,
+            hasAnalysis: !!fileContext.analysis,
+            analysisKeys: fileContext.analysis ? Object.keys(fileContext.analysis) : null
+        } : null
     })
 
     if (!query?.trim()) {
@@ -64,7 +69,8 @@ Only respond with the code, no potential errors, no explanations!`
         console.log('🤖 Sending request to Anthropic:', {
             model: 'claude-3-5-sonnet-20240620',
             systemPromptLength: systemPrompt.length,
-            hasAnalysis: !!fileContext?.analysis
+            hasAnalysis: !!fileContext?.analysis,
+            fullQuery: query
         })
 
         const response = await codeGenerationAnthropicAgent.messages.create({
@@ -80,10 +86,11 @@ Only respond with the code, no potential errors, no explanations!`
             ],
         })
 
-        console.log('✅ Code generation completed:', {
+        console.log('✅ Code generation response:', {
             responseType: typeof response.content,
             contentLength: response.content.length,
-            tokenUsage: response.usage
+            tokenUsage: response.usage,
+            content: response.content
         })
 
         if (Array.isArray(response.content) && response.content.length > 0) {
@@ -94,7 +101,11 @@ Only respond with the code, no potential errors, no explanations!`
                     .trim()
                 : ''
 
-            console.log('✨ Code generated successfully')
+            console.log('✨ Generated code:', {
+                length: generatedCode.length,
+                preview: generatedCode.substring(0, 200) + '...'
+            })
+
             return {
                 generatedCode,
                 codeTokenCount: response.usage.input_tokens + response.usage.output_tokens,

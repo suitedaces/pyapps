@@ -3,37 +3,9 @@ import { Message } from 'ai'
 import { z } from 'zod'
 
 // Model types
-export interface LLMModel {
-    id: string
-    provider: string
-    name: string
-    providerId: string
-}
-
-export interface ModelConfig {
-    apiKey: string
-    temperature?: number
-    maxTokens?: number
-}
-
-export interface LLMModelConfig {
-    model: string
-    temperature?: number
-    maxTokens?: number
-}
-
-export interface FileContext {
-    fileName: string
-    fileType: 'csv' | 'json' | 'txt'
-    content?: string
-    analysis?: any
-    id?: string
-}
-
 export interface ModelProvider {
-    model: string
-    provider: string
-    config: ModelConfig
+    id: string
+    streamText: (params: StreamParams) => Promise<void>
 }
 
 export interface StreamParams {
@@ -88,6 +60,24 @@ export interface Tool {
     execute: (parameters: Record<string, any>) => Promise<any>
 }
 
+// Model configuration
+export interface LLMModelConfig {
+    model: string
+    temperature?: number
+    maxTokens?: number
+    topP?: number
+    frequencyPenalty?: number
+    presencePenalty?: number
+}
+
+// Add this to your types.ts
+export type LLMModel = {
+    id: string
+    name: string
+    provider: string
+    providerId: string
+}
+
 export interface ToolInvocation {
     state: 'call' | 'result'
     toolCallId: string
@@ -100,4 +90,12 @@ export interface ToolCall {
     id: string
     name: string
     parameters: any
+}
+
+export interface FileContext {
+    id: string;
+    fileName: string;
+    fileType: 'csv' | 'json' | 'txt';
+    content?: string;
+    analysis?: any;
 }

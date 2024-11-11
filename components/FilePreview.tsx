@@ -14,10 +14,8 @@ import { z } from 'zod'
 const FileValidationSchema = z.object({
   file: z.instanceof(File).refine(
     (file) => {
-      const validTypes = ['text/csv', 'application/json', 'text/plain']
       const validExtensions = ['.csv', '.json', '.txt']
-      return validTypes.includes(file.type) ||
-             validExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+      return validExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
     },
     { message: 'Invalid file type. Please upload a CSV, JSON, or TXT file.' }
   ).refine(
@@ -79,21 +77,21 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
           return
         }
 
-        // For CSV files, validate structure
+        // For CSV files, validate structure with more lenient checks
         if (file.name.toLowerCase().endsWith('.csv')) {
-          const lines = content.split('\n')
-          if (lines.length < 2) {
-            reject(new Error('CSV file must contain headers and at least one data row'))
+          const lines = content.split('\n').filter(line => line.trim())
+          if (lines.length < 1) {
+            reject(new Error('CSV file appears to be empty'))
             return
           }
+        }
 
-          const headerCount = lines[0].split(',').length
-          const isValid = lines.every(line =>
-            line.trim() && line.split(',').length === headerCount
-          )
-
-          if (!isValid) {
-            reject(new Error('CSV file appears to be malformed'))
+        // For JSON files, validate JSON structure
+        if (file.name.toLowerCase().endsWith('.json')) {
+          try {
+            JSON.parse(content)
+          } catch {
+            reject(new Error('Invalid JSON format'))
             return
           }
         }
@@ -107,16 +105,9 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
   }
 
   const isPreviewable = (file: File) => {
-    const previewableTypes = [
-      'text/csv',
-      'text/plain',
-      'application/json',
-      '.csv',
-      '.txt',
-      '.json'
-    ]
-    return previewableTypes.some(type =>
-      file.type === type || file.name.toLowerCase().endsWith(type)
+    const validExtensions = ['.csv', '.txt', '.json']
+    return validExtensions.some(ext =>
+      file.name.toLowerCase().endsWith(ext)
     )
   }
 

@@ -66,7 +66,7 @@ export default function ChatPageClient({
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
 
-    const [generatedCode, setGeneratedCode] = useState('')
+    const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [csvFileName, setCsvFileName] = useState<string | null>(null)
     const [csvContent, setCsvContent] = useState<string | null>(null)
@@ -85,7 +85,7 @@ export default function ChatPageClient({
         messages,
         input,
         handleInputChange,
-        handleSubmit,
+        handleSubmit: originalHandleSubmit,
         isLoading,
         setMessages
     } = useChat({
@@ -94,81 +94,140 @@ export default function ChatPageClient({
         initialMessages,
         body: {
             model: currentModel,
-            config: languageModel
+            config: languageModel,
+            experimental_streamData: true
         },
+        maxSteps: 10,
         onResponse: (response) => {
-            console.log('🔄 Stream response received:', {
-                status: response.status,
-                headers: Object.fromEntries(response.headers.entries())
-            })
-
             if (!response.ok) {
-                console.error('❌ Stream response error:', response.status)
                 return
             }
 
             if (!currentChatId) {
                 const newChatId = response.headers.get('x-chat-id')
                 if (newChatId) {
-                    console.log('📝 New chat created:', newChatId)
                     setCurrentChatId(newChatId)
                     router.push(`/chat/${newChatId}`)
                 }
             }
         },
-        onFinish: (message) => {
-            console.log('✅ Stream finished:', {
-                messageLength: message.content.length,
-                hasToolCalls: !!message.toolInvocations?.length,
-                messageContent: message.content.substring(0, 100) + '...' // Preview assistant's response
-            })
+        onFinish: async (message) => {
+            if (message.toolInvocations?.length) {
+                const streamlitCall = message.toolInvocations
+                    .filter(invocation =>
+                        invocation.toolName === 'create_streamlit_app' &&
+                        invocation.state === 'result'
+                    )
+                    .pop()
 
-            // Log assistant message creation
+                if (streamlitCall?.state === 'result') {
+                    const code = streamlitCall.result
+
+                    if (code) {
+                        setGeneratedCode(code)
+                        await updateStreamlitApp(code)
+                    }
+                }
+            }
+
             if (message.content.trim()) {
-                console.log('👤 Creating assistant message')
                 const assistantMessage = {
                     id: Date.now().toString(),
                     role: 'assistant' as const,
                     content: message.content,
-                    createdAt: new Date()
+                    createdAt: new Date(),
+                    toolInvocations: message.toolInvocations
                 }
-                console.log('💬 Assistant message created:', {
-                    id: assistantMessage.id,
-                    contentPreview: assistantMessage.content.substring(0, 100) + '...',
-                    timestamp: assistantMessage.createdAt
-                })
 
-                setMessages(prev => {
-                    console.log('📝 Current messages:', prev.length)
-                    const newMessages = [...prev, assistantMessage]
-                    console.log('📝 Updated messages:', newMessages.length)
-                    return newMessages
-                })
-            }
-
-            // Log tool invocation handling
-            if (message.toolInvocations?.length) {
-                console.log('🔧 Processing tool invocations:', message.toolInvocations.length)
-                const streamlitCall = message.toolInvocations.find(
-                    invocation => invocation.state === 'result' &&
-                    invocation.toolName === 'create_streamlit_app'
-                )
-
-                if (streamlitCall?.state === 'result') {
-                    console.log('💻 Setting generated code:', {
-                        codeLength: streamlitCall.result.length,
-                        preview: streamlitCall.result.substring(0, 100) + '...'
-                    })
-                    setIsGeneratingCode(false)
-                    setGeneratedCode(streamlitCall.result)
-                }
+                setMessages(prev => [...prev, assistantMessage])
             }
         },
         onError: (error) => {
-            console.error('❌ Chat error:', error)
             setIsGeneratingCode(false)
         }
     })
+
+    useEffect(() => {
+        if (isLoading) {
+            setIsGeneratingCode(true)
+            setGeneratedCode('')
+        }
+    }, [isLoading])
+
+    // Add sandbox state
+    const [sandboxId, setSandboxId] = useState<string | null>(null)
+    const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
+
+    // Add sandbox initialization
+    const initializeSandbox = useCallback(async () => {
+        try {
+            const response = await fetch('/api/sandbox/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            const data = await response.json()
+            setSandboxId(data.sandboxId)
+        } catch (error) {
+            setSandboxErrors(prev => [...prev, { message: 'Error initializing sandbox' }])
+        }
+    }, [])
+
+    // Add streamlit update function
+    const updateStreamlitApp = useCallback(async (code: string) => {
+        if (code && sandboxId) {
+            try {
+                const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code }),
+                })
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`)
+                }
+
+                const data = await response.json()
+                if (data.url) {
+                    setStreamlitUrl(data.url)
+                } else {
+                    throw new Error('No URL returned from sandbox API')
+                }
+            } catch (error) {
+                setSandboxErrors(prev => [...prev, {
+                    message: error instanceof Error ? error.message : 'Error updating Streamlit app'
+                }])
+            } finally {
+                setIsGeneratingCode(false)
+            }
+        }
+    }, [sandboxId])
+
+    // Initialize sandbox on mount
+    useEffect(() => {
+        initializeSandbox()
+    }, [initializeSandbox])
+
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1]
+        if (lastMessage?.toolInvocations?.length) {
+            const streamlitCall = lastMessage.toolInvocations
+                .find(invocation =>
+                    invocation.toolName === 'create_streamlit_app' &&
+                    invocation.state === 'result'
+                )
+
+            if (streamlitCall?.state === 'result') {
+                setGeneratedCode(streamlitCall.result)
+                setIsGeneratingCode(false)
+                updateStreamlitApp(streamlitCall.result)
+            }
+        }
+    }, [messages, updateStreamlitApp])
 
     const resizableGroupRef = useRef<any>(null)
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
@@ -285,15 +344,6 @@ export default function ChatPageClient({
             }, 0)
         }
     }, [])
-
-    // Add effect to monitor code state changes
-    useEffect(() => {
-        console.log('💾 Generated code state updated:', {
-            length: generatedCode.length,
-            preview: generatedCode.substring(0, 100),
-            isGenerating: isGeneratingCode
-        })
-    }, [generatedCode, isGeneratingCode])
 
     if (!session) {
         return <LoginPage />

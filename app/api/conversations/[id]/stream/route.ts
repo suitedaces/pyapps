@@ -83,8 +83,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             }
 
             fileContext = {
+                id: fileData.id,
                 fileName: fileData.file_name,
-                fileType: fileData.file_type as 'csv' | 'json',
+                fileType: fileData.file_type as 'csv' | 'json' | 'txt',
                 content: fileContent,
                 analysis: fileData.analysis,
             }
