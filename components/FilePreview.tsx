@@ -121,7 +121,7 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
           transition={{ duration: 0.2 }}
           className="bg-slate-50 dark:bg-slate-900 rounded-t-xl border-x border-t"
         >
-          <div className="p-2 pb-7">
+          <div className="p-2">
             <motion.div
               className={`relative bg-white dark:bg-slate-800 rounded-lg border p-3 w-44 cursor-pointer
                 ${error ? 'border-red-500' : 'hover:border-primary/50'} transition-colors`}

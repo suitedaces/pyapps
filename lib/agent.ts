@@ -131,7 +131,8 @@ export class GruntyAgent {
                 messages: this.sanitizedMessages,
                 tools: formattedTools,
                 temperature: this.config.temperature || 0.7,
-                maxTokens: this.config.maxTokens || 4096
+                maxTokens: this.config.maxTokens || 4096,
+                experimental_toolCallStreaming: true,
             })
 
             // Process text stream

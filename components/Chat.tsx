@@ -12,12 +12,15 @@ import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
 import { FilePreview } from './FilePreview'
+import AIInput_15 from '@/components/kokonutui/chatbar'
+import ChatBar from '@/components/kokonutui/chatbar'
 
 interface ChatProps {
     chatId?: string | null
     initialMessages?: Message[]
     onChatCreated?: (chatId: string) => void
-    onFileSelect?: (file: File) => void
+    onFileSelect?: (file: { content: string, name: string }) => void
+    onUpdateStreamlit?: (message: string) => void
 }
 
 // File upload state interface
@@ -28,7 +31,7 @@ interface FileUploadState {
 }
 
 // Core chat component that handles message streaming, UI rendering, and error states
-export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect }: ChatProps) {
+export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -39,6 +42,9 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         progress: 0,
         error: null
     })
+
+    const [currentChatId, setCurrentChatId] = useState<string | null>(chatId)
+    const newChatIdRef = useRef<string | null>(null)
 
     // Get model configuration from localStorage
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -74,17 +80,41 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
 
             if (!chatId) {
                 const newChatId = response.headers.get('x-chat-id')
+                console.log('Response headers:', Object.fromEntries(response.headers))
                 if (newChatId) {
-                    onChatCreated?.(newChatId)
+                    console.log('Setting new chat ID:', newChatId)
+                    newChatIdRef.current = newChatId
+                    setCurrentChatId(newChatId)
                 }
             }
         },
         onFinish: async (message) => {
+            console.log('onFinish triggered with message:', message)
             setErrorState(null)
             setAttachedFile(null)
             resetFileUploadState()
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
+            }
+
+            if (message.role === 'assistant' && !chatId && newChatIdRef.current) {
+                console.log('Creating chat with ID from ref:', newChatIdRef.current)
+                onChatCreated?.(newChatIdRef.current)
+                newChatIdRef.current = null
+            }
+
+            if (message.toolInvocations?.length) {
+                console.log('Tool invocations found:', message.toolInvocations)
+                const streamlitCall = message.toolInvocations
+                    .filter(invocation =>
+                        invocation.toolName === 'create_streamlit_app' &&
+                        invocation.state === 'result'
+                    )
+                    .pop()
+
+                if (streamlitCall?.state === 'result') {
+                    console.log('Streamlit call successful')
+                }
             }
         },
         onError: (error) => {
@@ -101,7 +131,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         })
     }
 
-    // File upload handling
+    // TODO: Fix File upload handling
     const uploadFile = async (file: File): Promise<string> => {
         const formData = new FormData()
         formData.append('file', file)
@@ -154,18 +184,10 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             return
         }
 
-        // Basic size validation (5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            setFileUploadState(prev => ({
-                ...prev,
-                error: 'File size must be less than 5MB.'
-            }))
-            return
-        }
-
         try {
+            const content = await file.text()
             setAttachedFile(file)
-            onFileSelect?.(file)
+            onFileSelect?.({ content, name: file.name })
         } catch (error) {
             console.error('File selection error:', error)
             setFileUploadState(prev => ({
@@ -184,68 +206,36 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         }
     }
 
-    // Handle form submission with file upload
-    const handleSubmit = useCallback(
-        async (e?: React.FormEvent<HTMLFormElement>) => {
-            if (e) {
-                e.preventDefault()
-                e.stopPropagation()
+    const handleChatSubmit = useCallback(async (content: string, file?: File) => {
+        try {
+            if (file) {
+                const fileContent = await file.text()
+                const rows = fileContent.split('\n')
+                const columnNames = rows[0]
+                const previewRows = rows.slice(1, 6).join('\n')
+                const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+                const message = `I've uploaded "${file.name}". Create a Streamlit app to visualize this data. The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+
+                await onFileSelect?.({ content: fileContent, name: file.name })
+
+                await append({
+                    content: message,
+                    role: 'user',
+                    createdAt: new Date(),
+                })
+            } else if (content.trim()) {
+                await append({
+                    content,
+                    role: 'user',
+                    createdAt: new Date(),
+                })
             }
-
-            try {
-                let fileId: string | undefined
-                const currentFile = attachedFile // Store reference to current file
-
-                // Clear the file attachment immediately
-                handleRemoveFile()
-
-                if (currentFile) {
-                    // First upload the file
-                    fileId = await uploadFile(currentFile)
-
-                    // Read and format file content for the message
-                    const fileContent = await currentFile.text()
-                    const sanitizedContent = fileContent
-                        .split('\n')
-                        .map((row) => row.replace(/[\r\n]+/g, ''))
-                        .join('\n')
-
-                    const rows = sanitizedContent.split('\n')
-                    const columnNames = rows[0]
-                    const previewRows = rows.slice(1, 6).join('\n')
-                    const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
-
-                    const message = `I've uploaded "${currentFile.name}". Create a Streamlit app to visualize this data. The file is at '/home/user/${currentFile.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
-
-                    await append({
-                        content: message,
-                        role: 'user',
-                        createdAt: new Date(),
-                    }, {
-                        body: {
-                            fileId,
-                            fileName: currentFile.name,
-                            fileContent: sanitizedContent
-                        }
-                    })
-                } else {
-                    // Regular message without file
-                    const message = input.trim()
-                    if (!message) return
-
-                    await append({
-                        content: message,
-                        role: 'user',
-                        createdAt: new Date(),
-                    })
-                }
-            } catch (error) {
-                console.error('Submit error:', error)
-                setErrorState(new Error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`))
-            }
-        },
-        [append, input, attachedFile]
-    )
+        } catch (error) {
+            console.error('Submit error:', error)
+            setErrorState(new Error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`))
+        }
+    }, [append, onFileSelect])
 
     // Combine messages with proper deduplication and sorting
     const messages = useMemo(() => {
@@ -255,7 +245,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             const key = `${msg.role}:${msg.content}`;
             if (!messageMap.has(key) ||
                 (msg.createdAt && (!messageMap.get(key).createdAt ||
-                 new Date(msg.createdAt) > new Date(messageMap.get(key).createdAt)))) {
+                    new Date(msg.createdAt) > new Date(messageMap.get(key).createdAt)))) {
                 messageMap.set(key, msg);
             }
         });
@@ -301,16 +291,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             }
         }
     }, [messages, originalHandleSubmit])
-
-    // Auto-scroll to latest message
-    useEffect(() => {
-        if (messages.length > 0) {
-            const timeoutId = setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-            }, 100)
-            return () => clearTimeout(timeoutId)
-        }
-    }, [messages])
 
     // Auto-resize textarea based on content
     const handleTextareaChange = useCallback((
@@ -380,62 +360,10 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 </motion.div>
             )}
 
-            <form
-                onSubmit={handleSubmit}
-                className="p-4 m-auto w-full max-w-[800px]"
-            >
-                {attachedFile && (
-                    <div className="-mb-5">
-                        <FilePreview
-                            file={attachedFile}
-                            onRemove={handleRemoveFile}
-                            onError={(error) => setFileUploadState(prev => ({ ...prev, error }))}
-                        />
-                    </div>
-                )}
-
-                <div className="flex space-x-2">
-                    <div className="relative flex-grow">
-                        <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={handleTextareaChange}
-                            placeholder={attachedFile ? "Add a message or press Send" : "Type your message..."}
-                            className="relative flex w-full min-h-[80px] max-h-[200px] bg-bg rounded-3xl px-4 py-3 text-sm resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={fileUploadState.isUploading}
-                        />
-                        <div className="absolute right-2 bottom-2 flex gap-2">
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleFileSelect}
-                                className="hidden"
-                                accept=".csv,.txt,.json"
-                                disabled={fileUploadState.isUploading}
-                            />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isLoading || !!attachedFile || fileUploadState.isUploading}
-                            >
-                                <Paperclip className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={isLoading || fileUploadState.isUploading || (!input.trim() && !attachedFile)}
-                            >
-                                {isLoading || fileUploadState.isUploading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Send className="h-4 w-4" />
-                                )}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </form>
+            <ChatBar
+                handleSubmit={handleChatSubmit}
+                isLoading={isLoading}
+            />
         </div>
     )
 }

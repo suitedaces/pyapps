@@ -102,14 +102,6 @@ export default function ChatPageClient({
             if (!response.ok) {
                 return
             }
-
-            if (!currentChatId) {
-                const newChatId = response.headers.get('x-chat-id')
-                if (newChatId) {
-                    setCurrentChatId(newChatId)
-                    router.push(`/chat/${newChatId}`)
-                }
-            }
         },
         onFinish: async (message) => {
             if (message.toolInvocations?.length) {
@@ -122,7 +114,6 @@ export default function ChatPageClient({
 
                 if (streamlitCall?.state === 'result') {
                     const code = streamlitCall.result
-
                     if (code) {
                         setGeneratedCode(code)
                         await updateStreamlitApp(code)
