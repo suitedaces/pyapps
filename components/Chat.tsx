@@ -2,17 +2,14 @@
 
 import { useChat } from 'ai/react'
 import { Message } from 'ai'
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
+import { useCallback, useRef, useState, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Code, Loader2, Send, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import modelsList from '@/lib/models.json'
 import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
-import { FilePreview } from './FilePreview'
-import AIInput_15 from '@/components/kokonutui/chatbar'
 import ChatBar from '@/components/kokonutui/chatbar'
 
 interface ChatProps {
@@ -132,110 +129,54 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
     }
 
     // TODO: Fix File upload handling
-    const uploadFile = async (file: File): Promise<string> => {
-        const formData = new FormData()
-        formData.append('file', file)
-
-        try {
-            setFileUploadState(prev => ({ ...prev, isUploading: true }))
-
-            const response = await fetch('/api/files', {
-                method: 'POST',
-                body: formData
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to upload file')
-            }
-
-            const data = await response.json()
-            return data.id
-        } catch (error) {
-            console.error('File upload error:', error)
-            setFileUploadState(prev => ({
-                ...prev,
-                error: error instanceof Error ? error.message : 'Upload failed'
-            }))
-            throw error
-        } finally {
-            setFileUploadState(prev => ({ ...prev, isUploading: false }))
-        }
-    }
-
-    // Handle file selection
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-
-        // Reset any previous errors
-        resetFileUploadState()
-
-        // Basic file type validation
-        const validExtensions = ['.csv', '.json', '.txt']
-        const isValidType = validExtensions.some(ext =>
-            file.name.toLowerCase().endsWith(ext)
-        )
-
-        if (!isValidType) {
-            setFileUploadState(prev => ({
-                ...prev,
-                error: 'Invalid file type. Please upload a CSV, JSON, or TXT file.'
-            }))
-            return
+    const uploadFile = async (file: File): Promise<any> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (chatId) {
+            formData.append('chatId', chatId);
         }
 
-        try {
-            const content = await file.text()
-            setAttachedFile(file)
-            onFileSelect?.({ content, name: file.name })
-        } catch (error) {
-            console.error('File selection error:', error)
-            setFileUploadState(prev => ({
-                ...prev,
-                error: error instanceof Error ? error.message : 'File selection failed'
-            }))
-        }
-    }
+        const response = await fetch('/api/files', {
+            method: 'POST',
+            body: formData
+        });
 
-    // Handle file removal
-    const handleRemoveFile = () => {
-        setAttachedFile(null)
-        resetFileUploadState()
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''
+        if (!response.ok) {
+            throw new Error('Failed to upload file');
         }
-    }
 
-    const handleChatSubmit = useCallback(async (content: string, file?: File) => {
+        return await response.json();
+    };
+
+    const handleChatSubmit = async (content: string, file?: File) => {
         try {
             if (file) {
-                const fileContent = await file.text()
-                const rows = fileContent.split('\n')
-                const columnNames = rows[0]
-                const previewRows = rows.slice(1, 6).join('\n')
-                const dataPreview = `⚠️ EXACT column names (copy exactly as shown):\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+                const fileData = await uploadFile(file);
+                const fileContent = await file.text();
+                const rows = fileContent.split('\n');
+                const columnNames = rows[0];
+                const previewRows = rows.slice(1, 6).join('\n');
+                const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`;
 
-                const message = `I've uploaded "${file.name}". Create a Streamlit app to visualize this data. The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
-
-                await onFileSelect?.({ content: fileContent, name: file.name })
+                const message = content.trim() ||
+                    `Create a Streamlit app to visualize this data from "${file.name}". The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
 
                 await append({
                     content: message,
                     role: 'user',
                     createdAt: new Date(),
-                })
-            } else if (content.trim()) {
+                });
+            } else {
                 await append({
                     content,
                     role: 'user',
                     createdAt: new Date(),
-                })
+                });
             }
         } catch (error) {
-            console.error('Submit error:', error)
-            setErrorState(new Error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`))
+            console.error('Submit error:', error);
         }
-    }, [append, onFileSelect])
+    };
 
     // Combine messages with proper deduplication and sorting
     const messages = useMemo(() => {

@@ -5,9 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
+    const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -23,11 +21,26 @@ export async function POST(req: NextRequest) {
         })
 
         await sandbox.filesystem.makeDir('/app')
-        await sandbox.keepAlive(10 * 60 * 1000) // 10 minutes
+
+        const { data: files } = await supabase
+            .from('files')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+        if (files && files.content_hash) {
+            await sandbox.filesystem.write(
+                `/app/${files.file_name}`,
+                files.content_hash
+            )
+        }
+
+        await sandbox.keepAlive(10 * 60 * 1000)
 
         return NextResponse.json({ sandboxId: sandbox.id })
     } catch (error) {
-        console.error('Error initializing sandbox:', error)
         return NextResponse.json(
             { error: 'Failed to initialize sandbox' },
             { status: 500 }

@@ -8,9 +8,7 @@ export async function POST(
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
+    const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -31,10 +29,8 @@ export async function POST(
         })
 
         const url = sandbox.getHostname(8501)
-
         return NextResponse.json({ url: `https://${url}` })
     } catch (error) {
-        console.error('Error executing code in sandbox:', error)
         return NextResponse.json(
             { error: 'Failed to execute code in sandbox' },
             { status: 500 }

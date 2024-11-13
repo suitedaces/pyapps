@@ -61,6 +61,12 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
             className: "rounded-lg p-2 bg-black/5 dark:bg-white/5",
         },
     ];
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+        }
+    };
 
     const onSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -82,13 +88,6 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
             if (!isLoading && (value.trim() || selectedFile)) {
                 onSubmit(e as any as React.FormEvent<HTMLFormElement>);
             }
-        }
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setSelectedFile(file);
         }
     };
 
