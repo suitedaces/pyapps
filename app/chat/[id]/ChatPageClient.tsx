@@ -3,7 +3,6 @@
 import { Chat } from '@/components/Chat'
 import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
-import { MetaSheet } from '@/components/MetaSheet'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -335,6 +334,45 @@ export default function ChatPageClient({
             }, 0)
         }
     }, [])
+
+    // fetch tool results when chatId changes
+    useEffect(() => {
+        async function fetchToolResults() {
+            if (!currentChatId) return;
+
+            try {
+                const response = await fetch(`/api/conversations/${currentChatId}/messages`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch messages');
+                }
+
+                const data = await response.json();
+
+                const streamlitCode = data.messages
+                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                    .map((msg: any) => {
+                        const toolResult = msg.tool_results[0];
+                        if (toolResult && toolResult.name === 'create_streamlit_app') {
+                            return toolResult.result;
+                        }
+                        return null;
+                    })
+                    .filter(Boolean)
+                    .pop();
+
+                if (streamlitCode) {
+                    setGeneratedCode(streamlitCode);
+                    if (!isGeneratingCode) {
+                        await updateStreamlitApp(streamlitCode);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching tool results:', error);
+            }
+        }
+
+        fetchToolResults();
+    }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
 
     if (!session) {
         return <LoginPage />

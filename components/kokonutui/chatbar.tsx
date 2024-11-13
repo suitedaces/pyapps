@@ -97,7 +97,7 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
     };
 
     return (
-        <div className="w-[800px] m-auto py-4">
+        <div className="w-[80%] max-w-[800px] m-auto py-4">
             <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4 pb-4 border-b border-black/10 dark:border-white/10">
                     <div className="flex items-center gap-3">
