@@ -15,7 +15,9 @@ const TabsList = React.forwardRef<
     <TabsPrimitive.List
         ref={ref}
         className={cn(
-            'inline-flex h-12 items-center justify-center rounded-base border-2 border-border dark:border-darkBorder bg-blue p-1 text-black',
+            'inline-flex h-12 items-center justify-center rounded-2xl p-1.5',
+            'bg-foreground dark:bg-darkBg',
+            'border border-bordern dark:border-darkBorder',
             className
         )}
         {...props}
@@ -30,7 +32,12 @@ const TabsTrigger = React.forwardRef<
     <TabsPrimitive.Trigger
         ref={ref}
         className={cn(
-            'inline-flex items-center justify-center whitespace-nowrap rounded-base border-2 border-transparent px-3 py-1.5 text-sm font-heading ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-border dark:data-[state=active]:border-darkBorder data-[state=active]:bg-main',
+            'inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2',
+            'text-sm font-medium transition-all focus-visible:outline-none',
+            'text-text dark:text-darkText disabled:pointer-events-none disabled:opacity-50',
+            'hover:bg-black/5 dark:hover:bg-white/5',
+            'data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/10',
+            'data-[state=active]:text-text dark:data-[state=active]:text-darkText',
             className
         )}
         {...props}
@@ -45,7 +52,9 @@ const TabsContent = React.forwardRef<
     <TabsPrimitive.Content
         ref={ref}
         className={cn(
-            'mt-2 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2',
+            'mt-4 ring-offset-white focus-visible:outline-none',
+            'rounded-2xl border border-bordern dark:border-darkBorder',
+            'bg-foreground dark:bg-darkBg p-4',
             className
         )}
         {...props}

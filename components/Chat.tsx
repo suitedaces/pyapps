@@ -1,5 +1,6 @@
 'use client'
 
+import cn from 'clsx'
 import { useChat } from 'ai/react'
 import { Message } from 'ai'
 import { useCallback, useRef, useState, useMemo } from 'react'
@@ -11,6 +12,7 @@ import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
 import ChatBar from '@/components/kokonutui/chatbar'
+import { BorderTrail } from '@/components/core/border-trail'
 
 interface ChatProps {
     chatId?: string | null
@@ -128,7 +130,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         })
     }
 
-    // TODO: Fix File upload handling
     const uploadFile = async (file: File): Promise<any> => {
         const formData = new FormData();
         formData.append('file', file);
@@ -250,7 +251,11 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         : "Type your message..."
 
     return (
-        <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
+        <div className="flex flex-col h-full relative dark:border-darkBorder border border-bordern rounded-2xl bg-foreground dark:bg-darkBg text-text dark:text-darkText">
+            <BorderTrail
+                className='bg-gradient-to-l from-gray-500 via-gray-900 to-gray-300 transition-opacity duration-300 dark:from-green-700/30 dark:via-gray-500 dark:to-gray-700/30'
+                size={350}
+            />
             <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
                 <AnimatePresence initial={false}>
                     {messages.map((message, index) => (

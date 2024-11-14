@@ -10,12 +10,13 @@ module.exports = {
     theme: {
         extend: {
             colors: {
-                main: '#FFDC58',
-                mainAccent: '#ffc800',
+                main: '#FFFFFF',
+                mainAccent: '#E5E5E5',
                 overlay: 'rgba(0,0,0,0.8)',
                 blue: '#AF79FF',
                 matte: '#212121',
-                bg: '#E5E6E9',
+                bg: 'hsl(195, 5%, 98%)',
+                foreground: '#E5E6E9',
                 text: '#000',
                 white: '#FFFFFF',
                 border: '#000',

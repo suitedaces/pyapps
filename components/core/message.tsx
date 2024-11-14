@@ -23,12 +23,12 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
     >
       <div
         className={`flex ${
-          isUser ? "flex-row-reverse" : "flex-row"
+          isUser ? "flex-row-reverse" : "flex-row !max-w-full"
         } items-start max-w-[80%]`}
       >
         <Avatar
           className={`w-8 h-8 ${
-            isUser ? "bg-blue" : "bg-main"
+            isUser ? "bg-blue" : "bg-[#FFD700]"
           } border-2 border-border flex-shrink-0`}
         >
           <AvatarFallback>{isUser ? "U" : "A"}</AvatarFallback>
@@ -38,7 +38,7 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
           className={`mx-2 p-4 ${
             isUser
               ? "rounded-base bg-bg border-2 border-border"
-              : ""
+              : "w-full"
           } break-words overflow-hidden`}
         >
           <Markdown>{content as string}</Markdown>

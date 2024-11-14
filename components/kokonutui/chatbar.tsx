@@ -4,7 +4,6 @@ import {
     ArrowRight,
     Brain,
     type LucideIcon,
-    Mic,
     Paperclip,
     TriangleAlert,
     Loader2,
@@ -37,24 +36,11 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
         maxHeight: 200,
     });
     const [useMemory, setUseMemory] = useState(false);
-    const [isRecording, setIsRecording] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     const AI_MODELS = ["GPT-4", "Claude", "Gemini"];
 
     const TOOLBAR_BUTTONS: ToolbarButton[] = [
-        {
-            icon: Mic,
-            onClick: () => setIsRecording(!isRecording),
-            className: (isRecording: boolean) =>
-                cn(
-                    "rounded-lg p-2 transition-all",
-                    isRecording
-                        ? "bg-red-500 text-white"
-                        : "bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"
-                ),
-            isRecording,
-        },
         {
             icon: Paperclip,
             isFileInput: true,
@@ -97,7 +83,7 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
 
     return (
         <div className="w-[80%] max-w-[800px] m-auto py-4">
-            <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-6">
+            <div className="bg-gray-100 dark:bg-white/5 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4 pb-4 border-b border-black/10 dark:border-white/10">
                     <div className="flex items-center gap-3">
                         <select className="text-xs bg-black/5 dark:bg-white/5 border border-neutral-200 border-black/10 dark:border-white/10 rounded-md px-2 py-1 dark:text-white dark:border-neutral-800">
@@ -129,7 +115,7 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
                                     className={cn(
                                         typeof button.className === "string"
                                             ? button.className
-                                            : button.className(isRecording),
+                                            : button.className(false),
                                         isLoading && "opacity-50 cursor-not-allowed"
                                     )}
                                 >
@@ -150,7 +136,7 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
                                     className={
                                         typeof button.className === "string"
                                             ? button.className
-                                            : button.className(isRecording)
+                                            : button.className(false)
                                     }
                                 >
                                     <button.icon className="w-4 h-4" />

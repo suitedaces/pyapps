@@ -309,21 +309,21 @@ export default function ChatPageClient({
     const handleChatSelect = useCallback(
         (chatId: string) => {
             setCurrentChatId(chatId)
-            router.push(`/chat/${chatId}`, { scroll: false })
+            router.replace(`/chat/${chatId}`, { scroll: false })
         },
         [router]
     )
 
     const handleNewChat = useCallback(async () => {
         setCurrentChatId(null)
-        router.push('/', { scroll: false })
+        router.replace('/', { scroll: false })
         return Promise.resolve()
     }, [router])
 
     // Handle chat creation callback
     const handleChatCreated = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-        router.push(`/chat/${chatId}`)
+        router.replace(`/chat/${chatId}`)
     }, [router])
 
     const toggleRightContent = useCallback(() => {
@@ -408,18 +408,13 @@ export default function ChatPageClient({
                         {isRightContentVisible && (
                             <ResizablePanel
                                 minSize={40}
-                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border-2 bg-white border-border h-[calc(100vh-4rem)]"
+                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border border-bordern dark:border-darkBorder rounded-2xl bg-foreground dark:bg-darkBg h-[calc(100vh-4rem)]"
                             >
                                 <Tabs
                                     defaultValue="file"
-                                    // value={activeTab}
-                                    // onValueChange={handleTabChange}
                                     className="flex-grow flex flex-col h-full"
                                 >
-                                    <TabsList
-                                        // className={`grid w-full ${csvFileName ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}
-                                        className="grid w-full grid-cols-2 mb-4"
-                                    >
+                                    <TabsList className="grid w-full rounded-lg grid-cols-2 bg-bg">
                                         {csvFileName && (
                                             <TabsTrigger value="file">
                                                 {truncate(csvFileName)}
@@ -432,18 +427,20 @@ export default function ChatPageClient({
                                             Code
                                         </TabsTrigger>
                                     </TabsList>
+
                                     <TabsContent
                                         value="preview"
-                                        className="flex-grow"
+                                        className="flex-grow overflow-hidden"
                                     >
                                         <StreamlitPreview
                                             url={streamlitUrl}
                                             isGeneratingCode={isGeneratingCode}
                                         />
                                     </TabsContent>
+
                                     <TabsContent
                                         value="code"
-                                        className="flex-grow"
+                                        className="flex-grow overflow-hidden"
                                     >
                                         <CodeView
                                             code={generatedCode}
