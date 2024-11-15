@@ -254,7 +254,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         <div className="flex flex-col h-full relative dark:border-darkBorder border border-bordern rounded-2xl bg-foreground dark:bg-darkBg text-text dark:text-darkText">
             <BorderTrail
                 className='bg-gradient-to-l from-gray-500 via-gray-900 to-gray-300 transition-opacity duration-300 dark:from-green-700/30 dark:via-gray-500 dark:to-gray-700/30'
-                size={350}
+                size={500}
             />
             <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
                 <AnimatePresence initial={false}>
