@@ -54,6 +54,31 @@ module.exports = {
                 base: '500',
                 heading: '700',
             },
+            keyframes: {
+                blink: {
+                    '0%, 100%': { opacity: '1' },
+                    '50%': { opacity: '0' }
+                },
+                'fade-in': {
+                    '0%': { opacity: '0' },
+                    '100%': { opacity: '1' }
+                },
+                'cursor-blink': {
+                    '0%, 100%': {
+                        opacity: '1',
+                        borderRightColor: 'currentColor'
+                    },
+                    '50%': {
+                        opacity: '0',
+                        borderRightColor: 'transparent'
+                    }
+                }
+            },
+            animation: {
+                blink: 'blink 1s step-end infinite',
+                'fade-in': 'fade-in 0.5s ease-in',
+                'cursor-blink': 'cursor-blink 1.2s step-end infinite'
+            }
         },
     },
     plugins: [require('tailwindcss-animate')],

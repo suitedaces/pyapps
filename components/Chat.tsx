@@ -19,6 +19,7 @@ interface ChatProps {
     onChatCreated?: (chatId: string) => void
     onFileSelect?: (file: { content: string, name: string }) => void
     onUpdateStreamlit?: (message: string) => void
+    onChatSubmit?: () => void
 }
 
 // File upload state interface
@@ -29,7 +30,7 @@ interface FileUploadState {
 }
 
 // Core chat component that handles message streaming, UI rendering, and error states
-export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit }: ChatProps) {
+export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit, onChatSubmit }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -150,6 +151,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
 
     const handleChatSubmit = async (content: string, file?: File) => {
         try {
+            onChatSubmit?.()
             if (file) {
                 const fileData = await uploadFile(file);
                 const fileContent = await file.text();

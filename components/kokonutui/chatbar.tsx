@@ -81,6 +81,17 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
         setSelectedFile(null);
     };
 
+    const LoadingAnimation = () => (
+        <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-black dark:bg-white rounded-sm animate-spin"
+                 style={{ animationDuration: "3s" }}
+            />
+            <span className="text-sm text-black/70 dark:text-white/70">
+                Grunty is grunting...
+            </span>
+        </div>
+    );
+
     return (
         <div className="w-[80%] max-w-[800px] m-auto py-4">
             <div className="bg-gray-100 dark:bg-white/5 rounded-2xl p-6">
@@ -105,6 +116,10 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
                             adjustHeight();
                         }}
                         disabled={isLoading}
+                        className={cn(
+                            "pr-24",
+                            isLoading && "opacity-50"
+                        )}
                     />
 
                     <div className="absolute left-3 bottom-3 flex items-center gap-2">
@@ -145,26 +160,31 @@ export default function ChatBar({ handleSubmit, isLoading }: ChatBarProps) {
                         )}
                     </div>
 
-                    <button
-                        type="submit"
-                        className={cn(
-                            "absolute right-3 bottom-3 rounded-lg p-2",
-                            isLoading ? "bg-gray-300 dark:bg-gray-700" : "bg-black/5 dark:bg-white/5",
-                            (!value.trim() && !selectedFile) && "opacity-50 cursor-not-allowed"
-                        )}
-                        disabled={isLoading || (!value.trim() && !selectedFile)}
-                    >
+                    <div className="absolute right-3 bottom-3 flex items-center gap-2">
                         {isLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <LoadingAnimation />
                         ) : (
-                            <ArrowRight
+                            <button
+                                type="submit"
                                 className={cn(
-                                    "w-4 h-4 dark:text-white",
-                                    (value.trim() || selectedFile) ? "opacity-100" : "opacity-30"
+                                    "rounded-lg p-2 transition-all duration-200",
+                                    "hover:bg-black/10 dark:hover:bg-white/10",
+                                    (!value.trim() && !selectedFile)
+                                        ? "opacity-50 cursor-not-allowed bg-black/5 dark:bg-white/5"
+                                        : "bg-black/5 dark:bg-white/5"
                                 )}
-                            />
+                                disabled={isLoading || (!value.trim() && !selectedFile)}
+                            >
+                                <ArrowRight
+                                    className={cn(
+                                        "w-4 h-4 dark:text-white transition-transform duration-200",
+                                        "group-hover:translate-x-1",
+                                        (value.trim() || selectedFile) ? "opacity-100" : "opacity-30"
+                                    )}
+                                />
+                            </button>
                         )}
-                    </button>
+                    </div>
                 </form>
 
                 {selectedFile && !isLoading && (
