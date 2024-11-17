@@ -109,12 +109,11 @@ const CustomSidebarMenuSubItem = ({
     children,
     className,
 }: CustomSidebarMenuSubItemProps) => (
-    <div className={`${className} ${isActive ? 'bg-white/50' : ''}`}>
+    <div className={`${className} ${isActive ? 'bg-accent/50' : 'bg-background hover:bg-accent/30'}`}>
         {children}
     </div>
 )
 
-// Add this new component for typewriter effect
 const TypewriterText = ({ text }: { text: string }) => {
     return (
         <motion.span
@@ -195,7 +194,9 @@ const ChatsList = ({
                         }}
                     >
                         <CustomSidebarMenuSubItem
-                            className={`group/item relative ${currentChatId === chat.id ? 'bg-sidebar-accent' : ''}`}
+                            className={`group/item relative ${
+                                currentChatId === chat.id ? 'bg-accent/50' : 'bg-background hover:bg-accent/30'
+                            }`}
                         >
                             <SidebarMenuSubButton
                                 className="w-full text-left flex items-center gap-2"
@@ -328,7 +329,7 @@ export default function AppSidebar({
                             <SidebarMenuItem>
                                 <SidebarMenuButton
                                     onClick={handleNewChat}
-                                    className="w-full justify-center border border-gray-300"
+                                    className="w-full justify-center bg-background border border-border hover:bg-accent"
                                 >
                                     <BorderTrail
                                         className="bg-gradient-to-l from-gray-200 via-black to-gray-200 dark:from-gray-700 dark:via-black dark:to-gray-700"

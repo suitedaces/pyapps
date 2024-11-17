@@ -88,10 +88,10 @@ export default function Home() {
                 chats={sidebarChats || []}
                 isCreatingChat={isCreatingChat}
             />
-            <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
+            <div className="flex flex-col min-h-screen w-full bg-white text-white overflow-x-hidden">
                 <TypingText
                     text="What can I help you generate?"
-                    className="text-black dark:text-white font-semibold text-2xl"
+                    className="text-black dark:text-white font-semibold text-4xl"
                     show={showTypingText}
                 />
                 <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">

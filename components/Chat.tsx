@@ -12,6 +12,7 @@ import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
 import ChatBar from '@/components/kokonutui/chatbar'
 import { BorderTrail } from '@/components/core/border-trail'
+import SimpleChatbar from './kokonutui/simpleChatbar'
 
 interface ChatProps {
     chatId?: string | null
@@ -22,14 +23,12 @@ interface ChatProps {
     onChatSubmit?: () => void
 }
 
-// File upload state interface
 interface FileUploadState {
     isUploading: boolean
     progress: number
     error: string | null
 }
 
-// Core chat component that handles message streaming, UI rendering, and error states
 export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit, onChatSubmit }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -45,7 +44,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
     const [currentChatId, setCurrentChatId] = useState<string | null>(chatId)
     const newChatIdRef = useRef<string | null>(null)
 
-    // Get model configuration from localStorage
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
         model: 'claude-3-5-sonnet-20240620',
     })
@@ -54,7 +52,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         (model) => model.id === languageModel.model
     )
 
-    // Initialize chat with Vercel AI SDK
     const {
         messages: aiMessages,
         input,
@@ -180,7 +177,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         }
     };
 
-    // Combine messages with proper deduplication and sorting
     const messages = useMemo(() => {
         const messageMap = new Map();
 
@@ -203,7 +199,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         return dedupedMessages;
     }, [initialMessages, aiMessages]);
 
-    // Error handling functions
     const handleResponseError = (response: Response) => {
         const errorMessage = response.status === 429
             ? "Rate limit exceeded. Please wait a moment."
@@ -223,7 +218,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         }
     }
 
-    // Retry last message if error occurs
     const handleRetry = useCallback(async () => {
         setErrorState(null)
         if (messages.length > 0 && messages[messages.length - 1].role === 'user') {
@@ -235,7 +229,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         }
     }, [messages, originalHandleSubmit])
 
-    // Auto-resize textarea based on content
     const handleTextareaChange = useCallback((
         e: React.ChangeEvent<HTMLTextAreaElement>
     ) => {
@@ -252,11 +245,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         : "Type your message..."
 
     return (
-        <div className="flex flex-col h-full relative dark:border-darkBorder border border-bordern rounded-2xl bg-foreground dark:bg-darkBg text-text dark:text-darkText">
-            <BorderTrail
-                className='bg-gradient-to-l from-gray-500 via-gray-900 to-gray-300 transition-opacity duration-300 dark:from-green-700/30 dark:via-gray-500 dark:to-gray-700/30'
-                size={500}
-            />
+        <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">
             <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
                 <AnimatePresence initial={false}>
                     {messages.map((message, index) => (
@@ -307,8 +296,8 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 </motion.div>
             )}
 
-            <ChatBar
-                handleSubmit={handleChatSubmit}
+            <SimpleChatbar
+                onSubmit={handleChatSubmit}
                 isLoading={isLoading}
             />
         </div>

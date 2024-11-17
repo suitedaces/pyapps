@@ -406,7 +406,7 @@ export default function ChatPageClient({
                 chats={sidebarChats}
                 isCreatingChat={isCreatingChat}
             />
-            <div className="flex flex-col min-h-screen w-full bg-bg text-white overflow-x-hidden">
+            <div className="flex flex-col min-h-screen w-full bg-white text-white overflow-x-hidden">
                 <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
                     <ResizablePanelGroup
                         direction="horizontal"

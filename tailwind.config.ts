@@ -10,20 +10,39 @@ module.exports = {
     theme: {
         extend: {
             colors: {
-                main: '#FFFFFF',
-                mainAccent: '#E5E5E5',
-                overlay: 'rgba(0,0,0,0.8)',
-                blue: '#AF79FF',
-                matte: '#212121',
-                bg: 'hsl(195, 5%, 98%)',
-                foreground: '#E5E6E9',
-                text: '#000',
-                white: '#FFFFFF',
-                border: '#000',
-                darkBg: '#374151',
-                darkText: '#eeefe9',
-                darkBorder: '#000',
-                secondaryBlack: '#1b1b1b',
+                border: "hsl(var(--border))",
+                input: "hsl(var(--input))",
+                ring: "hsl(var(--ring))",
+                background: "hsl(var(--background))",
+                foreground: "hsl(var(--foreground))",
+                primary: {
+                    DEFAULT: "hsl(var(--primary))",
+                    foreground: "hsl(var(--primary-foreground))",
+                },
+                secondary: {
+                    DEFAULT: "hsl(var(--secondary))",
+                    foreground: "hsl(var(--secondary-foreground))",
+                },
+                destructive: {
+                    DEFAULT: "hsl(var(--destructive))",
+                    foreground: "hsl(var(--destructive-foreground))",
+                },
+                muted: {
+                    DEFAULT: "hsl(var(--muted))",
+                    foreground: "hsl(var(--muted-foreground))",
+                },
+                accent: {
+                    DEFAULT: "hsl(var(--accent))",
+                    foreground: "hsl(var(--accent-foreground))",
+                },
+                popover: {
+                    DEFAULT: "hsl(var(--popover))",
+                    foreground: "hsl(var(--popover-foreground))",
+                },
+                card: {
+                    DEFAULT: "hsl(var(--card))",
+                    foreground: "hsl(var(--card-foreground))",
+                },
                 sidebar: {
                     DEFAULT: 'hsl(var(--sidebar-background))',
                     foreground: 'hsl(var(--sidebar-foreground))',
