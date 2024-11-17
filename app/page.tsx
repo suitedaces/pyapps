@@ -1,14 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Chat } from '@/components/Chat'
-import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
-import { StreamlitPreview } from '@/components/StreamlitPreview'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
     ResizableHandle,
     ResizablePanel,

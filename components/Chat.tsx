@@ -1,6 +1,5 @@
 'use client'
 
-import cn from 'clsx'
 import { useChat } from 'ai/react'
 import { Message } from 'ai'
 import { useCallback, useRef, useState, useMemo } from 'react'
