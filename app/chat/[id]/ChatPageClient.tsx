@@ -151,49 +151,68 @@ export default function ChatPageClient({
     // Add sandbox initialization
     const initializeSandbox = useCallback(async () => {
         try {
+            console.log('Initializing sandbox...');
             const response = await fetch('/api/sandbox/init', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             })
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
+                const errorData = await response.json();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
             }
 
             const data = await response.json()
+            console.log('Sandbox initialized with ID:', data.sandboxId);
             setSandboxId(data.sandboxId)
         } catch (error) {
-            setSandboxErrors(prev => [...prev, { message: 'Error initializing sandbox' }])
+            console.error('Error initializing sandbox:', error);
+            setSandboxErrors(prev => [...prev, {
+                message: error instanceof Error ? error.message : 'Error initializing sandbox'
+            }])
         }
     }, [])
 
     // Add streamlit update function
     const updateStreamlitApp = useCallback(async (code: string) => {
-        if (code && sandboxId) {
-            try {
-                const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code }),
-                })
+        if (!code) {
+            console.error('No code provided to updateStreamlitApp');
+            return;
+        }
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`)
-                }
+        if (!sandboxId) {
+            console.error('No sandboxId available');
+            return;
+        }
 
-                const data = await response.json()
-                if (data.url) {
-                    setStreamlitUrl(data.url)
-                } else {
-                    throw new Error('No URL returned from sandbox API')
-                }
-            } catch (error) {
-                setSandboxErrors(prev => [...prev, {
-                    message: error instanceof Error ? error.message : 'Error updating Streamlit app'
-                }])
-            } finally {
-                setIsGeneratingCode(false)
+        try {
+            console.log('Updating Streamlit app with code:', code);
+            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
             }
+
+            const data = await response.json()
+            console.log('Sandbox API response:', data);
+
+            if (data.url) {
+                setStreamlitUrl(data.url)
+                setIsGeneratingCode(false)
+            } else {
+                throw new Error('No URL returned from sandbox API')
+            }
+        } catch (error) {
+            console.error('Error in updateStreamlitApp:', error);
+            setSandboxErrors(prev => [...prev, {
+                message: error instanceof Error ? error.message : 'Error updating Streamlit app'
+            }])
+            setIsGeneratingCode(false)
         }
     }, [sandboxId])
 
@@ -432,6 +451,33 @@ export default function ChatPageClient({
                                         value="preview"
                                         className="flex-grow overflow-hidden"
                                     >
+                                        {sandboxErrors.length > 0 && (
+                                            <div className="p-4 mb-4 text-red-500 bg-red-100 rounded relative">
+                                                <button
+                                                    onClick={() => setSandboxErrors([])}
+                                                    className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                                                    aria-label="Close error messages"
+                                                >
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    >
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
+                                                </button>
+                                                {sandboxErrors.map((error, index) => (
+                                                    <p key={index}>{error.message}</p>
+                                                ))}
+                                            </div>
+                                        )}
                                         <StreamlitPreview
                                             url={streamlitUrl}
                                             isGeneratingCode={isGeneratingCode}
