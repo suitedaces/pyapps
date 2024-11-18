@@ -63,8 +63,6 @@ export default function ChatPageClient({
 
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
-    const [csvFileName, setCsvFileName] = useState<string | null>(null)
-    const [csvContent, setCsvContent] = useState<string | null>(null)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
 
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -418,11 +416,6 @@ export default function ChatPageClient({
                                     className="flex-grow flex flex-col h-full"
                                 >
                                     <TabsList className="grid w-full rounded-lg grid-cols-2 bg-white">
-                                        {csvFileName && (
-                                            <TabsTrigger value="file">
-                                                {truncate(csvFileName)}
-                                            </TabsTrigger>
-                                        )}
                                         <TabsTrigger value="preview">
                                             App
                                         </TabsTrigger>

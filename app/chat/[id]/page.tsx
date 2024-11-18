@@ -8,7 +8,7 @@ export default async function ChatIdPage({
 }: {
     params: { id: string }
 }) {
-    const supabase = createClientComponentClient({ cookies })
+    const supabase = createClientComponentClient()
 
     // We only need to fetch the chat data here
     const { data: chat, error } = await supabase
