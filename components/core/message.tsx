@@ -6,6 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Markdown, UserMarkdown } from "./markdown";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface MessageProps extends AIMessage {
   isLastMessage?: boolean;
@@ -30,18 +32,27 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
                     <Avatar className="w-8 h-8 bg-[#FFD700] border-2 mt-5 border-border flex-shrink-0">
                         <AvatarFallback>A</AvatarFallback>
                     </Avatar>
-                    <div className="mx-2 p-4 break-words overflow-hidden w-full">
+                    <div className="mx-2 p-4 break-words w-full">
                         <Markdown>{content}</Markdown>
                     </div>
                 </div>
             )}
 
             {isUser && (
-                <div className="flex flex-row items-start justify-end w-full">
-                    <div className="mx-2 p-4 rounded-lg bg-background border border-border text-foreground break-words overflow-hidden text-right inline-block max-w-[600px]">
-                        <UserMarkdown>{content}</UserMarkdown>
+                <div className="flex flex-row items-start gap-2 max-w-[85%]">
+                    <div className="grow shrink mx-2 p-4 rounded-lg bg-background border border-border text-foreground">
+                        <div className="whitespace-pre-wrap break-words">
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                    p: ({ children }) => <div className="mb-4 last:mb-0">{children}</div>,
+                                }}
+                            >
+                                {content}
+                            </ReactMarkdown>
+                        </div>
                     </div>
-                    <Avatar className="w-8 h-8 bg-blue-500 border-2 border-border flex-shrink-0">
+                    <Avatar className="w-8 h-8 bg-blue-500 border-2 border-border flex-shrink-0 mt-1">
                         {user?.user_metadata?.avatar_url ? (
                             <AvatarImage
                                 src={user.user_metadata.avatar_url}
