@@ -157,8 +157,12 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 const previewRows = rows.slice(1, 6).join('\n');
                 const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`;
 
+                // const message = content.trim() ||
+                //     `Create a Streamlit app to visualize this data from "/app/${file.name}". The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
+
                 const message = content.trim() ||
-                    `Create a Streamlit app to visualize this data from "${file.name}". The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
+                    `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
+
 
                 await append({
                     content: message,

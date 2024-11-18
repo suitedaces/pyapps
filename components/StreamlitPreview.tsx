@@ -9,7 +9,7 @@ interface StreamlitPreviewProps {
 export function StreamlitPreview({ url, isGeneratingCode }: StreamlitPreviewProps) {
     if (isGeneratingCode) {
         return (
-            <Card className="bg-bg border-border h-full">
+            <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
                     <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-8 w-8 animate-spin text-text" />
@@ -24,7 +24,7 @@ export function StreamlitPreview({ url, isGeneratingCode }: StreamlitPreviewProp
 
     if (!url) {
         return (
-            <Card className="bg-bg border-border h-full">
+            <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
                     <p className="text-sm text-text">
                         Waiting for Streamlit app to start...
@@ -35,7 +35,7 @@ export function StreamlitPreview({ url, isGeneratingCode }: StreamlitPreviewProp
     }
 
     return (
-        <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow">
+        <Card className="bg-white border-border h-full max-h-[82vh] flex-grow">
             <CardContent className="p-0 h-full relative">
                 <div className="h-full overflow-auto streamlit-container">
                     <iframe

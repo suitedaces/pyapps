@@ -78,7 +78,7 @@ export default function SimpleChatbar({ onSubmit, isLoading = false }: SimpleCha
                     />
                 )}
 
-                <form onSubmit={handleSubmit} className="relative">
+                <form onSubmit={handleSubmit} className="relative items-center">
                     <div
                         className={cn(
                             "absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 flex items-center justify-center h-7 sm:h-8 w-7 sm:w-8 rounded-lg",

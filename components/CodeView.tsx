@@ -27,7 +27,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
 
     if (isGeneratingCode) {
         return (
-            <Card className="bg-bg border-border h-full">
+            <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
                     <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-8 w-8 animate-spin text-text" />
@@ -42,7 +42,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
 
     if (!displayCode) {
         return (
-            <Card className="bg-bg border-border h-full">
+            <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
                     <p className="text-sm text-text">
                         No code generated yet
@@ -99,7 +99,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                 }
                 .code-container::-webkit-scrollbar-thumb {
                     background: #212121;
-                    border-radius: 4px; 
+                    border-radius: 4px;
                 }
                 .code-container::-webkit-scrollbar-thumb:hover {
                     background: #1b1b1b;

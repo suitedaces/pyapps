@@ -7,8 +7,6 @@ import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChat } from 'ai/react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Session } from '@supabase/supabase-js'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -27,10 +25,10 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
 import modelsList from '@/lib/models.json'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface ChatPageClientProps {
     initialChat: any
-    initialSession: Session
 }
 
 const truncate = (str: string) => {
@@ -55,11 +53,9 @@ const CustomHandle = ({ ...props }) => (
 
 export default function ChatPageClient({
     initialChat,
-    initialSession,
 }: ChatPageClientProps) {
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [isAtBottom, setIsAtBottom] = useState(true)
-    const [session, setSession] = useState<Session | null>(initialSession)
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat.id)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
@@ -79,13 +75,11 @@ export default function ChatPageClient({
         (model) => model.id === languageModel.model
     )
 
-    const supabase = createClientComponentClient()
+    const { session, isLoading } = useAuth()
+
     const {
         messages,
-        input,
-        handleInputChange,
-        handleSubmit: originalHandleSubmit,
-        isLoading,
+        isLoading: chatLoading,
         setMessages
     } = useChat({
         api: currentChatId ? `/api/conversations/${currentChatId}/stream` : '/api/conversations/stream',
@@ -138,17 +132,17 @@ export default function ChatPageClient({
     })
 
     useEffect(() => {
-        if (isLoading) {
+        if (chatLoading) {
             setIsGeneratingCode(true)
             setGeneratedCode('')
         }
-    }, [isLoading])
+    }, [chatLoading])
 
-    // Add sandbox state
+    //  sandbox state
     const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
 
-    // Add sandbox initialization
+    //  sandbox initialization
     const initializeSandbox = useCallback(async () => {
         try {
             console.log('Initializing sandbox...');
@@ -173,7 +167,7 @@ export default function ChatPageClient({
         }
     }, [])
 
-    // Add streamlit update function
+    //  streamlit update function
     const updateStreamlitApp = useCallback(async (code: string) => {
         if (!code) {
             console.error('No code provided to updateStreamlitApp');
@@ -285,20 +279,6 @@ export default function ChatPageClient({
         }
     }, [id])
 
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-        })
-
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session)
-        })
-
-        return () => subscription.unsubscribe()
-    }, [supabase.auth])
-
     const fetchAndSetChats = useCallback(async () => {
         try {
             const response = await fetch('/api/conversations?page=1&limit=10')
@@ -393,6 +373,10 @@ export default function ChatPageClient({
         fetchToolResults();
     }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
 
+    if (isLoading) {
+        return <div>Loading...</div>
+    }
+
     if (!session) {
         return <LoginPage />
     }
@@ -427,13 +411,13 @@ export default function ChatPageClient({
                         {isRightContentVisible && (
                             <ResizablePanel
                                 minSize={40}
-                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border border-bordern dark:border-darkBorder rounded-2xl bg-foreground dark:bg-darkBg h-[calc(100vh-4rem)]"
+                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border border-bordern dark:border-darkBorder rounded-2xl bg-white dark:bg-darkBg h-[calc(100vh-4rem)]"
                             >
                                 <Tabs
-                                    defaultValue="file"
+                                    defaultValue="code"
                                     className="flex-grow flex flex-col h-full"
                                 >
-                                    <TabsList className="grid w-full rounded-lg grid-cols-2 bg-bg">
+                                    <TabsList className="grid w-full rounded-lg grid-cols-2 bg-white">
                                         {csvFileName && (
                                             <TabsTrigger value="file">
                                                 {truncate(csvFileName)}

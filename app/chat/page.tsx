@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { Chat } from '@/components/Chat'
 import LoginPage from '@/components/LoginPage'
 import {
@@ -9,6 +9,7 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
+import { MetaSheet } from '@/components/MetaSheet'
 import AppSidebar from '@/components/Sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { useAuth } from '@/contexts/AuthContext'
@@ -40,20 +41,13 @@ export default function Home() {
     const handleChatCreated = useCallback((chatId: string) => {
         setShowTypingText(false)
         setCurrentChatId(chatId)
-        router.replace(`/chat/${chatId}`)
+        router.push(`/chat/${chatId}`)
     }, [router])
-
-    // Add effect to hide typing text when chat starts
-    useEffect(() => {
-        if (currentChatId) {
-            setShowTypingText(false)
-        }
-    }, [currentChatId])
 
     // Handle chat selection
     const handleChatSelect = useCallback((chatId: string) => {
         setCurrentChatId(chatId)
-        router.replace(`/chat/${chatId}`)
+        router.push(`/chat/${chatId}`)
     }, [router])
 
     // Handle new chat creation
