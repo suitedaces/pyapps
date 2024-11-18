@@ -10,9 +10,7 @@ import modelsList from '@/lib/models.json'
 import { LLMModelConfig } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
-import ChatBar from '@/components/kokonutui/chatbar'
-import { BorderTrail } from '@/components/core/border-trail'
-import SimpleChatbar from './kokonutui/simpleChatbar'
+import Chatbar from '@/components/core/chatbar'
 
 interface ChatProps {
     chatId?: string | null
@@ -300,7 +298,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 </motion.div>
             )}
 
-            <SimpleChatbar
+            <Chatbar
                 onSubmit={handleChatSubmit}
                 isLoading={isLoading}
             />

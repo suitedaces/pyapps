@@ -84,7 +84,7 @@ export default function Home() {
             />
             <div className="flex flex-col min-h-screen w-full bg-white text-white overflow-x-hidden">
                 <TypingText
-                    text="What can I help you generate?"
+                    text="From Data to App, in seconds."
                     className="text-black dark:text-white font-semibold text-4xl"
                     show={showTypingText}
                 />
