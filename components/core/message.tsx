@@ -37,8 +37,8 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
             )}
 
             {isUser && (
-                <div className="flex flex-row items-start max-w-[600px] w-full">
-                    <div className="mx-2 p-4 rounded-lg bg-background border border-border text-foreground break-words overflow-hidden w-full">
+                <div className="flex flex-row items-start justify-end w-full">
+                    <div className="mx-2 p-4 rounded-lg bg-background border border-border text-foreground break-words overflow-hidden text-right inline-block max-w-[600px]">
                         <UserMarkdown>{content}</UserMarkdown>
                     </div>
                     <Avatar className="w-8 h-8 bg-blue-500 border-2 border-border flex-shrink-0">
