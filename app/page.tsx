@@ -14,7 +14,7 @@ import { generateUUID } from "@/lib/utils";
 import { useQuery } from '@tanstack/react-query'
 import { TypingText } from '@/components/core/typing-text'
 import { Logo } from '@/components/core/Logo'
-import { useSidebar } from '@/contexts/SidebarContext'
+import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -307,7 +307,7 @@ export default function Home() {
         }
     }, [messages, updateStreamlitApp])
 
-    // Fetch tool results from messages when ChatID changes! 
+    // Fetch tool results from messages when ChatID changes!
     useEffect(() => {
         async function fetchToolResults() {
             if (!currentChatId) return;
@@ -355,8 +355,8 @@ export default function Home() {
     }
 
     return (
-        <div className="flex h-screen">
-            <div className="flex w-screen h-screen overflow-hidden">
+        <SidebarProvider>
+            <div className="relative flex h-screen overflow-hidden">
                 <Sidebar
                     onChatSelect={handleChatSelect}
                     currentChatId={currentChatId}
@@ -364,7 +364,7 @@ export default function Home() {
                     collapsed={sidebarCollapsed}
                     onCollapsedChange={setSidebarCollapsed}
                 />
-                <div className="flex-1 flex flex-col bg-white relative">
+                <div className="flex-1 flex flex-col bg-white min-w-0">
                     {sidebarCollapsed && (
                         <div
                             className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
@@ -480,6 +480,6 @@ export default function Home() {
                     </main>
                 </div>
             </div>
-        </div>
+        </SidebarProvider>
     )
 }

@@ -383,7 +383,7 @@ export default function ChatPageClient({
     }
 
     return (
-        <div className="flex h-screen">
+        <div className="relative flex h-screen overflow-hidden">
             <Sidebar
                 onChatSelect={handleChatSelect}
                 currentChatId={currentChatId}
@@ -393,7 +393,7 @@ export default function ChatPageClient({
             />
             <div
                 className={cn(
-                    "flex-1 flex flex-col bg-white transition-all duration-200",
+                    "flex-1 flex flex-col bg-white min-w-0 transition-all duration-200",
                     "relative"
                 )}
             >
