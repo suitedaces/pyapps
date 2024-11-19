@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/tooltip'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Logo } from '@/components/core/Logo'
 
 interface SidebarProps {
     defaultCollapsed?: boolean
@@ -42,37 +43,21 @@ interface SidebarProps {
     currentChatId?: string | null
     chats?: any[]
     isCreatingChat?: boolean
+    collapsed?: boolean
+    onCollapsedChange?: (collapsed: boolean) => void
 }
 
-// Update Logo component to handle collapsed state
-const Logo = ({ collapsed }: { collapsed: boolean }) => {
-  return (
-    <div className="relative font-mono font-bold tracking-tighter">
-      <style jsx>{`
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
-        .cursor {
-          animation: blink 1s step-end infinite;
-          margin-left: -0.1em;
-        }
-        .app {
-          margin-left: 0.3em;
-        }
-      `}</style>
-      {collapsed ? (
-        <span className="text-white text-xl">py</span>
-      ) : (
-        <>
-          <span className="text-white text-xl">py_</span>
-          <span className="cursor absolute text-white text-xl">|</span>
-          <span className="app text-gray-500 text-xl">app</span>
-          <div className="absolute bottom-0 left-0 w-full h-px bg-gray-700"></div>
-        </>
-      )}
-    </div>
-  )
+// First, let's update the NavItem interface to ensure proper typing
+interface NavItemProps {
+    item: {
+        title: string;
+        icon: any;
+        href: string;
+        pattern: RegExp;
+        collapsible?: boolean;
+    };
+    collapsed: boolean;
+    onToggle?: () => void;
 }
 
 export function Sidebar({ 
@@ -83,8 +68,11 @@ export function Sidebar({
     currentChatId,
     chats = [],
     isCreatingChat = false,
+    collapsed = false,
+    onCollapsedChange,
 }: SidebarProps) {
-    const [collapsed, setCollapsed] = useState(defaultCollapsed)
+    // Add state for chats section collapse
+    const [isChatsCollapsed, setIsChatsCollapsed] = useState(false)
     const [session, setSession] = useState<Session | null>(null)
     const pathname = usePathname()
     const supabase = createClientComponentClient()
@@ -180,11 +168,7 @@ export function Sidebar({
     }
 
     // Update NavItem component
-    const NavItem = ({ item, collapsed, onToggle }: { 
-        item: typeof mainNavItems[0] & { collapsible?: boolean }; 
-        collapsed: boolean;
-        onToggle?: () => void;
-    }) => {
+    const NavItem = ({ item, collapsed, onToggle }: NavItemProps) => {
         const isActive = item.pattern.test(pathname)
         
         return (
@@ -249,16 +233,31 @@ export function Sidebar({
                     <ScrollArea className="flex-1 p-4">
                         <div className="flex flex-col gap-2">
                             {mainNavItems.map((item) => (
-                                <NavItem key={item.href} item={item} collapsed={collapsed} />
+                                <NavItem 
+                                    key={item.href} 
+                                    item={item} 
+                                    collapsed={false}
+                                />
                             ))}
-                            {pathname.startsWith('/chat') && <ChatList collapsed={collapsed} chats={chats} currentChatId={currentChatId} onChatSelect={onChatSelect} />}
+                            {pathname.startsWith('/chat') && (
+                                <ChatList 
+                                    collapsed={false} 
+                                    chats={chats} 
+                                    currentChatId={currentChatId} 
+                                    onChatSelect={onChatSelect} 
+                                />
+                            )}
                         </div>
                     </ScrollArea>
                     <div className="p-4">
                         <Separator className="mb-4" />
                         <div className="flex flex-col gap-2">
                             {subNavItems.map((item) => (
-                                <NavItem key={item.href} item={item} collapsed={collapsed} />
+                                <NavItem 
+                                    key={item.href} 
+                                    item={{...item, collapsible: true}} 
+                                    collapsed={false} 
+                                />
                             ))}
                             <Button
                                 variant="ghost"
@@ -278,8 +277,6 @@ export function Sidebar({
 
     // Update DesktopSidebar component
     const DesktopSidebar = () => {
-        const [isChatsCollapsed, setIsChatsCollapsed] = useState(false)
-
         return (
             <motion.div
                 initial={false}
@@ -297,18 +294,31 @@ export function Sidebar({
             >
                 <div className="flex h-full w-full flex-col gap-4">
                     <div className="flex h-14 items-center justify-between px-4">
-                        <Logo collapsed={collapsed} />
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn('h-6 w-6')}
-                            onClick={() => setCollapsed(!collapsed)}
-                        >
-                            <ChevronLeft className={cn(
-                                'h-4 w-4 transition-transform text-white',
-                                collapsed && 'rotate-180'
-                            )} />
-                        </Button>
+                        {collapsed ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn('h-6 w-6')}
+                                onClick={() => onCollapsedChange?.(!collapsed)}
+                            >
+                                <ChevronLeft className={cn(
+                                    'h-4 w-4 transition-transform text-white',
+                                    collapsed && 'rotate-180'
+                                )} />
+                            </Button>
+                        ) : (
+                            <div className="flex items-center justify-between w-full">
+                                <Logo collapsed={false} />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn('h-6 w-6 ml-2')}
+                                    onClick={() => onCollapsedChange?.(!collapsed)}
+                                >
+                                    <ChevronLeft className="h-4 w-4 text-white" />
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     <ScrollArea className="flex-1 px-2">
@@ -356,7 +366,7 @@ export function Sidebar({
                             {subNavItems.map((item) => (
                                 <NavItem 
                                     key={item.href} 
-                                    item={item} 
+                                    item={{...item, collapsible: true}} 
                                     collapsed={collapsed}
                                 />
                             ))}

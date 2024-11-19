@@ -20,13 +20,13 @@ import {
 } from '@/components/ui/resizable'
 
 import { Sidebar } from '@/components/core/Sidebar'
-import { SidebarProvider } from '@/components/ui/sidebar'
 
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
 import modelsList from '@/lib/models.json'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
+import { Logo } from '@/components/core/Logo'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -61,6 +61,7 @@ export default function ChatPageClient({
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
@@ -381,16 +382,39 @@ export default function ChatPageClient({
     }
 
     return (
-        <SidebarProvider>
+        <div className="flex h-screen">
             <Sidebar
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}
                 chats={sidebarChats}
                 isCreatingChat={isCreatingChat}
+                collapsed={sidebarCollapsed}
+                onCollapsedChange={setSidebarCollapsed}
             />
-            <div className="flex flex-col min-h-screen w-full bg-white text-white overflow-x-hidden">
-                <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
+            <div 
+                className={cn(
+                    "flex-1 flex flex-col bg-white transition-all duration-200",
+                    "relative"
+                )}
+            >
+                {sidebarCollapsed && (
+                    <div 
+                        className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200" 
+                        style={{ 
+                            left: '4rem',
+                            right: 0 
+                        }}
+                    >
+                        <div className="px-4">
+                            <Logo inverted collapsed={false} />
+                        </div>
+                    </div>
+                )}
+                <main className={cn(
+                    "flex-grow flex px-2 pr-9 flex-col mt-14 lg:flex-row overflow-hidden justify-center relative",
+                    !sidebarCollapsed && "mt-0"
+                )}>
                     <ResizablePanelGroup
                         direction="horizontal"
                         ref={resizableGroupRef}
@@ -480,6 +504,6 @@ export default function ChatPageClient({
                     </ResizablePanelGroup>
                 </main>
             </div>
-        </SidebarProvider>
+        </div>
     )
 }
