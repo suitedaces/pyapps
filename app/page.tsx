@@ -289,6 +289,63 @@ export default function Home() {
         }
     }, [currentChatId])
 
+    // Realtime tool result handling from messages
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1]
+        if (lastMessage?.toolInvocations?.length) {
+            const streamlitCall = lastMessage.toolInvocations
+                .find(invocation =>
+                    invocation.toolName === 'create_streamlit_app' &&
+                    invocation.state === 'result'
+                )
+
+            if (streamlitCall?.state === 'result') {
+                setGeneratedCode(streamlitCall.result)
+                setIsGeneratingCode(false)
+                updateStreamlitApp(streamlitCall.result)
+            }
+        }
+    }, [messages, updateStreamlitApp])
+
+    // Fetch tool results from messages when ChatID changes! 
+    useEffect(() => {
+        async function fetchToolResults() {
+            if (!currentChatId) return;
+
+            try {
+                const response = await fetch(`/api/conversations/${currentChatId}/messages`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch messages');
+                }
+
+                const data = await response.json();
+
+                const streamlitCode = data.messages
+                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                    .map((msg: any) => {
+                        const toolResult = msg.tool_results[0];
+                        if (toolResult && toolResult.name === 'create_streamlit_app') {
+                            return toolResult.result;
+                        }
+                        return null;
+                    })
+                    .filter(Boolean)
+                    .pop();
+
+                if (streamlitCode) {
+                    setGeneratedCode(streamlitCode);
+                    if (!isGeneratingCode) {
+                        await updateStreamlitApp(streamlitCode);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching tool results:', error);
+            }
+        }
+
+        fetchToolResults();
+    }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
+
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>
     }
