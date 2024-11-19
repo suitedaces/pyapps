@@ -227,10 +227,8 @@ export default function Home() {
             <div className="flex w-screen h-screen overflow-hidden">
                 <Sidebar
                     onChatSelect={handleChatSelect}
-                    onNewChat={handleNewChat}
                     currentChatId={currentChatId}
                     chats={sidebarChats || []}
-                    isCreatingChat={isCreatingChat}
                     collapsed={sidebarCollapsed}
                     onCollapsedChange={setSidebarCollapsed}
                 />
