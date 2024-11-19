@@ -9,8 +9,7 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
-import { Sidebar } from '@/components/core/Sidebar'
-import { SidebarProvider } from '@/components/ui/sidebar'
+import { Sidebar } from '@/components/Sidebar'
 import { useAuth } from '@/contexts/AuthContext'
 import { generateUUID } from "@/lib/utils";
 import { useQuery } from '@tanstack/react-query'
@@ -73,7 +72,7 @@ export default function Home() {
     }
 
     return (
-        <SidebarProvider>
+        <>
             <Sidebar
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
@@ -99,11 +98,9 @@ export default function Home() {
                                 />
                             </div>
                         </ResizablePanel>
-
-                        {/* Right panel components... */}
                     </ResizablePanelGroup>
                 </main>
             </div>
-        </SidebarProvider>
+        </>
     )
 }

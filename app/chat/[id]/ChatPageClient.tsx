@@ -19,7 +19,7 @@ import {
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
 
-import { Sidebar } from '@/components/core/Sidebar'
+import { Sidebar } from '@/components/Sidebar'
 
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
