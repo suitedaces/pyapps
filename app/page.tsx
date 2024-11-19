@@ -9,8 +9,7 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
-import { MetaSheet } from '@/components/MetaSheet'
-import AppSidebar from '@/components/Sidebar'
+import { Sidebar } from '@/components/core/Sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { useAuth } from '@/contexts/AuthContext'
 import { generateUUID } from "@/lib/utils";
@@ -75,7 +74,7 @@ export default function Home() {
 
     return (
         <SidebarProvider>
-            <AppSidebar
+            <Sidebar
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}

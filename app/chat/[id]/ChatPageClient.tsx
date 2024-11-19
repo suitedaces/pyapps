@@ -19,13 +19,14 @@ import {
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
 
-import AppSidebar from '@/components/Sidebar'
+import { Sidebar } from '@/components/core/Sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
 import modelsList from '@/lib/models.json'
 import { useAuth } from '@/contexts/AuthContext'
+import { cn } from '@/lib/utils'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -381,7 +382,7 @@ export default function ChatPageClient({
 
     return (
         <SidebarProvider>
-            <AppSidebar
+            <Sidebar
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}
@@ -404,57 +405,40 @@ export default function ChatPageClient({
                             </div>
                         </ResizablePanel>
 
-                        {isRightContentVisible && <CustomHandle />}
+                        {isRightContentVisible && (
+                            <CustomHandle 
+                                className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors"
+                            />
+                        )}
 
                         {isRightContentVisible && (
                             <ResizablePanel
                                 minSize={40}
-                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden border border-bordern dark:border-darkBorder rounded-2xl bg-white dark:bg-darkBg h-[calc(100vh-4rem)]"
+                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                             >
                                 <Tabs
                                     defaultValue="code"
                                     className="flex-grow flex flex-col h-full"
                                 >
-                                    <TabsList className="grid w-full rounded-lg grid-cols-2 bg-white">
-                                        <TabsTrigger value="preview">
+                                    <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
+                                        <TabsTrigger 
+                                            value="preview"
+                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
+                                        >
                                             App
                                         </TabsTrigger>
-                                        <TabsTrigger value="code">
+                                        <TabsTrigger 
+                                            value="code"
+                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
+                                        >
                                             Code
                                         </TabsTrigger>
                                     </TabsList>
 
                                     <TabsContent
                                         value="preview"
-                                        className="flex-grow overflow-hidden"
+                                        className="flex-grow overflow-hidden mt-4"
                                     >
-                                        {sandboxErrors.length > 0 && (
-                                            <div className="p-4 mb-4 text-red-500 bg-red-100 rounded relative">
-                                                <button
-                                                    onClick={() => setSandboxErrors([])}
-                                                    className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                                                    aria-label="Close error messages"
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        width="16"
-                                                        height="16"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        strokeWidth="2"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                    >
-                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                                                    </svg>
-                                                </button>
-                                                {sandboxErrors.map((error, index) => (
-                                                    <p key={index}>{error.message}</p>
-                                                ))}
-                                            </div>
-                                        )}
                                         <StreamlitPreview
                                             url={streamlitUrl}
                                             isGeneratingCode={isGeneratingCode}
@@ -463,7 +447,7 @@ export default function ChatPageClient({
 
                                     <TabsContent
                                         value="code"
-                                        className="flex-grow overflow-hidden"
+                                        className="flex-grow overflow-hidden mt-4"
                                     >
                                         <CodeView
                                             code={generatedCode}
@@ -473,18 +457,27 @@ export default function ChatPageClient({
                                 </Tabs>
                             </ResizablePanel>
                         )}
+
+                        <Button
+                            onClick={toggleRightContent}
+                            className={cn(
+                                "absolute top-2 right-4 z-10",
+                                "bg-black hover:bg-black/90",
+                                "text-white",
+                                "border border-transparent",
+                                "transition-all duration-200 ease-in-out",
+                                "shadow-lg hover:shadow-xl",
+                                "rounded-lg"
+                            )}
+                            size="icon"
+                        >
+                            {isRightContentVisible ? (
+                                <ChevronRight className="h-4 w-4" />
+                            ) : (
+                                <ChevronLeft className="h-4 w-4" />
+                            )}
+                        </Button>
                     </ResizablePanelGroup>
-                    <Button
-                        onClick={toggleRightContent}
-                        className="absolute top-2 right-4 z-10 bg-main text-text"
-                        size="icon"
-                    >
-                        {isRightContentVisible ? (
-                            <ChevronRight className="h-4 w-4" />
-                        ) : (
-                            <ChevronLeft className="h-4 w-4" />
-                        )}
-                    </Button>
                 </main>
             </div>
         </SidebarProvider>
