@@ -109,8 +109,9 @@ export default function Home() {
         fetchMessages(chatId)
     }, [fetchMessages])
 
-    // Update handleChatSelect to fetch messages
+    // Update handleChatSelect to fetch messages and hide typing text
     const handleChatSelect = useCallback((chatId: string) => {
+        setShowTypingText(false)
         setCurrentChatId(chatId)
         fetchMessages(chatId)
     }, [fetchMessages])

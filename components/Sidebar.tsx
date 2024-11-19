@@ -8,14 +8,14 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useEffect, useState } from 'react'
 import { Session } from '@supabase/supabase-js'
 import {
-    ChevronLeft,
     MessageSquare,
     FolderOpen,
     AppWindow,
-    Settings,
     LogOut,
     Menu,
     Plus,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -115,7 +115,10 @@ export function Sidebar({
         currentChatId?: string | null;
         onChatSelect?: (chatId: string) => void;
     }) => {
-        const latestChats = chats.slice(0, 5);
+        // When collapsed, only show the current chat or the first chat
+        const chatsToShow = collapsed 
+            ? [currentChatId ? chats.find(chat => chat.id === currentChatId) : chats[0]].filter(Boolean)
+            : chats.slice(0, 5);
 
         return (
             <div className={cn(
@@ -123,14 +126,14 @@ export function Sidebar({
                 collapsed ? "px-1" : "px-2"
             )}>
                 <ScrollArea className="flex-1 w-full">
-                    {latestChats.map((chat: any) => (
+                    {chatsToShow.map((chat: any) => (
                         <TooltipProvider key={chat.id}>
                             <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
                                     <Button
                                         variant="ghost"
                                         className={cn(
-                                            "w-full mb-1 relative group",
+                                            "w-full mb-1 relative group text-left",
                                             collapsed ? "justify-center px-2" : "justify-start",
                                             chat.id === currentChatId
                                                 ? "bg-white/20 text-white hover:bg-white/20"
@@ -143,15 +146,15 @@ export function Sidebar({
                                             collapsed ? "mx-auto" : "mr-2"
                                         )} />
                                         {!collapsed && (
-                                            <span className="truncate flex-1">
-                                                {chat.title || 'New Chat'}
+                                            <span className="truncate text-left">
+                                                {chat.title || 'New'}
                                             </span>
                                         )}
                                     </Button>
                                 </TooltipTrigger>
                                 {collapsed && (
                                     <TooltipContent side="right">
-                                        {chat.title || 'New Chat'}
+                                        {chat.title || 'New'}
                                     </TooltipContent>
                                 )}
                             </Tooltip>
@@ -165,48 +168,59 @@ export function Sidebar({
     // Update NavItem component
     const NavItem = ({ item, collapsed, onToggle }: NavItemProps) => {
         const isActive = item.pattern.test(pathname)
+        const isChatsItem = item.title === 'Chats'
 
         return (
-            <Tooltip delayDuration={0}>
-                <TooltipTrigger asChild>
-                    <div className="w-full">
-                        <Button
-                            variant="ghost"
-                            size={collapsed ? 'icon' : 'default'}
-                            className={cn(
-                                'w-full justify-start gap-2',
-                                'text-white hover:bg-white/10 hover:text-white',
-                                isActive && 'bg-white/20 text-white hover:bg-white/20'
-                            )}
-                            onClick={item.collapsible ? onToggle : undefined}
-                            asChild={!item.collapsible}
-                        >
-                            {!item.collapsible ? (
-                                <Link href={item.href}>
-                                    <item.icon className={cn(
-                                        'h-4 w-4 text-white',
-                                        collapsed ? 'mx-auto' : 'mr-2'
-                                    )} />
-                                    {!collapsed && <span className="text-white">{item.title}</span>}
-                                </Link>
-                            ) : (
-                                <>
-                                    <item.icon className={cn(
-                                        'h-4 w-4 text-white',
-                                        collapsed ? 'mx-auto' : 'mr-2'
-                                    )} />
-                                    {!collapsed && <span className="text-white">{item.title}</span>}
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                </TooltipTrigger>
-                {collapsed && (
-                    <TooltipContent side="right" className="flex items-center gap-4">
-                        {item.title}
-                    </TooltipContent>
-                )}
-            </Tooltip>
+            <TooltipProvider>
+                <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                        <div className="w-full">
+                            <Button
+                                variant="ghost"
+                                size={collapsed ? 'icon' : 'default'}
+                                className={cn(
+                                    'w-full justify-start gap-2',
+                                    'text-white hover:bg-white/10 hover:text-white',
+                                    isActive && 'bg-white/20 text-white hover:bg-white/20'
+                                )}
+                                onClick={isChatsItem ? onToggle : undefined}
+                                asChild={!isChatsItem}
+                            >
+                                {!isChatsItem ? (
+                                    <Link href={item.href}>
+                                        <item.icon className={cn(
+                                            'h-4 w-4 text-white',
+                                            collapsed ? 'mx-auto' : 'mr-2'
+                                        )} />
+                                        {!collapsed && <span className="text-white">{item.title}</span>}
+                                    </Link>
+                                ) : (
+                                    <>
+                                        <item.icon className={cn(
+                                            'h-4 w-4 text-white',
+                                            collapsed ? 'mx-auto' : 'mr-2'
+                                        )} />
+                                        {!collapsed && (
+                                            <div className="flex items-center justify-between w-full">
+                                                <span className="text-white">{item.title}</span>
+                                                <ChevronDown className={cn(
+                                                    'h-4 w-4 transition-transform text-white',
+                                                    !isChatsCollapsed && 'rotate-90'
+                                                )} />
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </TooltipTrigger>
+                    {collapsed && (
+                        <TooltipContent side="right" className="flex items-center gap-4">
+                            {item.title}
+                        </TooltipContent>
+                    )}
+                </Tooltip>
+            </TooltipProvider>
         )
     }
 
@@ -234,7 +248,7 @@ export function Sidebar({
                                     collapsed={false}
                                 />
                             ))}
-                            {pathname.startsWith('/chat') && (
+                            {(pathname === '/' || pathname.startsWith('/chat')) && (
                                 <ChatList
                                     collapsed={false}
                                     chats={chats}
@@ -257,10 +271,10 @@ export function Sidebar({
                             <Button
                                 variant="ghost"
                                 size="default"
-                                className="w-full justify-start gap-2 text-foreground"
+                                className="w-full justify-start gap-2 text-foreground hover:bg-red-500/20 hover:text-red-400"
                                 onClick={handleSignOut}
                             >
-                                <LogOut className="h-4 w-4 text-foreground mr-2" />
+                                <LogOut className="h-4 w-4 text-foreground mr-2 hover:text-red-400" />
                                 Sign out
                             </Button>
                         </div>
@@ -301,7 +315,7 @@ export function Sidebar({
                                 className={cn('h-6 w-6')}
                                 onClick={() => onCollapsedChange?.(!collapsed)}
                             >
-                                <ChevronLeft className={cn(
+                                <ChevronDown className={cn(
                                     'h-4 w-4 transition-transform text-white',
                                     collapsed && 'rotate-180'
                                 )} />
@@ -315,7 +329,7 @@ export function Sidebar({
                                     className={cn('h-6 w-6 ml-2')}
                                     onClick={() => onCollapsedChange?.(!collapsed)}
                                 >
-                                    <ChevronLeft className="h-4 w-4 text-white" />
+                                    <ChevronDown className="h-4 w-4 text-white" />
                                 </Button>
                             </div>
                         )}
@@ -337,7 +351,7 @@ export function Sidebar({
                                     'h-4 w-4',
                                     collapsed ? 'mx-auto' : 'mr-2'
                                 )} />
-                                {!collapsed && "New Chat"}
+                                {!collapsed && "New"}
                             </Button>
 
                             {mainNavItems.map((item) => (
@@ -349,7 +363,7 @@ export function Sidebar({
                                 />
                             ))}
 
-                            {pathname.startsWith('/chat') && !isChatsCollapsed && !collapsed && (
+                            {(pathname === '/' || pathname.startsWith('/chat')) && !isChatsCollapsed && (
                                 <ChatList
                                     collapsed={collapsed}
                                     chats={chats}
@@ -379,14 +393,17 @@ export function Sidebar({
                                         <Button
                                             variant="ghost"
                                             size={collapsed ? 'icon' : 'default'}
-                                            className="w-full justify-start gap-2 text-white hover:text-white"
+                                            className={cn(
+                                                'w-full justify-start gap-2 text-white hover:bg-red-500/20 hover:text-red-400 group',
+                                                collapsed ? 'mx-auto' : 'mr-2'
+                                            )}
                                             onClick={handleSignOut}
                                         >
                                             <LogOut className={cn(
-                                                'h-4 w-4 text-white',
+                                                'h-4 w-4 text-white group-hover:text-red-400',
                                                 collapsed ? 'mx-auto' : 'mr-2'
                                             )} />
-                                            {!collapsed && <span className="text-white">Sign out</span>}
+                                            {!collapsed && <span className="text-white group-hover:text-red-400">Sign out</span>}
                                         </Button>
                                     </TooltipTrigger>
                                     {collapsed && (
