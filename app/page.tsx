@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query'
 import { TypingText } from '@/components/core/typing-text'
 import { Logo } from '@/components/core/Logo'
 import { useSidebar } from '@/contexts/SidebarContext'
+import { cn } from '@/lib/utils'
 
 export default function Home() {
     const router = useRouter()
@@ -98,7 +99,10 @@ export default function Home() {
                         </div>
                     </div>
                 )}
-                <main className={`flex-grow flex px-2 pr-9 flex-col ${sidebarCollapsed ? 'mt-14' : 'mt-0'} lg:flex-row overflow-hidden justify-center relative`}>
+                <main className={cn(
+                    "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
+                    "h-screen pt-14"
+                )}>
                     {showTypingText && (
                         <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                             <TypingText

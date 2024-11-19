@@ -413,8 +413,8 @@ export default function ChatPageClient({
                     </div>
                 )}
                 <main className={cn(
-                    "flex-grow flex px-2 pr-9 flex-col mt-14 lg:flex-row overflow-hidden justify-center relative",
-                    !sidebarCollapsed && "mt-0"
+                    "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
+                    "h-screen pt-14"
                 )}>
                     <ResizablePanelGroup
                         direction="horizontal"
