@@ -21,9 +21,9 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
     return (
         <motion.div
             key={id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            // exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
             className={cn("flex w-full", isUser ? "justify-end" : "justify-start", "mb-4")}
         >
