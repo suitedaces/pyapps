@@ -386,25 +386,23 @@ export default function ChatPageClient({
         <div className="flex h-screen">
             <Sidebar
                 onChatSelect={handleChatSelect}
-                onNewChat={handleNewChat}
                 currentChatId={currentChatId}
                 chats={sidebarChats}
-                isCreatingChat={isCreatingChat}
                 collapsed={sidebarCollapsed}
                 onCollapsedChange={setSidebarCollapsed}
             />
-            <div 
+            <div
                 className={cn(
                     "flex-1 flex flex-col bg-white transition-all duration-200",
                     "relative"
                 )}
             >
                 {sidebarCollapsed && (
-                    <div 
-                        className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200" 
-                        style={{ 
+                    <div
+                        className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
+                        style={{
                             left: '4rem',
-                            right: 0 
+                            right: 0
                         }}
                     >
                         <div className="px-4">
@@ -431,7 +429,7 @@ export default function ChatPageClient({
                         </ResizablePanel>
 
                         {isRightContentVisible && (
-                            <CustomHandle 
+                            <CustomHandle
                                 className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors"
                             />
                         )}
@@ -446,13 +444,13 @@ export default function ChatPageClient({
                                     className="flex-grow flex flex-col h-full"
                                 >
                                     <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
-                                        <TabsTrigger 
+                                        <TabsTrigger
                                             value="preview"
                                             className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
                                         >
                                             App
                                         </TabsTrigger>
-                                        <TabsTrigger 
+                                        <TabsTrigger
                                             value="code"
                                             className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
                                         >

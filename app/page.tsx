@@ -23,6 +23,11 @@ import { CodeView } from '@/components/CodeView'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { ResizableHandle } from '@/components/ui/resizable'
 import { Message } from 'ai'
+import { useChat } from 'ai/react'
+
+import { useLocalStorage } from 'usehooks-ts'
+import { LLMModelConfig } from '@/lib/types'
+import modelsList from '@/lib/models.json'
 
 // Add CustomHandle component
 const CustomHandle = ({ ...props }) => (
@@ -65,6 +70,14 @@ export default function Home() {
         },
         enabled: !!session,
     })
+
+    const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
+        model: 'claude-3-5-sonnet-20240620',
+    })
+
+    const currentModel = modelsList.models.find(
+        (model) => model.id === languageModel.model
+    )
 
     // Add fetchMessages function
     const fetchMessages = useCallback(async (chatId: string) => {
@@ -130,6 +143,67 @@ export default function Home() {
     const handleChatSubmit = useCallback(() => {
         setShowTypingText(false)
     }, [])
+
+    const {
+        messages,
+        isLoading: chatLoading,
+        setMessages
+    } = useChat({
+        api: currentChatId ? `/api/conversations/${currentChatId}/stream` : '/api/conversations/stream',
+        id: currentChatId ?? undefined,
+        initialMessages,
+        body: {
+            model: currentModel,
+            config: languageModel,
+            experimental_streamData: true
+        },
+        maxSteps: 10,
+        onResponse: (response) => {
+            if (!response.ok) {
+                return
+            }
+        },
+        onFinish: async (message) => {
+            if (message.toolInvocations?.length) {
+                const streamlitCall = message.toolInvocations
+                    .filter(invocation =>
+                        invocation.toolName === 'create_streamlit_app' &&
+                        invocation.state === 'result'
+                    )
+                    .pop()
+
+                if (streamlitCall?.state === 'result') {
+                    const code = streamlitCall.result
+                    if (code) {
+                        setGeneratedCode(code)
+                        await updateStreamlitApp(code)
+                    }
+                }
+            }
+
+            if (message.content.trim()) {
+                const assistantMessage = {
+                    id: Date.now().toString(),
+                    role: 'assistant' as const,
+                    content: message.content,
+                    createdAt: new Date(),
+                    toolInvocations: message.toolInvocations
+                }
+
+                setMessages(prev => [...prev, assistantMessage])
+            }
+        },
+        onError: (error) => {
+            setIsGeneratingCode(false)
+        }
+    })
+
+    useEffect(() => {
+        if (chatLoading) {
+            setIsGeneratingCode(true)
+            setGeneratedCode('')
+        }
+    }, [chatLoading])
 
     // Add sandbox initialization logic
     const initializeSandbox = useCallback(async () => {
