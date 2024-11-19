@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -39,10 +39,8 @@ interface SidebarProps {
     defaultCollapsed?: boolean
     className?: string
     onChatSelect?: (chatId: string) => void
-    onNewChat?: () => Promise<void>
     currentChatId?: string | null
     chats?: any[]
-    isCreatingChat?: boolean
     collapsed?: boolean
     onCollapsedChange?: (collapsed: boolean) => void
 }
@@ -64,14 +62,11 @@ export function Sidebar({
     defaultCollapsed = false,
     className,
     onChatSelect,
-    onNewChat,
     currentChatId,
     chats = [],
-    isCreatingChat = false,
     collapsed = false,
     onCollapsedChange,
 }: SidebarProps) {
-    // Add state for chats section collapse
     const [isChatsCollapsed, setIsChatsCollapsed] = useState(false)
     const [session, setSession] = useState<Session | null>(null)
     const pathname = usePathname()
@@ -275,6 +270,11 @@ export function Sidebar({
         </Sheet>
     )
 
+    // Add this function inside Sidebar component
+    const handleNewChat = () => {
+        window.location.href = '/'
+    }
+
     // Update DesktopSidebar component
     const DesktopSidebar = () => {
         return (
@@ -331,15 +331,13 @@ export function Sidebar({
                                     'text-white hover:bg-white/10 hover:text-white',
                                     collapsed && 'justify-center'
                                 )}
-                                asChild
+                                onClick={handleNewChat}
                             >
-                                <Link href="/">
-                                    <Plus className={cn(
-                                        'h-4 w-4',
-                                        collapsed ? 'mx-auto' : 'mr-2'
-                                    )} />
-                                    {!collapsed && "New Chat"}
-                                </Link>
+                                <Plus className={cn(
+                                    'h-4 w-4',
+                                    collapsed ? 'mx-auto' : 'mr-2'
+                                )} />
+                                {!collapsed && "New Chat"}
                             </Button>
 
                             {mainNavItems.map((item) => (
