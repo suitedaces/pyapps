@@ -27,6 +27,7 @@ import modelsList from '@/lib/models.json'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/core/Logo'
+import { useSidebar } from '@/contexts/SidebarContext'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -61,7 +62,7 @@ export default function ChatPageClient({
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
 
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)

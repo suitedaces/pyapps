@@ -1,11 +1,10 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import React, { useCallback, useState, useEffect } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Chat } from '@/components/Chat'
 import LoginPage from '@/components/LoginPage'
 import {
-    ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
@@ -14,11 +13,14 @@ import { useAuth } from '@/contexts/AuthContext'
 import { generateUUID } from "@/lib/utils";
 import { useQuery } from '@tanstack/react-query'
 import { TypingText } from '@/components/core/typing-text'
+import { Logo } from '@/components/core/Logo'
+import { useSidebar } from '@/contexts/SidebarContext'
 
 export default function Home() {
     const router = useRouter()
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
+    const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { session, isLoading: isAuthLoading } = useAuth()
     const [showTypingText, setShowTypingText] = useState(true)
 
@@ -72,21 +74,40 @@ export default function Home() {
     }
 
     return (
-        <>
+        <div className="flex h-screen">
             <Sidebar
                 onChatSelect={handleChatSelect}
                 onNewChat={handleNewChat}
                 currentChatId={currentChatId}
                 chats={sidebarChats || []}
                 isCreatingChat={isCreatingChat}
+                collapsed={sidebarCollapsed}
+                onCollapsedChange={setSidebarCollapsed}
             />
-            <div className="flex flex-col min-h-screen w-full bg-white text-white overflow-x-hidden">
-                <TypingText
-                    text="From Data to App, in seconds."
-                    className="text-black dark:text-white font-semibold text-4xl"
-                    show={showTypingText}
-                />
-                <main className="flex-grow flex px-2 pr-9 flex-col mt-9 lg:flex-row overflow-hidden justify-center relative">
+            <div className="flex-1 flex flex-col bg-white relative">
+                {sidebarCollapsed && (
+                    <div 
+                        className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200" 
+                        style={{ 
+                            left: '4rem',
+                            right: 0 
+                        }}
+                    >
+                        <div className="px-4">
+                            <Logo inverted collapsed={false} />
+                        </div>
+                    </div>
+                )}
+                <main className={`flex-grow flex px-2 pr-9 flex-col ${sidebarCollapsed ? 'mt-14' : 'mt-0'} lg:flex-row overflow-hidden justify-center relative`}>
+                    {showTypingText && (
+                        <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                            <TypingText
+                                text="From Data to App, in seconds."
+                                className="text-black font-semibold text-4xl whitespace-nowrap"
+                                show={showTypingText}
+                            />
+                        </div>
+                    )}
                     <ResizablePanelGroup direction="horizontal">
                         <ResizablePanel defaultSize={65} minSize={45}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
@@ -101,6 +122,6 @@ export default function Home() {
                     </ResizablePanelGroup>
                 </main>
             </div>
-        </>
+        </div>
     )
 }
