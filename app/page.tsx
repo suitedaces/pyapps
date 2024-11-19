@@ -76,55 +76,57 @@ export default function Home() {
 
     return (
         <div className="flex h-screen">
-            <Sidebar
-                onChatSelect={handleChatSelect}
-                onNewChat={handleNewChat}
-                currentChatId={currentChatId}
-                chats={sidebarChats || []}
-                isCreatingChat={isCreatingChat}
-                collapsed={sidebarCollapsed}
-                onCollapsedChange={setSidebarCollapsed}
-            />
-            <div className="flex-1 flex flex-col bg-white relative">
-                {sidebarCollapsed && (
-                    <div 
-                        className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200" 
-                        style={{ 
-                            left: '4rem',
-                            right: 0 
-                        }}
-                    >
-                        <div className="px-4">
-                            <Logo inverted collapsed={false} />
-                        </div>
-                    </div>
-                )}
-                <main className={cn(
-                    "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
-                    "h-screen pt-14"
-                )}>
-                    {showTypingText && (
-                        <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                            <TypingText
-                                text="From Data to App, in seconds."
-                                className="text-black font-semibold text-4xl whitespace-nowrap"
-                                show={showTypingText}
-                            />
+            <div className="flex w-screen h-screen overflow-hidden">
+                <Sidebar
+                    onChatSelect={handleChatSelect}
+                    onNewChat={handleNewChat}
+                    currentChatId={currentChatId}
+                    chats={sidebarChats || []}
+                    isCreatingChat={isCreatingChat}
+                    collapsed={sidebarCollapsed}
+                    onCollapsedChange={setSidebarCollapsed}
+                />
+                <div className="flex-1 flex flex-col bg-white relative">
+                    {sidebarCollapsed && (
+                        <div
+                            className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
+                            style={{
+                                left: '4rem',
+                                right: 0
+                            }}
+                        >
+                            <div className="px-4">
+                                <Logo inverted collapsed={false} />
+                            </div>
                         </div>
                     )}
-                    <ResizablePanelGroup direction="horizontal">
-                        <ResizablePanel defaultSize={65} minSize={45}>
-                            <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                <Chat
-                                    chatId={currentChatId}
-                                    initialMessages={[]}
-                                    onChatCreated={handleChatCreated}
-                                    onChatSubmit={handleChatSubmit}
+                    <main className={cn(
+                        "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
+                        "h-screen pt-14"
+                    )}>
+                        {showTypingText && (
+                            <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+                                <TypingText
+                                    text="From Data to App, in seconds."
+                                    className="text-black font-semibold text-4xl whitespace-nowrap"
+                                    show={showTypingText}
                                 />
                             </div>
-                        </ResizablePanel>
-                    </ResizablePanelGroup>
-                </main>
+                        )}
+                        <ResizablePanelGroup direction="horizontal">
+                            <ResizablePanel defaultSize={65} minSize={45}>
+                                <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
+                                    <Chat
+                                        chatId={currentChatId}
+                                        initialMessages={[]}
+                                        onChatCreated={handleChatCreated}
+                                        onChatSubmit={handleChatSubmit}
+                                    />
+                                </div>
+                            </ResizablePanel>
+                        </ResizablePanelGroup>
+                    </main>
+                </div>
             </div>
         </div>
     )
