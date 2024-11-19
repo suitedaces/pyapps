@@ -60,8 +60,8 @@ interface NavItemProps {
     onToggle?: () => void;
 }
 
-export function Sidebar({ 
-    defaultCollapsed = false, 
+export function Sidebar({
+    defaultCollapsed = false,
     className,
     onChatSelect,
     onNewChat,
@@ -137,8 +137,8 @@ export function Sidebar({
                                         className={cn(
                                             "w-full mb-1 relative group",
                                             collapsed ? "justify-center px-2" : "justify-start",
-                                            chat.id === currentChatId 
-                                                ? "bg-white/20 text-white hover:bg-white/20" 
+                                            chat.id === currentChatId
+                                                ? "bg-white/20 text-white hover:bg-white/20"
                                                 : "text-white hover:bg-white/10 hover:text-white"
                                         )}
                                         onClick={() => onChatSelect?.(chat.id)}
@@ -170,7 +170,7 @@ export function Sidebar({
     // Update NavItem component
     const NavItem = ({ item, collapsed, onToggle }: NavItemProps) => {
         const isActive = item.pattern.test(pathname)
-        
+
         return (
             <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
@@ -233,18 +233,18 @@ export function Sidebar({
                     <ScrollArea className="flex-1 p-4">
                         <div className="flex flex-col gap-2">
                             {mainNavItems.map((item) => (
-                                <NavItem 
-                                    key={item.href} 
-                                    item={item} 
+                                <NavItem
+                                    key={item.href}
+                                    item={item}
                                     collapsed={false}
                                 />
                             ))}
                             {pathname.startsWith('/chat') && (
-                                <ChatList 
-                                    collapsed={false} 
-                                    chats={chats} 
-                                    currentChatId={currentChatId} 
-                                    onChatSelect={onChatSelect} 
+                                <ChatList
+                                    collapsed={false}
+                                    chats={chats}
+                                    currentChatId={currentChatId}
+                                    onChatSelect={onChatSelect}
                                 />
                             )}
                         </div>
@@ -253,10 +253,10 @@ export function Sidebar({
                         <Separator className="mb-4" />
                         <div className="flex flex-col gap-2">
                             {subNavItems.map((item) => (
-                                <NavItem 
-                                    key={item.href} 
-                                    item={{...item, collapsible: true}} 
-                                    collapsed={false} 
+                                <NavItem
+                                    key={item.href}
+                                    item={{...item, collapsible: true}}
+                                    collapsed={false}
                                 />
                             ))}
                             <Button
@@ -331,10 +331,9 @@ export function Sidebar({
                                     'text-white hover:bg-white/10 hover:text-white',
                                     collapsed && 'justify-center'
                                 )}
-                                onClick={onNewChat}
                                 asChild
                             >
-                                <Link href="/chat">
+                                <Link href="/">
                                     <Plus className={cn(
                                         'h-4 w-4',
                                         collapsed ? 'mx-auto' : 'mr-2'
@@ -344,14 +343,14 @@ export function Sidebar({
                             </Button>
 
                             {mainNavItems.map((item) => (
-                                <NavItem 
-                                    key={item.href} 
-                                    item={item} 
+                                <NavItem
+                                    key={item.href}
+                                    item={item}
                                     collapsed={collapsed}
                                     onToggle={item.collapsible ? () => setIsChatsCollapsed(!isChatsCollapsed) : undefined}
                                 />
                             ))}
-                            
+
                             {pathname.startsWith('/chat') && !isChatsCollapsed && !collapsed && (
                                 <ChatList
                                     collapsed={collapsed}
@@ -362,11 +361,11 @@ export function Sidebar({
                             )}
 
                             <Separator className="my-4 bg-gray-700" />
-                            
+
                             {subNavItems.map((item) => (
-                                <NavItem 
-                                    key={item.href} 
-                                    item={{...item, collapsible: true}} 
+                                <NavItem
+                                    key={item.href}
+                                    item={{...item, collapsible: true}}
                                     collapsed={collapsed}
                                 />
                             ))}
@@ -453,4 +452,4 @@ export function Sidebar({
             <DesktopSidebar />
         </TooltipProvider>
     )
-} 
+}

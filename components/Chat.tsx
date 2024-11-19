@@ -39,7 +39,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         error: null
     })
 
-    const [currentChatId, setCurrentChatId] = useState<string | null>(chatId)
     const newChatIdRef = useRef<string | null>(null)
 
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -78,7 +77,6 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 if (newChatId) {
                     console.log('Setting new chat ID:', newChatId)
                     newChatIdRef.current = newChatId
-                    setCurrentChatId(newChatId)
                 }
             }
         },
