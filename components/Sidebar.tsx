@@ -14,8 +14,8 @@ import {
     LogOut,
     Menu,
     Plus,
-    ChevronDown,
-    ChevronUp
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -203,7 +203,7 @@ export function Sidebar({
                                         {!collapsed && (
                                             <div className="flex items-center justify-between w-full">
                                                 <span className="text-white">{item.title}</span>
-                                                <ChevronDown className={cn(
+                                                <ChevronLeft className={cn(
                                                     'h-4 w-4 transition-transform text-white',
                                                     !isChatsCollapsed && 'rotate-90'
                                                 )} />
@@ -315,10 +315,7 @@ export function Sidebar({
                                 className={cn('h-6 w-6')}
                                 onClick={() => onCollapsedChange?.(!collapsed)}
                             >
-                                <ChevronDown className={cn(
-                                    'h-4 w-4 transition-transform text-white',
-                                    collapsed && 'rotate-180'
-                                )} />
+                                <ChevronRight className="h-4 w-4 text-white" />
                             </Button>
                         ) : (
                             <div className="flex items-center justify-between w-full">
@@ -329,7 +326,7 @@ export function Sidebar({
                                     className={cn('h-6 w-6 ml-2')}
                                     onClick={() => onCollapsedChange?.(!collapsed)}
                                 >
-                                    <ChevronDown className="h-4 w-4 text-white" />
+                                    <ChevronLeft className="h-4 w-4 text-white" />
                                 </Button>
                             </div>
                         )}
