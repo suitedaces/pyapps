@@ -2,14 +2,13 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Get all versions for an app
 export async function GET(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
+    const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -18,30 +17,30 @@ export async function GET(
         )
     }
 
-    const { data, error } = await supabase
-        .from('app_versions')
-        .select('*')
-        .eq('app_id', params.id)
-        .order('version_number', { ascending: false })
+    try {
+        // Use the RPC function to get versions
+        const { data, error } = await supabase
+            .rpc('get_app_versions', {
+                p_app_id: params.id
+            })
 
-    if (error) {
+        if (error) throw error
+        return NextResponse.json(data)
+    } catch (error) {
         return NextResponse.json(
-            { error: 'Failed to fetch app versions' },
+            { error: 'Failed to fetch versions' },
             { status: 500 }
         )
     }
-
-    return NextResponse.json(data)
 }
 
+// Create a new version
 export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
+    const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -50,44 +49,56 @@ export async function POST(
         )
     }
 
-    const { code } = await req.json()
+    try {
+        const { code } = await req.json()
 
-    // Get the latest version number
-    const { data: latestVersion, error: versionError } = await supabase
-        .from('app_versions')
-        .select('version_number')
-        .eq('app_id', params.id)
-        .order('version_number', { ascending: false })
-        .limit(1)
-        .single()
+        const { data, error } = await supabase
+            .rpc('create_app_version', {
+                p_app_id: params.id,
+                p_code: code
+            })
 
-    if (versionError && versionError.code !== 'PGRST116') {
+        if (error) throw error
+        return NextResponse.json(data)
+    } catch (error) {
         return NextResponse.json(
-            { error: 'Failed to get latest version' },
+            { error: 'Failed to create version' },
             { status: 500 }
         )
     }
+}
 
-    const newVersionNumber = latestVersion
-        ? latestVersion.version_number + 1
-        : 1
+// Switch to a specific version
+export async function PATCH(
+    req: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session } } = await supabase.auth.getSession()
 
-    const { data, error } = await supabase
-        .from('app_versions')
-        .insert({
-            app_id: params.id,
-            version_number: newVersionNumber,
-            code,
-        })
-        .select()
-        .single()
-
-    if (error) {
+    if (!session) {
         return NextResponse.json(
-            { error: 'Failed to create app version' },
-            { status: 500 }
+            { error: 'Not authenticated' },
+            { status: 401 }
         )
     }
 
-    return NextResponse.json(data)
+    try {
+        const { versionId } = await req.json()
+
+        // Use the RPC function to switch version
+        const { data, error } = await supabase
+            .rpc('switch_app_version', {
+                p_app_id: params.id,
+                p_version_id: versionId
+            })
+
+        if (error) throw error
+        return NextResponse.json(data)
+    } catch (error) {
+        return NextResponse.json(
+            { error: 'Failed to switch version' },
+            { status: 500 }
+        )
+    }
 }

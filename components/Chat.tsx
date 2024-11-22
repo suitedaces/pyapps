@@ -148,9 +148,16 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             if (file) {
                 const fileData = await uploadFile(file);
                 const fileContent = await file.text();
-                const rows = fileContent.split('\n');
-                const columnNames = rows[0];
-                const previewRows = rows.slice(1, 6).join('\n');
+
+                // Sanitize content
+                const sanitizedContent = fileContent
+                    .split('\n')
+                    .map((row) => row.replace(/[\r\n]+/g, ''))
+                    .join('\n')
+
+                const rows = sanitizedContent.split('\n')
+                const columnNames = rows[0]
+                const previewRows = rows.slice(1, 6).join('\n')
                 const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`;
 
                 // const message = content.trim() ||
@@ -164,16 +171,29 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                     content: message,
                     role: 'user',
                     createdAt: new Date(),
-                });
-            } else {
-                await append({
-                    content,
-                    role: 'user',
-                    createdAt: new Date(),
-                });
+                }, {
+                    body: {
+                        fileId: fileData.id,
+                        fileName: file.name,
+                        fileContent: sanitizedContent
+                    }
+                })
+
+                // Reset file state
+                setAttachedFile(null)
+                resetFileUploadState()
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = ''
+                }
             }
         } catch (error) {
-            console.error('Submit error:', error);
+            console.error('File upload/processing error:', error)
+            setFileUploadState(prev => ({
+                ...prev,
+                error: 'Failed to process file. Please try again.'
+            }))
+        } finally {
+            setFileUploadState(prev => ({ ...prev, isUploading: false }))
         }
     };
 

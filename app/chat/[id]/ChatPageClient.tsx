@@ -1,5 +1,8 @@
 'use client'
 
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Session } from '@supabase/supabase-js'
+
 import { Chat } from '@/components/Chat'
 import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
@@ -28,6 +31,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/core/Logo'
 import { useSidebar } from '@/contexts/SidebarContext'
+import { VersionSelector } from '@/components/VersionSelector'
+import { AppVersion } from '@/lib/types'
+import { createVersion } from '@/lib/supabase'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -56,6 +62,8 @@ const CustomHandle = ({ ...props }) => (
 export default function ChatPageClient({
     initialChat,
 }: ChatPageClientProps) {
+    const supabase = createClientComponentClient()
+
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [isAtBottom, setIsAtBottom] = useState(true)
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat.id)
@@ -77,6 +85,8 @@ export default function ChatPageClient({
     )
 
     const { session, isLoading } = useAuth()
+
+    const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
     const {
         messages,
@@ -109,8 +119,61 @@ export default function ChatPageClient({
                 if (streamlitCall?.state === 'result') {
                     const code = streamlitCall.result
                     if (code) {
+                        setIsCreatingVersion(true)
                         setGeneratedCode(code)
                         await updateStreamlitApp(code)
+
+                        if (session?.user?.id) {
+                            try {
+                                // Check if chat already has an app
+                                const { data: chat } = await supabase
+                                    .from('chats')
+                                    .select('app_id')
+                                    .eq('id', currentChatId)
+                                    .single()
+
+                                let appId = chat?.app_id
+
+                                if (!appId) {
+                                    // Create new app if none exists with null check for session
+                                    const { data: app, error: appError } = await supabase
+                                        .from('apps')
+                                        .insert({
+                                            user_id: session.user.id, // Now TypeScript knows session.user exists
+                                            name: messages[0].content.slice(0, 50) + '...',
+                                            description: 'Streamlit app created from chat',
+                                            is_public: false,
+                                            created_at: new Date().toISOString(),
+                                            updated_at: new Date().toISOString(),
+                                            created_by: session.user.id // Now TypeScript knows session.user exists
+                                        })
+                                        .select()
+                                        .single()
+
+                                    if (appError) throw appError
+                                    appId = app.id
+
+                                    // Link chat to app
+                                    await supabase
+                                        .from('chats')
+                                        .update({ app_id: appId })
+                                        .eq('id', currentChatId)
+                                }
+
+                                // Create new version
+                                const versionData = await createVersion(appId, code)
+                                console.log('Version created:', versionData)
+
+                                setCurrentApp({ id: appId })
+
+                            } catch (error) {
+                                console.error('Failed to handle version creation:', error)
+                            } finally {
+                                setIsCreatingVersion(false)
+                            }
+                        }
+                    } else {
+                        console.error('No session or user ID available')
                     }
                 }
             }
@@ -374,6 +437,34 @@ export default function ChatPageClient({
         fetchToolResults();
     }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
 
+    const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
+
+    const handleVersionChange = async (version: AppVersion) => {
+        if (version.code) {
+            setGeneratedCode(version.code)
+            await updateStreamlitApp(version.code)
+        }
+    }
+
+    // This useEffect fetches versions whenever app_id changes
+    const fetchAppId = useCallback(async () => {
+        if (!currentChatId) return
+
+        const { data: chat } = await supabase
+            .from('chats')
+            .select('app_id')
+            .eq('id', currentChatId)
+            .single()
+
+        if (chat?.app_id) {
+            setCurrentApp({ id: chat.app_id })
+        }
+    }, [currentChatId, supabase])
+
+    useEffect(() => {
+        fetchAppId()
+    }, [fetchAppId])
+
     if (isLoading) {
         return <div>Loading...</div>
     }
@@ -468,38 +559,44 @@ export default function ChatPageClient({
                                         />
                                     </TabsContent>
 
-                                    <TabsContent
-                                        value="code"
-                                        className="flex-grow overflow-hidden mt-4"
-                                    >
+                                    <TabsContent value="code" className="flex-grow overflow-hidden mt-4">
                                         <CodeView
                                             code={generatedCode}
-                                            isGeneratingCode={isGeneratingCode}
+                                            isGeneratingCode={isGeneratingCode || isCreatingVersion}
                                         />
                                     </TabsContent>
                                 </Tabs>
                             </ResizablePanel>
                         )}
 
-                        <Button
-                            onClick={toggleRightContent}
-                            className={cn(
-                                "absolute top-2 right-4 z-10",
-                                "bg-black hover:bg-black/90",
-                                "text-white",
-                                "border border-transparent",
-                                "transition-all duration-200 ease-in-out",
-                                "shadow-lg hover:shadow-xl",
-                                "rounded-lg"
+                        <div className="absolute top-2 right-4 z-10 flex justify-between items-center gap-4">
+                            {currentApp && (
+                                <VersionSelector
+                                    appId={currentApp.id}
+                                    onVersionChange={handleVersionChange}
+                                />
                             )}
-                            size="icon"
-                        >
-                            {isRightContentVisible ? (
-                                <ChevronRight className="h-4 w-4" />
-                            ) : (
-                                <ChevronLeft className="h-4 w-4" />
-                            )}
-                        </Button>
+
+                            <Button
+                                onClick={toggleRightContent}
+                                className={cn(
+                                    "bg-black hover:bg-black/90",
+                                    "text-white",
+                                    "border border-transparent",
+                                    "transition-all duration-200 ease-in-out",
+                                    "shadow-lg hover:shadow-xl",
+                                    "rounded-lg"
+                                )}
+                                size="icon"
+                            >
+                                {isRightContentVisible ? (
+                                    <ChevronRight className="h-4 w-4" />
+                                ) : (
+                                    <ChevronLeft className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
+
                     </ResizablePanelGroup>
                 </main>
             </div>

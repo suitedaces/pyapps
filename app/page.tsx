@@ -28,6 +28,10 @@ import { useChat } from 'ai/react'
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
 import modelsList from '@/lib/models.json'
+import { VersionSelector } from '@/components/VersionSelector'
+import { AppVersion } from '@/lib/types'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createVersion } from '@/lib/supabase'
 
 // Add CustomHandle component
 const CustomHandle = ({ ...props }) => (
@@ -39,7 +43,7 @@ const CustomHandle = ({ ...props }) => (
 )
 
 export default function Home() {
-    const router = useRouter()
+    const supabase = createClientComponentClient()
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
@@ -57,6 +61,10 @@ export default function Home() {
 
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
+
+    // Add state for app and version
+    const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
+    const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
     // Fetch chats for sidebar
     const { data: sidebarChats, isLoading: isLoadingChats } = useQuery({
@@ -164,6 +172,11 @@ export default function Home() {
             }
         },
         onFinish: async (message) => {
+            console.log('🎯 onFinish triggered:', {
+                hasToolInvocations: !!message.toolInvocations?.length,
+                messageContent: message.content.slice(0, 100)
+            })
+
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .filter(invocation =>
@@ -172,11 +185,98 @@ export default function Home() {
                     )
                     .pop()
 
+                console.log('🔍 Streamlit call:', {
+                    found: !!streamlitCall,
+                    state: streamlitCall?.state,
+                    hasResult: !!streamlitCall
+                })
+
                 if (streamlitCall?.state === 'result') {
                     const code = streamlitCall.result
-                    if (code) {
-                        setGeneratedCode(code)
-                        await updateStreamlitApp(code)
+                    console.log('💻 Generated code:', {
+                        hasCode: !!code,
+                        codeLength: code?.length,
+                        hasSession: !!session,
+                        userId: session?.user?.id
+                    })
+
+                    if (code && session?.user?.id) {
+                        try {
+                            setIsCreatingVersion(true)
+                            setGeneratedCode(code)
+                            console.log('🔄 Updating Streamlit app...')
+                            await updateStreamlitApp(code)
+
+                            // Check if chat already has an app
+                            console.log('🔍 Checking for existing app...')
+                            const { data: chat } = await supabase
+                                .from('chats')
+                                .select('app_id')
+                                .eq('id', currentChatId)
+                                .single()
+
+                            console.log('📱 Chat data:', {
+                                chatId: currentChatId,
+                                existingAppId: chat?.app_id
+                            })
+
+                            let appId = chat?.app_id
+
+                            if (!appId) {
+                                console.log('🆕 Creating new app...')
+                                // Create new app if none exists
+                                const { data: app, error: appError } = await supabase
+                                    .from('apps')
+                                    .insert({
+                                        user_id: session.user.id,
+                                        name: messages[0].content.slice(0, 50) + '...',
+                                        description: 'Streamlit app created from chat',
+                                        is_public: false,
+                                        created_at: new Date().toISOString(),
+                                        updated_at: new Date().toISOString(),
+                                        created_by: session.user.id
+                                    })
+                                    .select()
+                                    .single()
+
+                                if (appError) {
+                                    console.error('❌ App creation failed:', appError)
+                                    throw appError
+                                }
+                                appId = app.id
+                                console.log('✅ App created:', { appId })
+
+                                // Link chat to app
+                                const { error: chatError } = await supabase
+                                    .from('chats')
+                                    .update({ app_id: appId })
+                                    .eq('id', currentChatId)
+
+                                if (chatError) {
+                                    console.error('❌ Chat update failed:', chatError)
+                                    throw chatError
+                                }
+                                console.log('🔗 Chat linked to app')
+                            }
+
+                            // Create new version
+                            console.log('📝 Creating new version...')
+                            const versionData = await createVersion(appId, code)
+                            console.log('✅ Version created:', versionData)
+
+                            setCurrentApp({ id: appId })
+                            console.log('🔄 Current app updated:', { appId })
+
+                        } catch (error) {
+                            console.error('❌ Failed to handle version creation:', error)
+                        } finally {
+                            setIsCreatingVersion(false)
+                        }
+                    } else {
+                        console.error('❌ Missing code or session:', {
+                            hasCode: !!code,
+                            hasSession: !!session
+                        })
                     }
                 }
             }
@@ -346,6 +446,39 @@ export default function Home() {
         fetchToolResults();
     }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
 
+    // Add version change handler
+    const handleVersionChange = async (version: AppVersion) => {
+        if (version.code) {
+            setGeneratedCode(version.code)
+            await updateStreamlitApp(version.code)
+        }
+    }
+
+    // Add useEffect to fetch app ID when chat loads
+    useEffect(() => {
+        async function fetchAppId() {
+            if (!currentChatId) return
+
+            const { data: chat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', currentChatId)
+                .single()
+
+            if (chat?.app_id) {
+                setCurrentApp({ id: chat.app_id })
+            }
+        }
+        fetchAppId()
+    }, [currentChatId])
+
+    useEffect(() => {
+        console.log('👁️ Current app state changed:', {
+            hasApp: !!currentApp,
+            appId: currentApp?.id
+        })
+    }, [currentApp])
+
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>
     }
@@ -448,9 +581,17 @@ export default function Home() {
                                             value="code"
                                             className="flex-grow overflow-hidden mt-4"
                                         >
+                                            <div className="flex justify-between items-center mb-4">
+                                                {currentApp && (
+                                                    <VersionSelector
+                                                        appId={currentApp.id}
+                                                        onVersionChange={handleVersionChange}
+                                                    />
+                                                )}
+                                            </div>
                                             <CodeView
                                                 code={generatedCode}
-                                                isGeneratingCode={isGeneratingCode}
+                                                isGeneratingCode={isGeneratingCode || isCreatingVersion}
                                             />
                                         </TabsContent>
                                     </Tabs>
