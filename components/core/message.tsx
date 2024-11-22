@@ -23,7 +23,6 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
             key={id}
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
-            // exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
             className={cn("flex w-full", isUser ? "justify-end" : "justify-start", "mb-4")}
         >
@@ -40,12 +39,14 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
 
             {isUser && (
                 <div className="flex flex-row items-start gap-2 max-w-[85%]">
-                    <div className="grow shrink mx-2 p-4 rounded-lg bg-background border border-border text-foreground">
-                        <div className="whitespace-pre-wrap break-words">
+                    <div className="grow shrink mx-2 p-4 rounded-lg bg-background border border-border text-foreground overflow-auto">
+                        <div className="whitespace-pre-wrap break-words max-w-full">
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                    p: ({ children }) => <div className="mb-4 last:mb-0">{children}</div>,
+                                    p: ({ children }) => <div className="mb-4 last:mb-0 overflow-hidden text-ellipsis">{children}</div>,
+                                    pre: ({ children }) => <div className="overflow-x-auto">{children}</div>,
+                                    code: ({ children }) => <code className="break-all">{children}</code>
                                 }}
                             >
                                 {content}
