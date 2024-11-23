@@ -59,11 +59,52 @@ const CustomHandle = ({ ...props }) => (
     </ResizableHandle>
 )
 
+async function getOrCreateApp(chatId: string | null, userId: string) {
+    if (!chatId) throw new Error('No chat ID provided')
+
+    const supabase = createClientComponentClient()
+
+    // Check if chat already has an app
+    const { data: chat } = await supabase
+        .from('chats')
+        .select('app_id')
+        .eq('id', chatId)
+        .single()
+
+    if (chat?.app_id) return chat.app_id
+
+    // Create new app if none exists
+    const { data: app, error: appError } = await supabase
+        .from('apps')
+        .insert({
+            user_id: userId,
+            name: 'New App',
+            description: 'App created from chat',
+            is_public: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            created_by: userId
+        })
+        .select()
+        .single()
+
+    if (appError) throw appError
+
+    // Link chat to app
+    await supabase
+        .from('chats')
+        .update({ app_id: app.id })
+        .eq('id', chatId)
+
+    return app.id
+}
+
 export default function ChatPageClient({
     initialChat,
 }: ChatPageClientProps) {
     const supabase = createClientComponentClient()
 
+    // UI state management
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [isAtBottom, setIsAtBottom] = useState(true)
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat.id)
@@ -72,10 +113,18 @@ export default function ChatPageClient({
     const [loading, setLoading] = useState(false)
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
 
+    // Code and preview state
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
 
+    // Version switching stuff
+    const isVersionSwitching = useRef(false)
+    const versionSelectorRef = useRef<{
+        refreshVersions: () => void
+    } | null>(null);
+
+    // Model config
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
         model: 'claude-3-5-sonnet-20240620',
     })
@@ -84,10 +133,11 @@ export default function ChatPageClient({
         (model) => model.id === languageModel.model
     )
 
+    // Auth and version state
     const { session, isLoading } = useAuth()
-
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
+    // Chat handling with AI SDK
     const {
         messages,
         isLoading: chatLoading,
@@ -108,6 +158,7 @@ export default function ChatPageClient({
             }
         },
         onFinish: async (message) => {
+            // Handle tool invocations (like Streamlit code generation)
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .filter(invocation =>
@@ -119,52 +170,25 @@ export default function ChatPageClient({
                 if (streamlitCall?.state === 'result') {
                     const code = streamlitCall.result
                     if (code) {
+                        // Start version creation process
                         setIsCreatingVersion(true)
                         setGeneratedCode(code)
                         await updateStreamlitApp(code)
 
                         if (session?.user?.id) {
                             try {
-                                // Check if chat already has an app
-                                const { data: chat } = await supabase
-                                    .from('chats')
-                                    .select('app_id')
-                                    .eq('id', currentChatId)
-                                    .single()
+                                // Get or create app for this chat
+                                let appId = await getOrCreateApp(currentChatId, session.user.id)
 
-                                let appId = chat?.app_id
-
-                                if (!appId) {
-                                    // Create new app if none exists with null check for session
-                                    const { data: app, error: appError } = await supabase
-                                        .from('apps')
-                                        .insert({
-                                            user_id: session.user.id, // Now TypeScript knows session.user exists
-                                            name: messages[0].content.slice(0, 50) + '...',
-                                            description: 'Streamlit app created from chat',
-                                            is_public: false,
-                                            created_at: new Date().toISOString(),
-                                            updated_at: new Date().toISOString(),
-                                            created_by: session.user.id // Now TypeScript knows session.user exists
-                                        })
-                                        .select()
-                                        .single()
-
-                                    if (appError) throw appError
-                                    appId = app.id
-
-                                    // Link chat to app
-                                    await supabase
-                                        .from('chats')
-                                        .update({ app_id: appId })
-                                        .eq('id', currentChatId)
-                                }
-
-                                // Create new version
+                                // Create new version with the generated code
                                 const versionData = await createVersion(appId, code)
-                                console.log('Version created:', versionData)
-
                                 setCurrentApp({ id: appId })
+
+                                // Tell version selector to refresh its list
+                                if (versionSelectorRef.current) {
+                                    console.log('🔄 Refreshing version list after new version creation')
+                                    await versionSelectorRef.current.refreshVersions()
+                                }
 
                             } catch (error) {
                                 console.error('Failed to handle version creation:', error)
@@ -172,12 +196,11 @@ export default function ChatPageClient({
                                 setIsCreatingVersion(false)
                             }
                         }
-                    } else {
-                        console.error('No session or user ID available')
                     }
                 }
             }
 
+            // Add assistant's message to the chat
             if (message.content.trim()) {
                 const assistantMessage = {
                     id: Date.now().toString(),
@@ -233,13 +256,7 @@ export default function ChatPageClient({
 
     //  streamlit update function
     const updateStreamlitApp = useCallback(async (code: string) => {
-        if (!code) {
-            console.error('No code provided to updateStreamlitApp');
-            return;
-        }
-
-        if (!sandboxId) {
-            console.error('No sandboxId available');
+        if (!code || !sandboxId) {
             return;
         }
 
@@ -257,20 +274,11 @@ export default function ChatPageClient({
             }
 
             const data = await response.json()
-            console.log('Sandbox API response:', data);
-
             if (data.url) {
                 setStreamlitUrl(data.url)
-                setIsGeneratingCode(false)
-            } else {
-                throw new Error('No URL returned from sandbox API')
             }
         } catch (error) {
-            console.error('Error in updateStreamlitApp:', error);
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error updating Streamlit app'
-            }])
-            setIsGeneratingCode(false)
+            console.error('Error in updateStreamlitApp:', error)
         }
     }, [sandboxId])
 
@@ -398,51 +406,50 @@ export default function ChatPageClient({
         }
     }, [])
 
-    // fetch tool results when chatId changes
-    useEffect(() => {
-        async function fetchToolResults() {
-            if (!currentChatId) return;
-
-            try {
-                const response = await fetch(`/api/conversations/${currentChatId}/messages`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch messages');
-                }
-
-                const data = await response.json();
-
-                const streamlitCode = data.messages
-                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
-                    .map((msg: any) => {
-                        const toolResult = msg.tool_results[0];
-                        if (toolResult && toolResult.name === 'create_streamlit_app') {
-                            return toolResult.result;
-                        }
-                        return null;
-                    })
-                    .filter(Boolean)
-                    .pop();
-
-                if (streamlitCode) {
-                    setGeneratedCode(streamlitCode);
-                    if (!isGeneratingCode) {
-                        await updateStreamlitApp(streamlitCode);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching tool results:', error);
-            }
-        }
-
-        fetchToolResults();
-    }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
-
     const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
 
     const handleVersionChange = async (version: AppVersion) => {
-        if (version.code) {
+        if (!version.code) {
+            console.error('No code found in version:', version)
+            return
+        }
+
+        isVersionSwitching.current = true;
+        setIsGeneratingCode(true)
+
+        try {
+            console.log('🔄 Version switch initiated:', {
+                versionId: version.id,
+                appId: currentApp?.id,
+                versionNumber: version.version_number
+            })
+
+            // Update code view
             setGeneratedCode(version.code)
+
+            // Reinitialize sandbox for the new version
+            const initResponse = await fetch('/api/sandbox/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            })
+
+            if (!initResponse.ok) {
+                throw new Error('Failed to initialize sandbox')
+            }
+
+            const { sandboxId } = await initResponse.json()
+            console.log('🆕 New sandbox created:', { sandboxId })
+            setSandboxId(sandboxId)
+
+            // Update Streamlit preview with new sandbox
             await updateStreamlitApp(version.code)
+        } catch (error) {
+            console.error('❌ Failed to update app with version:', error)
+        } finally {
+            setTimeout(() => {
+                setIsGeneratingCode(false)
+                isVersionSwitching.current = false;
+            }, 500)
         }
     }
 
@@ -569,11 +576,12 @@ export default function ChatPageClient({
                             </ResizablePanel>
                         )}
 
-                        <div className="absolute top-2 right-4 z-10 flex justify-between items-center gap-4">
+                        <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
                             {currentApp && (
                                 <VersionSelector
                                     appId={currentApp.id}
                                     onVersionChange={handleVersionChange}
+                                    ref={versionSelectorRef}
                                 />
                             )}
 

@@ -7,9 +7,11 @@ export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
+    // Get user session - need this for auth
     const supabase = createRouteHandlerClient({ cookies })
     const { data: { session } } = await supabase.auth.getSession()
 
+    // Kick them out if not logged in
     if (!session) {
         return NextResponse.json(
             { error: 'Not authenticated' },
@@ -18,56 +20,35 @@ export async function POST(
     }
 
     try {
-        // First verify app ownership
-        const { data: app, error: appError } = await supabase
-            .from('apps')
-            .select('current_version_id')
-            .eq('id', params.id)
-            .eq('user_id', session.user.id)
-            .single()
-
-        if (appError || !app) {
+        // Get the code from request body - we need this to run in sandbox
+        const { code } = await req.json()
+        if (!code) {
             return NextResponse.json(
-                { error: 'App not found or access denied' },
-                { status: 404 }
-            )
-        }
-
-        // Get current version's code
-        if (!app.current_version_id) {
-            return NextResponse.json(
-                { error: 'No version available' },
+                { error: 'No code provided' },
                 { status: 400 }
             )
         }
 
-        const { data: version, error: versionError } = await supabase
-            .from('app_versions')
-            .select('code')
-            .eq('id', app.current_version_id)
-            .single()
-
-        if (versionError || !version) {
-            return NextResponse.json(
-                { error: 'Version not found' },
-                { status: 404 }
-            )
-        }
-
-        // Execute in sandbox
+        // Reconnect to existing sandbox using ID from URL
         const sandbox = await Sandbox.reconnect(params.id)
-        await sandbox.filesystem.write('/app/app.py', version.code)
 
+        // Write the Python code to a file in sandbox
+        await sandbox.filesystem.write('/app/app.py', code)
+
+        // Fire up streamlit with the code
+        // Added logs so we can debug if something breaks
         const process = await sandbox.process.start({
             cmd: 'streamlit run /app/app.py',
             onStdout: (data) => console.log('Streamlit stdout:', data),
             onStderr: (data) => console.error('Streamlit stderr:', data),
         })
 
+        // Get the URL where the app is running and send it back
         const url = sandbox.getHostname(8501)
         return NextResponse.json({ url: `https://${url}` })
 
     } catch (error) {
+        // Something went wrong - log it and let the user know
         console.error('Sandbox execution error:', error)
         return NextResponse.json(
             { error: 'Failed to execute code in sandbox' },

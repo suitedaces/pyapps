@@ -11,6 +11,7 @@ import {
     ToolInvocation as GruntyToolInvocation
 } from './types'
 import { encode } from 'gpt-tokenizer'
+import { createVersion } from '@/lib/supabase'
 
 interface FileContext {
     fileName: string;
@@ -246,7 +247,7 @@ export class GruntyAgent {
                 .select()
 
             if (error) {
-                console.error('❌ Failed to store message:', error)
+                console.error(' Failed to store message:', error)
                 throw error
             }
 
@@ -304,10 +305,52 @@ export class GruntyAgent {
     ) {
         let toolCalls: any[] = [];
         let toolResults: any[] = [];
+        let appId: string | null = null;
 
-        for await (const step of fullStream) {
-            if (step.type === 'tool-call') {
-                if (step.toolName === 'create_streamlit_app') {
+        try {
+            // First check if chat already has an associated app
+            const supabase = createRouteHandlerClient({ cookies })
+            const { data: existingChat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', chatId)
+                .single()
+
+            appId = existingChat?.app_id
+
+            // Extract CSV filename from messages
+            let csvFileName = 'data.csv'; // default fallback
+            if (this.fileContext?.fileName) {
+                csvFileName = this.fileContext.fileName;
+            } else {
+                // Try to find CSV filename in user messages
+                const csvFileNameMatch = this.sanitizedMessages
+                    .filter(msg => msg.role === 'user')
+                    .map(msg => {
+                        // Handle different content types
+                        const content = typeof msg.content === 'string'
+                            ? msg.content
+                            : Array.isArray(msg.content)
+                                ? msg.content.map(part =>
+                                    typeof part === 'string' ? part : ''
+                                ).join(' ')
+                                : '';
+
+                        const match = content.match(/['"]([\w\s-]+\.csv)['"]/i);
+                        return match ? match[1] : null;
+                    })
+                    .find(name => name !== null);
+
+                if (csvFileNameMatch) {
+                    csvFileName = csvFileNameMatch;
+                }
+            }
+
+            // Use the CSV filename (without extension) as the base for the app name
+            const baseAppName = csvFileName.replace('.csv', '');
+
+            for await (const step of fullStream) {
+                if (step.type === 'tool-call' && step.toolName === 'create_streamlit_app') {
                     try {
                         const toolInput = step.args
                         const codeQuery = `${toolInput.query}\n${
@@ -315,88 +358,128 @@ export class GruntyAgent {
                         }`
                         const { generatedCode } = await generateCode(codeQuery, this.fileContext)
 
-                        toolCalls.push({
-                            id: step.toolCallId,
-                            name: step.toolName,
-                            args: step.args || {}
-                        });
-
-                        const toolCallStartData = `b:${JSON.stringify({
-                            toolCallId: step.toolCallId,
-                            toolName: step.toolName
-                        })}\n\n`
-
-                        const toolCallData = `9:${JSON.stringify({
-                            toolCallId: step.toolCallId,
-                            toolName: step.toolName,
-                            args: step.args || {}
-                        })}\n\n`
-
                         if (generatedCode) {
-                            toolResults.push({
-                                id: step.toolCallId,
-                                name: step.toolName,
-                                result: generatedCode
-                            });
+                            // Create app if it doesn't exist
+                            if (!appId) {
+                                const { data: newApp, error: appError } = await supabase
+                                    .from('apps')
+                                    .insert({
+                                        user_id: userId,
+                                        name: baseAppName, // Use CSV filename without extension
+                                        description: toolInput.query, // Use the query as description
+                                        is_public: false,
+                                        created_at: new Date().toISOString(),
+                                        updated_at: new Date().toISOString(),
+                                        created_by: userId
+                                    })
+                                    .select()
+                                    .single()
 
-                            const toolResultData = `a:${JSON.stringify({
-                                toolCallId: step.toolCallId,
-                                result: generatedCode
-                            })}\n\n`
+                                if (appError) throw appError
+                                appId = newApp.id
 
-                            writer.write(encoder.encode(toolCallStartData))
-                            writer.write(encoder.encode(toolCallData))
-                            writer.write(encoder.encode(toolResultData))
-                        } else {
-                            throw new Error('No code generated')
+                                // Link chat to app
+                                await supabase
+                                    .from('chats')
+                                    .update({ app_id: appId })
+                                    .eq('id', chatId)
+                            }
+
+                            if (!appId) {
+                                throw new Error('Failed to create or retrieve app ID')
+                            }
+
+                            try {
+                                const versionData = await createVersion(appId, generatedCode)
+                                console.log('Version created successfully:', versionData)
+
+                                // Process tool results and write to stream
+                                toolCalls.push({
+                                    id: step.toolCallId,
+                                    name: step.toolName,
+                                    args: step.args || {}
+                                });
+
+                                toolResults.push({
+                                    id: step.toolCallId,
+                                    name: step.toolName,
+                                    result: generatedCode
+                                });
+
+                                // Write tool call data to stream
+                                const toolCallStartData = `b:${JSON.stringify({
+                                    toolCallId: step.toolCallId,
+                                    toolName: step.toolName
+                                })}\n\n`
+
+                                const toolCallData = `9:${JSON.stringify({
+                                    toolCallId: step.toolCallId,
+                                    toolName: step.toolName,
+                                    args: step.args || {}
+                                })}\n\n`
+
+                                const toolResultData = `a:${JSON.stringify({
+                                    toolCallId: step.toolCallId,
+                                    result: generatedCode
+                                })}\n\n`
+
+                                writer.write(encoder.encode(toolCallStartData))
+                                writer.write(encoder.encode(toolCallData))
+                                writer.write(encoder.encode(toolResultData))
+
+                            } catch (versionError) {
+                                console.error('Failed to create version:', versionError)
+                                throw versionError
+                            }
                         }
                     } catch (error) {
-                        const errorResult = `Error generating code: ${error instanceof Error ? error.message : 'Unknown error'}`;
-
-                        toolResults.push({
-                            id: step.toolCallId,
-                            name: step.toolName,
-                            result: errorResult
-                        });
-
+                        console.error('Error in code generation or app creation:', error)
+                        const errorResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
                         const toolResultData = `a:${JSON.stringify({
                             toolCallId: step.toolCallId,
                             result: errorResult
                         })}\n\n`
                         writer.write(encoder.encode(toolResultData))
                     }
-                }
-            } else if (step.type === 'text-delta') {
-                if (step.content) {
-                    const textData = `0:${JSON.stringify(step.content)}\n\n`
-                    writer.write(encoder.encode(textData))
-                }
-            } else if (step.type === 'finish') {
-                if (collectedContent) {
-                    const latestUserMessage = this.sanitizedMessages
-                        .filter(msg => msg.role === 'user')
-                        .pop()
+                } else if (step.type === 'text-delta') {
+                    if (step.content) {
+                        const textData = `0:${JSON.stringify(step.content)}\n\n`
+                        writer.write(encoder.encode(textData))
+                    }
+                } else if (step.type === 'finish') {
+                    if (collectedContent) {
+                        const latestUserMessage = this.sanitizedMessages
+                            .filter(msg => msg.role === 'user')
+                            .pop()
 
-                    await this.storeMessage(chatId, userId, {
-                        user_message: typeof latestUserMessage?.content === 'string'
-                            ? latestUserMessage.content
-                            : '',
-                        assistant_message: collectedContent,
-                        tool_calls: toolCalls,
-                        tool_results: toolResults
-                    })
+                        await this.storeMessage(chatId, userId, {
+                            user_message: typeof latestUserMessage?.content === 'string'
+                                ? latestUserMessage.content
+                                : '',
+                            assistant_message: collectedContent,
+                            tool_calls: toolCalls,
+                            tool_results: toolResults
+                        })
 
-                    const finishData = `d:${JSON.stringify({
-                        finishReason: step.finishReason || 'stop',
-                        usage: {
-                            promptTokens: step.usage?.promptTokens || 0,
-                            completionTokens: step.usage?.completionTokens || 0,
-                            totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
-                        }
-                    })}\n\n`
-                    writer.write(encoder.encode(finishData))
+                        const finishData = `d:${JSON.stringify({
+                            finishReason: step.finishReason || 'stop',
+                            usage: {
+                                promptTokens: step.usage?.promptTokens || 0,
+                                completionTokens: step.usage?.completionTokens || 0,
+                                totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
+                            }
+                        })}\n\n`
+                        writer.write(encoder.encode(finishData))
+                    }
                 }
             }
+        } catch (error) {
+            console.error('Stream processing failed:', {
+                chatId,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                timestamp: new Date().toISOString()
+            });
+            throw error;
         }
     }
 }

@@ -1,79 +1,129 @@
 'use client'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useImperativeHandle, forwardRef } from 'react'
 import { AppVersion } from '@/lib/types'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { getVersionHistory, switchVersion } from '@/lib/supabase'
 
+// Props we need to make this work
 interface VersionSelectorProps {
     appId: string
     onVersionChange: (version: AppVersion) => void
 }
 
-export function VersionSelector({ appId, onVersionChange }: VersionSelectorProps) {
-    const [versions, setVersions] = useState<AppVersion[]>([])
-    const [currentVersionId, setCurrentVersionId] = useState<string>()
-    const supabase = createClientComponentClient()
+// This lets parent components refresh our versions list
+export interface VersionSelectorRef {
+    refreshVersions: () => void
+}
 
-    useEffect(() => {
-        async function loadVersions() {
+// Main component - using forwardRef so parent can call our refresh function
+export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorProps>(
+    function VersionSelector({ appId, onVersionChange }, ref) {
+        // Track all the versions and which one is current
+        const [versions, setVersions] = useState<AppVersion[]>([])
+        const [currentVersionId, setCurrentVersionId] = useState<string>()
+        const [isLoading, setIsLoading] = useState(false)
+
+        // Only update code view on first load
+        const [isInitialLoad, setIsInitialLoad] = useState(true)
+
+        // Fetch and set up versions
+        const loadVersions = async () => {
             if (!appId) return
 
-            const { data, error } = await supabase
-                .rpc('get_app_versions', {
-                    p_app_id: appId
-                })
+            setIsLoading(true)
+            try {
+                // Get all versions for this app
+                const versionsData = await getVersionHistory(appId)
+                setVersions(versionsData)
 
-            if (error) {
+                // If we have versions, set up the latest one
+                if (versionsData.length > 0) {
+                    const latestVersion = versionsData[0]
+                    setCurrentVersionId(latestVersion.id)
+
+                    // Only update code on first load to avoid loops
+                    if (isInitialLoad) {
+                        onVersionChange(latestVersion)
+                        setIsInitialLoad(false)
+                    }
+                }
+            } catch (error) {
                 console.error('Failed to fetch versions:', error)
-                return
-            }
-
-            setVersions(data || [])
-            const currentVersion = data?.find((v: AppVersion) => v.is_current)
-            if (currentVersion) {
-                setCurrentVersionId(currentVersion.id)
+            } finally {
+                setIsLoading(false)
             }
         }
 
-        loadVersions()
-    }, [appId])
+        // Let parent components call our refresh function
+        useImperativeHandle(ref, () => ({
+            refreshVersions: loadVersions
+        }))
 
-    const handleVersionChange = async (versionId: string) => {
-        const version = versions.find(v => v.id === versionId)
-        if (version) {
+        // Load versions when app changes
+        useEffect(() => {
+            loadVersions()
+        }, [appId])
+
+        // Handle version selection
+        const handleVersionChange = async (versionId: string) => {
+            if (!appId || !versionId) return
+
+            setIsLoading(true)
             try {
-                // Switch version using RPC
-                const { error } = await switchVersion(appId, versionId)
+                // Find the version they picked
+                const selectedVersion = versions.find(v => v.id === versionId)
+                if (!selectedVersion) throw new Error('Version not found')
 
-                if (error) throw error
+                // Update in the database
+                await switchVersion(appId, versionId)
 
+                // Update our local state
                 setCurrentVersionId(versionId)
-                onVersionChange(version)
+                setVersions(prev => prev.map(v => ({
+                    ...v,
+                    is_current: v.id === versionId
+                })))
+
+                // Let parent know to update code view
+                onVersionChange(selectedVersion)
+
             } catch (error) {
                 console.error('Failed to switch version:', error)
+            } finally {
+                setIsLoading(false)
             }
         }
-    }
 
-    return (
-        <Select value={currentVersionId} onValueChange={handleVersionChange}>
-            <SelectTrigger className="w-[180px] text-black">
-                <SelectValue placeholder="Select version" className="text-black" />
-            </SelectTrigger>
-            <SelectContent className="text-black">
-                {versions.map((version) => (
-                    <SelectItem
-                        key={version.id}
-                        value={version.id}
+        // Nice clean dropdown for version selection
+        return (
+            <Select
+                value={currentVersionId}
+                onValueChange={handleVersionChange}
+                disabled={isLoading}
+            >
+                <SelectTrigger className="w-[180px] text-black">
+                    <SelectValue
+                        placeholder={isLoading ? "Loading..." : "Select version"}
                         className="text-black"
-                    >
-                        Version {version.version_number}
-                        {version.is_current && " (Current)"}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    )
-}
+                    />
+                </SelectTrigger>
+                <SelectContent className="text-black">
+                    {versions.map((version) => (
+                        <SelectItem
+                            key={version.id}
+                            value={version.id}
+                            className="text-black"
+                        >
+                            Version {version.version_number}
+                            {version.is_current && " (Current)"}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        )
+    }
+)
+
+// Help React DevTools show a nice name
+VersionSelector.displayName = 'VersionSelector'

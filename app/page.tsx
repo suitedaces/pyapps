@@ -44,27 +44,30 @@ const CustomHandle = ({ ...props }) => (
 
 export default function Home() {
     const supabase = createClientComponentClient()
+
+    // Chat and UI state
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
+    const [loading, setLoading] = useState(false)
+    const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { session, isLoading: isAuthLoading } = useAuth()
     const [showTypingText, setShowTypingText] = useState(true)
 
-    // Add new state for right panel
+    // Right panel state
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
+    const [isCreatingVersion, setIsCreatingVersion] = useState(false)
+
+    // Sandbox state
     const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
     const resizableGroupRef = useRef<any>(null)
 
-    const [initialMessages, setInitialMessages] = useState<Message[]>([])
-    const [loading, setLoading] = useState(false)
-
-    // Add state for app and version
+    // App state
     const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
-    const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
     // Fetch chats for sidebar
     const { data: sidebarChats, isLoading: isLoadingChats } = useQuery({
@@ -172,11 +175,6 @@ export default function Home() {
             }
         },
         onFinish: async (message) => {
-            console.log('🎯 onFinish triggered:', {
-                hasToolInvocations: !!message.toolInvocations?.length,
-                messageContent: message.content.slice(0, 100)
-            })
-
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .filter(invocation =>
@@ -185,45 +183,24 @@ export default function Home() {
                     )
                     .pop()
 
-                console.log('🔍 Streamlit call:', {
-                    found: !!streamlitCall,
-                    state: streamlitCall?.state,
-                    hasResult: !!streamlitCall
-                })
-
                 if (streamlitCall?.state === 'result') {
                     const code = streamlitCall.result
-                    console.log('💻 Generated code:', {
-                        hasCode: !!code,
-                        codeLength: code?.length,
-                        hasSession: !!session,
-                        userId: session?.user?.id
-                    })
-
                     if (code && session?.user?.id) {
                         try {
                             setIsCreatingVersion(true)
                             setGeneratedCode(code)
-                            console.log('🔄 Updating Streamlit app...')
                             await updateStreamlitApp(code)
 
                             // Check if chat already has an app
-                            console.log('🔍 Checking for existing app...')
                             const { data: chat } = await supabase
                                 .from('chats')
                                 .select('app_id')
                                 .eq('id', currentChatId)
                                 .single()
 
-                            console.log('📱 Chat data:', {
-                                chatId: currentChatId,
-                                existingAppId: chat?.app_id
-                            })
-
                             let appId = chat?.app_id
 
                             if (!appId) {
-                                console.log('🆕 Creating new app...')
                                 // Create new app if none exists
                                 const { data: app, error: appError } = await supabase
                                     .from('apps')
@@ -239,44 +216,33 @@ export default function Home() {
                                     .select()
                                     .single()
 
-                                if (appError) {
-                                    console.error('❌ App creation failed:', appError)
-                                    throw appError
-                                }
+                                if (appError) throw appError
                                 appId = app.id
-                                console.log('✅ App created:', { appId })
 
                                 // Link chat to app
-                                const { error: chatError } = await supabase
+                                await supabase
                                     .from('chats')
                                     .update({ app_id: appId })
                                     .eq('id', currentChatId)
-
-                                if (chatError) {
-                                    console.error('❌ Chat update failed:', chatError)
-                                    throw chatError
-                                }
-                                console.log('🔗 Chat linked to app')
                             }
 
                             // Create new version
-                            console.log('📝 Creating new version...')
                             const versionData = await createVersion(appId, code)
-                            console.log('✅ Version created:', versionData)
+                            console.log('Version created:', versionData)
 
                             setCurrentApp({ id: appId })
-                            console.log('🔄 Current app updated:', { appId })
+
+                            // Add this to refresh versions
+                            if (versionSelectorRef.current) {
+                                console.log('🔄 Refreshing version list after new version creation')
+                                await versionSelectorRef.current.refreshVersions()
+                            }
 
                         } catch (error) {
-                            console.error('❌ Failed to handle version creation:', error)
+                            console.error('Failed to handle version creation:', error)
                         } finally {
                             setIsCreatingVersion(false)
                         }
-                    } else {
-                        console.error('❌ Missing code or session:', {
-                            hasCode: !!code,
-                            hasSession: !!session
-                        })
                     }
                 }
             }
@@ -447,10 +413,53 @@ export default function Home() {
     }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
 
     // Add version change handler
+    const isVersionSwitching = useRef(false)
+    const versionSelectorRef = useRef<{
+        refreshVersions: () => void
+    } | null>(null);
+
     const handleVersionChange = async (version: AppVersion) => {
-        if (version.code) {
+        if (!version.code) {
+            console.error('No code found in version:', version)
+            return
+        }
+
+        isVersionSwitching.current = true;
+        setIsGeneratingCode(true)
+
+        try {
+            console.log('🔄 Version switch initiated:', {
+                versionId: version.id,
+                appId: currentApp?.id,
+                versionNumber: version.version_number
+            })
+
+            // Update code view
             setGeneratedCode(version.code)
+
+            // Reinitialize sandbox for the new version
+            const initResponse = await fetch('/api/sandbox/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            })
+
+            if (!initResponse.ok) {
+                throw new Error('Failed to initialize sandbox')
+            }
+
+            const { sandboxId } = await initResponse.json()
+            console.log('🆕 New sandbox created:', { sandboxId })
+            setSandboxId(sandboxId)
+
+            // Update Streamlit preview with new sandbox
             await updateStreamlitApp(version.code)
+        } catch (error) {
+            console.error('❌ Failed to update app with version:', error)
+        } finally {
+            setTimeout(() => {
+                setIsGeneratingCode(false)
+                isVersionSwitching.current = false;
+            }, 500)
         }
     }
 
@@ -471,13 +480,6 @@ export default function Home() {
         }
         fetchAppId()
     }, [currentChatId])
-
-    useEffect(() => {
-        console.log('👁️ Current app state changed:', {
-            hasApp: !!currentApp,
-            appId: currentApp?.id
-        })
-    }, [currentApp])
 
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -581,14 +583,6 @@ export default function Home() {
                                             value="code"
                                             className="flex-grow overflow-hidden mt-4"
                                         >
-                                            <div className="flex justify-between items-center mb-4">
-                                                {currentApp && (
-                                                    <VersionSelector
-                                                        appId={currentApp.id}
-                                                        onVersionChange={handleVersionChange}
-                                                    />
-                                                )}
-                                            </div>
                                             <CodeView
                                                 code={generatedCode}
                                                 isGeneratingCode={isGeneratingCode || isCreatingVersion}
@@ -598,25 +592,33 @@ export default function Home() {
                                 </ResizablePanel>
                             )}
 
-                            <Button
-                                onClick={toggleRightContent}
-                                className={cn(
-                                    "absolute top-2 right-4 z-10",
-                                    "bg-black hover:bg-black/90",
-                                    "text-white",
-                                    "border border-transparent",
-                                    "transition-all duration-200 ease-in-out",
-                                    "shadow-lg hover:shadow-xl",
-                                    "rounded-lg z-30"
+                            <div className="absolute top-2 right-4 flex gap-4 z-30">
+                                {currentApp && (
+                                    <VersionSelector
+                                        appId={currentApp.id}
+                                        onVersionChange={handleVersionChange}
+                                        ref={versionSelectorRef}
+                                    />
                                 )}
-                                size="icon"
-                            >
-                                {isRightContentVisible ? (
-                                    <ChevronRight className="h-4 w-4" />
-                                ) : (
-                                    <ChevronLeft className="h-4 w-4" />
-                                )}
-                            </Button>
+                                <Button
+                                    onClick={toggleRightContent}
+                                    className={cn(
+                                        "bg-black hover:bg-black/90",
+                                        "text-white",
+                                        "border border-transparent",
+                                        "transition-all duration-200 ease-in-out",
+                                        "shadow-lg hover:shadow-xl",
+                                        "rounded-lg"
+                                    )}
+                                    size="icon"
+                                >
+                                    {isRightContentVisible ? (
+                                        <ChevronRight className="h-4 w-4" />
+                                    ) : (
+                                        <ChevronLeft className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </div>
                         </ResizablePanelGroup>
                     </main>
                 </div>
