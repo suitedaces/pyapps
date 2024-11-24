@@ -158,7 +158,6 @@ export default function ChatPageClient({
             }
         },
         onFinish: async (message) => {
-            // Handle tool invocations (like Streamlit code generation)
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .filter(invocation =>
@@ -170,29 +169,21 @@ export default function ChatPageClient({
                 if (streamlitCall?.state === 'result') {
                     const code = streamlitCall.result
                     if (code) {
-                        // Start version creation process
                         setIsCreatingVersion(true)
                         setGeneratedCode(code)
                         await updateStreamlitApp(code)
 
                         if (session?.user?.id) {
                             try {
-                                // Get or create app for this chat
                                 let appId = await getOrCreateApp(currentChatId, session.user.id)
-
-                                // Create new version with the generated code
                                 const versionData = await createVersion(appId, code)
                                 setCurrentApp({ id: appId })
 
-                                // Tell version selector to refresh its list
                                 if (versionSelectorRef.current) {
-                                    console.log('🔄 Refreshing version list after new version creation')
                                     await versionSelectorRef.current.refreshVersions()
                                 }
 
                             } catch (error) {
-                                console.error('Failed to handle version creation:', error)
-                            } finally {
                                 setIsCreatingVersion(false)
                             }
                         }
@@ -200,7 +191,6 @@ export default function ChatPageClient({
                 }
             }
 
-            // Add assistant's message to the chat
             if (message.content.trim()) {
                 const assistantMessage = {
                     id: Date.now().toString(),
@@ -472,6 +462,13 @@ export default function ChatPageClient({
         fetchAppId()
     }, [fetchAppId])
 
+    const handleChatFinish = useCallback(() => {
+        console.log('🔄 Chat finished, refreshing version selector')
+        if (versionSelectorRef.current) {
+            versionSelectorRef.current.refreshVersions()
+        }
+    }, [])
+
     if (isLoading) {
         return <div>Loading...</div>
     }
@@ -522,6 +519,7 @@ export default function ChatPageClient({
                                     chatId={currentChatId}
                                     initialMessages={initialMessages}
                                     onChatCreated={handleChatCreated}
+                                    onChatFinish={handleChatFinish}
                                 />
                             </div>
                         </ResizablePanel>

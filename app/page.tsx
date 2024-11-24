@@ -191,7 +191,6 @@ export default function Home() {
                             setGeneratedCode(code)
                             await updateStreamlitApp(code)
 
-                            // Check if chat already has an app
                             const { data: chat } = await supabase
                                 .from('chats')
                                 .select('app_id')
@@ -201,7 +200,6 @@ export default function Home() {
                             let appId = chat?.app_id
 
                             if (!appId) {
-                                // Create new app if none exists
                                 const { data: app, error: appError } = await supabase
                                     .from('apps')
                                     .insert({
@@ -219,22 +217,16 @@ export default function Home() {
                                 if (appError) throw appError
                                 appId = app.id
 
-                                // Link chat to app
                                 await supabase
                                     .from('chats')
                                     .update({ app_id: appId })
                                     .eq('id', currentChatId)
                             }
 
-                            // Create new version
                             const versionData = await createVersion(appId, code)
-                            console.log('Version created:', versionData)
-
                             setCurrentApp({ id: appId })
 
-                            // Add this to refresh versions
                             if (versionSelectorRef.current) {
-                                console.log('🔄 Refreshing version list after new version creation')
                                 await versionSelectorRef.current.refreshVersions()
                             }
 
@@ -481,6 +473,13 @@ export default function Home() {
         fetchAppId()
     }, [currentChatId])
 
+    const handleChatFinish = useCallback(() => {
+        console.log('🔄 Chat finished, refreshing version selector')
+        if (versionSelectorRef.current) {
+            versionSelectorRef.current.refreshVersions()
+        }
+    }, [])
+
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>
     }
@@ -537,6 +536,7 @@ export default function Home() {
                                         initialMessages={initialMessages}
                                         onChatCreated={handleChatCreated}
                                         onChatSubmit={handleChatSubmit}
+                                        onChatFinish={handleChatFinish}
                                     />
                                 </div>
                             </ResizablePanel>

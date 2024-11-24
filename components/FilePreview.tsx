@@ -37,9 +37,6 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    console.log("🟡 FilePreview: rendered with file:", file?.name)
-    console.log("🟡 FilePreview: isVisible state:", isVisible)
-
     useEffect(() => {
         const validateAndLoadFile = async () => {
             setIsLoading(true)
@@ -116,12 +113,9 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
     }
 
     const handleRemove = (e: React.MouseEvent) => {
-        console.log("🟡 FilePreview: handleRemove called")
         e.stopPropagation()
         setIsVisible(false)
-        console.log("🟡 FilePreview: isVisible set to false")
         setTimeout(() => {
-            console.log("🟡 FilePreview: calling parent onRemove after timeout")
             onRemove()
         }, 200)
     }

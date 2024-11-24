@@ -19,6 +19,7 @@ interface ChatProps {
     onFileSelect?: (file: { content: string, name: string }) => void
     onUpdateStreamlit?: (message: string) => void
     onChatSubmit?: () => void
+    onChatFinish?: () => void
 }
 
 interface FileUploadState {
@@ -27,7 +28,7 @@ interface FileUploadState {
     error: string | null
 }
 
-export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit, onChatSubmit }: ChatProps) {
+export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit, onChatSubmit, onChatFinish }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -73,15 +74,12 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
 
             if (!chatId) {
                 const newChatId = response.headers.get('x-chat-id')
-                console.log('Response headers:', Object.fromEntries(response.headers))
                 if (newChatId) {
-                    console.log('Setting new chat ID:', newChatId)
                     newChatIdRef.current = newChatId
                 }
             }
         },
         onFinish: async (message) => {
-            console.log('onFinish triggered with message:', message)
             setErrorState(null)
             setAttachedFile(null)
             resetFileUploadState()
@@ -90,27 +88,22 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             }
 
             if (message.role === 'assistant' && !chatId && newChatIdRef.current) {
-                console.log('Creating chat with ID from ref:', newChatIdRef.current)
                 onChatCreated?.(newChatIdRef.current)
                 newChatIdRef.current = null
             }
 
             if (message.toolInvocations?.length) {
-                console.log('Tool invocations found:', message.toolInvocations)
                 const streamlitCall = message.toolInvocations
                     .filter(invocation =>
                         invocation.toolName === 'create_streamlit_app' &&
                         invocation.state === 'result'
                     )
                     .pop()
-
-                if (streamlitCall?.state === 'result') {
-                    console.log('Streamlit call successful')
-                }
             }
+
+            onChatFinish?.()
         },
         onError: (error) => {
-            console.error('Stream error:', error)
             handleChatError(error)
         }
     })
