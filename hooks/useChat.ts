@@ -10,6 +10,7 @@ import {
     Session,
 } from '@supabase/auth-helpers-nextjs'
 import { useCallback, useEffect, useState } from 'react'
+import { useSandbox } from '@/contexts/SandboxContext'
 
 export function useChat(chatId: string | null) {
     const [session, setSession] = useState<Session | null>(null)
@@ -25,30 +26,37 @@ export function useChat(chatId: string | null) {
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [codeExplanation, setCodeExplanation] = useState('')
     const [sandboxErrors, setSandboxErrors] = useState<any[]>([])
-    const [sandboxId, setSandboxId] = useState<string | null>(null)
 
-    const initializeSandbox = useCallback(async () => {
-        try {
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
+    const { sandbox, initializeSandbox, updateCode } = useSandbox()
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
+    const updateStreamlitApp = useCallback(
+        async (code: string) => {
+            if (!code) return
+
+            try {
+                console.log('Updating Streamlit app with code:', code)
+                const sandboxId = await initializeSandbox()
+                if (!sandboxId) {
+                    throw new Error('Failed to initialize sandbox')
+                }
+
+                await updateCode(code)
+                if (sandbox.url) {
+                    setStreamlitUrl(sandbox.url)
+                    console.log('Streamlit URL updated:', sandbox.url)
+                }
+            } catch (error) {
+                console.error('Error updating Streamlit app:', error)
+                setSandboxErrors((prev) => [
+                    ...prev,
+                    { message: 'Error updating Streamlit app' },
+                ])
+            } finally {
+                setIsGeneratingCode(false)
             }
-
-            const data = await response.json()
-            setSandboxId(data.sandboxId)
-            console.log('Sandbox initialized with ID:', data.sandboxId)
-        } catch (error) {
-            console.error('Error initializing sandbox:', error)
-            setSandboxErrors((prev) => [
-                ...prev,
-                { message: 'Error initializing sandbox' },
-            ])
-        }
-    }, [])
+        },
+        [initializeSandbox, updateCode, sandbox.url]
+    )
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -68,12 +76,11 @@ export function useChat(chatId: string | null) {
 
     useEffect(() => {
         if (chatId) {
-            initializeSandbox()
             fetchMessages(chatId)
         } else {
             resetState()
         }
-    }, [chatId, initializeSandbox])
+    }, [chatId])
 
     const resetState = () => {
         setMessages([])
@@ -84,7 +91,6 @@ export function useChat(chatId: string | null) {
         setStreamingMessage('')
         setCodeExplanation('')
         setSandboxErrors([])
-        setSandboxId(null)
     }
 
     const fetchMessages = async (id: string) => {
@@ -126,51 +132,6 @@ export function useChat(chatId: string | null) {
             setInput(e.target.value)
         },
         []
-    )
-
-    const updateStreamlitApp = useCallback(
-        async (code: string) => {
-            if (code && sandboxId) {
-                try {
-                    console.log('Updating Streamlit app with code:', code)
-                    const response = await fetch(
-                        `/api/sandbox/${sandboxId}/execute`,
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ code }),
-                        }
-                    )
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `HTTP error! status: ${response.status}`
-                        )
-                    }
-
-                    const data = await response.json()
-                    if (data.url) {
-                        setStreamlitUrl(data.url)
-                        console.log('Streamlit URL updated:', data.url)
-                    } else {
-                        throw new Error('No URL returned from sandbox API')
-                    }
-                } catch (error) {
-                    console.error('Error updating Streamlit app:', error)
-                    setSandboxErrors((prev) => [
-                        ...prev,
-                        { message: 'Error updating Streamlit app' },
-                    ])
-                } finally {
-                    setIsGeneratingCode(false)
-                }
-            } else {
-                console.error(
-                    'Generated code not available or sandbox not initialized'
-                )
-            }
-        },
-        [sandboxId]
     )
 
     const processStreamChunk = useCallback(
@@ -387,12 +348,12 @@ export function useChat(chatId: string | null) {
                         chat_id: chatId,
                         file_name: fileName,
                         file_type: 'csv',
-                        file_url: `/home/user/${fileName}`,
+                        file_url: `/app/${fileName}`,
                         backup_url: 'placeholder_url',
                         file_size: sanitizedContent.length,
                         content_hash: sanitizedContent,
                         analysis: null,
-                        sandbox_id: sandboxId,
+                        sandbox_id: sandbox.id,
                         expires_at: new Date(Date.now() + 1 * 60 * 1000),
                     }),
                 })
@@ -430,7 +391,7 @@ export function useChat(chatId: string | null) {
                 const newUserMessage: ClientMessage = {
                     id: `${Date.now()}-upload`,
                     role: 'user',
-                    content: `I've uploaded "${fileName}". Create a Streamlit app to visualize this data. The file is at '/home/user/${fileName}'.
+                    content: `I've uploaded "${fileName}". Create a Streamlit app to visualize this data. The file is at '/app/${fileName}'.
 ${dataPreview}
 Create a complex, aesthetic visualization using these exact column names.`,
                     createdAt: new Date(),
@@ -455,7 +416,7 @@ Create a complex, aesthetic visualization using these exact column names.`,
                 ])
             }
         },
-        [chatId, handleChatOperation, sandboxId]
+        [chatId, handleChatOperation, sandbox.id]
     )
 
     return {
@@ -473,6 +434,6 @@ Create a complex, aesthetic visualization using these exact column names.`,
         isGeneratingCode,
         streamingCodeExplanation: codeExplanation,
         sandboxErrors,
-        sandboxId,
+        sandboxId: sandbox.id,
     }
 }

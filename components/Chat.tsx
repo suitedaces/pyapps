@@ -2,7 +2,7 @@
 
 import { useChat } from 'ai/react'
 import { Message } from 'ai'
-import { useCallback, useRef, useState, useMemo } from 'react'
+import { useCallback, useRef, useState, useMemo, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -243,6 +243,27 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
     const placeholderText = attachedFile
         ? "File attached. Remove file to type a message."
         : "Type your message..."
+
+    const handleToolInvocation = useCallback(async (message: Message) => {
+        if (message.toolInvocations?.length) {
+            const streamlitCall = message.toolInvocations
+                .find(invocation =>
+                    invocation.toolName === 'create_streamlit_app' &&
+                    invocation.state === 'result'
+                )
+
+            if (streamlitCall?.state === 'result') {
+                onUpdateStreamlit?.(streamlitCall.result)
+            }
+        }
+    }, [onUpdateStreamlit])
+
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1]
+        if (lastMessage?.role === 'assistant') {
+            handleToolInvocation(lastMessage)
+        }
+    }, [messages, handleToolInvocation])
 
     return (
         <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">

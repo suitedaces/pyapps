@@ -5,7 +5,6 @@ import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
@@ -30,20 +29,35 @@ import { Logo } from '@/components/core/Logo'
 import { useSidebar } from '@/contexts/SidebarContext'
 
 interface ChatPageClientProps {
-    initialChat: any
+    initialChat: {
+        id: string;
+    }
 }
 
-const truncate = (str: string) => {
-    const maxLength = 30 // Adjust this value as needed
-    if (str.length <= maxLength) return str
-    const extension = str.slice(str.lastIndexOf('.'))
-    const nameWithoutExtension = str.slice(0, str.lastIndexOf('.'))
-    const truncatedName = nameWithoutExtension.slice(
-        0,
-        maxLength - 3 - extension.length
-    )
-    return `${truncatedName}...${extension}`
+interface ChatState {
+    currentChatId: string | null;
+    isCreatingChat: boolean;
+    initialMessages: Message[];
 }
+
+interface SandboxState {
+    id: string | null;
+    url: string | null;
+    isGenerating: boolean;
+    code: string;
+    error: string | null;
+}
+
+interface StreamlitToolResult {
+    toolName: string;
+    state: 'result';
+    output: string;
+}
+
+const SIDEBAR_COLLAPSED_LEFT = '4rem'
+const DEFAULT_PANEL_SIZE = 65
+const MIN_PANEL_SIZE = 45
+const CHAT_HEIGHT_OFFSET = 'calc(100vh-4rem)'
 
 const CustomHandle = ({ ...props }) => (
     <ResizableHandle {...props} withHandle className="relative">
@@ -56,13 +70,27 @@ const CustomHandle = ({ ...props }) => (
 export default function ChatPageClient({
     initialChat,
 }: ChatPageClientProps) {
-    const [isRightContentVisible, setIsRightContentVisible] = useState(false)
-    const [isAtBottom, setIsAtBottom] = useState(true)
-    const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat.id)
-    const [isCreatingChat, setIsCreatingChat] = useState(false)
-    const [initialMessages, setInitialMessages] = useState<Message[]>([])
-    const [loading, setLoading] = useState(false)
+    const [uiState, setUiState] = useState({
+        isRightContentVisible: false,
+        isAtBottom: true,
+        loading: false,
+    })
+
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
+
+    const [chatState, setChatState] = useState<ChatState>({
+        currentChatId: initialChat.id,
+        isCreatingChat: false,
+        initialMessages: [],
+    })
+
+    const [sandbox, setSandbox] = useState<SandboxState>({
+        id: null,
+        url: null,
+        isGenerating: false,
+        code: '',
+        error: null
+    })
 
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
@@ -83,9 +111,9 @@ export default function ChatPageClient({
         isLoading: chatLoading,
         setMessages
     } = useChat({
-        api: currentChatId ? `/api/conversations/${currentChatId}/stream` : '/api/conversations/stream',
-        id: currentChatId ?? undefined,
-        initialMessages,
+        api: chatState.currentChatId ? `/api/conversations/${chatState.currentChatId}/stream` : '/api/conversations/stream',
+        id: chatState.currentChatId ?? undefined,
+        initialMessages: chatState.initialMessages,
         body: {
             model: currentModel,
             config: languageModel,
@@ -136,98 +164,93 @@ export default function ChatPageClient({
         if (chatLoading) {
             setIsGeneratingCode(true)
             setGeneratedCode('')
+            if (!uiState.isRightContentVisible) {
+                setUiState(prev => ({ ...prev, isRightContentVisible: true }))
+            }
         }
-    }, [chatLoading])
+    }, [chatLoading, uiState.isRightContentVisible])
 
-    //  sandbox state
-    const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
+    const handleSandboxError = useCallback((error: unknown, context: string) => {
+        console.error(`Error in ${context}:`, error)
+        setSandbox(prev => ({
+            ...prev,
+            error: error instanceof Error ? error.message : `Error in ${context}`
+        }))
+    }, [])
 
-    //  sandbox initialization
     const initializeSandbox = useCallback(async () => {
         try {
-            console.log('Initializing sandbox...');
             const response = await fetch('/api/sandbox/init', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             })
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
-            }
-
+            if (!response.ok) throw new Error('Failed to initialize sandbox')
+            
             const data = await response.json()
-            console.log('Sandbox initialized with ID:', data.sandboxId);
-            setSandboxId(data.sandboxId)
+            setSandbox(prev => ({ ...prev, id: data.sandboxId }))
+            return data.sandboxId
         } catch (error) {
-            console.error('Error initializing sandbox:', error);
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error initializing sandbox'
-            }])
+            console.error('Sandbox initialization failed:', error)
+            setSandbox(prev => ({ ...prev, error: 'Failed to initialize sandbox' }))
+            return null
         }
     }, [])
 
-    //  streamlit update function
     const updateStreamlitApp = useCallback(async (code: string) => {
-        if (!code) {
-            console.error('No code provided to updateStreamlitApp');
-            return;
-        }
-
-        if (!sandboxId) {
-            console.error('No sandboxId available');
-            return;
-        }
+        if (!code) return
 
         try {
-            console.log('Updating Streamlit app with code:', code);
+            setSandbox(prev => ({ ...prev, isGenerating: true }))
+            
+            // Initialize sandbox if needed
+            let sandboxId = sandbox.id
+            if (!sandboxId) {
+                sandboxId = await initializeSandbox()
+                if (!sandboxId) throw new Error('Failed to initialize sandbox')
+            }
+
+            // Execute code
             const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code }),
             })
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
-            }
-
+            if (!response.ok) throw new Error('Failed to execute code')
+            
             const data = await response.json()
-            console.log('Sandbox API response:', data);
-
-            if (data.url) {
-                setStreamlitUrl(data.url)
-                setIsGeneratingCode(false)
-            } else {
-                throw new Error('No URL returned from sandbox API')
-            }
+            setSandbox(prev => ({
+                ...prev,
+                url: data.url,
+                code,
+                isGenerating: false,
+                error: null
+            }))
+            setIsGeneratingCode(false)
         } catch (error) {
-            console.error('Error in updateStreamlitApp:', error);
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error updating Streamlit app'
-            }])
+            console.error('Failed to update Streamlit app:', error)
+            setSandbox(prev => ({
+                ...prev,
+                isGenerating: false,
+                error: error instanceof Error ? error.message : 'Failed to update app'
+            }))
             setIsGeneratingCode(false)
         }
-    }, [sandboxId])
+    }, [sandbox.id, initializeSandbox])
 
-    // Initialize sandbox on mount
-    useEffect(() => {
-        initializeSandbox()
-    }, [initializeSandbox])
-
+    // Handle new messages with Streamlit code
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
         if (lastMessage?.toolInvocations?.length) {
             const streamlitCall = lastMessage.toolInvocations
-                .find(invocation =>
+                .find(invocation => 
                     invocation.toolName === 'create_streamlit_app' &&
                     invocation.state === 'result'
                 )
 
-            if (streamlitCall?.state === 'result') {
+            if (streamlitCall?.state === 'result' && streamlitCall.result) {
                 setGeneratedCode(streamlitCall.result)
-                setIsGeneratingCode(false)
                 updateStreamlitApp(streamlitCall.result)
             }
         }
@@ -242,7 +265,7 @@ export default function ChatPageClient({
     useEffect(() => {
         async function fetchMessages() {
             try {
-                setLoading(true)
+                setUiState(prev => ({ ...prev, loading: true }))
                 const response = await fetch(`/api/conversations/${id}/messages`)
                 if (!response.ok) throw new Error('Failed to fetch messages')
                 const data = await response.json()
@@ -258,27 +281,54 @@ export default function ChatPageClient({
                         })
                     }
                     if (msg.assistant_message) {
+                        // Add tool invocations to assistant messages
+                        const toolInvocations = msg.tool_results?.map((result: any) => ({
+                            toolName: 'create_streamlit_app',
+                            state: 'result',
+                            result: result.result
+                        })) || []
+
                         messages.push({
                             id: `${msg.id}-assistant`,
                             role: 'assistant',
                             content: msg.assistant_message,
+                            toolInvocations
                         })
                     }
                     return messages
                 })
 
-                setInitialMessages(messages)
+                setChatState(prev => ({ ...prev, initialMessages: messages }))
+
+                // Find and execute the last Streamlit code
+                const lastStreamlitCode = data.messages
+                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                    .map((msg: any) => {
+                        const toolResult = msg.tool_results[0];
+                        if (toolResult && toolResult.name === 'create_streamlit_app') {
+                            return toolResult.result;
+                        }
+                        return null;
+                    })
+                    .filter(Boolean)
+                    .pop();
+
+                if (lastStreamlitCode) {
+                    setUiState(prev => ({ ...prev, isRightContentVisible: true }))
+                    setGeneratedCode(lastStreamlitCode)
+                    await updateStreamlitApp(lastStreamlitCode)
+                }
             } catch (error) {
                 console.error('Error fetching messages:', error)
             } finally {
-                setLoading(false)
+                setUiState(prev => ({ ...prev, loading: false }))
             }
         }
 
         if (id) {
             fetchMessages()
         }
-    }, [id])
+    }, [id, updateStreamlitApp])
 
     const fetchAndSetChats = useCallback(async () => {
         try {
@@ -302,32 +352,32 @@ export default function ChatPageClient({
         const params = new URLSearchParams(window.location.search)
         const chatId = params.get('chat')
         if (chatId) {
-            setCurrentChatId(chatId)
+            setChatState(prev => ({ ...prev, currentChatId: chatId }))
         }
     }, [])
 
     const handleChatSelect = useCallback(
         (chatId: string) => {
-            setCurrentChatId(chatId)
+            setChatState(prev => ({ ...prev, currentChatId: chatId }))
             router.replace(`/chat/${chatId}`, { scroll: false })
         },
         [router]
     )
 
     const handleNewChat = useCallback(async () => {
-        setCurrentChatId(null)
+        setChatState(prev => ({ ...prev, currentChatId: null }))
         router.replace('/', { scroll: false })
         return Promise.resolve()
     }, [router])
 
     // Handle chat creation callback
     const handleChatCreated = useCallback((chatId: string) => {
-        setCurrentChatId(chatId)
+        setChatState(prev => ({ ...prev, currentChatId: chatId }))
         router.replace(`/chat/${chatId}`)
     }, [router])
 
     const toggleRightContent = useCallback(() => {
-        setIsRightContentVisible((prev) => !prev)
+        setUiState(prev => ({ ...prev, isRightContentVisible: !prev.isRightContentVisible }))
         if (resizableGroupRef.current) {
             setTimeout(() => {
                 resizableGroupRef.current.resetLayout()
@@ -335,44 +385,64 @@ export default function ChatPageClient({
         }
     }, [])
 
-    // fetch tool results when chatId changes
-    useEffect(() => {
-        async function fetchToolResults() {
-            if (!currentChatId) return;
+    const handleRerun = useCallback(async () => {
+        if (!sandbox.id || !generatedCode) return
 
-            try {
-                const response = await fetch(`/api/conversations/${currentChatId}/messages`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch messages');
-                }
+        try {
+            setSandbox(prev => ({ 
+                ...prev, 
+                isGenerating: true,
+                status: 'Refreshing Streamlit app...'  // Add status messages
+            }))
 
-                const data = await response.json();
+            const response = await fetch(`/api/sandbox/${sandbox.id}/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: generatedCode }),
+            })
 
-                const streamlitCode = data.messages
-                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
-                    .map((msg: any) => {
-                        const toolResult = msg.tool_results[0];
-                        if (toolResult && toolResult.name === 'create_streamlit_app') {
-                            return toolResult.result;
-                        }
-                        return null;
-                    })
-                    .filter(Boolean)
-                    .pop();
-
-                if (streamlitCode) {
-                    setGeneratedCode(streamlitCode);
-                    if (!isGeneratingCode) {
-                        await updateStreamlitApp(streamlitCode);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching tool results:', error);
+            if (!response.ok) {
+                throw new Error('Failed to refresh sandbox')
             }
-        }
 
-        fetchToolResults();
-    }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
+            const data = await response.json()
+            setSandbox(prev => ({
+                ...prev,
+                url: data.url,
+                isGenerating: false,
+                status: null
+            }))
+        } catch (error) {
+            console.error('Error refreshing sandbox:', error)
+            setSandbox(prev => ({
+                ...prev,
+                isGenerating: false,
+                error: error instanceof Error ? error.message : 'Failed to refresh app',
+                status: null
+            }))
+        }
+    }, [sandbox.id, generatedCode])
+
+    const handleEnvVarsChange = useCallback(async (envVars: Record<string, string>) => {
+        if (!sandbox.id) return
+
+        try {
+            const response = await fetch(`/api/sandbox/${sandbox.id}/env`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ envVars }),
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to update environment variables')
+            }
+
+            // Rerun the sandbox to apply new env vars
+            await handleRerun()
+        } catch (error) {
+            console.error('Error updating environment variables:', error)
+        }
+    }, [sandbox.id, handleRerun])
 
     if (isLoading) {
         return <div>Loading...</div>
@@ -386,17 +456,15 @@ export default function ChatPageClient({
         <div className="relative flex h-screen overflow-hidden">
             <Sidebar
                 onChatSelect={handleChatSelect}
-                currentChatId={currentChatId}
+                currentChatId={chatState.currentChatId}
                 chats={sidebarChats}
                 collapsed={sidebarCollapsed}
                 onCollapsedChange={setSidebarCollapsed}
             />
-            <div
-                className={cn(
-                    "flex-1 flex flex-col bg-white min-w-0 transition-all duration-200",
-                    "relative"
-                )}
-            >
+            <div className={cn(
+                "flex-1 flex flex-col bg-white min-w-0 transition-all duration-200",
+                "relative"
+            )}>
                 {sidebarCollapsed && (
                     <div
                         className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
@@ -418,73 +486,43 @@ export default function ChatPageClient({
                         direction="horizontal"
                         ref={resizableGroupRef}
                     >
-                        <ResizablePanel defaultSize={65} minSize={45}>
+                        <ResizablePanel defaultSize={DEFAULT_PANEL_SIZE} minSize={MIN_PANEL_SIZE}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
                                 <Chat
-                                    chatId={currentChatId}
-                                    initialMessages={initialMessages}
+                                    chatId={chatState.currentChatId}
+                                    initialMessages={chatState.initialMessages}
                                     onChatCreated={handleChatCreated}
                                 />
                             </div>
                         </ResizablePanel>
 
-                        {isRightContentVisible && (
-                            <CustomHandle
-                                className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors"
-                            />
+                        {uiState.isRightContentVisible && (
+                            <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
                         )}
 
-                        {isRightContentVisible && (
+                        {uiState.isRightContentVisible && (
                             <ResizablePanel
                                 minSize={40}
                                 className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                             >
-                                <Tabs
-                                    defaultValue="code"
-                                    className="flex-grow flex flex-col h-full"
-                                >
-                                    <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
-                                        <TabsTrigger
-                                            value="preview"
-                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                        >
-                                            App
-                                        </TabsTrigger>
-                                        <TabsTrigger
-                                            value="code"
-                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                        >
-                                            Code
-                                        </TabsTrigger>
-                                    </TabsList>
-
-                                    <TabsContent
-                                        value="preview"
-                                        className="flex-grow overflow-hidden mt-4"
-                                    >
-                                        <StreamlitPreview
-                                            url={streamlitUrl}
-                                            isGeneratingCode={isGeneratingCode}
-                                        />
-                                    </TabsContent>
-
-                                    <TabsContent
-                                        value="code"
-                                        className="flex-grow overflow-hidden mt-4"
-                                    >
-                                        <CodeView
-                                            code={generatedCode}
-                                            isGeneratingCode={isGeneratingCode}
-                                        />
-                                    </TabsContent>
-                                </Tabs>
+                                <StreamlitPreview
+                                    onRerun={() => updateStreamlitApp(sandbox.code)}
+                                    onEnvVarsChange={handleEnvVarsChange}
+                                />
                             </ResizablePanel>
                         )}
+                    </ResizablePanelGroup>
 
+                    <div 
+                        className={cn(
+                            "fixed top-[3.5rem]",
+                            sidebarCollapsed ? "right-3" : "right-4",
+                            "z-50 transition-all duration-200"
+                        )}
+                    >
                         <Button
                             onClick={toggleRightContent}
                             className={cn(
-                                "absolute top-2 right-4 z-10",
                                 "bg-black hover:bg-black/90",
                                 "text-white",
                                 "border border-transparent",
@@ -494,13 +532,13 @@ export default function ChatPageClient({
                             )}
                             size="icon"
                         >
-                            {isRightContentVisible ? (
+                            {uiState.isRightContentVisible ? (
                                 <ChevronRight className="h-4 w-4" />
                             ) : (
                                 <ChevronLeft className="h-4 w-4" />
                             )}
                         </Button>
-                    </ResizablePanelGroup>
+                    </div>
                 </main>
             </div>
         </div>

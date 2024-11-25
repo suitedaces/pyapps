@@ -309,6 +309,14 @@ export class GruntyAgent {
             if (step.type === 'tool-call') {
                 if (step.toolName === 'create_streamlit_app') {
                     try {
+                        // Emit streamlit status event
+                        const statusData = `s:${JSON.stringify({
+                            type: 'streamlit-status',
+                            status: 'generating',
+                            message: 'Generating Streamlit app...'
+                        })}\n\n`
+                        writer.write(encoder.encode(statusData))
+
                         const toolInput = step.args
                         const codeQuery = `${toolInput.query}\n${
                             this.fileContext ? `Using file: ${this.fileContext.fileName}` : ''
@@ -350,6 +358,14 @@ export class GruntyAgent {
                         } else {
                             throw new Error('No code generated')
                         }
+
+                        // Emit completion status
+                        const completionData = `s:${JSON.stringify({
+                            type: 'streamlit-status',
+                            status: 'generated',
+                            message: 'Starting Streamlit app...'
+                        })}\n\n`
+                        writer.write(encoder.encode(completionData))
                     } catch (error) {
                         const errorResult = `Error generating code: ${error instanceof Error ? error.message : 'Unknown error'}`;
 

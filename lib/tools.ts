@@ -27,8 +27,20 @@ export const tools: Tool[] = [
         description: 'Generates Python (Streamlit) code based on a given query and file context',
         parameters: streamlitAppSchema,
         execute: async (input) => {
+            // Emit a special event to indicate code generation has started
+            const startEvent = {
+                type: 'streamlit-status',
+                status: 'generating',
+                message: 'Generating Streamlit app...'
+            }
+            
             const { query, fileContext } = streamlitAppSchema.parse(input)
-            return generateCode(query, fileContext)
+            const result = await generateCode(query, fileContext)
+            
+            return {
+                code: result.generatedCode,
+                status: 'generated'
+            }
         },
     },
 ]

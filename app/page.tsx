@@ -17,9 +17,7 @@ import { Logo } from '@/components/core/Logo'
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { CodeView } from '@/components/CodeView'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { ResizableHandle } from '@/components/ui/resizable'
 import { Message } from 'ai'
@@ -28,6 +26,7 @@ import { useChat } from 'ai/react'
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
 import modelsList from '@/lib/models.json'
+import { useSandbox } from '@/contexts/SandboxContext'
 
 // Add CustomHandle component
 const CustomHandle = ({ ...props }) => (
@@ -45,18 +44,16 @@ export default function Home() {
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { session, isLoading: isAuthLoading } = useAuth()
     const [showTypingText, setShowTypingText] = useState(true)
+    const { sandbox, updateCode, updateEnvVars } = useSandbox()
 
     // Add new state for right panel
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
-    const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
-    const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
-    const resizableGroupRef = useRef<any>(null)
-
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
+
+    const resizableGroupRef = useRef<any>(null)
 
     // Fetch chats for sidebar
     const { data: sidebarChats, isLoading: isLoadingChats } = useQuery({
@@ -176,7 +173,7 @@ export default function Home() {
                     const code = streamlitCall.result
                     if (code) {
                         setGeneratedCode(code)
-                        await updateStreamlitApp(code)
+                        await updateCode(code)
                     }
                 }
             }
@@ -205,72 +202,39 @@ export default function Home() {
         }
     }, [chatLoading])
 
-    // Add sandbox initialization logic
-    const initializeSandbox = useCallback(async () => {
-        try {
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
+    // Update the useEffect that handles tool invocations
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1]
+        if (lastMessage?.toolInvocations?.length) {
+            const streamlitCall = lastMessage.toolInvocations
+                .find(invocation =>
+                    invocation.toolName === 'create_streamlit_app' &&
+                    invocation.state === 'result'
+                )
 
-            if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`)
-            }
-
-            const data = await response.json()
-            setSandboxId(data.sandboxId)
-        } catch (error) {
-            console.error('Error initializing sandbox:', error)
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error initializing sandbox'
-            }])
-        }
-    }, [])
-
-    // Add streamlit update function
-    const updateStreamlitApp = useCallback(async (code: string) => {
-        if (!code || !sandboxId) return
-
-        try {
-            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`)
-            }
-
-            const data = await response.json()
-            if (data.url) {
-                setStreamlitUrl(data.url)
+            if (streamlitCall?.state === 'result' && streamlitCall.result) {
+                setGeneratedCode(streamlitCall.result)
                 setIsGeneratingCode(false)
             }
-        } catch (error) {
-            console.error('Error in updateStreamlitApp:', error)
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error updating Streamlit app'
-            }])
-            setIsGeneratingCode(false)
         }
-    }, [sandboxId])
-
-    // Initialize sandbox on mount
-    useEffect(() => {
-        initializeSandbox()
-    }, [initializeSandbox])
+    }, [messages])
 
     const toggleRightContent = useCallback(() => {
+        setShowTypingText(false)
         setIsRightContentVisible((prev) => !prev)
+        
+        if (isRightContentVisible) {
+            setTimeout(() => {
+                setShowTypingText(true)
+            }, 200)
+        }
+        
         if (resizableGroupRef.current) {
             setTimeout(() => {
                 resizableGroupRef.current.resetLayout()
             }, 0)
         }
-    }, [])
+    }, [isRightContentVisible])
 
     // Update URL without navigation using replaceState
     useEffect(() => {
@@ -289,62 +253,17 @@ export default function Home() {
         }
     }, [currentChatId])
 
-    // Realtime tool result handling from messages
-    useEffect(() => {
-        const lastMessage = messages[messages.length - 1]
-        if (lastMessage?.toolInvocations?.length) {
-            const streamlitCall = lastMessage.toolInvocations
-                .find(invocation =>
-                    invocation.toolName === 'create_streamlit_app' &&
-                    invocation.state === 'result'
-                )
+    // Handle rerun through sandbox context
+    const handleRerun = useCallback(async () => {
+        if (!sandbox.code) return
+        await updateCode(sandbox.code)
+    }, [sandbox.code, updateCode])
 
-            if (streamlitCall?.state === 'result') {
-                setGeneratedCode(streamlitCall.result)
-                setIsGeneratingCode(false)
-                updateStreamlitApp(streamlitCall.result)
-            }
-        }
-    }, [messages, updateStreamlitApp])
-
-    // Fetch tool results from messages when ChatID changes!
-    useEffect(() => {
-        async function fetchToolResults() {
-            if (!currentChatId) return;
-
-            try {
-                const response = await fetch(`/api/conversations/${currentChatId}/messages`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch messages');
-                }
-
-                const data = await response.json();
-
-                const streamlitCode = data.messages
-                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
-                    .map((msg: any) => {
-                        const toolResult = msg.tool_results[0];
-                        if (toolResult && toolResult.name === 'create_streamlit_app') {
-                            return toolResult.result;
-                        }
-                        return null;
-                    })
-                    .filter(Boolean)
-                    .pop();
-
-                if (streamlitCode) {
-                    setGeneratedCode(streamlitCode);
-                    if (!isGeneratingCode) {
-                        await updateStreamlitApp(streamlitCode);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching tool results:', error);
-            }
-        }
-
-        fetchToolResults();
-    }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
+    // Handle env vars through sandbox context
+    const handleEnvVarsChange = useCallback(async (envVars: Record<string, string>) => {
+        if (!sandbox.id) return
+        await updateEnvVars(envVars)
+    }, [sandbox.id, updateEnvVars])
 
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -382,7 +301,7 @@ export default function Home() {
                         "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
                         "h-screen pt-14"
                     )}>
-                        {showTypingText && (
+                        {showTypingText && !currentChatId && (
                             <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
                                 <TypingText
                                     text="From Data to App, in seconds."
@@ -415,45 +334,10 @@ export default function Home() {
                                     minSize={40}
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                                 >
-                                    <Tabs
-                                        defaultValue="code"
-                                        className="flex-grow flex flex-col h-full"
-                                    >
-                                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
-                                            <TabsTrigger
-                                                value="preview"
-                                                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                            >
-                                                App
-                                            </TabsTrigger>
-                                            <TabsTrigger
-                                                value="code"
-                                                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                            >
-                                                Code
-                                            </TabsTrigger>
-                                        </TabsList>
-
-                                        <TabsContent
-                                            value="preview"
-                                            className="flex-grow overflow-hidden mt-4"
-                                        >
-                                            <StreamlitPreview
-                                                url={streamlitUrl}
-                                                isGeneratingCode={isGeneratingCode}
-                                            />
-                                        </TabsContent>
-
-                                        <TabsContent
-                                            value="code"
-                                            className="flex-grow overflow-hidden mt-4"
-                                        >
-                                            <CodeView
-                                                code={generatedCode}
-                                                isGeneratingCode={isGeneratingCode}
-                                            />
-                                        </TabsContent>
-                                    </Tabs>
+                                    <StreamlitPreview
+                                        onRerun={handleRerun}
+                                        onEnvVarsChange={handleEnvVarsChange}
+                                    />
                                 </ResizablePanel>
                             )}
 
