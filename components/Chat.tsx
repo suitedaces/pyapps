@@ -252,8 +252,10 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                     invocation.state === 'result'
                 )
 
-            if (streamlitCall?.state === 'result') {
-                onUpdateStreamlit?.(streamlitCall.result)
+            if (streamlitCall?.state === 'result' && streamlitCall.result) {
+                setTimeout(() => {
+                    onUpdateStreamlit?.(streamlitCall.result)
+                }, 500)
             }
         }
     }, [onUpdateStreamlit])

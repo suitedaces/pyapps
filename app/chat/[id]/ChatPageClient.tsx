@@ -74,6 +74,7 @@ export default function ChatPageClient({
         isRightContentVisible: false,
         isAtBottom: true,
         loading: false,
+        isCodeVisible: false
     })
 
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
@@ -197,24 +198,33 @@ export default function ChatPageClient({
         }
     }, [])
 
+    const [initError, setInitError] = useState<string | null>(null)
+
     const updateStreamlitApp = useCallback(async (code: string) => {
         if (!code) return
 
         try {
             setSandbox(prev => ({ ...prev, isGenerating: true }))
+            setInitError(null)
             
-            // Initialize sandbox if needed
+            // First get/ensure sandbox ID
             let sandboxId = sandbox.id
             if (!sandboxId) {
-                sandboxId = await initializeSandbox()
-                if (!sandboxId) throw new Error('Failed to initialize sandbox')
+                const initResponse = await fetch('/api/sandbox/init', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                if (!initResponse.ok) throw new Error('Failed to initialize sandbox')
+                const { sandboxId: newId } = await initResponse.json()
+                sandboxId = newId
+                setSandbox(prev => ({ ...prev, id: newId }))
             }
 
-            // Execute code
+            // Execute code in sandbox
             const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
+                body: JSON.stringify({ code })
             })
 
             if (!response.ok) throw new Error('Failed to execute code')
@@ -227,17 +237,24 @@ export default function ChatPageClient({
                 isGenerating: false,
                 error: null
             }))
-            setIsGeneratingCode(false)
+
+            // Force right panel visibility when we have a URL
+            if (data.url && !uiState.isRightContentVisible) {
+                setUiState(prev => ({ 
+                    ...prev, 
+                    isRightContentVisible: true 
+                }))
+            }
         } catch (error) {
             console.error('Failed to update Streamlit app:', error)
+            setInitError(error instanceof Error ? error.message : 'Failed to update app')
             setSandbox(prev => ({
                 ...prev,
                 isGenerating: false,
                 error: error instanceof Error ? error.message : 'Failed to update app'
             }))
-            setIsGeneratingCode(false)
         }
-    }, [sandbox.id, initializeSandbox])
+    }, [sandbox.id, uiState.isRightContentVisible])
 
     // Handle new messages with Streamlit code
     useEffect(() => {
@@ -251,6 +268,11 @@ export default function ChatPageClient({
 
             if (streamlitCall?.state === 'result' && streamlitCall.result) {
                 setGeneratedCode(streamlitCall.result)
+                setUiState(prev => ({ 
+                    ...prev, 
+                    isRightContentVisible: true,
+                    isCodeVisible: true 
+                }))
                 updateStreamlitApp(streamlitCall.result)
             }
         }
@@ -391,8 +413,7 @@ export default function ChatPageClient({
         try {
             setSandbox(prev => ({ 
                 ...prev, 
-                isGenerating: true,
-                status: 'Refreshing Streamlit app...'  // Add status messages
+                isGenerating: true
             }))
 
             const response = await fetch(`/api/sandbox/${sandbox.id}/execute`, {
@@ -401,48 +422,33 @@ export default function ChatPageClient({
                 body: JSON.stringify({ code: generatedCode }),
             })
 
-            if (!response.ok) {
-                throw new Error('Failed to refresh sandbox')
-            }
+            if (!response.ok) throw new Error('Failed to refresh sandbox')
 
             const data = await response.json()
             setSandbox(prev => ({
                 ...prev,
                 url: data.url,
-                isGenerating: false,
-                status: null
+                isGenerating: false
             }))
         } catch (error) {
             console.error('Error refreshing sandbox:', error)
             setSandbox(prev => ({
                 ...prev,
                 isGenerating: false,
-                error: error instanceof Error ? error.message : 'Failed to refresh app',
-                status: null
+                error: error instanceof Error ? error.message : 'Failed to refresh app'
             }))
         }
     }, [sandbox.id, generatedCode])
 
-    const handleEnvVarsChange = useCallback(async (envVars: Record<string, string>) => {
-        if (!sandbox.id) return
-
-        try {
-            const response = await fetch(`/api/sandbox/${sandbox.id}/env`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ envVars }),
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to update environment variables')
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (sandbox.id) {
+                fetch(`/api/sandbox/${sandbox.id}/cleanup`, { method: 'POST' })
+                    .catch(error => console.error('Error cleaning up sandbox:', error))
             }
-
-            // Rerun the sandbox to apply new env vars
-            await handleRerun()
-        } catch (error) {
-            console.error('Error updating environment variables:', error)
         }
-    }, [sandbox.id, handleRerun])
+    }, [sandbox.id])
 
     if (isLoading) {
         return <div>Loading...</div>
@@ -506,39 +512,33 @@ export default function ChatPageClient({
                                 className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                             >
                                 <StreamlitPreview
-                                    onRerun={() => updateStreamlitApp(sandbox.code)}
-                                    onEnvVarsChange={handleEnvVarsChange}
+                                    onRerun={handleRerun}
+                                    code={generatedCode}
                                 />
                             </ResizablePanel>
                         )}
                     </ResizablePanelGroup>
 
-                    <div 
+                    <Button
+                        onClick={toggleRightContent}
                         className={cn(
                             "fixed top-[3.5rem]",
                             sidebarCollapsed ? "right-3" : "right-4",
-                            "z-50 transition-all duration-200"
+                            "z-50 bg-black hover:bg-black/90",
+                            "text-white",
+                            "border border-transparent",
+                            "transition-all duration-200 ease-in-out",
+                            "shadow-lg hover:shadow-xl",
+                            "rounded-lg"
                         )}
+                        size="icon"
                     >
-                        <Button
-                            onClick={toggleRightContent}
-                            className={cn(
-                                "bg-black hover:bg-black/90",
-                                "text-white",
-                                "border border-transparent",
-                                "transition-all duration-200 ease-in-out",
-                                "shadow-lg hover:shadow-xl",
-                                "rounded-lg"
-                            )}
-                            size="icon"
-                        >
-                            {uiState.isRightContentVisible ? (
-                                <ChevronRight className="h-4 w-4" />
-                            ) : (
-                                <ChevronLeft className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </div>
+                        {uiState.isRightContentVisible ? (
+                            <ChevronRight className="h-4 w-4" />
+                        ) : (
+                            <ChevronLeft className="h-4 w-4" />
+                        )}
+                    </Button>
                 </main>
             </div>
         </div>

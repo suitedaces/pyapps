@@ -1,14 +1,13 @@
 'use client'
 
 import { createContext, useContext, useCallback, useState, useEffect } from 'react'
-import { Sandbox, SandboxMetadata, RunningSandbox } from '@/lib/sandbox'
+import { Sandbox } from '@/lib/sandbox'
 import { useAuth } from './AuthContext'
 
-interface SandboxState {
+export interface SandboxState {
     id: string | null
     url: string | null
     isGenerating: boolean
-    isLoading: boolean
     code: string
     error: string | null
 }
@@ -16,9 +15,7 @@ interface SandboxState {
 interface SandboxContextType {
     sandbox: SandboxState
     updateCode: (code: string) => Promise<void>
-    rerunCode: () => Promise<void>
     updateEnvVars: (vars: Record<string, string>) => Promise<void>
-    initializeSandbox: () => Promise<string | null>
 }
 
 const SandboxContext = createContext<SandboxContextType | null>(null)
@@ -29,102 +26,54 @@ export function SandboxProvider({ children }: { children: React.ReactNode }) {
         id: null,
         url: null,
         isGenerating: false,
-        isLoading: false,
         code: '',
         error: null
     })
 
-    const initializeSandbox = useCallback(async () => {
-        try {
-            const runningSandboxes = await Sandbox.list()
-            const existingSandbox = runningSandboxes.find(
-                (sandbox: RunningSandbox) => sandbox.metadata?.userId === session?.user?.id
-            )
-
-            if (existingSandbox) {
-                setSandbox(prev => ({ 
-                    ...prev, 
-                    id: existingSandbox.sandboxId 
-                }))
-                return existingSandbox.sandboxId
-            }
-
-            const metadata: SandboxMetadata = {
-                userId: session?.user?.id || '',
-                createdAt: new Date().toISOString()
-            }
-
-            const newSandbox = await Sandbox.create(metadata)
-            setSandbox(prev => ({ ...prev, id: newSandbox.sandboxId }))
-            return newSandbox.sandboxId
-        } catch (error) {
-            setSandbox(prev => ({ 
-                ...prev, 
-                error: 'Failed to initialize sandbox' 
-            }))
-            return null
-        }
-    }, [session?.user?.id])
-
     const updateCode = useCallback(async (code: string) => {
-        if (!code) return
+        if (!code || !session?.user?.id) return
 
         try {
-            setSandbox(prev => ({ 
-                ...prev, 
-                isGenerating: true,
-                isLoading: true,
-                code,
-                error: null
-            }))
+            setSandbox(prev => ({ ...prev, isGenerating: true, error: null }))
             
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    metadata: {
-                        userId: session?.user?.id,
-                        createdAt: new Date().toISOString()
-                    }
+            // First get/ensure sandbox ID
+            let sandboxId = sandbox.id
+            if (!sandboxId) {
+                const initResponse = await fetch('/api/sandbox/init', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
                 })
-            })
-            
-            if (!response.ok) throw new Error('Failed to initialize sandbox')
-            const { sandboxId } = await response.json()
+                if (!initResponse.ok) throw new Error('Failed to initialize sandbox')
+                const { sandboxId: newId } = await initResponse.json()
+                sandboxId = newId
+                setSandbox(prev => ({ ...prev, id: newId }))
+            }
 
-            const executeResponse = await fetch(`/api/sandbox/${sandboxId}/execute`, {
+            // Execute code in sandbox
+            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
+                body: JSON.stringify({ code })
             })
 
-            if (!executeResponse.ok) throw new Error('Failed to execute code')
+            if (!response.ok) throw new Error('Failed to execute code')
             
-            const data = await executeResponse.json()
+            const data = await response.json()
             setSandbox(prev => ({
                 ...prev,
-                id: sandboxId,
                 url: data.url,
+                code,
                 isGenerating: false,
-                isLoading: false,
                 error: null
             }))
         } catch (error) {
-            console.error('Error updating code:', error)
             setSandbox(prev => ({
                 ...prev,
                 isGenerating: false,
-                isLoading: false,
-                error: error instanceof Error ? error.message : 'Failed to update app'
+                error: 'Failed to execute code'
             }))
         }
-    }, [session?.user?.id])
-
-    const rerunCode = useCallback(async () => {
-        if (sandbox.code) {
-            await updateCode(sandbox.code)
-        }
-    }, [sandbox.code, updateCode])
+    }, [sandbox.id, session?.user?.id])
 
     const updateEnvVars = useCallback(async (vars: Record<string, string>) => {
         if (!sandbox.id) return
@@ -133,32 +82,28 @@ export function SandboxProvider({ children }: { children: React.ReactNode }) {
             const response = await fetch(`/api/sandbox/${sandbox.id}/env`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ envVars: vars }),
+                body: JSON.stringify({ envVars: vars })
             })
 
             if (!response.ok) throw new Error('Failed to update environment variables')
-            await rerunCode()
+            
+            // Re-run code to apply new env vars
+            if (sandbox.code) {
+                await updateCode(sandbox.code)
+            }
         } catch (error) {
             setSandbox(prev => ({
                 ...prev,
-                error: error instanceof Error ? error.message : 'Failed to update env vars'
+                error: 'Failed to update environment variables'
             }))
         }
-    }, [sandbox.id, rerunCode])
-
-    useEffect(() => {
-        if (session?.user?.id) {
-            initializeSandbox()
-        }
-    }, [session?.user?.id, initializeSandbox])
+    }, [sandbox.id, sandbox.code, updateCode])
 
     return (
         <SandboxContext.Provider value={{ 
             sandbox, 
-            updateCode, 
-            rerunCode, 
-            updateEnvVars, 
-            initializeSandbox 
+            updateCode,
+            updateEnvVars
         }}>
             {children}
         </SandboxContext.Provider>

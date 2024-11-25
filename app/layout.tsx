@@ -1,14 +1,11 @@
-import { AuthProvider } from '@/contexts/AuthContext'
-import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
-import { SidebarProvider } from '@/contexts/SidebarContext'
-import { SandboxProvider } from '@/contexts/SandboxContext'
+import ClientLayout from '@/components/ClientLayout'
 
 const inter = Inter({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
+export const metadata = {
     title: 'grunty - generate apps for your data in seconds',
     description: 'Analyze CSV files with Streamlit and AI',
 }
@@ -22,13 +19,9 @@ export default function RootLayout({
         <html lang="en">
             <body className={inter.className}>
                 <Providers>
-                    <AuthProvider>
-                        <SandboxProvider>
-                            <SidebarProvider>
-                                {children}
-                            </SidebarProvider>
-                        </SandboxProvider>
-                    </AuthProvider>
+                    <ClientLayout>
+                        {children}
+                    </ClientLayout>
                 </Providers>
             </body>
         </html>
