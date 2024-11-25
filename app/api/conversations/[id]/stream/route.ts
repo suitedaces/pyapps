@@ -14,7 +14,10 @@ const RequestSchema = z.object({
     messages: z.array(z.object({
         content: z.string(),
         role: z.enum(['user', 'assistant', 'system']),
-        createdAt: z.date().optional(),
+        createdAt: z.union([
+            z.date(),
+            z.string().transform((str) => new Date(str))
+        ]).optional(),
     })),
     model: z.object({
         id: z.string(),

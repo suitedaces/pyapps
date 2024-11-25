@@ -112,6 +112,8 @@ export default function ChatPageClient({
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
+    const [showTypingText, setShowTypingText] = useState(true)
+    const [activeTab, setActiveTab] = useState('preview')
 
     // Code and preview state
     const [generatedCode, setGeneratedCode] = useState<string>('')
@@ -383,6 +385,7 @@ export default function ChatPageClient({
 
     // Handle chat creation callback
     const handleChatCreated = useCallback((chatId: string) => {
+        setShowTypingText(false)
         setCurrentChatId(chatId)
         router.replace(`/chat/${chatId}`)
     }, [router])
@@ -469,6 +472,11 @@ export default function ChatPageClient({
         }
     }, [])
 
+    const handleChatSubmit = useCallback(() => {
+        setShowTypingText(false)
+    }, [])
+
+
     if (isLoading) {
         return <div>Loading...</div>
     }
@@ -519,7 +527,15 @@ export default function ChatPageClient({
                                     chatId={currentChatId}
                                     initialMessages={initialMessages}
                                     onChatCreated={handleChatCreated}
+                                    onChatSubmit={handleChatSubmit}
                                     onChatFinish={handleChatFinish}
+                                    onUpdateStreamlit={updateStreamlitApp}
+                                    setActiveTab={setActiveTab}
+                                    setIsRightContentVisible={setIsRightContentVisible}
+                                    onCodeClick={() => {
+                                        setActiveTab('code')
+                                        setIsRightContentVisible(true)
+                                    }}
                                 />
                             </div>
                         </ResizablePanel>

@@ -53,6 +53,7 @@ export default function Home() {
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { session, isLoading: isAuthLoading } = useAuth()
     const [showTypingText, setShowTypingText] = useState(true)
+    const [activeTab, setActiveTab] = useState('preview')
 
     // Right panel state
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
@@ -531,13 +532,25 @@ export default function Home() {
                         >
                             <ResizablePanel defaultSize={65} minSize={45}>
                                 <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                    <Chat
-                                        chatId={currentChatId}
-                                        initialMessages={initialMessages}
-                                        onChatCreated={handleChatCreated}
-                                        onChatSubmit={handleChatSubmit}
-                                        onChatFinish={handleChatFinish}
-                                    />
+                                <Chat
+                                    chatId={currentChatId}
+                                    initialMessages={initialMessages}
+                                    onChatCreated={handleChatCreated}
+                                    onChatSubmit={handleChatSubmit}
+                                    onChatFinish={handleChatFinish}
+                                    onUpdateStreamlit={updateStreamlitApp}
+                                    setActiveTab={setActiveTab}
+                                    setIsRightContentVisible={setIsRightContentVisible}
+                                    onCodeClick={() => {
+                                        setActiveTab('code')
+                                        setIsRightContentVisible(prev => !prev)
+                                        if (resizableGroupRef.current) {
+                                            setTimeout(() => {
+                                                resizableGroupRef.current.resetLayout()
+                                            }, 0)
+                                        }
+                                    }}
+                                />
                                 </div>
                             </ResizablePanel>
 

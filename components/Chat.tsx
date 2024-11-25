@@ -1,5 +1,6 @@
 'use client'
 
+import { App, ExecutionResult } from '@/lib/schema'
 import { useChat } from 'ai/react'
 import { Message } from 'ai'
 import { useCallback, useRef, useState, useMemo } from 'react'
@@ -7,7 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import modelsList from '@/lib/models.json'
-import { LLMModelConfig } from '@/lib/types'
+import { LLMModelConfig, CustomMessage } from '@/lib/types'
 import { useLocalStorage } from 'usehooks-ts'
 import { Message as AIMessage } from '@/components/core/message'
 import Chatbar from '@/components/core/chatbar'
@@ -20,6 +21,9 @@ interface ChatProps {
     onUpdateStreamlit?: (message: string) => void
     onChatSubmit?: () => void
     onChatFinish?: () => void
+    onCodeClick?: () => void
+    setActiveTab?: (tab: string) => void
+    setIsRightContentVisible?: (visible: boolean | ((prev: boolean) => boolean)) => void
 }
 
 interface FileUploadState {
@@ -28,7 +32,7 @@ interface FileUploadState {
     error: string | null
 }
 
-export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit, onChatSubmit, onChatFinish }: ChatProps) {
+export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit, onChatSubmit, onChatFinish, onCodeClick, setActiveTab, setIsRightContentVisible }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -66,6 +70,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             model: currentModel,
             config: languageModel,
         },
+        sendExtraMessageFields: true,
         onResponse: async (response) => {
             if (!response.ok) {
                 handleResponseError(response)
@@ -80,9 +85,11 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
             }
         },
         onFinish: async (message) => {
+            console.log("Message steps:", message);
             setErrorState(null)
             setAttachedFile(null)
             resetFileUploadState()
+
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
             }
@@ -100,6 +107,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                     )
                     .pop()
             }
+
 
             onChatFinish?.()
         },
@@ -257,6 +265,29 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         ? "File attached. Remove file to type a message."
         : "Type your message..."
 
+    const [currentPreview, setCurrentPreview] = useState<{
+        object: App | undefined
+        result: ExecutionResult | undefined
+    }>({
+        object: undefined,
+        result: undefined
+    })
+
+    const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        if (!input.trim()) return
+
+        const userMessage: CustomMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: input.trim(),
+            createdAt: new Date(),
+            isCodeVisible: false
+        }
+
+        setAiMessages(prev => [...prev, userMessage])
+    }, [input, setAiMessages])
+
     return (
         <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">
             <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
@@ -266,6 +297,28 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                             <AIMessage
                                 {...message}
                                 isLastMessage={index === messages.length - 1}
+                                object={(message as CustomMessage).object}
+                                result={(message as CustomMessage).result}
+                                onObjectClick={({ object, result }) => {
+                                    setCurrentPreview?.({ object, result })
+                                    if (object?.code) {
+                                        onUpdateStreamlit?.(object.code)
+                                    }
+                                }}
+                                onToolResultClick={(result) => {
+                                    onUpdateStreamlit?.(result)
+                                }}
+                                onCodeClick={(messageId: string) => {
+                                    setAiMessages((prevMessages: Message[]) =>
+                                        prevMessages.map((msg: Message) =>
+                                            msg.id === messageId
+                                                ? { ...msg, isCodeVisible: !(msg as CustomMessage).isCodeVisible }
+                                                : msg
+                                        )
+                                    );
+                                    setActiveTab?.('code');
+                                    setIsRightContentVisible?.((prev: boolean) => !prev);
+                                }}
                             />
                         </div>
                     ))}

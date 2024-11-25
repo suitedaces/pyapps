@@ -1,6 +1,7 @@
 import { Json } from '@/lib/database.types'
 import { Message } from 'ai'
 import { z } from 'zod'
+import { App, ExecutionResult } from '@/lib/schema'
 
 // Model types
 export interface ModelProvider {
@@ -139,4 +140,10 @@ export interface VersionMetadata {
     version_number: number;
     app_id: string;
     created_at: string;
+}
+
+export interface CustomMessage extends Message {
+    object?: App
+    result?: ExecutionResult
+    isCodeVisible?: boolean
 }
