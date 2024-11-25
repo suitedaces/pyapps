@@ -83,7 +83,7 @@ export default function Home() {
     })
 
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
     })
 
     const currentModel = modelsList.models.find(
