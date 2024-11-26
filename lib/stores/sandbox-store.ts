@@ -5,15 +5,17 @@ interface SandboxState {
   sandbox: Sandbox | null
   sandboxId: string | null
   isInitializing: boolean
+  lastExecutedCode: string | null
   initializeSandbox: () => Promise<void>
   killSandbox: () => Promise<void>
-  updateSandbox: (code: string) => Promise<string | null>
+  updateSandbox: (code: string, forceExecute?: boolean) => Promise<string | null>
 }
 
 export const useSandboxStore = create<SandboxState>((set, get) => ({
   sandbox: null,
   sandboxId: null,
   isInitializing: false,
+  lastExecutedCode: null,
 
   initializeSandbox: async () => {
     const state = get()
@@ -57,9 +59,14 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
     }
   },
 
-  updateSandbox: async (code: string) => {
-    const { sandbox, sandboxId } = get()
+  updateSandbox: async (code: string, forceExecute = false) => {
+    const { sandbox, sandboxId, lastExecutedCode } = get()
     if (!sandbox || !sandboxId) return null
+
+    if (!forceExecute && code === lastExecutedCode) {
+      const url = sandbox.getHostname(8501)
+      return `https://${url}`
+    }
 
     try {
       await sandbox.filesystem.write('/app/app.py', code)
@@ -70,6 +77,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
       })
 
       const url = sandbox.getHostname(8501)
+      set({ lastExecutedCode: code })
       return `https://${url}`
     } catch (error) {
       console.error('Error updating sandbox:', error)

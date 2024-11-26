@@ -113,18 +113,7 @@ export default function ChatPageClient({
         if (sandboxId && session?.user?.id) {
             try {
                 setIsGeneratingCode(true);
-                const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ code: generatedCode })
-                });
-                if (!response.ok) {
-                    throw new Error('Failed to refresh app');
-                }
-                // Wait for a moment to allow the app to restart
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await updateStreamlitApp(generatedCode, true);
             } catch (error) {
                 console.error('Error refreshing app:', error);
             } finally {
@@ -256,8 +245,8 @@ export default function ChatPageClient({
     }, [initializeSandbox, killSandbox])
 
     // Streamlit update function using store
-    const updateStreamlitApp = useCallback(async (code: string) => {
-        const url = await updateSandbox(code)
+    const updateStreamlitApp = useCallback(async (code: string, forceExecute = false) => {
+        const url = await updateSandbox(code, forceExecute)
         if (url) {
             setStreamlitUrl(url)
             setIsGeneratingCode(false)
@@ -395,14 +384,8 @@ export default function ChatPageClient({
         setIsGeneratingCode(true)
 
         try {
-            console.log('🔄 Version switch initiated:', {
-                versionId: version.id,
-                appId: currentApp?.id,
-                versionNumber: version.version_number
-            })
-
             setGeneratedCode(version.code)
-            const url = await updateSandbox(version.code)
+            const url = await updateSandbox(version.code, true)
             if (url) {
                 setStreamlitUrl(url)
             }
