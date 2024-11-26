@@ -7,7 +7,7 @@ interface SandboxState {
   lastExecutedCode: string | null
   initializeSandbox: () => Promise<void>
   killSandbox: () => Promise<void>
-  updateSandbox: (code: string, forceExecute?: boolean) => Promise<string | null>
+  updateSandbox: (code: string, forceExecute: boolean) => Promise<string | null>
 }
 
 export const useSandboxStore = create<SandboxState>((set, get) => ({
@@ -58,7 +58,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
     }
   },
 
-  updateSandbox: async (code: string, forceExecute = false) => {
+  updateSandbox: async (code: string, forceExecute: boolean = false) => {
     const { sandboxId, lastExecutedCode } = get()
 
     if (!sandboxId) {

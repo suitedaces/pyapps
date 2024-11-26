@@ -280,8 +280,8 @@ export default function Home() {
     }, [initializeSandbox, killSandbox])
 
     // Add streamlit update function
-    const updateStreamlitApp = useCallback(async (code: string) => {
-        const url = await updateSandbox(code)
+    const updateStreamlitApp = useCallback(async (code: string, forceExecute: boolean = false) => {
+        const url = await updateSandbox(code, forceExecute)
         if (url) {
             setStreamlitUrl(url)
             setIsGeneratingCode(false)
@@ -388,7 +388,7 @@ export default function Home() {
             return
         }
 
-        isVersionSwitching.current = true;
+        isVersionSwitching.current = true
         setIsGeneratingCode(true)
 
         try {
@@ -398,40 +398,23 @@ export default function Home() {
                 versionNumber: version.version_number
             })
 
-            // Update code view
             setGeneratedCode(version.code)
-
-            // Reinitialize sandbox for the new version
-            const initResponse = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
-
-            if (!initResponse.ok) {
-                throw new Error('Failed to initialize sandbox')
-            }
-
-            const { sandboxId } = await initResponse.json()
-            console.log('🆕 New sandbox created:', { sandboxId })
-            setSandboxId(sandboxId)
-
-            // Update Streamlit preview with new sandbox
-            await updateStreamlitApp(version.code)
+            await updateStreamlitApp(version.code, true)
         } catch (error) {
             console.error('❌ Failed to update app with version:', error)
         } finally {
             setTimeout(() => {
                 setIsGeneratingCode(false)
-                isVersionSwitching.current = false;
+                isVersionSwitching.current = false
             }, 500)
         }
     }
 
     // Add useEffect to fetch app ID when chat loads
-    useEffect(() => {
-        async function fetchAppId() {
-            if (!currentChatId) return
+    const fetchAppId = useCallback(async () => {
+        if (!currentChatId) return
 
+        try {
             const { data: chat } = await supabase
                 .from('chats')
                 .select('app_id')
@@ -440,10 +423,32 @@ export default function Home() {
 
             if (chat?.app_id) {
                 setCurrentApp({ id: chat.app_id })
+
+                // Fetch latest version code
+                const { data: versions } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (versions?.code) {
+                    setGeneratedCode(versions.code)
+                    await updateStreamlitApp(versions.code, true)
+                }
             }
+        } catch (error) {
+            console.error('Error fetching app:', error)
         }
-        fetchAppId()
-    }, [currentChatId])
+    }, [currentChatId, supabase, updateStreamlitApp])
+
+    // Add this useEffect to trigger fetchAppId
+    useEffect(() => {
+        if (session?.user?.id && currentChatId) {
+            fetchAppId()
+        }
+    }, [session?.user?.id, currentChatId, fetchAppId])
 
     const handleChatFinish = useCallback(() => {
         console.log('🔄 Chat finished, refreshing version selector')
@@ -543,7 +548,7 @@ export default function Home() {
                                 </ResizablePanel>
                             )}
                             <div className="absolute top-2 right-4 flex gap-4 z-30">
-                                {currentApp && (
+                                {currentApp?.id && (
                                     <VersionSelector
                                         appId={currentApp.id}
                                         onVersionChange={handleVersionChange}
