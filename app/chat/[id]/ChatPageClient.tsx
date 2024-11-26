@@ -234,24 +234,36 @@ export default function ChatPageClient({
         updateSandbox
     } = useSandboxStore()
 
-    // Initialize sandbox on mount and cleanup on unmount
-    useEffect(() => {
-        console.log('Initializing sandbox in ChatPageClient')
-        initializeSandbox()
-        return () => {
-            console.log('Cleaning up sandbox in ChatPageClient')
-            killSandbox()
-        }
-    }, [initializeSandbox, killSandbox])
+    // Add a ref to track initialization
+    const initializationComplete = useRef(false)
+    const initializationPromise = useRef<Promise<void> | null>(null)
 
-    // Streamlit update function using store
+    // Modified initialization function that returns a promise
+    const ensureSandboxInitialized = useCallback(async () => {
+        if (initializationComplete.current) {
+            return
+        }
+
+        if (!initializationPromise.current) {
+            initializationPromise.current = (async () => {
+                await initializeSandbox()
+                initializationComplete.current = true
+            })()
+        }
+
+        return initializationPromise.current
+    }, [initializeSandbox])
+
+    // Modified updateStreamlitApp to ensure initialization
     const updateStreamlitApp = useCallback(async (code: string, forceExecute = false) => {
+        await ensureSandboxInitialized()
+
         const url = await updateSandbox(code, forceExecute)
         if (url) {
             setStreamlitUrl(url)
             setIsGeneratingCode(false)
         }
-    }, [updateSandbox])
+    }, [updateSandbox, ensureSandboxInitialized])
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
@@ -374,9 +386,16 @@ export default function ChatPageClient({
 
     const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
 
+    // Add debug log for page load
+    useEffect(() => {
+        if (generatedCode && sandboxId) {
+            updateStreamlitApp(generatedCode, true)
+        }
+    }, []) // Empty dependency array for mount only
+
+    // Modify handleVersionChange
     const handleVersionChange = async (version: AppVersion) => {
         if (!version.code) {
-            console.error('No code found in version:', version)
             return
         }
 
@@ -384,25 +403,29 @@ export default function ChatPageClient({
         setIsGeneratingCode(true)
 
         try {
+            await ensureSandboxInitialized()
             setGeneratedCode(version.code)
-            const url = await updateSandbox(version.code, true)
-            if (url) {
-                setStreamlitUrl(url)
-            }
+            await updateStreamlitApp(version.code, true)
         } catch (error) {
-            console.error('❌ Failed to update app with version:', error)
             setSandboxErrors(prev => [...prev, {
                 message: error instanceof Error ? error.message : 'Error updating version'
             }])
         } finally {
-            setTimeout(() => {
-                setIsGeneratingCode(false)
-                isVersionSwitching.current = false
-            }, 500)
+            setIsGeneratingCode(false)
+            isVersionSwitching.current = false
         }
     }
 
-    // This useEffect fetches versions whenever app_id changes
+    // Modify cleanup
+    useEffect(() => {
+        return () => {
+            killSandbox()
+            initializationComplete.current = false
+            initializationPromise.current = null
+        }
+    }, [killSandbox])
+
+    // Modify fetchAppId
     const fetchAppId = useCallback(async () => {
         if (!currentChatId) return
 
@@ -415,7 +438,6 @@ export default function ChatPageClient({
         if (chat?.app_id) {
             setCurrentApp({ id: chat.app_id })
 
-            // Fetch latest version and execute it
             const { data: versions } = await supabase
                 .from('versions')
                 .select('*')
@@ -426,7 +448,7 @@ export default function ChatPageClient({
 
             if (versions?.code) {
                 setGeneratedCode(versions.code)
-                updateStreamlitApp(versions.code)
+                await updateStreamlitApp(versions.code, true)
             }
         }
     }, [currentChatId, supabase, updateStreamlitApp])
@@ -436,7 +458,6 @@ export default function ChatPageClient({
     }, [fetchAppId])
 
     const handleChatFinish = useCallback(() => {
-        console.log('🔄 Chat finished, refreshing version selector')
         if (versionSelectorRef.current) {
             versionSelectorRef.current.refreshVersions()
         }

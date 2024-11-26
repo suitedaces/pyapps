@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { Sandbox } from 'e2b'
 
 interface SandboxState {
-  sandbox: Sandbox | null
   sandboxId: string | null
   isInitializing: boolean
   lastExecutedCode: string | null
@@ -12,14 +11,13 @@ interface SandboxState {
 }
 
 export const useSandboxStore = create<SandboxState>((set, get) => ({
-  sandbox: null,
   sandboxId: null,
   isInitializing: false,
   lastExecutedCode: null,
 
   initializeSandbox: async () => {
     const state = get()
-    if (state.isInitializing || state.sandbox) return
+    if (state.isInitializing || state.sandboxId) return
 
     set({ isInitializing: true })
 
@@ -34,10 +32,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
       }
 
       const data = await response.json()
-      const sandbox = await Sandbox.reconnect(data.sandboxId)
-
       set({
-        sandbox,
         sandboxId: data.sandboxId,
         isInitializing: false
       })
@@ -48,11 +43,15 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
   },
 
   killSandbox: async () => {
-    const { sandbox } = get()
-    if (sandbox) {
+    const { sandboxId } = get()
+    if (sandboxId) {
       try {
-        await sandbox.close()
-        set({ sandbox: null, sandboxId: null })
+        await fetch(`/api/sandbox/${sandboxId}/kill`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sandboxId })
+        })
+        set({ sandboxId: null })
       } catch (error) {
         console.error('Error killing sandbox:', error)
       }
@@ -60,25 +59,30 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
   },
 
   updateSandbox: async (code: string, forceExecute = false) => {
-    const { sandbox, sandboxId, lastExecutedCode } = get()
-    if (!sandbox || !sandboxId) return null
+    const { sandboxId, lastExecutedCode } = get()
+
+    if (!sandboxId) {
+      return null
+    }
 
     if (!forceExecute && code === lastExecutedCode) {
-      const url = sandbox.getHostname(8501)
-      return `https://${url}`
+      return null
     }
 
     try {
-      await sandbox.filesystem.write('/app/app.py', code)
-      const process = await sandbox.process.start({
-        cmd: 'streamlit run /app/app.py',
-        onStdout: (data) => console.log('Streamlit stdout:', data),
-        onStderr: (data) => console.error('Streamlit stderr:', data),
+      const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
       })
 
-      const url = sandbox.getHostname(8501)
+      if (!response.ok) {
+        throw new Error(`Failed to execute code: ${response.status}`)
+      }
+
+      const data = await response.json()
       set({ lastExecutedCode: code })
-      return `https://${url}`
+      return data.url
     } catch (error) {
       console.error('Error updating sandbox:', error)
       return null
