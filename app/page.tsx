@@ -526,20 +526,20 @@ export default function Home() {
                         "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
                         "h-screen pt-14"
                     )}>
-                        {showTypingText && (
-                            <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-                                <TypingText
-                                    text="From Data to App, in seconds."
-                                    className="text-black font-semibold text-4xl whitespace-nowrap"
-                                    show={showTypingText}
-                                />
-                            </div>
-                        )}
                         <ResizablePanelGroup
                             direction="horizontal"
                             ref={resizableGroupRef}
                         >
-                            <ResizablePanel defaultSize={65} minSize={45}>
+                            <ResizablePanel defaultSize={65} minSize={45} className='relative'>
+                                {showTypingText && (
+                                    <div className="absolute w-full top-1/3 transform z-50">
+                                        <TypingText
+                                            text="From Data to App, in seconds."
+                                            className="text-black font-semibold text-4xl whitespace-nowrap"
+                                            show={showTypingText}
+                                        />
+                                    </div>
+                                )}
                                 <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
                                     <Chat
                                         chatId={currentChatId}
