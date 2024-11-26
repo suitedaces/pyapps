@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Globe } from 'lucide-react'
 import { PreviewPanel } from '@/components/PreviewPanel'
-import { StreamlitPreview } from '@/components/StreamlitPreview'
+import { StreamlitPreview, StreamlitPreviewRef } from '@/components/StreamlitPreview'
 import { ResizableHandle } from '@/components/ui/resizable'
 import { Message } from 'ai'
 import { useChat } from 'ai/react'
@@ -460,15 +460,18 @@ export default function Home() {
     const [showCodeView, setShowCodeView] = useState(false)
 
     const handleRefresh = useCallback(() => {
-        if (generatedCode) {
-            setIsGeneratingCode(true)
-            updateStreamlitApp(generatedCode, true)
+        if (streamlitPreviewRef.current) {
+            streamlitPreviewRef.current.refreshIframe()
         }
-    }, [generatedCode, updateStreamlitApp])
+        setIsGeneratingCode(true)
+        setTimeout(() => setIsGeneratingCode(false), 500)
+    }, [])
 
     const handleCodeViewToggle = useCallback(() => {
         setShowCodeView(prev => !prev)
     }, [])
+
+    const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
 
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>

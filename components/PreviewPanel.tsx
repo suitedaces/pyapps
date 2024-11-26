@@ -3,7 +3,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { Code, Globe, RefreshCcw } from 'lucide-react'
 import { CodeView } from './CodeView'
-import { StreamlitPreview } from './StreamlitPreview'
+import { StreamlitPreview, StreamlitPreviewRef } from './StreamlitPreview'
+import { useRef } from 'react'
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
@@ -22,6 +23,15 @@ export function PreviewPanel({
     onRefresh,
     onCodeViewToggle,
 }: PreviewPanelProps) {
+    const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
+
+    const handleRefresh = () => {
+        if (streamlitPreviewRef.current) {
+            streamlitPreviewRef.current.refreshIframe()
+        }
+        onRefresh?.()
+    }
+
     return (
         <div className="h-full flex flex-col">
             <div className="flex items-center gap-2 p-2 border-b bg-muted/40">
@@ -36,7 +46,7 @@ export function PreviewPanel({
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={onRefresh}
+                    onClick={handleRefresh}
                     className="hover:bg-background"
                     title="Refresh App"
                     disabled={isGeneratingCode}
@@ -69,11 +79,9 @@ export function PreviewPanel({
                     </div>
                 ) : (
                     <StreamlitPreview
+                        ref={streamlitPreviewRef}
                         url={streamlitUrl}
                         isGeneratingCode={isGeneratingCode}
-                        onRefresh={onRefresh}
-                        onToggleCode={onCodeViewToggle}
-                        showCode={showCodeView}
                     />
                 )}
             </div>

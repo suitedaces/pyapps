@@ -1,18 +1,31 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, Globe } from 'lucide-react'
+import { useRef, forwardRef, useImperativeHandle } from 'react'
 
 interface StreamlitPreviewProps {
     url: string | null
     isGeneratingCode: boolean
-    onRefresh?: () => void
-    onToggleCode?: () => void
-    showCode?: boolean
 }
 
-export function StreamlitPreview({ 
+export interface StreamlitPreviewRef {
+    refreshIframe: () => void
+}
+
+export const StreamlitPreview = forwardRef<StreamlitPreviewRef, StreamlitPreviewProps>(({ 
     url, 
     isGeneratingCode
-}: StreamlitPreviewProps) {
+}, ref) => {
+    const iframeRef = useRef<HTMLIFrameElement>(null)
+
+    // Expose refreshIframe method through ref
+    useImperativeHandle(ref, () => ({
+        refreshIframe: () => {
+            if (iframeRef.current) {
+                iframeRef.current.src = iframeRef.current.src
+            }
+        }
+    }))
+
     const content = (
         <div className="h-full relative">
             {isGeneratingCode && (
@@ -42,6 +55,7 @@ export function StreamlitPreview({
                 </div>
             ) : (
                 <iframe
+                    ref={iframeRef}
                     src={url}
                     className="w-full h-full border-0"
                     allow="accelerometer; camera; gyroscope; microphone"
@@ -57,4 +71,6 @@ export function StreamlitPreview({
             </CardContent>
         </Card>
     );
-}
+})
+
+StreamlitPreview.displayName = 'StreamlitPreview'
