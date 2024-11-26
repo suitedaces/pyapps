@@ -1,15 +1,13 @@
 'use client'
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Session } from '@supabase/supabase-js'
 
 import { Chat } from '@/components/Chat'
-import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { Button } from '@/components/ui/button'
 import { useChat } from 'ai/react'
-import { ChevronLeft, ChevronRight, Code, Globe, RefreshCcw } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -30,22 +28,9 @@ import { VersionSelector } from '@/components/VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { createVersion } from '@/lib/supabase'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
-import { Input } from '@/components/ui/input'
 
 interface ChatPageClientProps {
     initialChat: any
-}
-
-const truncate = (str: string) => {
-    const maxLength = 30 // Adjust this value as needed
-    if (str.length <= maxLength) return str
-    const extension = str.slice(str.lastIndexOf('.'))
-    const nameWithoutExtension = str.slice(0, str.lastIndexOf('.'))
-    const truncatedName = nameWithoutExtension.slice(
-        0,
-        maxLength - 3 - extension.length
-    )
-    return `${truncatedName}...${extension}`
 }
 
 async function getOrCreateApp(chatId: string | null, userId: string) {
@@ -527,24 +512,22 @@ export default function ChatPageClient({
                         </ResizablePanel>
 
                         {isRightContentVisible && (
-                            <ResizablePanel
-                                minSize={40}
-                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
-                            >
-                                <PreviewPanel
-                                    streamlitUrl={streamlitUrl}
-                                    generatedCode={generatedCode}
-                                    isGeneratingCode={isGeneratingCode}
-                                    showCodeView={showCodeView}
-                                    onRefresh={handleRefresh}
-                                    onCodeViewToggle={handleCodeViewToggle}
-                                />
-                            </ResizablePanel>
-                        )}
-                        {isRightContentVisible && (
-                            <CustomHandle
-                                className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors"
-                            />
+                            <>
+                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
+                                <ResizablePanel
+                                    minSize={40}
+                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
+                                >
+                                    <PreviewPanel
+                                        streamlitUrl={streamlitUrl}
+                                        generatedCode={generatedCode}
+                                        isGeneratingCode={isGeneratingCode}
+                                        showCodeView={showCodeView}
+                                        onRefresh={handleRefresh}
+                                        onCodeViewToggle={handleCodeViewToggle}
+                                    />
+                                </ResizablePanel>
+                            </>
                         )}
                     </ResizablePanelGroup>
                     <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">

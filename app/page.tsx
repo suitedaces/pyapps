@@ -460,7 +460,10 @@ export default function Home() {
     const [showCodeView, setShowCodeView] = useState(false)
 
     const handleRefresh = useCallback(() => {
-        updateStreamlitApp(generatedCode)
+        if (generatedCode) {
+            setIsGeneratingCode(true)
+            updateStreamlitApp(generatedCode, true)
+        }
     }, [generatedCode, updateStreamlitApp])
 
     const handleCodeViewToggle = useCallback(() => {
@@ -529,23 +532,22 @@ export default function Home() {
                             </ResizablePanel>
 
                             {isRightContentVisible && (
-                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
-                            )}
-
-                            {isRightContentVisible && (
-                                <ResizablePanel
-                                    minSize={40}
-                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
-                                >
-                                    <PreviewPanel
-                                        streamlitUrl={streamlitUrl}
-                                        generatedCode={generatedCode}
-                                        isGeneratingCode={isGeneratingCode}
-                                        showCodeView={showCodeView}
-                                        onRefresh={handleRefresh}
-                                        onCodeViewToggle={handleCodeViewToggle}
-                                    />
-                                </ResizablePanel>
+                                <>
+                                    <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
+                                    <ResizablePanel
+                                        minSize={40}
+                                        className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
+                                    >
+                                        <PreviewPanel
+                                            streamlitUrl={streamlitUrl}
+                                            generatedCode={generatedCode}
+                                            isGeneratingCode={isGeneratingCode}
+                                            showCodeView={showCodeView}
+                                            onRefresh={handleRefresh}
+                                            onCodeViewToggle={handleCodeViewToggle}
+                                        />
+                                    </ResizablePanel>
+                                </>
                             )}
                             <div className="absolute top-2 right-4 flex gap-4 z-30">
                                 {currentApp?.id && (
