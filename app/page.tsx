@@ -31,6 +31,7 @@ import { VersionSelector } from '@/components/VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createVersion } from '@/lib/supabase'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { Input } from '@/components/ui/input'
 
 // Add CustomHandle component
@@ -263,58 +264,29 @@ export default function Home() {
         }
     }, [chatLoading])
 
-    // Add sandbox initialization logic
-    const initializeSandbox = useCallback(async () => {
-        try {
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
+    // Sandbox state management
+    const {
+        initializeSandbox,
+        killSandbox,
+        updateSandbox
+    } = useSandboxStore()
 
-            if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`)
-            }
+    useEffect(() => {
+        initializeSandbox()
 
-            const data = await response.json()
-            setSandboxId(data.sandboxId)
-        } catch (error) {
-            console.error('Error initializing sandbox:', error)
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error initializing sandbox'
-            }])
+        return () => {
+            killSandbox()
         }
-    }, [])
+    }, [initializeSandbox, killSandbox])
 
     // Add streamlit update function
     const updateStreamlitApp = useCallback(async (code: string) => {
-        if (!code || !sandboxId) return
-
-        try {
-            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`)
-            }
-
-            const data = await response.json()
-            if (data.url) {
-                setStreamlitUrl(data.url)
-                setIsGeneratingCode(false)
-            }
-        } catch (error) {
-            console.error('Error in updateStreamlitApp:', error)
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error updating Streamlit app'
-            }])
+        const url = await updateSandbox(code)
+        if (url) {
+            setStreamlitUrl(url)
             setIsGeneratingCode(false)
         }
-    }, [sandboxId])
+    }, [updateSandbox])
 
     // Initialize sandbox on mount
     useEffect(() => {

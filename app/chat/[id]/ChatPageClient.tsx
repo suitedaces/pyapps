@@ -22,13 +22,14 @@ import { Sidebar } from '@/components/Sidebar'
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
 import modelsList from '@/lib/models.json'
-import { useAuth } from '@/contexts/AuthContext' 
+import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/core/Logo'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { VersionSelector } from '@/components/VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { createVersion } from '@/lib/supabase'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { Input } from '@/components/ui/input'
 
 interface ChatPageClientProps {
@@ -237,65 +238,31 @@ export default function ChatPageClient({
     const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
 
-    //  sandbox initialization
-    const initializeSandbox = useCallback(async () => {
-        try {
-            console.log('Initializing sandbox...');
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
+    // Sandbox store hooks
+    const {
+        initializeSandbox,
+        killSandbox,
+        updateSandbox
+    } = useSandboxStore()
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
-            }
-
-            const data = await response.json()
-            console.log('Sandbox initialized with ID:', data.sandboxId);
-            setSandboxId(data.sandboxId)
-        } catch (error) {
-            console.error('Error initializing sandbox:', error);
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error initializing sandbox'
-            }])
-        }
-    }, [])
-
-    //  streamlit update function
-    const updateStreamlitApp = useCallback(async (code: string) => {
-        if (!code || !sandboxId) {
-            return;
-        }
-
-        try {
-            console.log('Updating Streamlit app with code:', code);
-            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
-            }
-
-            const data = await response.json()
-            if (data.url) {
-                setStreamlitUrl(data.url)
-            }
-        } catch (error) {
-            console.error('Error in updateStreamlitApp:', error)
-        }
-    }, [sandboxId])
-
-    // Initialize sandbox on mount
+    // Initialize sandbox on mount and cleanup on unmount
     useEffect(() => {
-        if (!sandboxId && session?.user?.id) {
-            initializeSandbox()
+        console.log('Initializing sandbox in ChatPageClient')
+        initializeSandbox()
+        return () => {
+            console.log('Cleaning up sandbox in ChatPageClient')
+            killSandbox()
         }
-    }, [initializeSandbox, sandboxId, session])
+    }, [initializeSandbox, killSandbox])
+
+    // Streamlit update function using store
+    const updateStreamlitApp = useCallback(async (code: string) => {
+        const url = await updateSandbox(code)
+        if (url) {
+            setStreamlitUrl(url)
+            setIsGeneratingCode(false)
+        }
+    }, [updateSandbox])
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
@@ -424,7 +391,7 @@ export default function ChatPageClient({
             return
         }
 
-        isVersionSwitching.current = true;
+        isVersionSwitching.current = true
         setIsGeneratingCode(true)
 
         try {
@@ -434,31 +401,20 @@ export default function ChatPageClient({
                 versionNumber: version.version_number
             })
 
-            // Update code view
             setGeneratedCode(version.code)
-
-            // Reinitialize sandbox for the new version
-            const initResponse = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
-
-            if (!initResponse.ok) {
-                throw new Error('Failed to initialize sandbox')
+            const url = await updateSandbox(version.code)
+            if (url) {
+                setStreamlitUrl(url)
             }
-
-            const { sandboxId } = await initResponse.json()
-            console.log('🆕 New sandbox created:', { sandboxId })
-            setSandboxId(sandboxId)
-
-            // Update Streamlit preview with new sandbox
-            await updateStreamlitApp(version.code)
         } catch (error) {
             console.error('❌ Failed to update app with version:', error)
+            setSandboxErrors(prev => [...prev, {
+                message: error instanceof Error ? error.message : 'Error updating version'
+            }])
         } finally {
             setTimeout(() => {
                 setIsGeneratingCode(false)
-                isVersionSwitching.current = false;
+                isVersionSwitching.current = false
             }, 500)
         }
     }
@@ -475,7 +431,7 @@ export default function ChatPageClient({
 
         if (chat?.app_id) {
             setCurrentApp({ id: chat.app_id })
-            
+
             // Fetch latest version and execute it
             const { data: versions } = await supabase
                 .from('versions')
