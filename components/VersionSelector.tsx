@@ -1,50 +1,41 @@
 'use client'
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { Button } from './ui/button'
 import { useEffect, useState, useImperativeHandle, forwardRef } from 'react'
 import { AppVersion } from '@/lib/types'
 import { getVersionHistory, switchVersion } from '@/lib/supabase'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-// Props we need to make this work
 interface VersionSelectorProps {
     appId: string
     onVersionChange: (version: AppVersion) => void
 }
 
-// This lets parent components refresh our versions list
 export interface VersionSelectorRef {
     refreshVersions: () => void
 }
 
-// Main component - using forwardRef so parent can call our refresh function
 export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorProps>(
     function VersionSelector({ appId, onVersionChange }, ref) {
-        // Track all the versions and which one is current
         const [versions, setVersions] = useState<AppVersion[]>([])
-        const [currentVersionId, setCurrentVersionId] = useState<string>()
+        const [currentIndex, setCurrentIndex] = useState<number>(0)
         const [isLoading, setIsLoading] = useState(false)
-
-        // Only update code view on first load
         const [isInitialLoad, setIsInitialLoad] = useState(true)
 
-        // Fetch and set up versions
         const loadVersions = async () => {
             if (!appId) return
 
             setIsLoading(true)
             try {
-                // Get all versions for this app
                 const versionsData = await getVersionHistory(appId)
                 setVersions(versionsData)
 
-                // If we have versions, set up the latest one
                 if (versionsData.length > 0) {
-                    const latestVersion = versionsData[0]
-                    setCurrentVersionId(latestVersion.id)
+                    setCurrentIndex(0)
 
-                    // Only update code on first load to avoid loops
                     if (isInitialLoad) {
-                        onVersionChange(latestVersion)
+                        onVersionChange(versionsData[0])
                         setIsInitialLoad(false)
                     }
                 }
@@ -55,39 +46,29 @@ export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorPro
             }
         }
 
-        // Let parent components call our refresh function
         useImperativeHandle(ref, () => ({
             refreshVersions: loadVersions
         }))
 
-        // Load versions when app changes
         useEffect(() => {
             loadVersions()
         }, [appId])
 
-        // Handle version selection
-        const handleVersionChange = async (versionId: string) => {
-            if (!appId || !versionId) return
+        const handleVersionChange = async (newIndex: number) => {
+            if (!appId || newIndex < 0 || newIndex >= versions.length) return
 
             setIsLoading(true)
             try {
-                // Find the version they picked
-                const selectedVersion = versions.find(v => v.id === versionId)
-                if (!selectedVersion) throw new Error('Version not found')
+                const selectedVersion = versions[newIndex]
+                await switchVersion(appId, selectedVersion.id)
 
-                // Update in the database
-                await switchVersion(appId, versionId)
-
-                // Update our local state
-                setCurrentVersionId(versionId)
-                setVersions(prev => prev.map(v => ({
+                setCurrentIndex(newIndex)
+                setVersions(prev => prev.map((v, idx) => ({
                     ...v,
-                    is_current: v.id === versionId
+                    is_current: idx === newIndex
                 })))
 
-                // Let parent know to update code view
                 onVersionChange(selectedVersion)
-
             } catch (error) {
                 console.error('Failed to switch version:', error)
             } finally {
@@ -95,35 +76,64 @@ export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorPro
             }
         }
 
-        // Nice clean dropdown for version selection
+        const navigateVersion = (direction: 'prev' | 'next') => {
+            const newIndex = direction === 'prev' ? currentIndex + 1 : currentIndex - 1
+            handleVersionChange(newIndex)
+        }
+
+        if (versions.length === 0) return null
+
         return (
-            <Select
-                value={currentVersionId}
-                onValueChange={handleVersionChange}
-                disabled={isLoading}
-            >
-                <SelectTrigger className="w-[180px] text-black">
-                    <SelectValue
-                        placeholder={isLoading ? "Loading..." : "Select version"}
-                        className="text-black"
-                    />
-                </SelectTrigger>
-                <SelectContent className="text-black">
-                    {versions.map((version) => (
-                        <SelectItem
-                            key={version.id}
-                            value={version.id}
-                            className="text-black"
-                        >
-                            Version {version.version_number}
-                            {version.is_current && " (Current)"}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigateVersion('prev')}
+                    disabled={isLoading || currentIndex === versions.length - 1}
+                    className={cn(
+                        "h-8 w-8",
+                        "bg-white hover:bg-gray-100",
+                        "border border-gray-200",
+                        "text-gray-700",
+                        "transition-all duration-200"
+                    )}
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <div className="flex items-center justify-center min-w-[120px] px-3 py-1.5 bg-white border border-gray-200 rounded-md">
+                    <span className="text-sm font-medium text-gray-700">
+                        {isLoading ? (
+                            "Loading..."
+                        ) : (
+                            <>
+                                Version {versions[currentIndex]?.version_number}
+                                <span className="text-xs text-gray-400 ml-1">
+                                    / {versions.length}
+                                </span>
+                            </>
+                        )}
+                    </span>
+                </div>
+
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigateVersion('next')}
+                    disabled={isLoading || currentIndex === 0}
+                    className={cn(
+                        "h-8 w-8",
+                        "bg-white hover:bg-gray-100",
+                        "border border-gray-200",
+                        "text-gray-700",
+                        "transition-all duration-200"
+                    )}
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
         )
     }
 )
 
-// Help React DevTools show a nice name
 VersionSelector.displayName = 'VersionSelector'
