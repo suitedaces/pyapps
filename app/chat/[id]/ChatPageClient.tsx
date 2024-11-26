@@ -6,34 +6,30 @@ import { Session } from '@supabase/supabase-js'
 import { Chat } from '@/components/Chat'
 import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
-import { StreamlitPreview } from '@/components/StreamlitPreview'
+import { PreviewPanel } from '@/components/PreviewPanel'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChat } from 'ai/react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Code, Globe, RefreshCcw } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Message } from 'ai'
 
-import {
-    ResizableHandle,
-    ResizablePanel,
-    ResizablePanelGroup,
-} from '@/components/ui/resizable'
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
 import { Sidebar } from '@/components/Sidebar'
 
 import { useLocalStorage } from 'usehooks-ts'
 import { LLMModelConfig } from '@/lib/types'
 import modelsList from '@/lib/models.json'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext' 
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/core/Logo'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { VersionSelector } from '@/components/VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { createVersion } from '@/lib/supabase'
+import { Input } from '@/components/ui/input'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -50,14 +46,6 @@ const truncate = (str: string) => {
     )
     return `${truncatedName}...${extension}`
 }
-
-const CustomHandle = ({ ...props }) => (
-    <ResizableHandle {...props} withHandle className="relative">
-        <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
-            <div className="h-8 w-1 rounded-full bg-black" />
-        </div>
-    </ResizableHandle>
-)
 
 async function getOrCreateApp(chatId: string | null, userId: string) {
     if (!chatId) throw new Error('No chat ID provided')
@@ -117,6 +105,36 @@ export default function ChatPageClient({
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
+    const [showCodeView, setShowCodeView] = useState(false)
+    const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
+
+    const handleRefresh = async () => {
+        if (sandboxId && session?.user?.id) {
+            try {
+                setIsGeneratingCode(true);
+                const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code: generatedCode })
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to refresh app');
+                }
+                // Wait for a moment to allow the app to restart
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } catch (error) {
+                console.error('Error refreshing app:', error);
+            } finally {
+                setIsGeneratingCode(false);
+            }
+        }
+    };
+
+    const handleCodeViewToggle = () => {
+        setShowCodeView(!showCodeView);
+    };
 
     // Version switching stuff
     const isVersionSwitching = useRef(false)
@@ -274,8 +292,10 @@ export default function ChatPageClient({
 
     // Initialize sandbox on mount
     useEffect(() => {
-        initializeSandbox()
-    }, [initializeSandbox])
+        if (!sandboxId && session?.user?.id) {
+            initializeSandbox()
+        }
+    }, [initializeSandbox, sandboxId, session])
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
@@ -455,8 +475,22 @@ export default function ChatPageClient({
 
         if (chat?.app_id) {
             setCurrentApp({ id: chat.app_id })
+            
+            // Fetch latest version and execute it
+            const { data: versions } = await supabase
+                .from('versions')
+                .select('*')
+                .eq('app_id', chat.app_id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+            if (versions?.code) {
+                setGeneratedCode(versions.code)
+                updateStreamlitApp(versions.code)
+            }
         }
-    }, [currentChatId, supabase])
+    }, [currentChatId, supabase, updateStreamlitApp])
 
     useEffect(() => {
         fetchAppId()
@@ -468,6 +502,14 @@ export default function ChatPageClient({
             versionSelectorRef.current.refreshVersions()
         }
     }, [])
+
+    const CustomHandle = ({ ...props }) => (
+        <ResizableHandle {...props} withHandle className="relative">
+            <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
+                <div className="h-8 w-1 rounded-full bg-black" />
+            </div>
+        </ResizableHandle>
+    )
 
     if (isLoading) {
         return <div>Loading...</div>
@@ -525,85 +567,54 @@ export default function ChatPageClient({
                         </ResizablePanel>
 
                         {isRightContentVisible && (
-                            <CustomHandle
-                                className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors"
-                            />
-                        )}
-
-                        {isRightContentVisible && (
                             <ResizablePanel
                                 minSize={40}
                                 className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                             >
-                                <Tabs
-                                    defaultValue="code"
-                                    className="flex-grow flex flex-col h-full"
-                                >
-                                    <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
-                                        <TabsTrigger
-                                            value="preview"
-                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                        >
-                                            App
-                                        </TabsTrigger>
-                                        <TabsTrigger
-                                            value="code"
-                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                        >
-                                            Code
-                                        </TabsTrigger>
-                                    </TabsList>
-
-                                    <TabsContent
-                                        value="preview"
-                                        className="flex-grow overflow-hidden mt-4"
-                                    >
-                                        <StreamlitPreview
-                                            url={streamlitUrl}
-                                            isGeneratingCode={isGeneratingCode}
-                                        />
-                                    </TabsContent>
-
-                                    <TabsContent value="code" className="flex-grow overflow-hidden mt-4">
-                                        <CodeView
-                                            code={generatedCode}
-                                            isGeneratingCode={isGeneratingCode || isCreatingVersion}
-                                        />
-                                    </TabsContent>
-                                </Tabs>
+                                <PreviewPanel
+                                    streamlitUrl={streamlitUrl}
+                                    generatedCode={generatedCode}
+                                    isGeneratingCode={isGeneratingCode}
+                                    showCodeView={showCodeView}
+                                    onRefresh={handleRefresh}
+                                    onCodeViewToggle={handleCodeViewToggle}
+                                />
                             </ResizablePanel>
                         )}
-
-                        <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
-                            {currentApp && (
-                                <VersionSelector
-                                    appId={currentApp.id}
-                                    onVersionChange={handleVersionChange}
-                                    ref={versionSelectorRef}
-                                />
-                            )}
-
-                            <Button
-                                onClick={toggleRightContent}
-                                className={cn(
-                                    "bg-black hover:bg-black/90",
-                                    "text-white",
-                                    "border border-transparent",
-                                    "transition-all duration-200 ease-in-out",
-                                    "shadow-lg hover:shadow-xl",
-                                    "rounded-lg"
-                                )}
-                                size="icon"
-                            >
-                                {isRightContentVisible ? (
-                                    <ChevronRight className="h-4 w-4" />
-                                ) : (
-                                    <ChevronLeft className="h-4 w-4" />
-                                )}
-                            </Button>
-                        </div>
-
+                        {isRightContentVisible && (
+                            <CustomHandle
+                                className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors"
+                            />
+                        )}
                     </ResizablePanelGroup>
+                    <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
+                        {currentApp && (
+                            <VersionSelector
+                                appId={currentApp.id}
+                                onVersionChange={handleVersionChange}
+                                ref={versionSelectorRef}
+                            />
+                        )}
+
+                        <Button
+                            onClick={toggleRightContent}
+                            className={cn(
+                                "bg-black hover:bg-black/90",
+                                "text-white",
+                                "border border-transparent",
+                                "transition-all duration-200 ease-in-out",
+                                "shadow-lg hover:shadow-xl",
+                                "rounded-lg"
+                            )}
+                            size="icon"
+                        >
+                            {isRightContentVisible ? (
+                                <ChevronRight className="h-4 w-4" />
+                            ) : (
+                                <ChevronLeft className="h-4 w-4" />
+                            )}
+                        </Button>
+                    </div>
                 </main>
             </div>
         </div>

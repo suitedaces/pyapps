@@ -17,9 +17,8 @@ import { Logo } from '@/components/core/Logo'
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { CodeView } from '@/components/CodeView'
+import { ChevronLeft, ChevronRight, Globe } from 'lucide-react'
+import { PreviewPanel } from '@/components/PreviewPanel'
 import { StreamlitPreview } from '@/components/StreamlitPreview'
 import { ResizableHandle } from '@/components/ui/resizable'
 import { Message } from 'ai'
@@ -32,6 +31,7 @@ import { VersionSelector } from '@/components/VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createVersion } from '@/lib/supabase'
+import { Input } from '@/components/ui/input'
 
 // Add CustomHandle component
 const CustomHandle = ({ ...props }) => (
@@ -480,6 +480,16 @@ export default function Home() {
         }
     }, [])
 
+    const [showCodeView, setShowCodeView] = useState(false)
+
+    const handleRefresh = useCallback(() => {
+        updateStreamlitApp(generatedCode)
+    }, [generatedCode, updateStreamlitApp])
+
+    const handleCodeViewToggle = useCallback(() => {
+        setShowCodeView(prev => !prev)
+    }, [])
+
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>
     }
@@ -550,48 +560,16 @@ export default function Home() {
                                     minSize={40}
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                                 >
-                                    <Tabs
-                                        defaultValue="code"
-                                        className="flex-grow flex flex-col h-full"
-                                    >
-                                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
-                                            <TabsTrigger
-                                                value="preview"
-                                                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                            >
-                                                App
-                                            </TabsTrigger>
-                                            <TabsTrigger
-                                                value="code"
-                                                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                            >
-                                                Code
-                                            </TabsTrigger>
-                                        </TabsList>
-
-                                        <TabsContent
-                                            value="preview"
-                                            className="flex-grow overflow-hidden mt-4"
-                                        >
-                                            <StreamlitPreview
-                                                url={streamlitUrl}
-                                                isGeneratingCode={isGeneratingCode}
-                                            />
-                                        </TabsContent>
-
-                                        <TabsContent
-                                            value="code"
-                                            className="flex-grow overflow-hidden mt-4"
-                                        >
-                                            <CodeView
-                                                code={generatedCode}
-                                                isGeneratingCode={isGeneratingCode || isCreatingVersion}
-                                            />
-                                        </TabsContent>
-                                    </Tabs>
+                                    <PreviewPanel
+                                        streamlitUrl={streamlitUrl}
+                                        generatedCode={generatedCode}
+                                        isGeneratingCode={isGeneratingCode}
+                                        showCodeView={showCodeView}
+                                        onRefresh={handleRefresh}
+                                        onCodeViewToggle={handleCodeViewToggle}
+                                    />
                                 </ResizablePanel>
                             )}
-
                             <div className="absolute top-2 right-4 flex gap-4 z-30">
                                 {currentApp && (
                                     <VersionSelector
