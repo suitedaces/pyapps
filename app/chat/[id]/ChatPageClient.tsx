@@ -1,14 +1,11 @@
 'use client'
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { Session } from '@supabase/supabase-js'
 
 import { Chat } from '@/components/Chat'
-import { CodeView } from '@/components/CodeView'
 import LoginPage from '@/components/LoginPage'
-import { StreamlitPreview } from '@/components/StreamlitPreview'
+import { PreviewPanel } from '@/components/PreviewPanel'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
@@ -16,11 +13,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Message } from 'ai'
 
-import {
-    ResizableHandle,
-    ResizablePanel,
-    ResizablePanelGroup,
-} from '@/components/ui/resizable'
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 
 import { Sidebar } from '@/components/Sidebar'
 
@@ -34,30 +27,11 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import { VersionSelector } from '@/components/VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { createVersion } from '@/lib/supabase'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 
 interface ChatPageClientProps {
     initialChat: any
 }
-
-const truncate = (str: string) => {
-    const maxLength = 30 // Adjust this value as needed
-    if (str.length <= maxLength) return str
-    const extension = str.slice(str.lastIndexOf('.'))
-    const nameWithoutExtension = str.slice(0, str.lastIndexOf('.'))
-    const truncatedName = nameWithoutExtension.slice(
-        0,
-        maxLength - 3 - extension.length
-    )
-    return `${truncatedName}...${extension}`
-}
-
-const CustomHandle = ({ ...props }) => (
-    <ResizableHandle {...props} withHandle className="relative">
-        <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
-            <div className="h-8 w-1 rounded-full bg-black" />
-        </div>
-    </ResizableHandle>
-)
 
 async function getOrCreateApp(chatId: string | null, userId: string) {
     if (!chatId) throw new Error('No chat ID provided')
@@ -119,6 +93,25 @@ export default function ChatPageClient({
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
+    const [showCodeView, setShowCodeView] = useState(false)
+    const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
+
+    const handleRefresh = async () => {
+        if (sandboxId && session?.user?.id) {
+            try {
+                setIsGeneratingCode(true);
+                await updateStreamlitApp(generatedCode, true);
+            } catch (error) {
+                console.error('Error refreshing app:', error);
+            } finally {
+                setIsGeneratingCode(false);
+            }
+        }
+    };
+
+    const handleCodeViewToggle = () => {
+        setShowCodeView(!showCodeView);
+    };
 
     // Version switching stuff
     const isVersionSwitching = useRef(false)
@@ -128,7 +121,7 @@ export default function ChatPageClient({
 
     // Model config
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
     })
 
     const currentModel = modelsList.models.find(
@@ -221,63 +214,43 @@ export default function ChatPageClient({
     const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
 
-    //  sandbox initialization
-    const initializeSandbox = useCallback(async () => {
-        try {
-            console.log('Initializing sandbox...');
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
+    // Sandbox store hooks
+    const {
+        initializeSandbox,
+        killSandbox,
+        updateSandbox
+    } = useSandboxStore()
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
-            }
+    // Add a ref to track initialization
+    const initializationComplete = useRef(false)
+    const initializationPromise = useRef<Promise<void> | null>(null)
 
-            const data = await response.json()
-            console.log('Sandbox initialized with ID:', data.sandboxId);
-            setSandboxId(data.sandboxId)
-        } catch (error) {
-            console.error('Error initializing sandbox:', error);
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error initializing sandbox'
-            }])
-        }
-    }, [])
-
-    //  streamlit update function
-    const updateStreamlitApp = useCallback(async (code: string) => {
-        if (!code || !sandboxId) {
-            return;
+    // Modified initialization function that returns a promise
+    const ensureSandboxInitialized = useCallback(async () => {
+        if (initializationComplete.current) {
+            return
         }
 
-        try {
-            console.log('Updating Streamlit app with code:', code);
-            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`);
-            }
-
-            const data = await response.json()
-            if (data.url) {
-                setStreamlitUrl(data.url)
-            }
-        } catch (error) {
-            console.error('Error in updateStreamlitApp:', error)
+        if (!initializationPromise.current) {
+            initializationPromise.current = (async () => {
+                await initializeSandbox()
+                initializationComplete.current = true
+            })()
         }
-    }, [sandboxId])
 
-    // Initialize sandbox on mount
-    useEffect(() => {
-        initializeSandbox()
+        return initializationPromise.current
     }, [initializeSandbox])
+
+    // Modified updateStreamlitApp to ensure initialization
+    const updateStreamlitApp = useCallback(async (code: string, forceExecute = false) => {
+        await ensureSandboxInitialized()
+
+        const url = await updateSandbox(code, forceExecute)
+        if (url) {
+            setStreamlitUrl(url)
+            setIsGeneratingCode(false)
+        }
+    }, [updateSandbox, ensureSandboxInitialized])
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
@@ -401,52 +374,46 @@ export default function ChatPageClient({
 
     const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
 
+    // Add debug log for page load
+    useEffect(() => {
+        if (generatedCode && sandboxId) {
+            updateStreamlitApp(generatedCode, true)
+        }
+    }, []) // Empty dependency array for mount only
+
+    // Modify handleVersionChange
     const handleVersionChange = async (version: AppVersion) => {
         if (!version.code) {
-            console.error('No code found in version:', version)
             return
         }
 
-        isVersionSwitching.current = true;
+        isVersionSwitching.current = true
         setIsGeneratingCode(true)
 
         try {
-            console.log('🔄 Version switch initiated:', {
-                versionId: version.id,
-                appId: currentApp?.id,
-                versionNumber: version.version_number
-            })
-
-            // Update code view
+            await ensureSandboxInitialized()
             setGeneratedCode(version.code)
-
-            // Reinitialize sandbox for the new version
-            const initResponse = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
-
-            if (!initResponse.ok) {
-                throw new Error('Failed to initialize sandbox')
-            }
-
-            const { sandboxId } = await initResponse.json()
-            console.log('🆕 New sandbox created:', { sandboxId })
-            setSandboxId(sandboxId)
-
-            // Update Streamlit preview with new sandbox
-            await updateStreamlitApp(version.code)
+            await updateStreamlitApp(version.code, true)
         } catch (error) {
-            console.error('❌ Failed to update app with version:', error)
+            setSandboxErrors(prev => [...prev, {
+                message: error instanceof Error ? error.message : 'Error updating version'
+            }])
         } finally {
-            setTimeout(() => {
-                setIsGeneratingCode(false)
-                isVersionSwitching.current = false;
-            }, 500)
+            setIsGeneratingCode(false)
+            isVersionSwitching.current = false
         }
     }
 
-    // This useEffect fetches versions whenever app_id changes
+    // Modify cleanup
+    useEffect(() => {
+        return () => {
+            killSandbox()
+            initializationComplete.current = false
+            initializationPromise.current = null
+        }
+    }, [killSandbox])
+
+    // Modify fetchAppId
     const fetchAppId = useCallback(async () => {
         if (!currentChatId) return
 
@@ -458,15 +425,27 @@ export default function ChatPageClient({
 
         if (chat?.app_id) {
             setCurrentApp({ id: chat.app_id })
+
+            const { data: versions } = await supabase
+                .from('versions')
+                .select('*')
+                .eq('app_id', chat.app_id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+            if (versions?.code) {
+                setGeneratedCode(versions.code)
+                await updateStreamlitApp(versions.code, true)
+            }
         }
-    }, [currentChatId, supabase])
+    }, [currentChatId, supabase, updateStreamlitApp])
 
     useEffect(() => {
         fetchAppId()
     }, [fetchAppId])
 
     const handleChatFinish = useCallback(() => {
-        console.log('🔄 Chat finished, refreshing version selector')
         if (versionSelectorRef.current) {
             versionSelectorRef.current.refreshVersions()
         }
@@ -475,7 +454,6 @@ export default function ChatPageClient({
     const handleChatSubmit = useCallback(() => {
         setShowTypingText(false)
     }, [])
-
 
     if (isLoading) {
         return <div>Loading...</div>
@@ -541,85 +519,52 @@ export default function ChatPageClient({
                         </ResizablePanel>
 
                         {isRightContentVisible && (
-                            <CustomHandle
-                                className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors"
+                            <>
+                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
+                                <ResizablePanel
+                                    minSize={40}
+                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
+                                >
+                                    <PreviewPanel
+                                        streamlitUrl={streamlitUrl}
+                                        generatedCode={generatedCode}
+                                        isGeneratingCode={isGeneratingCode}
+                                        showCodeView={showCodeView}
+                                        onRefresh={handleRefresh}
+                                        onCodeViewToggle={handleCodeViewToggle}
+                                    />
+                                </ResizablePanel>
+                            </>
+                        )}
+                    </ResizablePanelGroup>
+                    <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
+                        {currentApp && (
+                            <VersionSelector
+                                appId={currentApp.id}
+                                onVersionChange={handleVersionChange}
+                                ref={versionSelectorRef}
                             />
                         )}
 
-                        {isRightContentVisible && (
-                            <ResizablePanel
-                                minSize={40}
-                                className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
-                            >
-                                <Tabs
-                                    defaultValue="code"
-                                    className="flex-grow flex flex-col h-full"
-                                >
-                                    <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
-                                        <TabsTrigger
-                                            value="preview"
-                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                        >
-                                            App
-                                        </TabsTrigger>
-                                        <TabsTrigger
-                                            value="code"
-                                            className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                        >
-                                            Code
-                                        </TabsTrigger>
-                                    </TabsList>
-
-                                    <TabsContent
-                                        value="preview"
-                                        className="flex-grow overflow-hidden mt-4"
-                                    >
-                                        <StreamlitPreview
-                                            url={streamlitUrl}
-                                            isGeneratingCode={isGeneratingCode}
-                                        />
-                                    </TabsContent>
-
-                                    <TabsContent value="code" className="flex-grow overflow-hidden mt-4">
-                                        <CodeView
-                                            code={generatedCode}
-                                            isGeneratingCode={isGeneratingCode || isCreatingVersion}
-                                        />
-                                    </TabsContent>
-                                </Tabs>
-                            </ResizablePanel>
-                        )}
-
-                        <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
-                            {currentApp && (
-                                <VersionSelector
-                                    appId={currentApp.id}
-                                    onVersionChange={handleVersionChange}
-                                    ref={versionSelectorRef}
-                                />
+                        <Button
+                            onClick={toggleRightContent}
+                            className={cn(
+                                "bg-black hover:bg-black/90",
+                                "text-white",
+                                "border border-transparent",
+                                "transition-all duration-200 ease-in-out",
+                                "shadow-lg hover:shadow-xl",
+                                "rounded-lg"
                             )}
-
-                            <Button
-                                onClick={toggleRightContent}
-                                className={cn(
-                                    "bg-black hover:bg-black/90",
-                                    "text-white",
-                                    "border border-transparent",
-                                    "transition-all duration-200 ease-in-out",
-                                    "shadow-lg hover:shadow-xl",
-                                    "rounded-lg"
-                                )}
-                                size="icon"
-                            >
-                                {isRightContentVisible ? (
-                                    <ChevronRight className="h-4 w-4" />
-                                ) : (
-                                    <ChevronLeft className="h-4 w-4" />
-                                )}
-                            </Button>
-                        </div>
-
-                    </ResizablePanelGroup>
+                            size="icon"
+                        >
+                            {isRightContentVisible ? (
+                                <ChevronRight className="h-4 w-4" />
+                            ) : (
+                                <ChevronLeft className="h-4 w-4" />
+                            )}
+                        </Button>
+                    </div>
                 </main>
             </div>
         </div>

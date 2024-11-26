@@ -67,14 +67,14 @@ DO NOT use "st.experimental_rerun()" at any cost.
 Only respond with the code, no potential errors, no explanations!`
 
         console.log('🤖 Sending request to Anthropic:', {
-            model: 'claude-3-5-sonnet-20240620',
+            model: 'claude-3-5-sonnet-20241022',
             systemPromptLength: systemPrompt.length,
             hasAnalysis: !!fileContext?.analysis,
             fullQuery: query
         })
 
         const response = await codeGenerationAnthropicAgent.messages.create({
-            model: 'claude-3-5-sonnet-20240620',
+            model: 'claude-3-5-sonnet-20241022',
             max_tokens: 2000,
             temperature: 0.7,
             system: systemPrompt,

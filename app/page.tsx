@@ -17,10 +17,9 @@ import { Logo } from '@/components/core/Logo'
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { CodeView } from '@/components/CodeView'
-import { StreamlitPreview } from '@/components/StreamlitPreview'
+import { ChevronLeft, ChevronRight, Globe } from 'lucide-react'
+import { PreviewPanel } from '@/components/PreviewPanel'
+import { StreamlitPreview, StreamlitPreviewRef } from '@/components/StreamlitPreview'
 import { ResizableHandle } from '@/components/ui/resizable'
 import { Message } from 'ai'
 import { useChat } from 'ai/react'
@@ -32,6 +31,8 @@ import { VersionSelector } from '@/components/VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { createVersion } from '@/lib/supabase'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { Input } from '@/components/ui/input'
 
 // Add CustomHandle component
 const CustomHandle = ({ ...props }) => (
@@ -84,7 +85,7 @@ export default function Home() {
     })
 
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
     })
 
     const currentModel = modelsList.models.find(
@@ -264,58 +265,29 @@ export default function Home() {
         }
     }, [chatLoading])
 
-    // Add sandbox initialization logic
-    const initializeSandbox = useCallback(async () => {
-        try {
-            const response = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
+    // Sandbox state management
+    const {
+        initializeSandbox,
+        killSandbox,
+        updateSandbox
+    } = useSandboxStore()
 
-            if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`)
-            }
+    useEffect(() => {
+        initializeSandbox()
 
-            const data = await response.json()
-            setSandboxId(data.sandboxId)
-        } catch (error) {
-            console.error('Error initializing sandbox:', error)
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error initializing sandbox'
-            }])
+        return () => {
+            killSandbox()
         }
-    }, [])
+    }, [initializeSandbox, killSandbox])
 
     // Add streamlit update function
-    const updateStreamlitApp = useCallback(async (code: string) => {
-        if (!code || !sandboxId) return
-
-        try {
-            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(`HTTP error! status: ${response.status}, message: ${JSON.stringify(errorData)}`)
-            }
-
-            const data = await response.json()
-            if (data.url) {
-                setStreamlitUrl(data.url)
-                setIsGeneratingCode(false)
-            }
-        } catch (error) {
-            console.error('Error in updateStreamlitApp:', error)
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error updating Streamlit app'
-            }])
+    const updateStreamlitApp = useCallback(async (code: string, forceExecute: boolean = false) => {
+        const url = await updateSandbox(code, forceExecute)
+        if (url) {
+            setStreamlitUrl(url)
             setIsGeneratingCode(false)
         }
-    }, [sandboxId])
+    }, [updateSandbox])
 
     // Initialize sandbox on mount
     useEffect(() => {
@@ -417,7 +389,7 @@ export default function Home() {
             return
         }
 
-        isVersionSwitching.current = true;
+        isVersionSwitching.current = true
         setIsGeneratingCode(true)
 
         try {
@@ -427,40 +399,23 @@ export default function Home() {
                 versionNumber: version.version_number
             })
 
-            // Update code view
             setGeneratedCode(version.code)
-
-            // Reinitialize sandbox for the new version
-            const initResponse = await fetch('/api/sandbox/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            })
-
-            if (!initResponse.ok) {
-                throw new Error('Failed to initialize sandbox')
-            }
-
-            const { sandboxId } = await initResponse.json()
-            console.log('🆕 New sandbox created:', { sandboxId })
-            setSandboxId(sandboxId)
-
-            // Update Streamlit preview with new sandbox
-            await updateStreamlitApp(version.code)
+            await updateStreamlitApp(version.code, true)
         } catch (error) {
             console.error('❌ Failed to update app with version:', error)
         } finally {
             setTimeout(() => {
                 setIsGeneratingCode(false)
-                isVersionSwitching.current = false;
+                isVersionSwitching.current = false
             }, 500)
         }
     }
 
     // Add useEffect to fetch app ID when chat loads
-    useEffect(() => {
-        async function fetchAppId() {
-            if (!currentChatId) return
+    const fetchAppId = useCallback(async () => {
+        if (!currentChatId) return
 
+        try {
             const { data: chat } = await supabase
                 .from('chats')
                 .select('app_id')
@@ -469,10 +424,32 @@ export default function Home() {
 
             if (chat?.app_id) {
                 setCurrentApp({ id: chat.app_id })
+
+                // Fetch latest version code
+                const { data: versions } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (versions?.code) {
+                    setGeneratedCode(versions.code)
+                    await updateStreamlitApp(versions.code, true)
+                }
             }
+        } catch (error) {
+            console.error('Error fetching app:', error)
         }
-        fetchAppId()
-    }, [currentChatId])
+    }, [currentChatId, supabase, updateStreamlitApp])
+
+    // Add this useEffect to trigger fetchAppId
+    useEffect(() => {
+        if (session?.user?.id && currentChatId) {
+            fetchAppId()
+        }
+    }, [session?.user?.id, currentChatId, fetchAppId])
 
     const handleChatFinish = useCallback(() => {
         console.log('🔄 Chat finished, refreshing version selector')
@@ -480,6 +457,22 @@ export default function Home() {
             versionSelectorRef.current.refreshVersions()
         }
     }, [])
+
+    const [showCodeView, setShowCodeView] = useState(false)
+
+    const handleRefresh = useCallback(() => {
+        if (streamlitPreviewRef.current) {
+            streamlitPreviewRef.current.refreshIframe()
+        }
+        setIsGeneratingCode(true)
+        setTimeout(() => setIsGeneratingCode(false), 500)
+    }, [])
+
+    const handleCodeViewToggle = useCallback(() => {
+        setShowCodeView(prev => !prev)
+    }, [])
+
+    const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
 
     if (isAuthLoading) {
         return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -517,20 +510,20 @@ export default function Home() {
                         "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
                         "h-screen pt-14"
                     )}>
-                        {showTypingText && (
-                            <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-                                <TypingText
-                                    text="From Data to App, in seconds."
-                                    className="text-black font-semibold text-4xl whitespace-nowrap"
-                                    show={showTypingText}
-                                />
-                            </div>
-                        )}
                         <ResizablePanelGroup
                             direction="horizontal"
                             ref={resizableGroupRef}
                         >
-                            <ResizablePanel defaultSize={65} minSize={45}>
+                            <ResizablePanel defaultSize={65} minSize={45} className='relative'>
+                                {showTypingText && (
+                                    <div className="absolute w-full top-1/3 transform z-50">
+                                        <TypingText
+                                            text="From Data to App, in seconds."
+                                            className="text-black font-semibold text-4xl whitespace-nowrap"
+                                            show={showTypingText}
+                                        />
+                                    </div>
+                                )}
                                 <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
                                 <Chat
                                     chatId={currentChatId}
@@ -555,58 +548,25 @@ export default function Home() {
                             </ResizablePanel>
 
                             {isRightContentVisible && (
-                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
-                            )}
-
-                            {isRightContentVisible && (
-                                <ResizablePanel
-                                    minSize={40}
-                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
-                                >
-                                    <Tabs
-                                        defaultValue="code"
-                                        className="flex-grow flex flex-col h-full"
+                                <>
+                                    <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
+                                    <ResizablePanel
+                                        minSize={40}
+                                        className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                                     >
-                                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-lg overflow-hidden p-1">
-                                            <TabsTrigger
-                                                value="preview"
-                                                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                            >
-                                                App
-                                            </TabsTrigger>
-                                            <TabsTrigger
-                                                value="code"
-                                                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-700 hover:text-black transition-colors rounded"
-                                            >
-                                                Code
-                                            </TabsTrigger>
-                                        </TabsList>
-
-                                        <TabsContent
-                                            value="preview"
-                                            className="flex-grow overflow-hidden mt-4"
-                                        >
-                                            <StreamlitPreview
-                                                url={streamlitUrl}
-                                                isGeneratingCode={isGeneratingCode}
-                                            />
-                                        </TabsContent>
-
-                                        <TabsContent
-                                            value="code"
-                                            className="flex-grow overflow-hidden mt-4"
-                                        >
-                                            <CodeView
-                                                code={generatedCode}
-                                                isGeneratingCode={isGeneratingCode || isCreatingVersion}
-                                            />
-                                        </TabsContent>
-                                    </Tabs>
-                                </ResizablePanel>
+                                        <PreviewPanel
+                                            streamlitUrl={streamlitUrl}
+                                            generatedCode={generatedCode}
+                                            isGeneratingCode={isGeneratingCode}
+                                            showCodeView={showCodeView}
+                                            onRefresh={handleRefresh}
+                                            onCodeViewToggle={handleCodeViewToggle}
+                                        />
+                                    </ResizablePanel>
+                                </>
                             )}
-
                             <div className="absolute top-2 right-4 flex gap-4 z-30">
-                                {currentApp && (
+                                {currentApp?.id && (
                                     <VersionSelector
                                         appId={currentApp.id}
                                         onVersionChange={handleVersionChange}

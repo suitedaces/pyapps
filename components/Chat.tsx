@@ -47,7 +47,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
     const newChatIdRef = useRef<string | null>(null)
 
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
     })
 
     const currentModel = modelsList.models.find(
@@ -146,6 +146,8 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
     const handleChatSubmit = async (content: string, file?: File) => {
         try {
             onChatSubmit?.()
+
+            // Handle file upload case
             if (file) {
                 const fileData = await uploadFile(file);
                 const fileContent = await file.text();
@@ -187,11 +189,19 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                     fileInputRef.current.value = ''
                 }
             }
+            // Handle regular text message case
+            else if (content.trim()) {
+                await append({
+                    content: content.trim(),
+                    role: 'user',
+                    createdAt: new Date(),
+                })
+            }
         } catch (error) {
-            console.error('File upload/processing error:', error)
+            console.error('Error submitting message:', error)
             setFileUploadState(prev => ({
                 ...prev,
-                error: 'Failed to process file. Please try again.'
+                error: 'Failed to send message. Please try again.'
             }))
         } finally {
             setFileUploadState(prev => ({ ...prev, isUploading: false }))
