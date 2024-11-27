@@ -1,3 +1,7 @@
+import {
+    StreamlitPreview,
+    StreamlitPreviewRef,
+} from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,7 +14,6 @@ import { cn } from '@/lib/utils'
 import { Code, Globe, Layout, RefreshCcw } from 'lucide-react'
 import { useRef } from 'react'
 import { CodeView } from './CodeView'
-import { StreamlitPreview, StreamlitPreviewRef } from './StreamlitPreview'
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
