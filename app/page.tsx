@@ -513,7 +513,7 @@ export default function Home() {
                             direction="horizontal"
                             ref={resizableGroupRef}
                         >
-                            <ResizablePanel defaultSize={65} minSize={45} className='relative'>
+                            <ResizablePanel defaultSize={40} minSize={30} className='relative'>
                                 {showTypingText && (
                                     <div className="absolute w-full top-1/3 transform z-50">
                                         <TypingText
@@ -536,10 +536,11 @@ export default function Home() {
 
                             {isRightContentVisible && (
                                 <>
-                                    <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
+                                    <CustomHandle className="bg-gradient-to-l from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
                                     <ResizablePanel
-                                        minSize={40}
-                                        className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
+                                        defaultSize={60}
+                                        minSize={45}
+                                        className="w-full lg:w-1/2 p-2 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                                     >
                                         <PreviewPanel
                                             streamlitUrl={streamlitUrl}
@@ -552,34 +553,35 @@ export default function Home() {
                                     </ResizablePanel>
                                 </>
                             )}
-                            <div className="absolute top-2 right-4 flex gap-4 z-30">
-                                {currentApp?.id && (
-                                    <VersionSelector
-                                        appId={currentApp.id}
-                                        onVersionChange={handleVersionChange}
-                                        ref={versionSelectorRef}
-                                    />
-                                )}
-                                <Button
-                                    onClick={toggleRightContent}
-                                    className={cn(
-                                        "bg-black hover:bg-black/90",
-                                        "text-white",
-                                        "border border-transparent",
-                                        "transition-all duration-200 ease-in-out",
-                                        "shadow-lg hover:shadow-xl",
-                                        "rounded-lg"
-                                    )}
-                                    size="icon"
-                                >
-                                    {isRightContentVisible ? (
-                                        <ChevronRight className="h-4 w-4" />
-                                    ) : (
-                                        <ChevronLeft className="h-4 w-4" />
-                                    )}
-                                </Button>
-                            </div>
                         </ResizablePanelGroup>
+
+                        <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
+                            {currentApp?.id && (
+                                <VersionSelector
+                                    appId={currentApp.id}
+                                    onVersionChange={handleVersionChange}
+                                    ref={versionSelectorRef}
+                                />
+                            )}
+                            <Button
+                                onClick={toggleRightContent}
+                                className={cn(
+                                    "bg-black hover:bg-black/90",
+                                    "text-white",
+                                    "border border-transparent",
+                                    "transition-all duration-200 ease-in-out",
+                                    "shadow-lg hover:shadow-xl",
+                                    "rounded-lg"
+                                )}
+                                size="icon"
+                            >
+                                {isRightContentVisible ? (
+                                    <ChevronRight className="h-4 w-4" />
+                                ) : (
+                                    <ChevronLeft className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
                     </main>
                 </div>
             </div>

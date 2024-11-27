@@ -376,7 +376,7 @@ export default function ChatPageClient({
         if (generatedCode && sandboxId) {
             updateStreamlitApp(generatedCode, true)
         }
-    }, []) // Empty dependency array for mount only
+    }, [])
 
     // Modify handleVersionChange
     const handleVersionChange = async (version: AppVersion) => {
@@ -500,7 +500,7 @@ export default function ChatPageClient({
                         direction="horizontal"
                         ref={resizableGroupRef}
                     >
-                        <ResizablePanel defaultSize={65} minSize={45}>
+                        <ResizablePanel defaultSize={40} minSize={30}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
                                 <Chat
                                     chatId={currentChatId}
@@ -515,6 +515,7 @@ export default function ChatPageClient({
                             <>
                                 <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
                                 <ResizablePanel
+                                    defaultSize={60}
                                     minSize={40}
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                                 >
