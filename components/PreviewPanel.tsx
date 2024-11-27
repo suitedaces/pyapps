@@ -1,10 +1,16 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { Code, Globe, RefreshCcw } from 'lucide-react'
+import { Code, Globe, RefreshCcw, Layout } from 'lucide-react'
 import { CodeView } from './CodeView'
 import { StreamlitPreview, StreamlitPreviewRef } from './StreamlitPreview'
 import { useRef } from 'react'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
@@ -43,31 +49,50 @@ export function PreviewPanel({
                         className="flex-grow font-mono text-sm border-0 focus-visible:ring-0 px-0 py-0 h-auto bg-transparent text-foreground selection:bg-blue-200"
                     />
                 </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleRefresh}
-                    className="hover:bg-background"
-                    title="Refresh App"
-                    disabled={isGeneratingCode}
-                >
-                    <RefreshCcw className={cn(
-                        "h-4 w-4 text-foreground/90",
-                        isGeneratingCode && "animate-spin"
-                    )} />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onCodeViewToggle}
-                    className={cn(
-                        "hover:bg-background",
-                        showCodeView && "bg-background text-primary"
-                    )}
-                    title={showCodeView ? "Show App" : "Show Code"}
-                >
-                    <Code className="h-4 w-4 text-foreground/90" />
-                </Button>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleRefresh}
+                                className="hover:bg-background"
+                                disabled={isGeneratingCode}
+                            >
+                                <RefreshCcw className={cn(
+                                    "h-4 w-4 text-foreground/90",
+                                    isGeneratingCode && "animate-spin"
+                                )} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            <p>Refresh App</p>
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onCodeViewToggle}
+                                className={cn(
+                                    "hover:bg-background",
+                                    showCodeView && "bg-background text-primary"
+                                )}
+                            >
+                                {showCodeView ? (
+                                    <Layout className="h-4 w-4 text-foreground/90" />
+                                ) : (
+                                    <Code className="h-4 w-4 text-foreground/90" />
+                                )}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            <p>{showCodeView ? "Show App" : "Show Code"}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             </div>
             <div className="flex-grow relative">
                 {showCodeView ? (
