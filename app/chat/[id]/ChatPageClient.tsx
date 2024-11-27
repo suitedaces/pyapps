@@ -81,7 +81,6 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const [currentChatId, setCurrentChatId] = useState<string | null>(
         initialChat.id
     )
-    const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } =
