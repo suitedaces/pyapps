@@ -1,11 +1,13 @@
 import { parse } from 'papaparse'
 
+export interface CSVColumn {
+    name: string
+    type: string
+}
+
 export interface CSVAnalysis {
+    columns: CSVColumn[]
     totalRows: number
-    columns: {
-        name: string
-        type: string
-    }[]
     sampleRows: string[][]
 }
 

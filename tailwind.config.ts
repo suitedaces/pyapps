@@ -10,22 +10,51 @@ module.exports = {
     theme: {
         extend: {
             colors: {
-                main: '#FFDC58',
-                mainAccent: '#ffc800', // not needed for shadcn components
-                overlay: 'rgba(0,0,0,0.8)', // background color overlay for alert dialogs, modals, etc.
-                blue: '#AF79FF',
-                matte: '#212121',
-
-                // light mode
-                bg: '#F0EFE9',
-                text: '#000',
-                border: '#000',
-
-                // dark mode
-                darkBg: '#374151',
-                darkText: '#eeefe9',
-                darkBorder: '#000',
-                secondaryBlack: '#1b1b1b', // opposite of plain white, not used pitch black because borders and box-shadows are that color
+                border: 'hsl(var(--border))',
+                input: 'hsl(var(--input))',
+                ring: 'hsl(var(--ring))',
+                background: 'hsl(var(--background))',
+                foreground: 'hsl(var(--foreground))',
+                primary: {
+                    DEFAULT: 'hsl(var(--primary))',
+                    foreground: 'hsl(var(--primary-foreground))',
+                },
+                secondary: {
+                    DEFAULT: 'hsl(var(--secondary))',
+                    foreground: 'hsl(var(--secondary-foreground))',
+                },
+                destructive: {
+                    DEFAULT: 'hsl(var(--destructive))',
+                    foreground: 'hsl(var(--destructive-foreground))',
+                },
+                muted: {
+                    DEFAULT: 'hsl(var(--muted))',
+                    foreground: 'hsl(var(--muted-foreground))',
+                },
+                accent: {
+                    DEFAULT: 'hsl(var(--accent))',
+                    foreground: 'hsl(var(--accent-foreground))',
+                },
+                popover: {
+                    DEFAULT: 'hsl(var(--popover))',
+                    foreground: 'hsl(var(--popover-foreground))',
+                },
+                card: {
+                    DEFAULT: 'hsl(var(--card))',
+                    foreground: 'hsl(var(--card-foreground))',
+                },
+                sidebar: {
+                    DEFAULT: 'hsl(var(--sidebar-background))',
+                    foreground: 'hsl(var(--sidebar-foreground))',
+                    primary: 'hsl(var(--sidebar-primary))',
+                    'primary-foreground':
+                        'hsl(var(--sidebar-primary-foreground))',
+                    accent: 'hsl(var(--sidebar-accent))',
+                    'accent-foreground':
+                        'hsl(var(--sidebar-accent-foreground))',
+                    border: 'hsl(var(--sidebar-border))',
+                    ring: 'hsl(var(--sidebar-ring))',
+                },
             },
             borderRadius: {
                 base: '15px',
@@ -43,6 +72,31 @@ module.exports = {
             fontWeight: {
                 base: '500',
                 heading: '700',
+            },
+            keyframes: {
+                blink: {
+                    '0%, 100%': { opacity: '1' },
+                    '50%': { opacity: '0' },
+                },
+                'fade-in': {
+                    '0%': { opacity: '0' },
+                    '100%': { opacity: '1' },
+                },
+                'cursor-blink': {
+                    '0%, 100%': {
+                        opacity: '1',
+                        borderRightColor: 'currentColor',
+                    },
+                    '50%': {
+                        opacity: '0',
+                        borderRightColor: 'transparent',
+                    },
+                },
+            },
+            animation: {
+                blink: 'blink 1s step-end infinite',
+                'fade-in': 'fade-in 0.5s ease-in',
+                'cursor-blink': 'cursor-blink 1.2s step-end infinite',
             },
         },
     },

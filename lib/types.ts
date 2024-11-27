@@ -1,68 +1,144 @@
 import { Json } from '@/lib/database.types'
-import { Anthropic } from '@anthropic-ai/sdk'
+import { Message } from 'ai'
+import { z } from 'zod'
 
-export type ToolCall = {
-    id?: string
-    name: string
-    parameters: string
+// Model types
+export interface ModelProvider {
+    id: string
+    streamText: (params: StreamParams) => Promise<void>
 }
 
-export type ToolResult = {
-    id?: string
-    name: string
-    result: any
-    error?: any
+export interface AppVersion {
+    id: string
+    app_id: string
+    version_number: number
+    code: string
+    created_at: string
+    is_current: boolean
 }
 
-export interface ClientMessage {
-    role: 'user' | 'assistant'
+export interface StreamParams {
+    messages: Message[]
+    tools?: Tool[]
+    stream?: boolean
+    onToken: (token: string) => void
+    onToolCall?: (toolInvocation: ToolInvocation) => Promise<void>
+}
+
+// Tool types aligned with Vercel AI SDK
+export interface ToolCallPayload {
+    id: string
+    name: string
+    parameters: Record<string, any>
+}
+
+export interface ToolResultPayload {
+    id: string
+    name: string
     content: string
-    created_at?: Date
-    tool_calls?: ToolCall[] | Json | null
-    tool_results?: ToolResult[] | Json | null
 }
 
-export interface Message {
+// Message types aligned with Vercel AI SDK
+export interface ClientMessage {
+    id: string
+    role: 'system' | 'user' | 'assistant' | 'tool'
+    content: string
+    createdAt: Date
+    toolInvocations?: ToolInvocation[]
+}
+
+// Database message type
+export interface DatabaseMessage {
     id: string
     user_id: string
+    chat_id: string
+    role: 'system' | 'user' | 'assistant' | 'tool'
     user_message: string
     assistant_message: string
-    tool_calls: Json | null
+    tool_calls: ToolCall[] | Json
     tool_results: Json | null
     token_count: number
     created_at: string
 }
-export type StreamChunk = {
-    type:
-        | 'message_start'
-        | 'content_block_start'
-        | 'content_block_delta'
-        | 'content_block_stop'
-        | 'message_delta'
-        | 'message_stop'
-        | 'generated_code'
-        | 'code_explanation'
-        | 'error'
-        | 'tool_use'
-    message?: any
-    content_block?: any
-    delta?: any
+
+// Tool definition aligned with Vercel AI SDK
+export interface Tool {
+    toolName: string
+    description: string
+    parameters: z.ZodObject<any>
+    execute: (parameters: Record<string, any>) => Promise<any>
+}
+
+// Model configuration
+export interface LLMModelConfig {
+    model: string
+    temperature?: number
+    maxTokens?: number
+    topP?: number
+    frequencyPenalty?: number
+    presencePenalty?: number
+}
+
+// Add this to your types.ts
+export type LLMModel = {
+    id: string
+    name: string
+    provider: string
+    providerId: string
+}
+
+export interface ToolInvocation {
+    state: 'call' | 'result'
+    toolCallId: string
+    toolName: string
+    args: Record<string, any>
+    result?: any
+}
+
+export interface ToolCall {
+    id: string
+    name: string
+    parameters: any
+}
+
+export interface FileContext {
+    id: string
+    fileName: string
+    fileType: 'csv' | 'json' | 'txt'
     content?: string
-    name?: string
+    analysis?: any
 }
 
-export type CSVAnalysis = {
-    totalRows: number
-    columns: {
-        name: string
-        type: string
-    }[]
-    sampleRows: string[][]
-}
+// Add this to your existing types
+export const RequestSchema = z.object({
+    messages: z.array(
+        z.object({
+            content: z.string(),
+            role: z.enum(['user', 'assistant', 'system']),
+            createdAt: z.date().optional(),
+        })
+    ),
+    model: z.object({
+        id: z.string(),
+        provider: z.string(),
+        providerId: z.string(),
+        name: z.string(),
+    }),
+    config: z.object({
+        model: z.string(),
+        temperature: z.number().optional(),
+        maxTokens: z.number().optional(),
+    }),
+    fileId: z.string().optional(),
+    fileName: z.string().optional(),
+    fileContent: z.string().optional(),
+})
 
-export type CreateStreamlitAppTool = {
-    query: string
-    csvAnalysis: CSVAnalysis
-}
+export type RequestSchemaType = z.infer<typeof RequestSchema>
 
-export type Tool = Anthropic.Messages.Tool
+export interface VersionMetadata {
+    version_id: string
+    version_number: number
+    app_id: string
+    created_at: string
+}

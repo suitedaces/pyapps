@@ -2,6 +2,18 @@ import { analyzeCSV } from '@/lib/csvAnalyzer'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+
+// Analysis request validation schema
+const AnalysisRequestSchema = z.object({
+    fileContent: z.string().min(1),
+    options: z
+        .object({
+            detailed: z.boolean().optional(),
+            maxRows: z.number().min(1).max(1000).optional(),
+        })
+        .optional(),
+})
 
 export async function POST(
     req: NextRequest,
@@ -19,31 +31,63 @@ export async function POST(
         )
     }
 
-    const { fileContent } = await req.json()
-
     try {
-        const analysis = await analyzeCSV(fileContent)
+        // Validate request body
+        const body = await req.json()
+        const { fileContent, options } =
+            await AnalysisRequestSchema.parseAsync(body)
 
-        const { data, error } = await supabase
+        // Fetch file metadata to verify ownership and type
+        const { data: fileData, error: fileError } = await supabase
             .from('files')
-            .update({ analysis, updated_at: new Date().toISOString() })
+            .select('*')
             .eq('id', params.id)
             .eq('user_id', session.user.id)
-            .select()
             .single()
 
-        if (error) {
+        if (fileError || !fileData) {
             return NextResponse.json(
-                { error: 'Failed to update file analysis' },
-                { status: 500 }
+                { error: 'File not found or access denied' },
+                { status: 404 }
             )
         }
 
-        return NextResponse.json(data)
+        // Perform analysis based on file type
+        let analysis = null
+        if (fileData.file_type === 'csv') {
+            analysis = await analyzeCSV(fileContent)
+        } else {
+            return NextResponse.json(
+                { error: 'File type not supported for analysis' },
+                { status: 400 }
+            )
+        }
+
+        // Update file record with analysis results
+        const { error: updateError } = await supabase
+            .from('files')
+            .update({
+                analysis,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', params.id)
+            .eq('user_id', session.user.id)
+
+        if (updateError) throw updateError
+
+        return NextResponse.json({
+            id: params.id,
+            analysis,
+        })
     } catch (error) {
-        console.error('Error analyzing CSV:', error)
+        console.error('Error analyzing file:', error)
         return NextResponse.json(
-            { error: 'Failed to analyze CSV' },
+            {
+                error:
+                    error instanceof z.ZodError
+                        ? 'Invalid analysis request'
+                        : 'Failed to analyze file',
+            },
             { status: 500 }
         )
     }

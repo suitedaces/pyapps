@@ -3,6 +3,7 @@ import { getModelClient } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
 import { FileContext } from '@/lib/types'
+import { generateUUID } from '@/lib/utils'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { convertToCoreMessages } from 'ai'
 import { cookies } from 'next/headers'
@@ -34,47 +35,35 @@ const RequestSchema = z.object({
     fileContent: z.string().optional(),
 })
 
-export async function POST(
-    req: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
     const {
         data: { session },
     } = await supabase.auth.getSession()
-
+    const chatId = generateUUID()
     if (!session) {
         return new Response('Unauthorized', { status: 401 })
     }
 
-    if (!params.id) {
-        return new Response('Invalid chat ID', { status: 400 })
-    }
-
     try {
         const body = await req.json()
+
+        console.log('🔍 Raw request body:', {
+            hasBody: !!body,
+            bodyKeys: Object.keys(body),
+            requestBody: body.body,
+        })
+
         const { messages, model, config, fileId, fileName, fileContent } =
             await RequestSchema.parseAsync(body)
 
-        console.log('🔍 Fetching chat data:', { chatId: params.id })
+        console.log('🔍 Parsed request body:', {
+            hasFileId: !!fileId,
+            hasFileName: !!fileName,
+            hasFileContent: !!fileContent,
+        })
 
-        // Fetch chat and verify ownership
-        const { data: chatData, error: chatError } = await supabase
-            .from('chats')
-            .select('*')
-            .eq('id', params.id)
-            .eq('user_id', session.user.id)
-            .single()
-
-        if (chatError || !chatData) {
-            console.error('❌ Chat not found:', chatError)
-            return new Response('Chat not found', { status: 404 })
-        }
-
-        // Initialize fileContext as undefined
         let fileContext: FileContext | undefined = undefined
-
-        // Check for file in request or existing chat
         if (fileId) {
             console.log('🔍 Fetching file data:', { fileId })
 
@@ -90,6 +79,8 @@ export async function POST(
                 return new Response('File not found', { status: 404 })
             }
 
+            console.log('📄 File data fetched:', fileData)
+
             fileContext = {
                 id: fileData.id,
                 fileName: fileData.file_name,
@@ -104,11 +95,47 @@ export async function POST(
                 hasAnalysis: !!fileData.analysis,
             })
 
-            // Update file access timestamp
             await supabase
                 .from('files')
-                .update({ last_accessed: new Date().toISOString() })
+                .update({
+                    last_accessed: new Date().toISOString(),
+                    chat_id: chatId,
+                })
                 .eq('id', fileData.id)
+        }
+
+        const { error: chatError } = await supabase.from('chats').insert([
+            {
+                id: chatId,
+                user_id: session.user.id,
+                name: messages[0].content.slice(0, 50) + '...',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            },
+        ])
+
+        if (chatError) {
+            console.error('❌ Error creating chat:', chatError)
+            return new Response('Failed to create chat', { status: 500 })
+        }
+
+        if (fileContext?.id) {
+            console.log('🔄 Updating file with chat ID:', {
+                fileId: fileContext.id,
+                chatId,
+            })
+
+            const { error: fileUpdateError } = await supabase
+                .from('files')
+                .update({ chat_id: chatId })
+                .eq('id', fileContext.id)
+
+            if (fileUpdateError) {
+                console.error(
+                    '❌ Error updating file with chat_id:',
+                    fileUpdateError
+                )
+            }
         }
 
         console.log('🎯 Initializing model client:', {
@@ -140,8 +167,8 @@ export async function POST(
             }
         )
 
-        console.log('🚀 Continuing chat stream with:', {
-            chatId: params.id,
+        console.log('🚀 Initializing stream with:', {
+            chatId,
             messageCount: messages.length,
             hasFile: !!fileContext,
             fileInfo: fileContext
@@ -154,13 +181,29 @@ export async function POST(
                 : null,
         })
 
-        return agent.streamResponse(
-            params.id,
+        console.log('🚀 ~ fileContext', fileContext)
+
+        const agentResponse = await agent.streamResponse(
+            chatId,
             session.user.id,
             convertToCoreMessages(messages),
             tools,
             fileContext
         )
+
+        if (!agentResponse.body) {
+            throw new Error('No stream body returned from agent')
+        }
+
+        return new Response(agentResponse.body, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                Connection: 'keep-alive',
+                'x-chat-id': chatId,
+                'x-file-id': fileContext?.id || '',
+            },
+        })
     } catch (error) {
         console.error('❌ Error in stream processing:', error)
         return new Response(

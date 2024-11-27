@@ -1,63 +1,68 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
+// Fetch all conversations for the authenticated user
+export async function GET() {
     const supabase = createRouteHandlerClient({ cookies })
     const {
         data: { session },
     } = await supabase.auth.getSession()
 
     if (!session) {
-        return NextResponse.json(
-            { error: 'Not authenticated' },
-            { status: 401 }
-        )
+        return new Response('Unauthorized', { status: 401 })
     }
 
-    const { data, error } = await supabase
-        .from('chats')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
+    try {
+        const { data: chats, error } = await supabase
+            .from('chats')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('updated_at', { ascending: false })
 
-    if (error) {
+        if (error) throw error
+
+        return NextResponse.json({ chats })
+    } catch (error) {
         return NextResponse.json(
             { error: 'Failed to fetch conversations' },
             { status: 500 }
         )
     }
-
-    return NextResponse.json(data)
 }
 
-export async function POST(req: NextRequest) {
+// Create a new conversation
+export async function POST(req: Request) {
     const supabase = createRouteHandlerClient({ cookies })
     const {
         data: { session },
     } = await supabase.auth.getSession()
 
     if (!session) {
-        return NextResponse.json(
-            { error: 'Not authenticated' },
-            { status: 401 }
-        )
+        return new Response('Unauthorized', { status: 401 })
     }
 
-    const { name, appId } = await req.json()
+    try {
+        const body = await req.json()
 
-    const { data, error } = await supabase
-        .from('chats')
-        .insert({ user_id: session.user.id, name, app_id: appId })
-        .select()
-        .single()
+        const { data: chat, error } = await supabase
+            .from('chats')
+            .insert({
+                user_id: session.user.id,
+                name: body.name || 'New Chat',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single()
 
-    if (error) {
+        if (error) throw error
+
+        return NextResponse.json(chat)
+    } catch (error) {
         return NextResponse.json(
             { error: 'Failed to create conversation' },
             { status: 500 }
         )
     }
-
-    return NextResponse.json(data)
 }
