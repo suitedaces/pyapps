@@ -14,20 +14,23 @@ const anthropic = new Anthropic({
 interface MessageState {
     messageStoredChatId: string | null
     processedChatIds: Set<string>
-    toolInvocations: Map<string, Array<{
-        state: 'call' | 'result'
-        toolCallId: string
-        toolName: string
-        args: Record<string, any>
-        result?: any
-    }>>
+    toolInvocations: Map<
+        string,
+        Array<{
+            state: 'call' | 'result'
+            toolCallId: string
+            toolName: string
+            args: Record<string, any>
+            result?: any
+        }>
+    >
 }
 
 class MessageStore {
     private state: MessageState = {
         messageStoredChatId: null,
         processedChatIds: new Set(),
-        toolInvocations: new Map()
+        toolInvocations: new Map(),
     }
 
     setMessageStored(chatId: string, toolInvocations?: any[]) {

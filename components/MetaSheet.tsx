@@ -62,7 +62,10 @@ export function MetaSheet({ csvContent }: MetaSheetProps) {
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
-    const generateSampleRows = (columns: CSVColumn[], existingRows: string[][]) => {
+    const generateSampleRows = (
+        columns: CSVColumn[],
+        existingRows: string[][]
+    ) => {
         const targetRowCount = Math.min(20, existingRows.length)
         return existingRows.slice(0, targetRowCount)
     }

@@ -5,7 +5,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     try {
         const sandbox = await Sandbox.create({
             apiKey: process.env.E2B_API_KEY,
-            template: 'streamlit-sandbox-me',
+            template: 'streamlit-sandbox-me2',
         })
 
         await sandbox.filesystem.makeDir('/app')
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        await sandbox.keepAlive(10 * 60 * 1000)
+        await sandbox.keepAlive(2 * 60 * 1000)
 
         return NextResponse.json({ sandboxId: sandbox.id })
     } catch (error) {

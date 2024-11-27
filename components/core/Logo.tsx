@@ -8,13 +8,27 @@ interface LogoProps {
     className?: string
 }
 
-export function Logo({ collapsed = false, inverted = false, className }: LogoProps) {
+export function Logo({
+    collapsed = false,
+    inverted = false,
+    className,
+}: LogoProps) {
     return (
-        <div className={cn("relative font-mono font-bold tracking-tighter", className)}>
+        <div
+            className={cn(
+                'relative font-mono font-bold tracking-tighter',
+                className
+            )}
+        >
             <style jsx>{`
                 @keyframes blink {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0; }
+                    0%,
+                    100% {
+                        opacity: 1;
+                    }
+                    50% {
+                        opacity: 0;
+                    }
                 }
                 .cursor {
                     animation: blink 1s step-end infinite;
@@ -25,35 +39,41 @@ export function Logo({ collapsed = false, inverted = false, className }: LogoPro
                 }
             `}</style>
             {collapsed ? (
-                <span className={cn(
-                    "text-2xl",
-                    inverted ? "text-black" : "text-white"
-                )}>
+                <span
+                    className={cn(
+                        'text-2xl',
+                        inverted ? 'text-black' : 'text-white'
+                    )}
+                >
                     py
                 </span>
             ) : (
                 <>
-                    <span className={cn(
-                        "text-2xl",
-                        inverted ? "text-black" : "text-white"
-                    )}>
+                    <span
+                        className={cn(
+                            'text-2xl',
+                            inverted ? 'text-black' : 'text-white'
+                        )}
+                    >
                         py_
                     </span>
-                    <span className={cn(
-                        "cursor absolute text-2xl",
-                        inverted ? "text-black" : "text-white"
-                    )}>
+                    <span
+                        className={cn(
+                            'cursor absolute text-2xl',
+                            inverted ? 'text-black' : 'text-white'
+                        )}
+                    >
                         |
                     </span>
-                    <span className="app text-gray-500 text-2xl">
-                        app
-                    </span>
-                    <div className={cn(
-                        "absolute bottom-0 left-0 w-full h-px",
-                        inverted ? "bg-gray-200" : "bg-gray-700"
-                    )} />
+                    <span className="app text-gray-500 text-2xl">app</span>
+                    <div
+                        className={cn(
+                            'absolute bottom-0 left-0 w-full h-px',
+                            inverted ? 'bg-gray-200' : 'bg-gray-700'
+                        )}
+                    />
                 </>
             )}
         </div>
     )
-} 
+}

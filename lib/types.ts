@@ -8,6 +8,15 @@ export interface ModelProvider {
     streamText: (params: StreamParams) => Promise<void>
 }
 
+export interface AppVersion {
+    id: string
+    app_id: string
+    version_number: number
+    code: string
+    created_at: string
+    is_current: boolean
+}
+
 export interface StreamParams {
     messages: Message[]
     tools?: Tool[]
@@ -93,9 +102,43 @@ export interface ToolCall {
 }
 
 export interface FileContext {
-    id: string;
-    fileName: string;
-    fileType: 'csv' | 'json' | 'txt';
-    content?: string;
-    analysis?: any;
+    id: string
+    fileName: string
+    fileType: 'csv' | 'json' | 'txt'
+    content?: string
+    analysis?: any
+}
+
+// Add this to your existing types
+export const RequestSchema = z.object({
+    messages: z.array(
+        z.object({
+            content: z.string(),
+            role: z.enum(['user', 'assistant', 'system']),
+            createdAt: z.date().optional(),
+        })
+    ),
+    model: z.object({
+        id: z.string(),
+        provider: z.string(),
+        providerId: z.string(),
+        name: z.string(),
+    }),
+    config: z.object({
+        model: z.string(),
+        temperature: z.number().optional(),
+        maxTokens: z.number().optional(),
+    }),
+    fileId: z.string().optional(),
+    fileName: z.string().optional(),
+    fileContent: z.string().optional(),
+})
+
+export type RequestSchemaType = z.infer<typeof RequestSchema>
+
+export interface VersionMetadata {
+    version_id: string
+    version_number: number
+    app_id: string
+    created_at: string
 }

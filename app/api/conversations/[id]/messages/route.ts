@@ -1,7 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { encode } from 'gpt-tokenizer'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { encode } from 'gpt-tokenizer'
 
 // Fetch messages for a specific conversation
 export async function GET(
@@ -40,10 +40,15 @@ export async function POST(
         // Calculate token counts for different message components
         const userTokens = encode(body.user_message || '').length
         const assistantTokens = encode(body.assistant_message || '').length
-        const toolCallTokens = body.tool_calls ? encode(JSON.stringify(body.tool_calls)).length : 0
-        const toolResultTokens = body.tool_results ? encode(JSON.stringify(body.tool_results)).length : 0
+        const toolCallTokens = body.tool_calls
+            ? encode(JSON.stringify(body.tool_calls)).length
+            : 0
+        const toolResultTokens = body.tool_results
+            ? encode(JSON.stringify(body.tool_results)).length
+            : 0
 
-        const totalTokens = userTokens + assistantTokens + toolCallTokens + toolResultTokens
+        const totalTokens =
+            userTokens + assistantTokens + toolCallTokens + toolResultTokens
 
         // Prepare message data for storage
         const messageData = {
@@ -55,7 +60,7 @@ export async function POST(
             tool_calls: body.tool_calls || null,
             tool_results: body.tool_results || null,
             token_count: totalTokens,
-            created_at: body.created_at || new Date().toISOString()
+            created_at: body.created_at || new Date().toISOString(),
         }
 
         const { data, error } = await supabase
@@ -90,7 +95,7 @@ export async function PUT(
                 assistant_message: body.assistant_message,
                 tool_calls: body.tool_calls,
                 tool_results: body.tool_results,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
             })
             .eq('id', params.id)
             .select()

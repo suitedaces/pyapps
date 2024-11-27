@@ -5,7 +5,9 @@ import { NextResponse } from 'next/server'
 // Fetch all conversations for the authenticated user
 export async function GET() {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return new Response('Unauthorized', { status: 401 })
@@ -32,7 +34,9 @@ export async function GET() {
 // Create a new conversation
 export async function POST(req: Request) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return new Response('Unauthorized', { status: 401 })
@@ -47,7 +51,7 @@ export async function POST(req: Request) {
                 user_id: session.user.id,
                 name: body.name || 'New Chat',
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
             })
             .select()
             .single()

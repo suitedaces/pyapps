@@ -1,24 +1,25 @@
 'use client'
 
-import { useChat } from 'ai/react'
-import { Message } from 'ai'
-import { useCallback, useRef, useState, useMemo } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import Chatbar from '@/components/core/chatbar'
+import { Message as AIMessage } from '@/components/core/message'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import modelsList from '@/lib/models.json'
 import { LLMModelConfig } from '@/lib/types'
+import { Message } from 'ai'
+import { useChat } from 'ai/react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
-import { Message as AIMessage } from '@/components/core/message'
-import Chatbar from '@/components/core/chatbar'
 
 interface ChatProps {
     chatId?: string | null
     initialMessages?: Message[]
     onChatCreated?: (chatId: string) => void
-    onFileSelect?: (file: { content: string, name: string }) => void
+    onFileSelect?: (file: { content: string; name: string }) => void
     onUpdateStreamlit?: (message: string) => void
     onChatSubmit?: () => void
+    onChatFinish?: () => void
 }
 
 interface FileUploadState {
@@ -27,7 +28,15 @@ interface FileUploadState {
     error: string | null
 }
 
-export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFileSelect, onUpdateStreamlit, onChatSubmit }: ChatProps) {
+export function Chat({
+    chatId = null,
+    initialMessages = [],
+    onChatCreated,
+    onFileSelect,
+    onUpdateStreamlit,
+    onChatSubmit,
+    onChatFinish,
+}: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -36,13 +45,13 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
     const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
         isUploading: false,
         progress: 0,
-        error: null
+        error: null,
     })
 
     const newChatIdRef = useRef<string | null>(null)
 
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
     })
 
     const currentModel = modelsList.models.find(
@@ -58,7 +67,9 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         setMessages: setAiMessages,
         append,
     } = useChat({
-        api: chatId ? `/api/conversations/${chatId}/stream` : '/api/conversations/stream',
+        api: chatId
+            ? `/api/conversations/${chatId}/stream`
+            : '/api/conversations/stream',
         id: chatId ?? undefined,
         initialMessages,
         body: {
@@ -73,15 +84,12 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
 
             if (!chatId) {
                 const newChatId = response.headers.get('x-chat-id')
-                console.log('Response headers:', Object.fromEntries(response.headers))
                 if (newChatId) {
-                    console.log('Setting new chat ID:', newChatId)
                     newChatIdRef.current = newChatId
                 }
             }
         },
         onFinish: async (message) => {
-            console.log('onFinish triggered with message:', message)
             setErrorState(null)
             setAttachedFile(null)
             resetFileUploadState()
@@ -89,122 +97,159 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 fileInputRef.current.value = ''
             }
 
-            if (message.role === 'assistant' && !chatId && newChatIdRef.current) {
-                console.log('Creating chat with ID from ref:', newChatIdRef.current)
+            if (
+                message.role === 'assistant' &&
+                !chatId &&
+                newChatIdRef.current
+            ) {
                 onChatCreated?.(newChatIdRef.current)
                 newChatIdRef.current = null
             }
 
             if (message.toolInvocations?.length) {
-                console.log('Tool invocations found:', message.toolInvocations)
                 const streamlitCall = message.toolInvocations
-                    .filter(invocation =>
-                        invocation.toolName === 'create_streamlit_app' &&
-                        invocation.state === 'result'
+                    .filter(
+                        (invocation) =>
+                            invocation.toolName === 'create_streamlit_app' &&
+                            invocation.state === 'result'
                     )
                     .pop()
-
-                if (streamlitCall?.state === 'result') {
-                    console.log('Streamlit call successful')
-                }
             }
+
+            onChatFinish?.()
         },
         onError: (error) => {
-            console.error('Stream error:', error)
             handleChatError(error)
-        }
+        },
     })
 
     const resetFileUploadState = () => {
         setFileUploadState({
             isUploading: false,
             progress: 0,
-            error: null
+            error: null,
         })
     }
 
     const uploadFile = async (file: File): Promise<any> => {
-        const formData = new FormData();
-        formData.append('file', file);
+        const formData = new FormData()
+        formData.append('file', file)
         if (chatId) {
-            formData.append('chatId', chatId);
+            formData.append('chatId', chatId)
         }
 
         const response = await fetch('/api/files', {
             method: 'POST',
-            body: formData
-        });
+            body: formData,
+        })
 
         if (!response.ok) {
-            throw new Error('Failed to upload file');
+            throw new Error('Failed to upload file')
         }
 
-        return await response.json();
-    };
+        return await response.json()
+    }
 
     const handleChatSubmit = async (content: string, file?: File) => {
         try {
             onChatSubmit?.()
+
+            // Handle file upload case
             if (file) {
-                const fileData = await uploadFile(file);
-                const fileContent = await file.text();
-                const rows = fileContent.split('\n');
-                const columnNames = rows[0];
-                const previewRows = rows.slice(1, 6).join('\n');
-                const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`;
+                const fileData = await uploadFile(file)
+                const fileContent = await file.text()
+
+                // Sanitize content
+                const sanitizedContent = fileContent
+                    .split('\n')
+                    .map((row) => row.replace(/[\r\n]+/g, ''))
+                    .join('\n')
+
+                const rows = sanitizedContent.split('\n')
+                const columnNames = rows[0]
+                const previewRows = rows.slice(1, 6).join('\n')
+                const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
 
                 // const message = content.trim() ||
                 //     `Create a Streamlit app to visualize this data from "/app/${file.name}". The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
 
-                const message = content.trim() ||
-                    `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
+                const message =
+                    content.trim() ||
+                    `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
 
+                await append(
+                    {
+                        content: message,
+                        role: 'user',
+                        createdAt: new Date(),
+                    },
+                    {
+                        body: {
+                            fileId: fileData.id,
+                            fileName: file.name,
+                            fileContent: sanitizedContent,
+                        },
+                    }
+                )
 
+                // Reset file state
+                setAttachedFile(null)
+                resetFileUploadState()
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = ''
+                }
+            }
+            // Handle regular text message case
+            else if (content.trim()) {
                 await append({
-                    content: message,
+                    content: content.trim(),
                     role: 'user',
                     createdAt: new Date(),
-                });
-            } else {
-                await append({
-                    content,
-                    role: 'user',
-                    createdAt: new Date(),
-                });
+                })
             }
         } catch (error) {
-            console.error('Submit error:', error);
+            console.error('Error submitting message:', error)
+            setFileUploadState((prev) => ({
+                ...prev,
+                error: 'Failed to send message. Please try again.',
+            }))
+        } finally {
+            setFileUploadState((prev) => ({ ...prev, isUploading: false }))
         }
-    };
+    }
 
     const messages = useMemo(() => {
-        const messageMap = new Map();
+        const messageMap = new Map()
 
-        [...initialMessages, ...aiMessages].forEach(msg => {
-            const key = `${msg.role}:${msg.content}`;
-            if (!messageMap.has(key) ||
-                (msg.createdAt && (!messageMap.get(key).createdAt ||
-                    new Date(msg.createdAt) > new Date(messageMap.get(key).createdAt)))) {
-                messageMap.set(key, msg);
+        ;[...initialMessages, ...aiMessages].forEach((msg) => {
+            const key = `${msg.role}:${msg.content}`
+            if (
+                !messageMap.has(key) ||
+                (msg.createdAt &&
+                    (!messageMap.get(key).createdAt ||
+                        new Date(msg.createdAt) >
+                            new Date(messageMap.get(key).createdAt)))
+            ) {
+                messageMap.set(key, msg)
             }
-        });
+        })
 
-        const dedupedMessages = Array.from(messageMap.values())
-            .sort((a, b) => {
-                const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                return timeA - timeB;
-            });
+        const dedupedMessages = Array.from(messageMap.values()).sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return timeA - timeB
+        })
 
-        return dedupedMessages;
-    }, [initialMessages, aiMessages]);
+        return dedupedMessages
+    }, [initialMessages, aiMessages])
 
     const handleResponseError = (response: Response) => {
-        const errorMessage = response.status === 429
-            ? "Rate limit exceeded. Please wait a moment."
-            : response.status === 413
-                ? "Message too long. Please try a shorter message."
-                : "An error occurred. Please try again."
+        const errorMessage =
+            response.status === 429
+                ? 'Rate limit exceeded. Please wait a moment.'
+                : response.status === 413
+                  ? 'Message too long. Please try a shorter message.'
+                  : 'An error occurred. Please try again.'
 
         setErrorState(new Error(errorMessage))
     }
@@ -220,7 +265,10 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
 
     const handleRetry = useCallback(async () => {
         setErrorState(null)
-        if (messages.length > 0 && messages[messages.length - 1].role === 'user') {
+        if (
+            messages.length > 0 &&
+            messages[messages.length - 1].role === 'user'
+        ) {
             try {
                 await originalHandleSubmit(undefined as any)
             } catch (e) {
@@ -229,20 +277,21 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
         }
     }, [messages, originalHandleSubmit])
 
-    const handleTextareaChange = useCallback((
-        e: React.ChangeEvent<HTMLTextAreaElement>
-    ) => {
-        handleInputChange(e)
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-        }
-    }, [handleInputChange])
+    const handleTextareaChange = useCallback(
+        (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            handleInputChange(e)
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto'
+                textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+            }
+        },
+        [handleInputChange]
+    )
 
     const isInputDisabled = !!attachedFile
     const placeholderText = attachedFile
-        ? "File attached. Remove file to type a message."
-        : "Type your message..."
+        ? 'File attached. Remove file to type a message.'
+        : 'Type your message...'
 
     return (
         <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">
@@ -296,10 +345,7 @@ export function Chat({ chatId = null, initialMessages = [], onChatCreated, onFil
                 </motion.div>
             )}
 
-            <Chatbar
-                onSubmit={handleChatSubmit}
-                isLoading={isLoading}
-            />
+            <Chatbar onSubmit={handleChatSubmit} isLoading={isLoading} />
         </div>
     )
 }

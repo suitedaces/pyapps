@@ -1,8 +1,8 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
 import { highlight, languages } from 'prismjs'
+import { useEffect, useState } from 'react'
 import Editor from 'react-simple-code-editor'
-import { useState, useEffect } from 'react'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
@@ -19,7 +19,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         if (code) {
             const formattedCode = code
                 .split('\n')
-                .map(line => line.trim())
+                .map((line) => line.trim())
                 .join('\n')
             setDisplayCode(formattedCode)
         }
@@ -31,9 +31,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                 <CardContent className="p-0 h-full flex items-center justify-center">
                     <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-8 w-8 animate-spin text-text" />
-                        <p className="text-sm text-text">
-                            Generating code...
-                        </p>
+                        <p className="text-sm text-text">Generating code...</p>
                     </div>
                 </CardContent>
             </Card>
@@ -44,9 +42,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         return (
             <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
-                    <p className="text-sm text-text">
-                        No code generated yet
-                    </p>
+                    <p className="text-sm text-text">No code generated yet</p>
                 </CardContent>
             </Card>
         )
@@ -59,13 +55,14 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                     <div className="min-w-max">
                         <Editor
                             value={displayCode}
-                            onValueChange={() => { }}
-                            highlight={code =>
+                            onValueChange={() => {}}
+                            highlight={(code) =>
                                 highlight(code, languages.python, 'python')
                             }
                             padding={16}
                             style={{
-                                fontFamily: '"Fira code", "Fira Mono", monospace',
+                                fontFamily:
+                                    '"Fira code", "Fira Mono", monospace',
                                 fontSize: 14,
                                 lineHeight: 1.5,
                                 minHeight: '100%',
@@ -95,7 +92,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                     height: 8px;
                 }
                 .code-container::-webkit-scrollbar-track {
-                    background: #E5E6E9;
+                    background: #e5e6e9;
                 }
                 .code-container::-webkit-scrollbar-thumb {
                     background: #212121;
@@ -106,7 +103,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                 }
                 .code-container {
                     scrollbar-width: thin;
-                    scrollbar-color: #212121 #E5E6E9;
+                    scrollbar-color: #212121 #e5e6e9;
                 }
                 .custom-editor {
                     padding: 1rem !important;
@@ -116,11 +113,21 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                     color: #000 !important;
                 }
                 /* Token colors for syntax highlighting */
-                .token.comment { color: #6b7280; }
-                .token.string { color: #059669; }
-                .token.number { color: #7c3aed; }
-                .token.keyword { color: #2563eb; }
-                .token.function { color: #0284c7; }
+                .token.comment {
+                    color: #6b7280;
+                }
+                .token.string {
+                    color: #059669;
+                }
+                .token.number {
+                    color: #7c3aed;
+                }
+                .token.keyword {
+                    color: #2563eb;
+                }
+                .token.function {
+                    color: #0284c7;
+                }
             `}</style>
         </Card>
     )

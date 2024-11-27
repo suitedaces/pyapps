@@ -156,3 +156,15 @@ export function getTitleFromChat(chat: Chat) {
 
     return firstMessage.content
 }
+
+export const truncate = (str: string) => {
+    const maxLength = 30 // Adjust this value as needed
+    if (str.length <= maxLength) return str
+    const extension = str.slice(str.lastIndexOf('.'))
+    const nameWithoutExtension = str.slice(0, str.lastIndexOf('.'))
+    const truncatedName = nameWithoutExtension.slice(
+        0,
+        maxLength - 3 - extension.length
+    )
+    return `${truncatedName}...${extension}`
+}
