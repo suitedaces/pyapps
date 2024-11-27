@@ -15,7 +15,8 @@ import {
     Menu,
     Plus,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    ChevronLeft
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -315,7 +316,7 @@ export function Sidebar({
                                 className={cn('h-6 w-6')}
                                 onClick={() => onCollapsedChange?.(!collapsed)}
                             >
-                                <ChevronDown className={cn(
+                                <ChevronLeft className={cn(
                                     'h-4 w-4 transition-transform text-white',
                                     collapsed && 'rotate-180'
                                 )} />
@@ -329,7 +330,7 @@ export function Sidebar({
                                     className={cn('h-6 w-6 ml-2')}
                                     onClick={() => onCollapsedChange?.(!collapsed)}
                                 >
-                                    <ChevronDown className="h-4 w-4 text-white" />
+                                    <ChevronLeft className="h-4 w-4 text-white" />
                                 </Button>
                             </div>
                         )}
