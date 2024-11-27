@@ -12,6 +12,7 @@ import {
 } from './types'
 import { encode } from 'gpt-tokenizer'
 import { createVersion } from '@/lib/supabase'
+import { useToolState } from '@/lib/stores/tool-state-store'
 
 interface FileContext {
     fileName: string;
@@ -350,127 +351,120 @@ export class GruntyAgent {
             const baseAppName = csvFileName.replace('.csv', '');
 
             for await (const step of fullStream) {
-                if (step.type === 'tool-call' && step.toolName === 'create_streamlit_app') {
-                    try {
-                        const toolInput = step.args
-                        const codeQuery = `${toolInput.query}\n${
-                            this.fileContext ? `Using file: ${this.fileContext.fileName}` : ''
-                        }`
-                        const { generatedCode } = await generateCode(codeQuery, this.fileContext)
+                try {
+                    if (step.type === 'text-delta') {
+                        // Handle text deltas with proper null checks
+                        const textContent = step.text || step.content || '';
+                        if (textContent) {
+                            // Format according to protocol: 0:string\n
+                            const textData = `0:${JSON.stringify(textContent)}\n\n`
+                            writer.write(encoder.encode(textData))
+                            collectedContent += textContent
+                        }
+                    } else if (step.type === 'tool-call' && step.toolName === 'create_streamlit_app') {
+                        try {
+                            const toolInput = step.args
+                            const codeQuery = `${toolInput.query}\n${
+                                this.fileContext ? `Using file: ${this.fileContext.fileName}` : ''
+                            }`
+                            const { generatedCode } = await generateCode(codeQuery, this.fileContext)
 
-                        if (generatedCode) {
-                            // Create app if it doesn't exist
-                            if (!appId) {
-                                const { data: newApp, error: appError } = await supabase
-                                    .from('apps')
-                                    .insert({
-                                        user_id: userId,
-                                        name: baseAppName, // Use CSV filename without extension
-                                        description: toolInput.query, // Use the query as description
-                                        is_public: false,
-                                        created_at: new Date().toISOString(),
-                                        updated_at: new Date().toISOString(),
-                                        created_by: userId
-                                    })
-                                    .select()
-                                    .single()
-
-                                if (appError) throw appError
-                                appId = newApp.id
-
-                                // Link chat to app
-                                await supabase
-                                    .from('chats')
-                                    .update({ app_id: appId })
-                                    .eq('id', chatId)
-                            }
-
-                            if (!appId) {
-                                throw new Error('Failed to create or retrieve app ID')
-                            }
-
-                            try {
-                                const versionData = await createVersion(appId, generatedCode)
-                                console.log('Version created successfully:', versionData)
-
-                                // Process tool results and write to stream
-                                toolCalls.push({
-                                    id: step.toolCallId,
-                                    name: step.toolName,
-                                    args: step.args || {}
-                                });
-
-                                toolResults.push({
-                                    id: step.toolCallId,
-                                    name: step.toolName,
-                                    result: generatedCode
-                                });
-
-                                // Write tool call data to stream
+                            if (generatedCode) {
+                                // Handle tool call start (b: protocol)
                                 const toolCallStartData = `b:${JSON.stringify({
                                     toolCallId: step.toolCallId,
-                                    toolName: step.toolName
+                                    toolName: step.toolName,
+                                    args: step.args || {}
                                 })}\n\n`
+                                writer.write(encoder.encode(toolCallStartData))
 
+                                // Update store
+                                useToolState.getState().startToolCall(step.toolCallId, step.toolName)
+
+                                // Handle tool call delta (c: protocol) - Fixed delta format
+                                const deltaText = typeof step.args === 'string' ? step.args : JSON.stringify(step.args)
+                                const toolCallDelta = `c:${JSON.stringify({
+                                    toolCallId: step.toolCallId,
+                                    argsTextDelta: deltaText
+                                })}\n\n`
+                                writer.write(encoder.encode(toolCallDelta))
+
+                                // Update store
+                                useToolState.getState().updateToolCallDelta(step.toolCallId)
+
+                                // Handle tool call completion (9: protocol)
                                 const toolCallData = `9:${JSON.stringify({
                                     toolCallId: step.toolCallId,
                                     toolName: step.toolName,
                                     args: step.args || {}
                                 })}\n\n`
+                                writer.write(encoder.encode(toolCallData))
 
+                                // Update store
+                                useToolState.getState().completeToolCall(step.toolCallId)
+
+                                // Write tool result (a: protocol)
                                 const toolResultData = `a:${JSON.stringify({
                                     toolCallId: step.toolCallId,
                                     result: generatedCode
                                 })}\n\n`
-
-                                writer.write(encoder.encode(toolCallStartData))
-                                writer.write(encoder.encode(toolCallData))
                                 writer.write(encoder.encode(toolResultData))
 
-                            } catch (versionError) {
-                                console.error('Failed to create version:', versionError)
-                                throw versionError
+                                // Add to tracking arrays
+                                toolCalls.push({
+                                    id: step.toolCallId,
+                                    name: step.toolName,
+                                    args: step.args || {}
+                                })
+
+                                toolResults.push({
+                                    id: step.toolCallId,
+                                    name: step.toolName,
+                                    result: generatedCode
+                                })
                             }
+                        } catch (error) {
+                            console.error('Error in code generation or app creation:', error)
+                            const errorResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+                            const toolResultData = `a:${JSON.stringify({
+                                toolCallId: step.toolCallId,
+                                result: errorResult
+                            })}\n\n`
+                            writer.write(encoder.encode(toolResultData))
                         }
-                    } catch (error) {
-                        console.error('Error in code generation or app creation:', error)
-                        const errorResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-                        const toolResultData = `a:${JSON.stringify({
-                            toolCallId: step.toolCallId,
-                            result: errorResult
-                        })}\n\n`
-                        writer.write(encoder.encode(toolResultData))
-                    }
-                } else if (step.type === 'text-delta') {
-                    if (step.content) {
-                        const textData = `0:${JSON.stringify(step.content)}\n\n`
-                        writer.write(encoder.encode(textData))
-                    }
-                } else if (step.type === 'finish') {
-                    if (collectedContent) {
-                        const latestUserMessage = this.sanitizedMessages
-                            .filter(msg => msg.role === 'user')
-                            .pop()
+                    } else if (step.type === 'finish') {
+                        if (collectedContent) {
+                            const latestUserMessage = this.sanitizedMessages
+                                .filter(msg => msg.role === 'user')
+                                .pop()
 
-                        await this.storeMessage(chatId, userId, {
-                            user_message: typeof latestUserMessage?.content === 'string'
-                                ? latestUserMessage.content
-                                : '',
-                            assistant_message: collectedContent,
-                            tool_calls: toolCalls,
-                            tool_results: toolResults
-                        })
+                            await this.storeMessage(chatId, userId, {
+                                user_message: typeof latestUserMessage?.content === 'string'
+                                    ? latestUserMessage.content
+                                    : '',
+                                assistant_message: collectedContent,
+                                tool_calls: toolCalls,
+                                tool_results: toolResults
+                            })
 
-                        const finishData = `d:${JSON.stringify({
-                            finishReason: step.finishReason || 'stop',
-                            usage: {
-                                promptTokens: step.usage?.promptTokens || 0,
-                                completionTokens: step.usage?.completionTokens || 0,
-                                totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
-                            }
-                        })}\n\n`
-                        writer.write(encoder.encode(finishData))
+                            const finishData = `d:${JSON.stringify({
+                                finishReason: step.finishReason || 'stop',
+                                usage: {
+                                    promptTokens: step.usage?.promptTokens || 0,
+                                    completionTokens: step.usage?.completionTokens || 0,
+                                    totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
+                                }
+                            })}\n\n`
+                            writer.write(encoder.encode(finishData))
+                        }
                     }
+                } catch (error) {
+                    console.error('Error processing stream step:', {
+                        stepType: step.type,
+                        error: error instanceof Error ? error.message : 'Unknown error'
+                    });
+                    // Continue processing other steps
+                    continue;
                 }
             }
         } catch (error) {
