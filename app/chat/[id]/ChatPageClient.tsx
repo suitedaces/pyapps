@@ -94,7 +94,6 @@ export default function ChatPageClient({
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
     const [showCodeView, setShowCodeView] = useState(false)
-    const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
 
     const handleRefresh = async () => {
         if (sandboxId && session?.user?.id) {
@@ -450,6 +449,14 @@ export default function ChatPageClient({
             versionSelectorRef.current.refreshVersions()
         }
     }, [])
+
+    const CustomHandle = ({ ...props }) => (
+        <ResizableHandle {...props} withHandle className="relative">
+            <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
+                <div className="h-8 w-1 rounded-full bg-black" />
+            </div>
+        </ResizableHandle>
+    )
 
     const handleChatSubmit = useCallback(() => {
         setShowTypingText(false)
