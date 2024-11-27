@@ -8,7 +8,9 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -19,10 +21,9 @@ export async function GET(
 
     try {
         // Use the RPC function to get versions
-        const { data, error } = await supabase
-            .rpc('get_app_versions', {
-                p_app_id: params.id
-            })
+        const { data, error } = await supabase.rpc('get_app_versions', {
+            p_app_id: params.id,
+        })
 
         if (error) throw error
         return NextResponse.json(data)
@@ -40,7 +41,9 @@ export async function POST(
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -52,11 +55,10 @@ export async function POST(
     try {
         const { code } = await req.json()
 
-        const { data, error } = await supabase
-            .rpc('create_app_version', {
-                p_app_id: params.id,
-                p_code: code
-            })
+        const { data, error } = await supabase.rpc('create_app_version', {
+            p_app_id: params.id,
+            p_code: code,
+        })
 
         if (error) throw error
         return NextResponse.json(data)
@@ -74,7 +76,9 @@ export async function PATCH(
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -87,11 +91,10 @@ export async function PATCH(
         const { versionId } = await req.json()
 
         // Use the RPC function to switch version
-        const { data, error } = await supabase
-            .rpc('switch_app_version', {
-                p_app_id: params.id,
-                p_version_id: versionId
-            })
+        const { data, error } = await supabase.rpc('switch_app_version', {
+            p_app_id: params.id,
+            p_version_id: versionId,
+        })
 
         if (error) throw error
         return NextResponse.json(data)

@@ -1,9 +1,9 @@
+import { analyzeFile } from '@/lib/fileAnalyzer'
+import { generateUUID } from '@/lib/utils'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { generateUUID } from '@/lib/utils'
-import { analyzeFile } from '@/lib/fileAnalyzer'
 
 // File metadata validation schema
 const FileMetadataSchema = z.object({
@@ -15,7 +15,10 @@ const FileMetadataSchema = z.object({
 
 export async function GET(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser()
 
     if (userError || !user) {
         return NextResponse.json(
@@ -43,7 +46,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser()
 
     if (userError || !user) {
         return NextResponse.json(
@@ -65,7 +71,10 @@ export async function POST(req: NextRequest) {
 
         const metadata = await FileMetadataSchema.parseAsync({
             fileName: file.name,
-            fileType: file.name.split('.').pop()?.toLowerCase() as 'csv' | 'json' | 'txt',
+            fileType: file.name.split('.').pop()?.toLowerCase() as
+                | 'csv'
+                | 'json'
+                | 'txt',
             fileSize: file.size,
             chatId: formData.get('chatId')?.toString(),
         })
@@ -112,13 +121,13 @@ export async function POST(req: NextRequest) {
             fileType: metadata.fileType,
             analysis,
         })
-
     } catch (error) {
         return NextResponse.json(
             {
-                error: error instanceof z.ZodError
-                    ? 'Invalid file data'
-                    : 'Failed to upload file'
+                error:
+                    error instanceof z.ZodError
+                        ? 'Invalid file data'
+                        : 'Failed to upload file',
             },
             { status: 500 }
         )

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
 
 interface TypingTextProps {
     text: string
@@ -10,8 +10,13 @@ interface TypingTextProps {
     show: boolean
 }
 
-export function TypingText({ text, speed = 30, className, show }: TypingTextProps) {
-    const [displayText, setDisplayText] = useState("")
+export function TypingText({
+    text,
+    speed = 30,
+    className,
+    show,
+}: TypingTextProps) {
+    const [displayText, setDisplayText] = useState('')
     const [isTyping, setIsTyping] = useState(true)
 
     useEffect(() => {
@@ -32,7 +37,7 @@ export function TypingText({ text, speed = 30, className, show }: TypingTextProp
         }
 
         return () => {
-            setDisplayText("")
+            setDisplayText('')
             setIsTyping(true)
         }
     }, [text, speed, show])
@@ -53,7 +58,7 @@ export function TypingText({ text, speed = 30, className, show }: TypingTextProp
                                 className="ml-[2px] w-[2px] h-[1.2em] bg-current animate-cursor-blink"
                                 style={{
                                     display: 'inline-block',
-                                    verticalAlign: 'middle'
+                                    verticalAlign: 'middle',
                                 }}
                             />
                         )}

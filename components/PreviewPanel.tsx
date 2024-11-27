@@ -1,16 +1,16 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
-import { Code, Globe, RefreshCcw, Layout } from 'lucide-react'
-import { CodeView } from './CodeView'
-import { StreamlitPreview, StreamlitPreviewRef } from './StreamlitPreview'
-import { useRef } from 'react'
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import { Code, Globe, Layout, RefreshCcw } from 'lucide-react'
+import { useRef } from 'react'
+import { CodeView } from './CodeView'
+import { StreamlitPreview, StreamlitPreviewRef } from './StreamlitPreview'
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
@@ -43,9 +43,9 @@ export function PreviewPanel({
             <div className="flex items-center gap-2 p-2 border-b bg-muted/40">
                 <div className="flex items-center flex-grow gap-2 px-2 py-1.5 bg-background rounded-md border shadow-sm">
                     <Globe className="h-4 w-4 text-foreground/90" />
-                    <Input 
-                        value={streamlitUrl || ''} 
-                        readOnly 
+                    <Input
+                        value={streamlitUrl || ''}
+                        readOnly
                         className="flex-grow font-mono text-sm border-0 focus-visible:ring-0 px-0 py-0 h-auto bg-transparent text-foreground selection:bg-blue-200"
                     />
                 </div>
@@ -59,10 +59,12 @@ export function PreviewPanel({
                                 className="hover:bg-background"
                                 disabled={isGeneratingCode}
                             >
-                                <RefreshCcw className={cn(
-                                    "h-4 w-4 text-foreground/90",
-                                    isGeneratingCode && "animate-spin"
-                                )} />
+                                <RefreshCcw
+                                    className={cn(
+                                        'h-4 w-4 text-foreground/90',
+                                        isGeneratingCode && 'animate-spin'
+                                    )}
+                                />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
@@ -77,8 +79,8 @@ export function PreviewPanel({
                                 size="icon"
                                 onClick={onCodeViewToggle}
                                 className={cn(
-                                    "hover:bg-background",
-                                    showCodeView && "bg-background text-primary"
+                                    'hover:bg-background',
+                                    showCodeView && 'bg-background text-primary'
                                 )}
                             >
                                 {showCodeView ? (
@@ -89,7 +91,7 @@ export function PreviewPanel({
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
-                            <p>{showCodeView ? "Show App" : "Show Code"}</p>
+                            <p>{showCodeView ? 'Show App' : 'Show Code'}</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
@@ -97,8 +99,8 @@ export function PreviewPanel({
             <div className="flex-grow relative">
                 {showCodeView ? (
                     <div className="h-full overflow-auto">
-                        <CodeView 
-                            code={generatedCode} 
+                        <CodeView
+                            code={generatedCode}
                             isGeneratingCode={isGeneratingCode}
                         />
                     </div>

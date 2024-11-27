@@ -1,7 +1,12 @@
-import { Message as VercelMessage, ToolInvocation as VercelToolInvocation } from 'ai'
-import { DatabaseMessage, ClientMessage } from './types'
+import {
+    Message as VercelMessage,
+    ToolInvocation as VercelToolInvocation,
+} from 'ai'
+import { ClientMessage, DatabaseMessage } from './types'
 
-export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMessage[] {
+export function mapDatabaseToVercelMessage(
+    dbMessage: DatabaseMessage
+): VercelMessage[] {
     const messages: VercelMessage[] = []
 
     // Map user message if exists
@@ -10,7 +15,7 @@ export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMe
             id: `${dbMessage.id}-user`,
             role: 'user',
             content: dbMessage.user_message,
-            createdAt: new Date(dbMessage.created_at)
+            createdAt: new Date(dbMessage.created_at),
         })
     }
 
@@ -26,7 +31,7 @@ export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMe
                     state: 'call',
                     toolCallId: call.id,
                     toolName: call.name,
-                    args: call.parameters
+                    args: call.parameters,
                 })
             })
         }
@@ -40,7 +45,7 @@ export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMe
                     toolCallId: result.id,
                     toolName: result.name,
                     args: result.parameters,
-                    result: result.content
+                    result: result.content,
                 })
             })
         }
@@ -50,20 +55,26 @@ export function mapDatabaseToVercelMessage(dbMessage: DatabaseMessage): VercelMe
             role: 'assistant',
             content: dbMessage.assistant_message,
             createdAt: new Date(dbMessage.created_at),
-            toolInvocations: toolInvocations.length > 0 ? toolInvocations : undefined
+            toolInvocations:
+                toolInvocations.length > 0 ? toolInvocations : undefined,
         })
     }
 
     return messages
 }
 
-export function mapVercelToClientMessage(vercelMessage: VercelMessage): ClientMessage {
+export function mapVercelToClientMessage(
+    vercelMessage: VercelMessage
+): ClientMessage {
     return {
         id: vercelMessage.id,
         role: vercelMessage.role as ClientMessage['role'],
         content: vercelMessage.content,
-        createdAt: vercelMessage.createdAt ? new Date(vercelMessage.createdAt) : new Date(),
-        toolInvocations: vercelMessage.toolInvocations as unknown as ClientMessage['toolInvocations']
+        createdAt: vercelMessage.createdAt
+            ? new Date(vercelMessage.createdAt)
+            : new Date(),
+        toolInvocations:
+            vercelMessage.toolInvocations as unknown as ClientMessage['toolInvocations'],
     }
 }
 
@@ -73,30 +84,36 @@ export function mapVercelToDatabaseMessage(
     vercelMessage: VercelMessage
 ): Partial<DatabaseMessage> {
     // Extract tool calls and results from toolInvocations
-    const toolCalls = vercelMessage.toolInvocations
-        ?.filter(t => t.state === 'call')
-        .map(t => ({
-            id: t.toolCallId,
-            name: t.toolName,
-            parameters: t.args
-        })) || null
+    const toolCalls =
+        vercelMessage.toolInvocations
+            ?.filter((t) => t.state === 'call')
+            .map((t) => ({
+                id: t.toolCallId,
+                name: t.toolName,
+                parameters: t.args,
+            })) || null
 
-    const toolResults = vercelMessage.toolInvocations
-        ?.filter(t => t.state === 'result')
-        .map(t => ({
-            id: t.toolCallId,
-            name: t.toolName,
-            content: t.result
-        })) || null
+    const toolResults =
+        vercelMessage.toolInvocations
+            ?.filter((t) => t.state === 'result')
+            .map((t) => ({
+                id: t.toolCallId,
+                name: t.toolName,
+                content: t.result,
+            })) || null
 
     return {
         chat_id: chatId,
         user_id: userId,
-        user_message: vercelMessage.role === 'user' ? vercelMessage.content : '',
-        assistant_message: vercelMessage.role === 'assistant' ? vercelMessage.content : '',
+        user_message:
+            vercelMessage.role === 'user' ? vercelMessage.content : '',
+        assistant_message:
+            vercelMessage.role === 'assistant' ? vercelMessage.content : '',
         tool_calls: toolCalls,
         tool_results: toolResults,
-        created_at: vercelMessage.createdAt ? new Date(vercelMessage.createdAt).toISOString() : new Date().toISOString(),
-        role: vercelMessage.role as DatabaseMessage['role']
+        created_at: vercelMessage.createdAt
+            ? new Date(vercelMessage.createdAt).toISOString()
+            : new Date().toISOString(),
+        role: vercelMessage.role as DatabaseMessage['role'],
     }
 }

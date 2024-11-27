@@ -102,20 +102,22 @@ export interface ToolCall {
 }
 
 export interface FileContext {
-    id: string;
-    fileName: string;
-    fileType: 'csv' | 'json' | 'txt';
-    content?: string;
-    analysis?: any;
+    id: string
+    fileName: string
+    fileType: 'csv' | 'json' | 'txt'
+    content?: string
+    analysis?: any
 }
 
 // Add this to your existing types
 export const RequestSchema = z.object({
-    messages: z.array(z.object({
-        content: z.string(),
-        role: z.enum(['user', 'assistant', 'system']),
-        createdAt: z.date().optional(),
-    })),
+    messages: z.array(
+        z.object({
+            content: z.string(),
+            role: z.enum(['user', 'assistant', 'system']),
+            createdAt: z.date().optional(),
+        })
+    ),
     model: z.object({
         id: z.string(),
         provider: z.string(),
@@ -135,8 +137,8 @@ export const RequestSchema = z.object({
 export type RequestSchemaType = z.infer<typeof RequestSchema>
 
 export interface VersionMetadata {
-    version_id: string;
-    version_number: number;
-    app_id: string;
-    created_at: string;
+    version_id: string
+    version_number: number
+    app_id: string
+    created_at: string
 }

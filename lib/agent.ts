@@ -1,23 +1,16 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { CoreMessage as VercelMessage } from 'ai'
-import { cookies } from 'next/headers'
-import { messageStore } from './messageStore'
-import { generateCode } from './tools'
-import { streamText, LanguageModelV1, CoreMessage } from 'ai'
-import {
-    ModelProvider,
-    Tool,
-    LLMModelConfig,
-    ToolInvocation as GruntyToolInvocation
-} from './types'
-import { encode } from 'gpt-tokenizer'
 import { createVersion } from '@/lib/supabase'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { CoreMessage, LanguageModelV1, streamText } from 'ai'
+import { encode } from 'gpt-tokenizer'
+import { cookies } from 'next/headers'
+import { generateCode } from './tools'
+import { LLMModelConfig, ModelProvider, Tool } from './types'
 
 interface FileContext {
-    fileName: string;
-    fileType: string;
-    content?: string;
-    analysis?: any;
+    fileName: string
+    fileType: string
+    content?: string
+    analysis?: any
 }
 
 // AI Agent that handles message streaming, tool execution, and conversation management
@@ -59,7 +52,7 @@ export class GruntyAgent {
 
         this.sanitizedMessages.push({
             role: 'system',
-            content: systemMessage
+            content: systemMessage,
         })
 
         // Fetch complete conversation history
@@ -84,7 +77,7 @@ export class GruntyAgent {
         if (latestUserMessage.role === 'user') {
             this.sanitizedMessages.push({
                 role: 'user',
-                content: latestUserMessage.content
+                content: latestUserMessage.content,
             })
         }
 
@@ -100,9 +93,9 @@ export class GruntyAgent {
             headers: {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
+                Connection: 'keep-alive',
                 'x-vercel-ai-data-stream': 'v1',
-                'x-chat-id': chatId
+                'x-chat-id': chatId,
             },
         })
     }
@@ -146,7 +139,6 @@ export class GruntyAgent {
                 chatId,
                 userId
             )
-
         } catch (error) {
             console.error('🔥 Stream process error:', error)
             throw error
@@ -156,19 +148,22 @@ export class GruntyAgent {
     }
 
     private formatTools(tools: Tool[]) {
-        return tools.reduce((acc, tool) => {
-            acc[tool.toolName] = {
-                description: tool.description,
-                parameters: tool.parameters,
-                execute: async (args: any) => {
-                    if (tool.toolName === 'create_streamlit_app') {
-                        return this.handleStreamlitCodeGeneration(args)
-                    }
-                    return tool.execute(args)
+        return tools.reduce(
+            (acc, tool) => {
+                acc[tool.toolName] = {
+                    description: tool.description,
+                    parameters: tool.parameters,
+                    execute: async (args: any) => {
+                        if (tool.toolName === 'create_streamlit_app') {
+                            return this.handleStreamlitCodeGeneration(args)
+                        }
+                        return tool.execute(args)
+                    },
                 }
-            }
-            return acc
-        }, {} as Record<string, any>)
+                return acc
+            },
+            {} as Record<string, any>
+        )
     }
 
     private async handleStreamlitCodeGeneration(args: any) {
@@ -198,8 +193,8 @@ export class GruntyAgent {
                 user: message.user_message,
                 assistant: message.assistant_message,
                 toolCalls: message.tool_calls.length,
-                toolResults: message.tool_results.length
-            }
+                toolResults: message.tool_results.length,
+            },
         })
 
         const supabase = createRouteHandlerClient({ cookies })
@@ -212,7 +207,9 @@ export class GruntyAgent {
             )
 
             const userTokens = this.calculateTokenCount(message.user_message)
-            const assistantTokens = this.calculateTokenCount(cleanedAssistantMessage)
+            const assistantTokens = this.calculateTokenCount(
+                cleanedAssistantMessage
+            )
             const toolCallTokens = message.tool_calls?.length
                 ? this.calculateTokenCount(JSON.stringify(message.tool_calls))
                 : 0
@@ -220,14 +217,15 @@ export class GruntyAgent {
                 ? this.calculateTokenCount(JSON.stringify(message.tool_results))
                 : 0
 
-            const totalTokens = userTokens + assistantTokens + toolCallTokens + toolResultTokens
+            const totalTokens =
+                userTokens + assistantTokens + toolCallTokens + toolResultTokens
 
             console.log('🔢 Token counts:', {
                 user: userTokens,
                 assistant: assistantTokens,
                 toolCalls: toolCallTokens,
                 toolResults: toolResultTokens,
-                total: totalTokens
+                total: totalTokens,
             })
 
             const messageData = {
@@ -235,10 +233,14 @@ export class GruntyAgent {
                 user_id: userId,
                 user_message: message.user_message,
                 assistant_message: cleanedAssistantMessage,
-                tool_calls: message.tool_calls.length > 0 ? message.tool_calls : null,
-                tool_results: message.tool_results.length > 0 ? message.tool_results : null,
+                tool_calls:
+                    message.tool_calls.length > 0 ? message.tool_calls : null,
+                tool_results:
+                    message.tool_results.length > 0
+                        ? message.tool_results
+                        : null,
                 created_at: new Date().toISOString(),
-                token_count: totalTokens
+                token_count: totalTokens,
             }
 
             const { data, error } = await supabase
@@ -253,7 +255,7 @@ export class GruntyAgent {
 
             console.log('✅ Message stored successfully:', {
                 messageId: data[0]?.id,
-                timestamp: data[0]?.created_at
+                timestamp: data[0]?.created_at,
             })
             return data
         } catch (error) {
@@ -264,34 +266,35 @@ export class GruntyAgent {
 
     private processMessageHistory(messageHistory: any[]) {
         console.log('📝 Processing message history:', {
-            messageCount: messageHistory.length
+            messageCount: messageHistory.length,
         })
 
-        messageHistory.forEach(msg => {
+        messageHistory.forEach((msg) => {
             if (msg.user_message) {
                 this.sanitizedMessages.push({
                     role: 'user',
-                    content: msg.user_message
+                    content: msg.user_message,
                 })
                 console.log('➕ Added user message:', {
                     timestamp: msg.created_at,
-                    contentPreview: msg.user_message.substring(0, 50) + '...'
+                    contentPreview: msg.user_message.substring(0, 50) + '...',
                 })
             }
             if (msg.assistant_message) {
                 this.sanitizedMessages.push({
                     role: 'assistant',
-                    content: msg.assistant_message
+                    content: msg.assistant_message,
                 })
                 console.log('➕ Added assistant message:', {
                     timestamp: msg.created_at,
-                    contentPreview: msg.assistant_message.substring(0, 50) + '...'
+                    contentPreview:
+                        msg.assistant_message.substring(0, 50) + '...',
                 })
             }
         })
 
         console.log('✅ Message history processed:', {
-            totalMessages: this.sanitizedMessages.length
+            totalMessages: this.sanitizedMessages.length,
         })
     }
 
@@ -303,9 +306,9 @@ export class GruntyAgent {
         chatId: string,
         userId: string
     ) {
-        let toolCalls: any[] = [];
-        let toolResults: any[] = [];
-        let appId: string | null = null;
+        let toolCalls: any[] = []
+        let toolResults: any[] = []
+        let appId: string | null = null
 
         try {
             // First check if chat already has an associated app
@@ -319,61 +322,75 @@ export class GruntyAgent {
             appId = existingChat?.app_id
 
             // Extract CSV filename from messages
-            let csvFileName = 'data.csv'; // default fallback
+            let csvFileName = 'data.csv' // default fallback
             if (this.fileContext?.fileName) {
-                csvFileName = this.fileContext.fileName;
+                csvFileName = this.fileContext.fileName
             } else {
                 // Try to find CSV filename in user messages
                 const csvFileNameMatch = this.sanitizedMessages
-                    .filter(msg => msg.role === 'user')
-                    .map(msg => {
+                    .filter((msg) => msg.role === 'user')
+                    .map((msg) => {
                         // Handle different content types
-                        const content = typeof msg.content === 'string'
-                            ? msg.content
-                            : Array.isArray(msg.content)
-                                ? msg.content.map(part =>
-                                    typeof part === 'string' ? part : ''
-                                ).join(' ')
-                                : '';
+                        const content =
+                            typeof msg.content === 'string'
+                                ? msg.content
+                                : Array.isArray(msg.content)
+                                  ? msg.content
+                                        .map((part) =>
+                                            typeof part === 'string' ? part : ''
+                                        )
+                                        .join(' ')
+                                  : ''
 
-                        const match = content.match(/['"]([\w\s-]+\.csv)['"]/i);
-                        return match ? match[1] : null;
+                        const match = content.match(/['"]([\w\s-]+\.csv)['"]/i)
+                        return match ? match[1] : null
                     })
-                    .find(name => name !== null);
+                    .find((name) => name !== null)
 
                 if (csvFileNameMatch) {
-                    csvFileName = csvFileNameMatch;
+                    csvFileName = csvFileNameMatch
                 }
             }
 
             // Use the CSV filename (without extension) as the base for the app name
-            const baseAppName = csvFileName.replace('.csv', '');
+            const baseAppName = csvFileName.replace('.csv', '')
 
             for await (const step of fullStream) {
-                if (step.type === 'tool-call' && step.toolName === 'create_streamlit_app') {
+                if (
+                    step.type === 'tool-call' &&
+                    step.toolName === 'create_streamlit_app'
+                ) {
                     try {
                         const toolInput = step.args
                         const codeQuery = `${toolInput.query}\n${
-                            this.fileContext ? `Using file: ${this.fileContext.fileName}` : ''
+                            this.fileContext
+                                ? `Using file: ${this.fileContext.fileName}`
+                                : ''
                         }`
-                        const { generatedCode } = await generateCode(codeQuery, this.fileContext)
+                        const { generatedCode } = await generateCode(
+                            codeQuery,
+                            this.fileContext
+                        )
 
                         if (generatedCode) {
                             // Create app if it doesn't exist
                             if (!appId) {
-                                const { data: newApp, error: appError } = await supabase
-                                    .from('apps')
-                                    .insert({
-                                        user_id: userId,
-                                        name: baseAppName, // Use CSV filename without extension
-                                        description: toolInput.query, // Use the query as description
-                                        is_public: false,
-                                        created_at: new Date().toISOString(),
-                                        updated_at: new Date().toISOString(),
-                                        created_by: userId
-                                    })
-                                    .select()
-                                    .single()
+                                const { data: newApp, error: appError } =
+                                    await supabase
+                                        .from('apps')
+                                        .insert({
+                                            user_id: userId,
+                                            name: baseAppName, // Use CSV filename without extension
+                                            description: toolInput.query, // Use the query as description
+                                            is_public: false,
+                                            created_at:
+                                                new Date().toISOString(),
+                                            updated_at:
+                                                new Date().toISOString(),
+                                            created_by: userId,
+                                        })
+                                        .select()
+                                        .single()
 
                                 if (appError) throw appError
                                 appId = newApp.id
@@ -386,58 +403,71 @@ export class GruntyAgent {
                             }
 
                             if (!appId) {
-                                throw new Error('Failed to create or retrieve app ID')
+                                throw new Error(
+                                    'Failed to create or retrieve app ID'
+                                )
                             }
 
                             try {
-                                const versionData = await createVersion(appId, generatedCode)
-                                console.log('Version created successfully:', versionData)
+                                const versionData = await createVersion(
+                                    appId,
+                                    generatedCode
+                                )
+                                console.log(
+                                    'Version created successfully:',
+                                    versionData
+                                )
 
                                 // Process tool results and write to stream
                                 toolCalls.push({
                                     id: step.toolCallId,
                                     name: step.toolName,
-                                    args: step.args || {}
-                                });
+                                    args: step.args || {},
+                                })
 
                                 toolResults.push({
                                     id: step.toolCallId,
                                     name: step.toolName,
-                                    result: generatedCode
-                                });
+                                    result: generatedCode,
+                                })
 
                                 // Write tool call data to stream
                                 const toolCallStartData = `b:${JSON.stringify({
                                     toolCallId: step.toolCallId,
-                                    toolName: step.toolName
+                                    toolName: step.toolName,
                                 })}\n\n`
 
                                 const toolCallData = `9:${JSON.stringify({
                                     toolCallId: step.toolCallId,
                                     toolName: step.toolName,
-                                    args: step.args || {}
+                                    args: step.args || {},
                                 })}\n\n`
 
                                 const toolResultData = `a:${JSON.stringify({
                                     toolCallId: step.toolCallId,
-                                    result: generatedCode
+                                    result: generatedCode,
                                 })}\n\n`
 
                                 writer.write(encoder.encode(toolCallStartData))
                                 writer.write(encoder.encode(toolCallData))
                                 writer.write(encoder.encode(toolResultData))
-
                             } catch (versionError) {
-                                console.error('Failed to create version:', versionError)
+                                console.error(
+                                    'Failed to create version:',
+                                    versionError
+                                )
                                 throw versionError
                             }
                         }
                     } catch (error) {
-                        console.error('Error in code generation or app creation:', error)
-                        const errorResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        console.error(
+                            'Error in code generation or app creation:',
+                            error
+                        )
+                        const errorResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
                         const toolResultData = `a:${JSON.stringify({
                             toolCallId: step.toolCallId,
-                            result: errorResult
+                            result: errorResult,
                         })}\n\n`
                         writer.write(encoder.encode(toolResultData))
                     }
@@ -449,25 +479,29 @@ export class GruntyAgent {
                 } else if (step.type === 'finish') {
                     if (collectedContent) {
                         const latestUserMessage = this.sanitizedMessages
-                            .filter(msg => msg.role === 'user')
+                            .filter((msg) => msg.role === 'user')
                             .pop()
 
                         await this.storeMessage(chatId, userId, {
-                            user_message: typeof latestUserMessage?.content === 'string'
-                                ? latestUserMessage.content
-                                : '',
+                            user_message:
+                                typeof latestUserMessage?.content === 'string'
+                                    ? latestUserMessage.content
+                                    : '',
                             assistant_message: collectedContent,
                             tool_calls: toolCalls,
-                            tool_results: toolResults
+                            tool_results: toolResults,
                         })
 
                         const finishData = `d:${JSON.stringify({
                             finishReason: step.finishReason || 'stop',
                             usage: {
                                 promptTokens: step.usage?.promptTokens || 0,
-                                completionTokens: step.usage?.completionTokens || 0,
-                                totalTokens: (step.usage?.promptTokens || 0) + (step.usage?.completionTokens || 0)
-                            }
+                                completionTokens:
+                                    step.usage?.completionTokens || 0,
+                                totalTokens:
+                                    (step.usage?.promptTokens || 0) +
+                                    (step.usage?.completionTokens || 0),
+                            },
                         })}\n\n`
                         writer.write(encoder.encode(finishData))
                     }
@@ -477,9 +511,9 @@ export class GruntyAgent {
             console.error('Stream processing failed:', {
                 chatId,
                 error: error instanceof Error ? error.message : 'Unknown error',
-                timestamp: new Date().toISOString()
-            });
-            throw error;
+                timestamp: new Date().toISOString(),
+            })
+            throw error
         }
     }
 }

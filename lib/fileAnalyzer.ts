@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import Papa from 'papaparse'
 import { FileContext } from './types'
 
@@ -39,7 +38,7 @@ export async function analyzeFile(
     console.log('📊 Starting file analysis:', {
         fileType,
         contentLength: content.length,
-        options
+        options,
     })
 
     try {
@@ -56,14 +55,14 @@ export async function analyzeFile(
 
         console.log('✅ File analysis completed:', {
             fileType,
-            analysisType: result.constructor.name
+            analysisType: result.constructor.name,
         })
 
         return result
     } catch (error) {
         console.error('❌ File analysis failed:', {
             fileType,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Unknown error',
         })
         throw error
     }
@@ -75,19 +74,19 @@ export async function analyzeCSV(
 ): Promise<CSVAnalysis> {
     console.log('📊 Starting CSV analysis:', {
         contentLength: content.length,
-        options
+        options,
     })
 
     try {
         const parsed = Papa.parse(content.trim(), {
             header: true,
             skipEmptyLines: true,
-            dynamicTyping: true
+            dynamicTyping: true,
         })
 
         console.log('📋 CSV parsing completed:', {
             rowCount: parsed.data.length,
-            columnCount: parsed.meta.fields?.length
+            columnCount: parsed.meta.fields?.length,
         })
 
         const columns = parsed.meta.fields || []
@@ -99,12 +98,13 @@ export async function analyzeCSV(
             rowCount,
             columnTypes: {},
             summary: {},
-            sampleData: rows.slice(0, options?.maxRows || 5)
+            sampleData: rows.slice(0, options?.maxRows || 5),
         }
 
-        columns.forEach(column => {
-            const values = rows.map(row => row[column])
-                .filter(v => v !== null && v !== undefined)
+        columns.forEach((column) => {
+            const values = rows
+                .map((row) => row[column])
+                .filter((v) => v !== null && v !== undefined)
             const type = inferColumnType(values)
             analysis.columnTypes[column] = type
 
@@ -116,7 +116,7 @@ export async function analyzeCSV(
         console.log('✅ CSV analysis completed:', {
             columns: analysis.columns.length,
             rowCount: analysis.rowCount,
-            sampleSize: analysis.sampleData.length
+            sampleSize: analysis.sampleData.length,
         })
 
         return analysis
@@ -137,12 +137,12 @@ export async function analyzeJSON(
         const analysis: JSONAnalysis = {
             structure: inferJSONStructure(data),
             depth: calculateJSONDepth(data),
-            sampleData: options?.detailed ? data : undefined
+            sampleData: options?.detailed ? data : undefined,
         }
 
         console.log('✅ JSON analysis completed:', {
             structure: analysis.structure,
-            depth: analysis.depth
+            depth: analysis.depth,
         })
 
         return analysis
@@ -158,7 +158,7 @@ type ColumnType = 'number' | 'boolean' | 'date' | 'string' | 'mixed' | 'unknown'
 function inferColumnType(values: any[]): ColumnType {
     if (values.length === 0) return 'unknown'
 
-    const types = values.map(value => {
+    const types = values.map((value) => {
         if (typeof value === 'number') return 'number' as const
         if (typeof value === 'boolean') return 'boolean' as const
         if (value instanceof Date) return 'date' as const
@@ -181,11 +181,11 @@ function inferColumnType(values: any[]): ColumnType {
 function analyzeColumn(values: any[], type: string): ColumnAnalysis {
     const summary: ColumnAnalysis = {
         uniqueCount: new Set(values).size,
-        nullCount: values.filter(v => v === null || v === undefined).length
+        nullCount: values.filter((v) => v === null || v === undefined).length,
     }
 
     if (type === 'number') {
-        const numbers = values.filter(v => typeof v === 'number')
+        const numbers = values.filter((v) => typeof v === 'number')
         if (numbers.length > 0) {
             summary.min = Math.min(...numbers)
             summary.max = Math.max(...numbers)
@@ -208,8 +208,8 @@ function inferJSONStructure(data: any): string {
 
 function calculateJSONDepth(data: any): number {
     if (typeof data !== 'object' || data === null) return 0
-    return 1 + Math.max(
-        ...Object.values(data).map(v => calculateJSONDepth(v)),
-        -1
+    return (
+        1 +
+        Math.max(...Object.values(data).map((v) => calculateJSONDepth(v)), -1)
     )
 }

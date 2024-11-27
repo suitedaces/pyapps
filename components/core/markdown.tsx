@@ -1,57 +1,65 @@
-import Link from "next/link";
-import React, { memo } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import Link from 'next/link'
+import { memo } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 function parseCSVToMarkdownTable(text: string): string {
-    const mainTextMatch = text.match(/^(.*?)\s*(?=⚠️|$)/);
-    const mainText = mainTextMatch ? mainTextMatch[1].trim() : '';
-    const processedContent = [];
-    let headers: string[] = [];
+    const mainTextMatch = text.match(/^(.*?)\s*(?=⚠️|$)/)
+    const mainText = mainTextMatch ? mainTextMatch[1].trim() : ''
+    const processedContent = []
+    let headers: string[] = []
 
     if (mainText) {
-        processedContent.push(mainText);
+        processedContent.push(mainText)
     }
 
-    const columnMatch = text.match(/⚠️ EXACT column names:\s*([^]*?)(?=First 5 rows:|$)/);
+    const columnMatch = text.match(
+        /⚠️ EXACT column names:\s*([^]*?)(?=First 5 rows:|$)/
+    )
     if (columnMatch) {
-        headers = columnMatch[1].trim().split(',').map(col => col.trim());
-        processedContent.push(`⚠️ EXACT column names: ${headers.join(', ')}`);
+        headers = columnMatch[1]
+            .trim()
+            .split(',')
+            .map((col) => col.trim())
+        processedContent.push(`⚠️ EXACT column names: ${headers.join(', ')}`)
     }
 
-    const rowsMatch = text.match(/First 5 rows:\s*([^]*?)(?=Create a complex|$)/);
+    const rowsMatch = text.match(
+        /First 5 rows:\s*([^]*?)(?=Create a complex|$)/
+    )
     if (rowsMatch && headers.length > 0) {
-        const rowsData = rowsMatch[1].trim()
+        const rowsData = rowsMatch[1]
+            .trim()
             .split(/\s+(?=D-\d{4})/)
-            .map(row => row.trim())
-            .filter(Boolean);
+            .map((row) => row.trim())
+            .filter(Boolean)
 
-        const headerRow = `| ${headers.join(' | ')} |`;
-        const separatorRow = `| ${headers.map(() => '---').join(' | ')} |`;
+        const headerRow = `| ${headers.join(' | ')} |`
+        const separatorRow = `| ${headers.map(() => '---').join(' | ')} |`
 
-        const tableRows = rowsData.map(row => {
-            const cells = row.split(',').map(cell => cell.trim());
-            return `| ${cells.join(' | ')} |`;
-        });
+        const tableRows = rowsData.map((row) => {
+            const cells = row.split(',').map((cell) => cell.trim())
+            return `| ${cells.join(' | ')} |`
+        })
 
         processedContent.push(`
   ${headerRow}
   ${separatorRow}
-  ${tableRows.join('\n')}`);
+  ${tableRows.join('\n')}`)
     }
 
-    const finalInstructionMatch = text.match(/Create a complex.*$/);
+    const finalInstructionMatch = text.match(/Create a complex.*$/)
     if (finalInstructionMatch) {
-        processedContent.push(finalInstructionMatch[0]);
+        processedContent.push(finalInstructionMatch[0])
     }
 
-    return processedContent.join('\n\n');
+    return processedContent.join('\n\n')
 }
 
 const NonMemoizedMarkdown = ({ children }: { children: string }) => {
     const components = {
         code: ({ node, inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || "");
+            const match = /language-(\w+)/.exec(className || '')
             return !inline && match ? (
                 <pre
                     {...props}
@@ -66,35 +74,35 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
                 >
                     {children}
                 </code>
-            );
+            )
         },
         ol: ({ node, children, ...props }: any) => {
             return (
                 <ol className="list-decimal list-outside ml-4" {...props}>
                     {children}
                 </ol>
-            );
+            )
         },
         li: ({ node, children, ...props }: any) => {
             return (
                 <li className="py-1" {...props}>
                     {children}
                 </li>
-            );
+            )
         },
         ul: ({ node, children, ...props }: any) => {
             return (
                 <ul className="list-decimal list-outside ml-4" {...props}>
                     {children}
                 </ul>
-            );
+            )
         },
         strong: ({ node, children, ...props }: any) => {
             return (
                 <span className="font-semibold" {...props}>
                     {children}
                 </span>
-            );
+            )
         },
         a: ({ node, children, ...props }: any) => {
             return (
@@ -106,30 +114,30 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
                 >
                     {children}
                 </Link>
-            );
+            )
         },
-    };
+    }
 
     return (
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
             {children}
         </ReactMarkdown>
-    );
-};
+    )
+}
 
 export const Markdown = memo(
     NonMemoizedMarkdown,
-    (prevProps, nextProps) => prevProps.children === nextProps.children,
-);
+    (prevProps, nextProps) => prevProps.children === nextProps.children
+)
 
 // User Message Markdown
 
 const NonMemoUserMarkdown = ({ children }: { children: string }) => {
-    const processedContent = parseCSVToMarkdownTable(children);
+    const processedContent = parseCSVToMarkdownTable(children)
 
     const components = {
         code: ({ node, inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || "");
+            const match = /language-(\w+)/.exec(className || '')
             return !inline && match ? (
                 <pre
                     {...props}
@@ -144,11 +152,14 @@ const NonMemoUserMarkdown = ({ children }: { children: string }) => {
                 >
                     {children}
                 </code>
-            );
+            )
         },
         table: ({ children, ...props }: any) => (
             <div className="overflow-x-auto my-4 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700" {...props}>
+                <table
+                    className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700"
+                    {...props}
+                >
                     {children}
                 </table>
             </div>
@@ -179,28 +190,28 @@ const NonMemoUserMarkdown = ({ children }: { children: string }) => {
                 <ol className="list-decimal list-outside ml-4" {...props}>
                     {children}
                 </ol>
-            );
+            )
         },
         li: ({ node, children, ...props }: any) => {
             return (
                 <li className="py-1" {...props}>
                     {children}
                 </li>
-            );
+            )
         },
         ul: ({ node, children, ...props }: any) => {
             return (
                 <ul className="list-decimal list-outside ml-4" {...props}>
                     {children}
                 </ul>
-            );
+            )
         },
         strong: ({ node, children, ...props }: any) => {
             return (
                 <span className="font-semibold" {...props}>
                     {children}
                 </span>
-            );
+            )
         },
         a: ({ node, children, ...props }: any) => {
             return (
@@ -212,30 +223,46 @@ const NonMemoUserMarkdown = ({ children }: { children: string }) => {
                 >
                     {children}
                 </Link>
-            );
+            )
         },
         div: ({ className, children, ...props }: any) => {
             return (
                 <div className={className} {...props}>
                     {children}
                 </div>
-            );
+            )
         },
-    };
+    }
 
     return (
         <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={components}
             allowElement={(element) => true}
-            allowedElements={['div', 'p', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'code', 'pre', 'ol', 'ul', 'li', 'strong', 'a']}
+            allowedElements={[
+                'div',
+                'p',
+                'table',
+                'thead',
+                'tbody',
+                'tr',
+                'th',
+                'td',
+                'code',
+                'pre',
+                'ol',
+                'ul',
+                'li',
+                'strong',
+                'a',
+            ]}
         >
             {processedContent}
         </ReactMarkdown>
-    );
-};
+    )
+}
 
 export const UserMarkdown = memo(
     NonMemoUserMarkdown,
-    (prevProps, nextProps) => prevProps.children === nextProps.children,
-);
+    (prevProps, nextProps) => prevProps.children === nextProps.children
+)

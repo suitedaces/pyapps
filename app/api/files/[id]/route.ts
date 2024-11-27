@@ -7,7 +7,9 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -34,10 +36,7 @@ export async function GET(
 
         // Check if file has expired
         if (data.expires_at && new Date(data.expires_at) < new Date()) {
-            await supabase
-                .from('files')
-                .delete()
-                .eq('id', params.id)
+            await supabase.from('files').delete().eq('id', params.id)
 
             return NextResponse.json(
                 { error: 'File has expired' },
@@ -46,7 +45,6 @@ export async function GET(
         }
 
         return NextResponse.json(data)
-
     } catch (error) {
         console.error('Failed to fetch file:', error)
         return NextResponse.json(
@@ -61,7 +59,9 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return NextResponse.json(
@@ -81,7 +81,6 @@ export async function DELETE(
         if (error) throw error
 
         return NextResponse.json({ success: true })
-
     } catch (error) {
         console.error('Failed to delete file:', error)
         return NextResponse.json(

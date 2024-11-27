@@ -1,11 +1,11 @@
-"use client";
+'use client'
 
-import * as React from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { cn } from "@/lib/utils"
-import { PaperclipIcon, SendIcon, Loader2 } from "lucide-react"
-import { FilePreview } from "@/components/FilePreview"
+import { FilePreview } from '@/components/FilePreview'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+import { Loader2, PaperclipIcon, SendIcon } from 'lucide-react'
+import * as React from 'react'
 
 interface ChatbarProps {
     onSubmit: (content: string, file?: File) => Promise<void>
@@ -13,7 +13,7 @@ interface ChatbarProps {
 }
 
 export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
-    const [message, setMessage] = React.useState("")
+    const [message, setMessage] = React.useState('')
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
 
@@ -32,13 +32,13 @@ export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
             const currentFile = file
 
             // Clear form
-            setMessage("")
+            setMessage('')
             handleRemoveFile()
 
             try {
                 await onSubmit(currentMessage, currentFile || undefined)
             } catch (error) {
-                console.error("Failed to send message:", error)
+                console.error('Failed to send message:', error)
                 // Optionally restore values on err
                 setMessage(currentMessage)
                 setFile(currentFile)
@@ -47,7 +47,7 @@ export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && !e.shiftKey) {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             if (!isLoading && (message.trim() || file)) {
                 handleSubmit(e as any)
@@ -57,12 +57,12 @@ export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
 
     return (
         <div className="p-4 border-t bg-background">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4 max-w-[800px] mx-auto">
+            <form
+                onSubmit={handleSubmit}
+                className="flex flex-col gap-4 max-w-[800px] mx-auto"
+            >
                 {file && (
-                    <FilePreview
-                        file={file}
-                        onRemove={handleRemoveFile}
-                    />
+                    <FilePreview file={file} onRemove={handleRemoveFile} />
                 )}
 
                 <div className="relative flex items-center">
@@ -72,10 +72,10 @@ export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
                         onKeyDown={handleKeyDown}
                         placeholder="Type a message..."
                         className={cn(
-                            "min-h-[56px] w-full resize-none rounded-lg pr-24 py-4",
-                            "focus-visible:ring-1 focus-visible:ring-offset-0",
-                            "scrollbar-thumb-rounded scrollbar-track-rounded",
-                            "scrollbar-thin scrollbar-thumb-border"
+                            'min-h-[56px] w-full resize-none rounded-lg pr-24 py-4',
+                            'focus-visible:ring-1 focus-visible:ring-offset-0',
+                            'scrollbar-thumb-rounded scrollbar-track-rounded',
+                            'scrollbar-thin scrollbar-thumb-border'
                         )}
                         disabled={isLoading}
                     />
@@ -85,7 +85,9 @@ export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
                             type="file"
                             ref={fileInputRef}
                             className="hidden"
-                            onChange={(e) => setFile(e.target.files?.[0] || null)}
+                            onChange={(e) =>
+                                setFile(e.target.files?.[0] || null)
+                            }
                         />
 
                         <Button

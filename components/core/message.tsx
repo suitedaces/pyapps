@@ -1,22 +1,27 @@
-"use client";
+'use client'
 
-import { Message as AIMessage } from "ai";
-import { motion } from "framer-motion";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Markdown, UserMarkdown } from "./markdown";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useAuth } from '@/contexts/AuthContext'
+import { cn } from '@/lib/utils'
+import { Message as AIMessage } from 'ai'
+import { motion } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Markdown } from './markdown'
 
 interface MessageProps extends AIMessage {
-  isLastMessage?: boolean;
+    isLastMessage?: boolean
 }
 
-export function Message({ role, content, id, isLastMessage = false }: MessageProps) {
-    const isUser = role === "user";
-    const { session } = useAuth();
-    const user = session?.user;
+export function Message({
+    role,
+    content,
+    id,
+    isLastMessage = false,
+}: MessageProps) {
+    const isUser = role === 'user'
+    const { session } = useAuth()
+    const user = session?.user
 
     return (
         <motion.div
@@ -25,7 +30,11 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
             animate={{ opacity: 1, y: 0 }}
             // exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className={cn("flex w-full", isUser ? "justify-end" : "justify-start", "mb-4")}
+            className={cn(
+                'flex w-full',
+                isUser ? 'justify-end' : 'justify-start',
+                'mb-4'
+            )}
         >
             {!isUser && (
                 <div className="flex flex-row items-start w-full">
@@ -45,7 +54,11 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                    p: ({ children }) => <div className="mb-4 last:mb-0">{children}</div>,
+                                    p: ({ children }) => (
+                                        <div className="mb-4 last:mb-0">
+                                            {children}
+                                        </div>
+                                    ),
                                 }}
                             >
                                 {content}
@@ -56,18 +69,18 @@ export function Message({ role, content, id, isLastMessage = false }: MessagePro
                         {user?.user_metadata?.avatar_url ? (
                             <AvatarImage
                                 src={user.user_metadata.avatar_url}
-                                alt={user.user_metadata.full_name || "User"}
+                                alt={user.user_metadata.full_name || 'User'}
                             />
                         ) : (
                             <AvatarFallback>
                                 {user?.user_metadata?.full_name?.[0]?.toUpperCase() ||
                                     user?.email?.[0]?.toUpperCase() ||
-                                    "U"}
+                                    'U'}
                             </AvatarFallback>
                         )}
                     </Avatar>
                 </div>
             )}
         </motion.div>
-    );
+    )
 }

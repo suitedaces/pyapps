@@ -8,26 +8,29 @@ import { PreviewPanel } from '@/components/PreviewPanel'
 import { Button } from '@/components/ui/button'
 import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRouter, useParams } from 'next/navigation'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Message } from 'ai'
 
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import {
+    ResizableHandle,
+    ResizablePanel,
+    ResizablePanelGroup,
+} from '@/components/ui/resizable'
 
 import { Sidebar } from '@/components/Sidebar'
 
-import { useLocalStorage } from 'usehooks-ts'
-import { LLMModelConfig } from '@/lib/types'
-import modelsList from '@/lib/models.json'
-import { useAuth } from '@/contexts/AuthContext'
-import { cn } from '@/lib/utils'
 import { Logo } from '@/components/core/Logo'
-import { useSidebar } from '@/contexts/SidebarContext'
 import { VersionSelector } from '@/components/VersionSelector'
-import { AppVersion } from '@/lib/types'
-import { createVersion } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
+import { useSidebar } from '@/contexts/SidebarContext'
+import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { createVersion } from '@/lib/supabase'
+import { AppVersion, LLMModelConfig } from '@/lib/types'
+import { cn } from '@/lib/utils'
+import { useLocalStorage } from 'usehooks-ts'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -57,7 +60,7 @@ async function getOrCreateApp(chatId: string | null, userId: string) {
             is_public: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            created_by: userId
+            created_by: userId,
         })
         .select()
         .single()
@@ -65,27 +68,24 @@ async function getOrCreateApp(chatId: string | null, userId: string) {
     if (appError) throw appError
 
     // Link chat to app
-    await supabase
-        .from('chats')
-        .update({ app_id: app.id })
-        .eq('id', chatId)
+    await supabase.from('chats').update({ app_id: app.id }).eq('id', chatId)
 
     return app.id
 }
 
-export default function ChatPageClient({
-    initialChat,
-}: ChatPageClientProps) {
+export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const supabase = createClientComponentClient()
 
     // UI state management
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
-    const [isAtBottom, setIsAtBottom] = useState(true)
-    const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat.id)
+    const [currentChatId, setCurrentChatId] = useState<string | null>(
+        initialChat.id
+    )
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const [loading, setLoading] = useState(false)
-    const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
+    const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } =
+        useSidebar()
 
     // Code and preview state
     const [generatedCode, setGeneratedCode] = useState<string>('')
@@ -97,25 +97,25 @@ export default function ChatPageClient({
     const handleRefresh = async () => {
         if (sandboxId && session?.user?.id) {
             try {
-                setIsGeneratingCode(true);
-                await updateStreamlitApp(generatedCode, true);
+                setIsGeneratingCode(true)
+                await updateStreamlitApp(generatedCode, true)
             } catch (error) {
-                console.error('Error refreshing app:', error);
+                console.error('Error refreshing app:', error)
             } finally {
-                setIsGeneratingCode(false);
+                setIsGeneratingCode(false)
             }
         }
-    };
+    }
 
     const handleCodeViewToggle = () => {
-        setShowCodeView(!showCodeView);
-    };
+        setShowCodeView(!showCodeView)
+    }
 
     // Version switching stuff
     const isVersionSwitching = useRef(false)
     const versionSelectorRef = useRef<{
         refreshVersions: () => void
-    } | null>(null);
+    } | null>(null)
 
     // Model config
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -134,15 +134,17 @@ export default function ChatPageClient({
     const {
         messages,
         isLoading: chatLoading,
-        setMessages
+        setMessages,
     } = useChat({
-        api: currentChatId ? `/api/conversations/${currentChatId}/stream` : '/api/conversations/stream',
+        api: currentChatId
+            ? `/api/conversations/${currentChatId}/stream`
+            : '/api/conversations/stream',
         id: currentChatId ?? undefined,
         initialMessages,
         body: {
             model: currentModel,
             config: languageModel,
-            experimental_streamData: true
+            experimental_streamData: true,
         },
         maxSteps: 10,
         onResponse: (response) => {
@@ -153,9 +155,10 @@ export default function ChatPageClient({
         onFinish: async (message) => {
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
-                    .filter(invocation =>
-                        invocation.toolName === 'create_streamlit_app' &&
-                        invocation.state === 'result'
+                    .filter(
+                        (invocation) =>
+                            invocation.toolName === 'create_streamlit_app' &&
+                            invocation.state === 'result'
                     )
                     .pop()
 
@@ -168,14 +171,19 @@ export default function ChatPageClient({
 
                         if (session?.user?.id) {
                             try {
-                                let appId = await getOrCreateApp(currentChatId, session.user.id)
-                                const versionData = await createVersion(appId, code)
+                                let appId = await getOrCreateApp(
+                                    currentChatId,
+                                    session.user.id
+                                )
+                                const versionData = await createVersion(
+                                    appId,
+                                    code
+                                )
                                 setCurrentApp({ id: appId })
 
                                 if (versionSelectorRef.current) {
                                     await versionSelectorRef.current.refreshVersions()
                                 }
-
                             } catch (error) {
                                 setIsCreatingVersion(false)
                             }
@@ -190,15 +198,15 @@ export default function ChatPageClient({
                     role: 'assistant' as const,
                     content: message.content,
                     createdAt: new Date(),
-                    toolInvocations: message.toolInvocations
+                    toolInvocations: message.toolInvocations,
                 }
 
-                setMessages(prev => [...prev, assistantMessage])
+                setMessages((prev) => [...prev, assistantMessage])
             }
         },
         onError: (error) => {
             setIsGeneratingCode(false)
-        }
+        },
     })
 
     useEffect(() => {
@@ -210,14 +218,12 @@ export default function ChatPageClient({
 
     //  sandbox state
     const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
+    const [sandboxErrors, setSandboxErrors] = useState<
+        Array<{ message: string }>
+    >([])
 
     // Sandbox store hooks
-    const {
-        initializeSandbox,
-        killSandbox,
-        updateSandbox
-    } = useSandboxStore()
+    const { initializeSandbox, killSandbox, updateSandbox } = useSandboxStore()
 
     // Add a ref to track initialization
     const initializationComplete = useRef(false)
@@ -240,24 +246,27 @@ export default function ChatPageClient({
     }, [initializeSandbox])
 
     // Modified updateStreamlitApp to ensure initialization
-    const updateStreamlitApp = useCallback(async (code: string, forceExecute = false) => {
-        await ensureSandboxInitialized()
+    const updateStreamlitApp = useCallback(
+        async (code: string, forceExecute = false) => {
+            await ensureSandboxInitialized()
 
-        const url = await updateSandbox(code, forceExecute)
-        if (url) {
-            setStreamlitUrl(url)
-            setIsGeneratingCode(false)
-        }
-    }, [updateSandbox, ensureSandboxInitialized])
+            const url = await updateSandbox(code, forceExecute)
+            if (url) {
+                setStreamlitUrl(url)
+                setIsGeneratingCode(false)
+            }
+        },
+        [updateSandbox, ensureSandboxInitialized]
+    )
 
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
         if (lastMessage?.toolInvocations?.length) {
-            const streamlitCall = lastMessage.toolInvocations
-                .find(invocation =>
+            const streamlitCall = lastMessage.toolInvocations.find(
+                (invocation) =>
                     invocation.toolName === 'create_streamlit_app' &&
                     invocation.state === 'result'
-                )
+            )
 
             if (streamlitCall?.state === 'result') {
                 setGeneratedCode(streamlitCall.result)
@@ -277,29 +286,33 @@ export default function ChatPageClient({
         async function fetchMessages() {
             try {
                 setLoading(true)
-                const response = await fetch(`/api/conversations/${id}/messages`)
+                const response = await fetch(
+                    `/api/conversations/${id}/messages`
+                )
                 if (!response.ok) throw new Error('Failed to fetch messages')
                 const data = await response.json()
 
                 // Transform messages to the format expected by the AI SDK
-                const messages: Message[] = data.messages.flatMap((msg: any) => {
-                    const messages: Message[] = []
-                    if (msg.user_message) {
-                        messages.push({
-                            id: `${msg.id}-user`,
-                            role: 'user',
-                            content: msg.user_message,
-                        })
+                const messages: Message[] = data.messages.flatMap(
+                    (msg: any) => {
+                        const messages: Message[] = []
+                        if (msg.user_message) {
+                            messages.push({
+                                id: `${msg.id}-user`,
+                                role: 'user',
+                                content: msg.user_message,
+                            })
+                        }
+                        if (msg.assistant_message) {
+                            messages.push({
+                                id: `${msg.id}-assistant`,
+                                role: 'assistant',
+                                content: msg.assistant_message,
+                            })
+                        }
+                        return messages
                     }
-                    if (msg.assistant_message) {
-                        messages.push({
-                            id: `${msg.id}-assistant`,
-                            role: 'assistant',
-                            content: msg.assistant_message,
-                        })
-                    }
-                    return messages
-                })
+                )
 
                 setInitialMessages(messages)
             } catch (error) {
@@ -355,10 +368,13 @@ export default function ChatPageClient({
     }, [router])
 
     // Handle chat creation callback
-    const handleChatCreated = useCallback((chatId: string) => {
-        setCurrentChatId(chatId)
-        router.replace(`/chat/${chatId}`)
-    }, [router])
+    const handleChatCreated = useCallback(
+        (chatId: string) => {
+            setCurrentChatId(chatId)
+            router.replace(`/chat/${chatId}`)
+        },
+        [router]
+    )
 
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
@@ -392,9 +408,15 @@ export default function ChatPageClient({
             setGeneratedCode(version.code)
             await updateStreamlitApp(version.code, true)
         } catch (error) {
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error updating version'
-            }])
+            setSandboxErrors((prev) => [
+                ...prev,
+                {
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : 'Error updating version',
+                },
+            ])
         } finally {
             setIsGeneratingCode(false)
             isVersionSwitching.current = false
@@ -475,8 +497,8 @@ export default function ChatPageClient({
             />
             <div
                 className={cn(
-                    "flex-1 flex flex-col bg-white min-w-0 transition-all duration-200",
-                    "relative"
+                    'flex-1 flex flex-col bg-white min-w-0 transition-all duration-200',
+                    'relative'
                 )}
             >
                 {sidebarCollapsed && (
@@ -484,7 +506,7 @@ export default function ChatPageClient({
                         className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
                         style={{
                             left: '4rem',
-                            right: 0
+                            right: 0,
                         }}
                     >
                         <div className="px-4">
@@ -492,10 +514,12 @@ export default function ChatPageClient({
                         </div>
                     </div>
                 )}
-                <main className={cn(
-                    "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
-                    "h-screen pt-14"
-                )}>
+                <main
+                    className={cn(
+                        'flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative',
+                        'h-screen pt-14'
+                    )}
+                >
                     <ResizablePanelGroup
                         direction="horizontal"
                         ref={resizableGroupRef}
@@ -543,12 +567,12 @@ export default function ChatPageClient({
                         <Button
                             onClick={toggleRightContent}
                             className={cn(
-                                "bg-black hover:bg-black/90",
-                                "text-white",
-                                "border border-transparent",
-                                "transition-all duration-200 ease-in-out",
-                                "shadow-lg hover:shadow-xl",
-                                "rounded-lg"
+                                'bg-black hover:bg-black/90',
+                                'text-white',
+                                'border border-transparent',
+                                'transition-all duration-200 ease-in-out',
+                                'shadow-lg hover:shadow-xl',
+                                'rounded-lg'
                             )}
                             size="icon"
                         >
