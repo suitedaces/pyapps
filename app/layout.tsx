@@ -1,7 +1,9 @@
 import { AuthProvider } from '@/contexts/AuthContext'
+import { SidebarProvider } from '@/contexts/SidebarContext'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { Providers } from './providers'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,7 +20,11 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className={inter.className}>
-                <AuthProvider>{children}</AuthProvider>
+                <Providers>
+                    <AuthProvider>
+                        <SidebarProvider>{children}</SidebarProvider>
+                    </AuthProvider>
+                </Providers>
             </body>
         </html>
     )

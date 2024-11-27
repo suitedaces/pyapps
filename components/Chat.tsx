@@ -1,522 +1,351 @@
 'use client'
 
-import { CircularProgress } from '@/components/CircularProgress'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import Chatbar from '@/components/core/chatbar'
+import { Message as AIMessage } from '@/components/core/message'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-
-import { AnimatePresence, motion } from 'framer-motion'
-
-import { LLMModelConfig } from '@/lib/modelProviders'
 import modelsList from '@/lib/models.json'
+import { LLMModelConfig } from '@/lib/types'
+import { Message } from 'ai'
+import { useChat } from 'ai/react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 
-import { analyzeCSV, CSVAnalysis } from '@/lib/csvAnalyzer'
-import { ClientMessage } from '@/lib/types'
-import { Code, FileIcon, Loader2, Paperclip, Send, X } from 'lucide-react'
-import React, {
-    ChangeEvent,
-    FormEvent,
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-} from 'react'
-import ReactMarkdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import Spreadsheet from './Spreadsheet'
-
-interface CodeProps {
-    node?: any
-    inline?: boolean
-    className?: string
-    children?: React.ReactNode
-}
-
 interface ChatProps {
-    messages: ClientMessage[]
-    input: string
-    handleInputChange: (
-        e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-    ) => void
-    handleSubmit: (e: FormEvent<HTMLFormElement>) => void
-    isLoading: boolean
-    streamingMessage: string
-    streamingCodeExplanation: string
-    handleFileUpload: (content: string, fileName: string) => void
-    onChatSelect: (chatId: string) => void
-    currentChatId: string | null
+    chatId?: string | null
+    initialMessages?: Message[]
+    onChatCreated?: (chatId: string) => void
+    onFileSelect?: (file: { content: string; name: string }) => void
+    onUpdateStreamlit?: (message: string) => void
+    onChatSubmit?: () => void
+    onChatFinish?: () => void
 }
 
-interface Chat {
-    id: string
-    name: string
-}
-
-const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' bytes'
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-    else return (bytes / 1048576).toFixed(1) + ' MB'
+interface FileUploadState {
+    isUploading: boolean
+    progress: number
+    error: string | null
 }
 
 export function Chat({
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading: isLoadingProp,
-    streamingMessage,
-    streamingCodeExplanation,
-    handleFileUpload,
-    currentChatId,
+    chatId = null,
+    initialMessages = [],
+    onChatCreated,
+    onFileSelect,
+    onUpdateStreamlit,
+    onChatSubmit,
+    onChatFinish,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const [errorState, setErrorState] = useState<Error | null>(null)
+    const [attachedFile, setAttachedFile] = useState<File | null>(null)
+    const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
+        isUploading: false,
+        progress: 0,
+        error: null,
+    })
 
-    const [isAtBottom, setIsAtBottom] = useState<boolean>(true)
-    const [file, setFile] = useState<File | null>(null)
-    const [isLoadingInternal, setIsLoadingInternal] = useState<boolean>(false)
-    const [isInputDisabled, setIsInputDisabled] = useState<boolean>(false)
-    const [uploadProgress, setUploadProgress] = useState<number>(0)
-    const [isUploading, setIsUploading] = useState<boolean>(false)
-    const [csvAnalysis, setCsvAnalysis] = useState<CSVAnalysis | null>(null)
-    const [showSpreadsheet, setShowSpreadsheet] = useState(false)
-    const [fileContent, setFileContent] = useState<string | null>(null)
-    const [fullData, setFullData] = useState<string[][] | null>(null)
+    const newChatIdRef = useRef<string | null>(null)
 
-    const [isInitial, setIsInitial] = useState(() => !currentChatId)
-    const [isAnimating, setIsAnimating] = useState(false)
-
-    const isLoading = isLoadingProp || isLoadingInternal
-
-    const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
-        'languageModel',
-        {
-            model: 'claude-3-5-sonnet-20240620',
-        }
-    )
+    const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
+        model: 'claude-3-5-sonnet-20241022',
+    })
 
     const currentModel = modelsList.models.find(
         (model) => model.id === languageModel.model
     )
 
-    useEffect(() => {
-        if (isAtBottom) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-        }
-    }, [messages, streamingMessage, streamingCodeExplanation, isAtBottom])
-
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-        }
-    }, [input])
-
-    const handleTextareaChange = (
-        e: React.ChangeEvent<HTMLTextAreaElement>
-    ) => {
-        handleInputChange(e)
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-        }
-    }
-
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-        setIsAtBottom(scrollHeight - scrollTop === clientHeight)
-    }
-
-    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = event.target.files?.[0]
-        if (selectedFile && selectedFile.name.endsWith('.csv')) {
-            setFile(selectedFile)
-            setIsInputDisabled(true)
-            setUploadProgress(0)
-            readFile(selectedFile)
-        } else {
-            alert('Please select a CSV file.')
-        }
-    }
-
-    const readFile = (file: File) => {
-        setIsUploading(true)
-        const reader = new FileReader()
-        reader.onload = async (e: ProgressEvent<FileReader>) => {
-            const content = e.target?.result as string
-            setFileContent(content)
-            setIsUploading(false)
-            setUploadProgress(100)
-            const rows = content.split('\n').map((row) => row.split(','))
-            setFullData(rows)
-        }
-        reader.onprogress = (event) => {
-            if (event.lengthComputable) {
-                const progress = Math.round((event.loaded / event.total) * 100)
-                setUploadProgress(progress)
+    const {
+        messages: aiMessages,
+        input,
+        handleInputChange,
+        handleSubmit: originalHandleSubmit,
+        isLoading,
+        setMessages: setAiMessages,
+        append,
+    } = useChat({
+        api: chatId
+            ? `/api/conversations/${chatId}/stream`
+            : '/api/conversations/stream',
+        id: chatId ?? undefined,
+        initialMessages,
+        body: {
+            model: currentModel,
+            config: languageModel,
+        },
+        onResponse: async (response) => {
+            if (!response.ok) {
+                handleResponseError(response)
+                return
             }
-        }
-        reader.readAsText(file)
-    }
 
-    const removeFile = useCallback(() => {
-        setFile(null)
-        setFileContent(null)
-        setIsInputDisabled(false)
-        setUploadProgress(0)
-        setIsUploading(false)
-        if (fileInputRef.current) {
-            fileInputRef.current.value = ''
-        }
-    }, [])
-
-    const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-
-        if ((!input.trim() && !file) || isLoading || isAnimating) return
-
-        setIsAnimating(true)
-        setIsInitial(false)
-
-        if (isLoadingInternal) return
-
-        try {
-            setIsLoadingInternal(true)
-            if (file && fileContent) {
-                const analysis = await analyzeCSV(fileContent)
-                setCsvAnalysis(analysis)
-                setShowSpreadsheet(true)
-                await handleFileUpload(fileContent, file.name)
-                removeFile()
+            if (!chatId) {
+                const newChatId = response.headers.get('x-chat-id')
+                if (newChatId) {
+                    newChatIdRef.current = newChatId
+                }
             }
-            await handleSubmit(e)
-        } catch (error) {
-            console.error('Error submitting form:', error)
-        } finally {
-            setIsLoadingInternal(false)
-            setIsAnimating(false)
-        }
-    }
+        },
+        onFinish: async (message) => {
+            setErrorState(null)
+            setAttachedFile(null)
+            resetFileUploadState()
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
 
-    const renderMessage = (content: string) => (
-        <ReactMarkdown
-            components={{
-                code({
-                    node,
-                    inline,
-                    className,
-                    children,
-                    ...props
-                }: CodeProps) {
-                    const match = /language-(\w+)/.exec(className || '')
-                    const lang = match && match[1] ? match[1] : ''
-                    const codeString = String(children).replace(/\n$/, '')
+            if (
+                message.role === 'assistant' &&
+                !chatId &&
+                newChatIdRef.current
+            ) {
+                onChatCreated?.(newChatIdRef.current)
+                newChatIdRef.current = null
+            }
 
-                    if (inline) {
-                        return (
-                            <code
-                                className="px-1 py-0.5 rounded-base bg-bg dark:bg-darkBg text-text dark:text-darkText text-sm font-mono"
-                                {...props}
-                            >
-                                {codeString}
-                            </code>
-                        )
-                    }
-
-                    return (
-                        <div className="rounded-base overflow-hidden bg-dark dark:bg-darkBg my-4 border-border border-2 dark:shadow-dark w-full">
-                            <div className="flex items-center justify-between px-4 py-2 bg-bg">
-                                <div className="flex items-center">
-                                    <Code className="w-5 h-5 mr-2 text-text dark:text-darkText" />
-                                    <span className="text-sm font-medium text-text dark:text-darkText">
-                                        {lang.toUpperCase() || 'Code'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="w-full">
-                                <SyntaxHighlighter
-                                    style={tomorrow}
-                                    language={lang || 'javascript'}
-                                    PreTag="div"
-                                    customStyle={{
-                                        margin: 0,
-                                        padding: '1rem 0.5rem',
-                                        overflowX: 'auto',
-                                        maxWidth: '100%',
-                                    }}
-                                    {...props}
-                                >
-                                    {codeString}
-                                </SyntaxHighlighter>
-                            </div>
-                        </div>
+            if (message.toolInvocations?.length) {
+                const streamlitCall = message.toolInvocations
+                    .filter(
+                        (invocation) =>
+                            invocation.toolName === 'create_streamlit_app' &&
+                            invocation.state === 'result'
                     )
-                },
-                p: ({ children }) => (
-                    <p className="mb-2 break-words">{children}</p>
-                ),
-                h1: ({ children }) => (
-                    <h1 className="text-2xl font-bold mb-3">{children}</h1>
-                ),
-                h2: ({ children }) => (
-                    <h2 className="text-xl font-bold mb-2">{children}</h2>
-                ),
-                h3: ({ children }) => (
-                    <h3 className="text-lg font-bold mb-2">{children}</h3>
-                ),
-                ul: ({ children }) => (
-                    <ul className="list-disc list-outside pl-6 mb-2">
-                        {children}
-                    </ul>
-                ),
-                ol: ({ children }) => (
-                    <ol className="list-decimal list-outside pl-6 mb-2">
-                        {children}
-                    </ol>
-                ),
-                li: ({ children }) => (
-                    <li className="mb-1">
-                        {React.Children.map(children, (child) =>
-                            typeof child === 'string' ? (
-                                <span>{child}</span>
-                            ) : (
-                                child
-                            )
-                        )}
-                    </li>
-                ),
-                blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-main pl-4 italic mb-2">
-                        {children}
-                    </blockquote>
-                ),
-            }}
-            className="prose prose-invert max-w-none"
-        >
-            {content}
-        </ReactMarkdown>
+                    .pop()
+            }
+
+            onChatFinish?.()
+        },
+        onError: (error) => {
+            handleChatError(error)
+        },
+    })
+
+    const resetFileUploadState = () => {
+        setFileUploadState({
+            isUploading: false,
+            progress: 0,
+            error: null,
+        })
+    }
+
+    const uploadFile = async (file: File): Promise<any> => {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (chatId) {
+            formData.append('chatId', chatId)
+        }
+
+        const response = await fetch('/api/files', {
+            method: 'POST',
+            body: formData,
+        })
+
+        if (!response.ok) {
+            throw new Error('Failed to upload file')
+        }
+
+        return await response.json()
+    }
+
+    const handleChatSubmit = async (content: string, file?: File) => {
+        try {
+            onChatSubmit?.()
+
+            // Handle file upload case
+            if (file) {
+                const fileData = await uploadFile(file)
+                const fileContent = await file.text()
+
+                // Sanitize content
+                const sanitizedContent = fileContent
+                    .split('\n')
+                    .map((row) => row.replace(/[\r\n]+/g, ''))
+                    .join('\n')
+
+                const rows = sanitizedContent.split('\n')
+                const columnNames = rows[0]
+                const previewRows = rows.slice(1, 6).join('\n')
+                const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+                // const message = content.trim() ||
+                //     `Create a Streamlit app to visualize this data from "/app/${file.name}". The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
+
+                const message =
+                    content.trim() ||
+                    `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+
+                await append(
+                    {
+                        content: message,
+                        role: 'user',
+                        createdAt: new Date(),
+                    },
+                    {
+                        body: {
+                            fileId: fileData.id,
+                            fileName: file.name,
+                            fileContent: sanitizedContent,
+                        },
+                    }
+                )
+
+                // Reset file state
+                setAttachedFile(null)
+                resetFileUploadState()
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = ''
+                }
+            }
+            // Handle regular text message case
+            else if (content.trim()) {
+                await append({
+                    content: content.trim(),
+                    role: 'user',
+                    createdAt: new Date(),
+                })
+            }
+        } catch (error) {
+            console.error('Error submitting message:', error)
+            setFileUploadState((prev) => ({
+                ...prev,
+                error: 'Failed to send message. Please try again.',
+            }))
+        } finally {
+            setFileUploadState((prev) => ({ ...prev, isUploading: false }))
+        }
+    }
+
+    const messages = useMemo(() => {
+        const messageMap = new Map()
+
+        ;[...initialMessages, ...aiMessages].forEach((msg) => {
+            const key = `${msg.role}:${msg.content}`
+            if (
+                !messageMap.has(key) ||
+                (msg.createdAt &&
+                    (!messageMap.get(key).createdAt ||
+                        new Date(msg.createdAt) >
+                            new Date(messageMap.get(key).createdAt)))
+            ) {
+                messageMap.set(key, msg)
+            }
+        })
+
+        const dedupedMessages = Array.from(messageMap.values()).sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return timeA - timeB
+        })
+
+        return dedupedMessages
+    }, [initialMessages, aiMessages])
+
+    const handleResponseError = (response: Response) => {
+        const errorMessage =
+            response.status === 429
+                ? 'Rate limit exceeded. Please wait a moment.'
+                : response.status === 413
+                  ? 'Message too long. Please try a shorter message.'
+                  : 'An error occurred. Please try again.'
+
+        setErrorState(new Error(errorMessage))
+    }
+
+    const handleChatError = (error: Error) => {
+        if (!errorState) {
+            const errorMessage = error.message.includes('Failed to fetch')
+                ? 'Network error. Please check your connection.'
+                : error.message
+            setErrorState(new Error(errorMessage))
+        }
+    }
+
+    const handleRetry = useCallback(async () => {
+        setErrorState(null)
+        if (
+            messages.length > 0 &&
+            messages[messages.length - 1].role === 'user'
+        ) {
+            try {
+                await originalHandleSubmit(undefined as any)
+            } catch (e) {
+                console.error('Retry failed:', e)
+            }
+        }
+    }, [messages, originalHandleSubmit])
+
+    const handleTextareaChange = useCallback(
+        (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            handleInputChange(e)
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto'
+                textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+            }
+        },
+        [handleInputChange]
     )
 
+    const isInputDisabled = !!attachedFile
+    const placeholderText = attachedFile
+        ? 'File attached. Remove file to type a message.'
+        : 'Type your message...'
+
     return (
-        <div className="flex flex-col h-full relative dark:border-darkBorder border-2 border-border bg-white dark:bg-darkBg text-text dark:text-darkText">
-            {isInitial && (
-                <div className="w-full h-full absolute">
-                    <div className="relative w-full h-full">
-                        <AnimatePresence>
-                            <motion.div
-                                initial={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                className="text-center w-full absolute top-[40%] m-auto pb-4"
-                            >
-                                <motion.h1
-                                    className="text-4xl font-bold tracking-tight mb-1"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                >
-                                    What data can I help you analyze?
-                                </motion.h1>
-                                <motion.p
-                                    className="text-muted-foreground mt-4 text-sm"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 0.4 }}
-                                >
-                                    analyse and generate dashboard apps,
-                                    spreadsheets and more...
-                                </motion.p>
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-                </div>
-            )}
-            <ScrollArea
-                className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto"
-                onScroll={handleScroll}
-            >
-                {showSpreadsheet && csvAnalysis && (
-                    <div className="relative w-full mb-10 flex justify-end">
-                        <div className="w-[80%]">
-                            <Spreadsheet
-                                analysis={csvAnalysis}
-                                onClose={() => setShowSpreadsheet(false)}
-                                fullData={fullData}
+        <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">
+            <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
+                <AnimatePresence initial={false}>
+                    {messages.map((message, index) => (
+                        <div key={message.id}>
+                            <AIMessage
+                                {...message}
+                                isLastMessage={index === messages.length - 1}
                             />
                         </div>
-                    </div>
-                )}
-                {messages.map((message, index) => (
-                    <React.Fragment key={index}>
-                        {message.role === 'user' && (
-                            <div className="flex justify-end mb-4">
-                                <div className="flex flex-row-reverse items-start max-w-[80%]">
-                                    <Avatar className="w-8 h-8 bg-blue border-2 border-border flex-shrink-0">
-                                        <AvatarFallback>U</AvatarFallback>
-                                    </Avatar>
-                                    <div className="mx-2 p-4 rounded-base bg-bg text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
-                                        {renderMessage(message.content)}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {message.role === 'assistant' && (
-                            <div className="flex justify-start mb-4 w-full">
-                                <div className="flex flex-row items-start">
-                                    <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
-                                        <AvatarFallback>G</AvatarFallback>
-                                    </Avatar>
-                                    <div className="mx-2 p-4 text-text dark:text-darkText break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
-                                        {renderMessage(message.content)}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </React.Fragment>
-                ))}
-                {streamingMessage && (
-                    <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start max-w-[80%]">
-                            <Avatar className="w-8 h-8 bg-main border-2 border-border flex-shrink-0">
-                                <AvatarFallback>G</AvatarFallback>
-                            </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText border-2 border-border break-words overflow-hidden dark:shadow-dark transition-all duration-300 ease-in-out">
-                                {renderMessage(streamingMessage)}
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {streamingCodeExplanation && (
-                    <div className="flex justify-start mb-4">
-                        <div className="flex flex-row items-start max-w-[80%]">
-                            <Avatar className="w-8 bg-main h-8 flex-shrink-0">
-                                <AvatarFallback>G</AvatarFallback>
-                            </Avatar>
-                            <div className="mx-2 p-4 rounded-base bg-main text-text dark:text-darkText break-words overflow-hidden shadow-light dark:shadow-dark transition-all duration-500 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none">
-                                {renderMessage(streamingCodeExplanation)}
-                            </div>
-                        </div>
-                    </div>
-                )}
+                    ))}
+                </AnimatePresence>
                 <div ref={messagesEndRef} />
             </ScrollArea>
-            {!isAtBottom && (
-                <Button
-                    onClick={() =>
-                        messagesEndRef.current?.scrollIntoView({
-                            behavior: 'smooth',
-                        })
-                    }
-                    className="absolute bottom-20 right-8 bg-main hover:bg-mainAccent text-text dark:text-darkText rounded-full p-2 shadow-light dark:shadow-dark transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none"
+
+            {errorState && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="p-4 text-center"
                 >
-                    ↓
-                </Button>
+                    <p className="text-red-500 mb-2">{errorState.message}</p>
+                    <Button
+                        onClick={() => setErrorState(null)}
+                        variant="secondary"
+                        size="sm"
+                    >
+                        Dismiss
+                    </Button>
+                </motion.div>
             )}
-            <motion.form
-                onSubmit={handleFormSubmit}
-                className="p-4 dark:border-darkBorder m-auto w-full max-w-[800px]"
-                initial={false}
-                animate={{
-                    y: isInitial ? '-30vh' : 0,
-                }}
-                transition={{
-                    type: 'spring',
-                    stiffness: 200,
-                    damping: 20,
-                }}
-            >
-                <div className="flex space-x-2">
-                    <div className="relative flex-grow">
-                        <div
-                            className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                                file ? 'max-h-20' : 'max-h-0'
-                            }`}
-                        >
-                            {file && (
-                                <div className="px-3 flex justify-start mb-2">
-                                    <div className="inline-flex items-center bg-white border-black border-2 rounded-xl py-1 px-3 max-w-full">
-                                        <FileIcon
-                                            size={16}
-                                            className="text-blue-400 mr-2 flex-shrink-0"
-                                        />
-                                        <div className="flex flex-col min-w-0 mr-2">
-                                            <span className="text-black text-sm truncate max-w-[200px]">
-                                                {file.name}
-                                            </span>
-                                            <span className="text-gray-700 text-xs">
-                                                {formatFileSize(file.size)}
-                                            </span>
-                                        </div>
-                                        {isUploading ? (
-                                            <CircularProgress
-                                                size={24}
-                                                percentage={uploadProgress}
-                                                color="text-blue-400"
-                                            />
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={removeFile}
-                                                className="text-gray-400 hover:text-black p-1 ml-1"
-                                                aria-label="Remove file"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={handleTextareaChange}
-                            placeholder={
-                                file
-                                    ? 'File attached. Remove file to type a message.'
-                                    : 'Type your message...'
-                            }
-                            className="relative flex w-full min-h-[80px] max-h-[200px] rounded-3xl text-text dark:text-darkText font-base selection:bg-main selection:text-text dark:selection:text-darkText dark:border-darkBorder bg-bg dark:bg-darkBg px-3 pl-14 pt-6 py-3 pr-16 text-sm ring-offset-bg dark:ring-offset-darkBg placeholder:text-text/50 dark:placeholder:text-darkText/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-text dark:focus-visible:ring-darkText focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-2 border-border shadow-light resize-none overflow-hidden"
-                            disabled={!!file}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="absolute left-5 bottom-5 transform -translate-y-1/2 text-text dark:text-darkText hover:text-main transition-colors duration-300 ease-in-out"
-                            disabled={isUploading || file !== null}
-                        >
-                            <Paperclip className="h-5 w-5" />
-                        </button>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".csv"
-                            onChange={handleFileChange}
-                            className="hidden"
-                            disabled={isUploading}
-                        />
-                        <Button
-                            type="submit"
-                            variant={'noShadow'}
-                            size={'boxy'}
-                            disabled={
-                                isLoading ||
-                                isUploading ||
-                                (!input.trim() && !file)
-                            }
-                            className="absolute top rounded-lg right-5 bottom-5 bg-blue hover:bg-main text-text dark:text-darkText transition-all duration-300 ease-in-out hover:translate-x-boxShadowX hover:translate-y-boxShadowY"
-                        >
-                            {isLoading || isUploading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Send className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </div>
-                </div>
-            </motion.form>
+
+            {fileUploadState.error && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="p-4 text-center"
+                >
+                    <p className="text-red-500 mb-2">{fileUploadState.error}</p>
+                    <Button
+                        onClick={resetFileUploadState}
+                        variant="secondary"
+                        size="sm"
+                    >
+                        Dismiss
+                    </Button>
+                </motion.div>
+            )}
+
+            <Chatbar onSubmit={handleChatSubmit} isLoading={isLoading} />
         </div>
     )
 }

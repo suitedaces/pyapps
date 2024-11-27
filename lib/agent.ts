@@ -1,50 +1,29 @@
+import { createVersion } from '@/lib/supabase'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import {
-    CoreAssistantMessage,
-    CoreMessage,
-    CoreTool,
-    CoreToolMessage,
-    CoreUserMessage,
-    LanguageModelUsage,
-    LanguageModelV1,
-    streamText,
-    TextPart,
-    ToolCallPart,
-    ToolResultPart,
-} from 'ai'
+import { CoreMessage, LanguageModelV1, streamText } from 'ai'
+import { encode } from 'gpt-tokenizer'
 import { cookies } from 'next/headers'
-import { z } from 'zod'
-import { messageStore } from './messageStore'
-import { LLMModelConfig } from './modelProviders'
 import { generateCode } from './tools'
-import {
-    CSVAnalysis,
-    Message,
-    StreamChunk,
-    Tool,
-    ToolCall,
-    ToolResult,
-} from './types'
+import { LLMModelConfig, ModelProvider, Tool } from './types'
 
-const messageSchema = z.object({
-    type: z.string(),
-    content: z.string(),
-    toolCalls: z.array(z.any()).optional(),
-    toolResults: z.array(z.any()).optional(),
-})
+interface FileContext {
+    fileName: string
+    fileType: string
+    content?: string
+    analysis?: any
+}
 
+// AI Agent that handles message streaming, tool execution, and conversation management
 export class GruntyAgent {
-    private model: LanguageModelV1
+    private model: ModelProvider
     private role: string
     private roleDescription: string
     private config: LLMModelConfig
-    private inputTokens: number = 0
-    private outputTokens: number = 0
-    private codeTokens: number = 0
-    private totalTokens: number = 0
+    private sanitizedMessages: CoreMessage[] = []
+    private fileContext?: FileContext
 
     constructor(
-        modelClient: LanguageModelV1,
+        modelClient: ModelProvider,
         role: string,
         roleDescription: string,
         config: LLMModelConfig
@@ -55,318 +34,486 @@ export class GruntyAgent {
         this.config = config
     }
 
-    private async fetchChatHistory(chatId: string): Promise<Message[]> {
-        const supabase = createRouteHandlerClient({ cookies })
-        const { data, error } = await supabase.rpc('get_chat_messages', {
-            p_chat_id: chatId,
-            p_limit: 50,
-            p_offset: 0,
-        })
-
-        if (error) {
-            console.error('Failed to fetch chat history:', error)
-            return []
-        }
-
-        return data
-    }
-
-    async *chat(
+    // Main method to handle streaming responses and tool execution
+    async streamResponse(
         chatId: string,
         userId: string,
-        latestMessage: string,
+        messages: CoreMessage[],
         tools: Tool[],
-        temperature: number,
-        maxTokens: number,
-        csvAnalysis?: CSVAnalysis
-    ): AsyncGenerator<StreamChunk> {
-        const chatHistory = await this.fetchChatHistory(chatId)
-        console.log('Chat History for chatId:', chatId, chatHistory)
-        const userMessage: CoreUserMessage = {
-            role: 'user',
-            content: latestMessage,
-        }
+        fileContext?: FileContext
+    ) {
+        this.fileContext = fileContext
+        this.sanitizedMessages = []
 
-        const sanitizedMessages = this.prepareMessagesForAI(chatHistory)
-        sanitizedMessages.push(userMessage)
+        // Add system message with file context if available
+        const systemMessage = fileContext
+            ? `${this.roleDescription}\n\nYou are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}".`
+            : this.roleDescription
 
-        console.log('Sanitized Messages:', sanitizedMessages)
-
-        const recordTokenUsage = ({
-            promptTokens,
-            completionTokens,
-            totalTokens,
-        }: LanguageModelUsage) => {
-            console.log('Prompt tokens:', promptTokens)
-            console.log('Completion tokens:', completionTokens)
-            console.log('Total tokens:', totalTokens)
-            this.totalTokens = totalTokens
-        }
-
-        let currentMessage: any = null
-        let currentContentBlock: any = null
-        let accumulatedJson = ''
-        let accumulatedResponse = ''
-        let generatedCode = ''
-        let toolCalls: ToolCall<string, any>[] = []
-        let toolResults: ToolResult<string, any, any>[] = []
-
-        const Tools = tools.reduce(
-            (acc, tool) => {
-                acc[tool.name] = tool // Assuming each tool has a unique 'name' property
-                return acc
-            },
-            {} as Record<string, CoreTool<any, any>>
-        )
-
-        const stream = await streamText({
-            model: this.model,
-            tools: Tools,
-            system: this.roleDescription,
-            messages: sanitizedMessages,
-            maxTokens: maxTokens,
-            maxSteps: 10,
-            toolChoice: 'auto',
-            onStepFinish: (event) => {
-                if (event.stepType === 'initial') {
-                    currentMessage = event.text
-
-                    currentContentBlock = event
-                    accumulatedJson = ''
-                }
-
-                if (event.usage) {
-                    this.inputTokens = event.usage.promptTokens
-                }
-            },
+        this.sanitizedMessages.push({
+            role: 'system',
+            content: systemMessage,
         })
 
-        for await (const event of stream.fullStream) {
-            yield event as StreamChunk
+        // Fetch complete conversation history
+        const supabase = createRouteHandlerClient({ cookies })
+        const { data: messageHistory, error: historyError } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: true })
 
-            if (event.type === 'text-delta') {
-                accumulatedResponse += event.textDelta
-            } else if (event.type === 'tool-call') {
-                toolCalls.push({
-                    toolCallId: event.toolCallId,
-                    toolName: event.toolName,
-                    args: event.args,
-                })
-
-                if (event.toolName === 'create_streamlit_app') {
-                    try {
-                        const codeQuery = `
-                            ${event.args.query}
-                            Use the following CSV analysis to inform your code:
-                            ${JSON.stringify(csvAnalysis, null, 2)}
-                        `
-                        const { generatedCode, codeTokenCount } =
-                            await generateCode(codeQuery)
-                        this.codeTokens += codeTokenCount
-
-                        yield {
-                            type: 'generated_code',
-                            content: generatedCode,
-                        } as StreamChunk
-
-                        toolResults.push({
-                            toolCallId: event.toolCallId,
-                            toolName: 'create_streamlit_app',
-                            result: generatedCode,
-                            args: {},
-                        })
-                    } catch (error) {
-                        console.error('Error generating Streamlit code:', error)
-                        yield {
-                            type: 'error',
-                            content: 'Error in code generation process',
-                        } as StreamChunk
-                    }
-                }
-            } else if (event.type === 'tool-call-delta') {
-                // Handle streaming tool call updates
-                if (event.argsTextDelta) {
-                    accumulatedJson += event.argsTextDelta
-                }
-            } else if (event.type === 'tool-call-streaming-start') {
-                // Reset accumulated JSON when a new tool call starts streaming
-                accumulatedJson = ''
-            } else if (event.type === 'step-finish') {
-                yield {
-                    type: 'text_chunk',
-                    content: accumulatedResponse,
-                } as StreamChunk
-
-                // Handle step completion if needed
-                if (event.usage) {
-                    this.inputTokens = event.usage.promptTokens
-                }
-            } else if (event.type === 'finish') {
-                if (event.usage) {
-                    this.outputTokens = event.usage.completionTokens
-                }
-
-                console.log('Storing Message for chatId:', chatId)
-                const totalTokenCount =
-                    this.outputTokens + this.codeTokens + this.inputTokens
-                console.log(
-                    'Total Token Count (output, code, input):',
-                    this.outputTokens,
-                    this.codeTokens,
-                    this.inputTokens
-                )
-
-                await stream.usage.then(recordTokenUsage)
-                await this.storeMessage(
-                    chatId,
-                    userId,
-                    latestMessage,
-                    accumulatedResponse.trim(),
-                    this.totalTokens,
-                    toolCalls,
-                    toolResults
-                )
-
-                // Reset all accumulators
-                currentMessage = null
-                accumulatedResponse = ''
-                generatedCode = ''
-                toolCalls = []
-                toolResults = []
-            } else if (event.type === 'error') {
-                console.error('Stream error:', event)
-                yield {
-                    type: 'error',
-                    content: 'An error occurred during processing',
-                } as StreamChunk
-            }
+        if (historyError) {
+            console.error('❌ Error fetching message history:', historyError)
         }
+
+        // Process message history
+        if (messageHistory) {
+            this.processMessageHistory(messageHistory)
+        }
+
+        // Add the latest user message
+        const latestUserMessage = messages[messages.length - 1]
+        if (latestUserMessage.role === 'user') {
+            this.sanitizedMessages.push({
+                role: 'user',
+                content: latestUserMessage.content,
+            })
+        }
+
+        // Set up streaming
+        const encoder = new TextEncoder()
+        const stream = new TransformStream()
+        const writer = stream.writable.getWriter()
+
+        // Start streaming process
+        this.handleStreamProcess(writer, encoder, tools, chatId, userId)
+
+        return new Response(stream.readable, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                Connection: 'keep-alive',
+                'x-vercel-ai-data-stream': 'v1',
+                'x-chat-id': chatId,
+            },
+        })
+    }
+
+    private async handleStreamProcess(
+        writer: WritableStreamDefaultWriter,
+        encoder: TextEncoder,
+        tools: Tool[],
+        chatId: string,
+        userId: string
+    ) {
+        try {
+            let collectedContent = ''
+
+            // Format tools with file context
+            const formattedTools = this.formatTools(tools)
+
+            // Initialize stream
+            const { textStream, fullStream } = await streamText({
+                model: this.model as unknown as LanguageModelV1,
+                messages: this.sanitizedMessages,
+                tools: formattedTools,
+                temperature: this.config.temperature || 0.7,
+                maxTokens: this.config.maxTokens || 4096,
+                experimental_toolCallStreaming: true,
+            })
+
+            // Process text stream
+            for await (const chunk of textStream) {
+                collectedContent += chunk
+                const textPart = `0:${JSON.stringify(chunk)}\n\n`
+                writer.write(encoder.encode(textPart))
+            }
+
+            // Process full stream
+            await this.processFullStream(
+                fullStream,
+                writer,
+                encoder,
+                collectedContent,
+                chatId,
+                userId
+            )
+        } catch (error) {
+            console.error('🔥 Stream process error:', error)
+            throw error
+        } finally {
+            writer.close()
+        }
+    }
+
+    private formatTools(tools: Tool[]) {
+        return tools.reduce(
+            (acc, tool) => {
+                acc[tool.toolName] = {
+                    description: tool.description,
+                    parameters: tool.parameters,
+                    execute: async (args: any) => {
+                        if (tool.toolName === 'create_streamlit_app') {
+                            return this.handleStreamlitCodeGeneration(args)
+                        }
+                        return tool.execute(args)
+                    },
+                }
+                return acc
+            },
+            {} as Record<string, any>
+        )
+    }
+
+    private async handleStreamlitCodeGeneration(args: any) {
+        const query = `${args.query}\n${this.fileContext ? `Using file: ${this.fileContext.fileName}` : ''}`
+        const { generatedCode } = await generateCode(query, this.fileContext)
+        return generatedCode
+    }
+
+    private calculateTokenCount(text: string): number {
+        return encode(text).length
     }
 
     private async storeMessage(
         chatId: string,
         userId: string,
-        userMessage: string,
-        assistantMessage: string,
-        tokenCount: number,
-        toolCalls: any,
-        toolResults: any
+        message: {
+            user_message: string
+            assistant_message: string
+            tool_calls: any[]
+            tool_results: any[]
+        }
     ) {
+        console.log('💾 Attempting to store message:', {
+            chatId,
+            userId,
+            messagePreview: {
+                user: message.user_message,
+                assistant: message.assistant_message,
+                toolCalls: message.tool_calls.length,
+                toolResults: message.tool_results.length,
+            },
+        })
+
         const supabase = createRouteHandlerClient({ cookies })
-        const { data, error } = await supabase
-            .from('messages')
-            .insert({
+
+        try {
+            // Clean the assistant message by removing the metadata
+            const cleanedAssistantMessage = message.assistant_message.replace(
+                /d:{"finishReason":"[^"]+","usage":{[^}]+}}$/,
+                ''
+            )
+
+            const userTokens = this.calculateTokenCount(message.user_message)
+            const assistantTokens = this.calculateTokenCount(
+                cleanedAssistantMessage
+            )
+            const toolCallTokens = message.tool_calls?.length
+                ? this.calculateTokenCount(JSON.stringify(message.tool_calls))
+                : 0
+            const toolResultTokens = message.tool_results?.length
+                ? this.calculateTokenCount(JSON.stringify(message.tool_results))
+                : 0
+
+            const totalTokens =
+                userTokens + assistantTokens + toolCallTokens + toolResultTokens
+
+            console.log('🔢 Token counts:', {
+                user: userTokens,
+                assistant: assistantTokens,
+                toolCalls: toolCallTokens,
+                toolResults: toolResultTokens,
+                total: totalTokens,
+            })
+
+            const messageData = {
                 chat_id: chatId,
                 user_id: userId,
-                user_message: userMessage,
-                assistant_message: assistantMessage,
-                tool_calls: toolCalls,
-                tool_results: toolResults,
-                token_count: tokenCount,
+                user_message: message.user_message,
+                assistant_message: cleanedAssistantMessage,
+                tool_calls:
+                    message.tool_calls.length > 0 ? message.tool_calls : null,
+                tool_results:
+                    message.tool_results.length > 0
+                        ? message.tool_results
+                        : null,
+                created_at: new Date().toISOString(),
+                token_count: totalTokens,
+            }
+
+            const { data, error } = await supabase
+                .from('messages')
+                .insert(messageData)
+                .select()
+
+            if (error) {
+                console.error(' Failed to store message:', error)
+                throw error
+            }
+
+            console.log('✅ Message stored successfully:', {
+                messageId: data[0]?.id,
+                timestamp: data[0]?.created_at,
             })
-            .select()
-
-        if (error) {
-            console.error(
-                'Failed to store message:',
-                error.message,
-                error.details,
-                error.hint
-            )
+            return data
+        } catch (error) {
+            console.error('❌ Error in storeMessage:', error)
             throw error
-        } else {
-            console.log('Message stored successfully with ID:', data)
-
-            messageStore.setMessageStored(chatId)
         }
     }
 
-    private prepareMessagesForAI(messages: Message[]): CoreMessage[] {
-        const sanitizedMessages: CoreMessage[] = []
+    private processMessageHistory(messageHistory: any[]) {
+        console.log('📝 Processing message history:', {
+            messageCount: messageHistory.length,
+        })
 
-        for (const message of messages) {
-            // Add user message
-            const userMessage: CoreUserMessage = {
-                role: 'user',
-                content: message.user_message,
-            }
-            sanitizedMessages.push(userMessage)
-
-            // Initialize assistant message
-            const assistantContentParts: Array<TextPart | ToolCallPart> = []
-
-            // Add text content
-            if (message.assistant_message) {
-                sanitizedMessages.push({
-                    role: 'assistant',
-                    content: message.assistant_message,
+        messageHistory.forEach((msg) => {
+            if (msg.user_message) {
+                this.sanitizedMessages.push({
+                    role: 'user',
+                    content: msg.user_message,
+                })
+                console.log('➕ Added user message:', {
+                    timestamp: msg.created_at,
+                    contentPreview: msg.user_message.substring(0, 50) + '...',
                 })
             }
-
-            // Add tool calls if they exist
-            if (message.tool_calls && typeof message.tool_calls === 'object') {
-                const toolCalls = message.tool_calls as Record<
-                    string,
-                    Record<string, any>
-                >
-                for (const [id, callData] of Object.entries(toolCalls)) {
-                    if (
-                        callData &&
-                        'name' in callData &&
-                        'parameters' in callData
-                    ) {
-                        assistantContentParts.push({
-                            type: 'tool-call',
-                            toolCallId: id,
-                            toolName: callData.name as string,
-                            args: callData.parameters,
-                        } as ToolCallPart)
-                    }
-                }
-            }
-
-            // Add tool results if they exist
-            if (
-                message.tool_results &&
-                typeof message.tool_results === 'object'
-            ) {
-                const toolResults = message.tool_results as Record<
-                    string,
-                    { name: string; result: any }
-                >
-                for (const [id, resultData] of Object.entries(toolResults)) {
-                    if (
-                        resultData &&
-                        'result' in resultData &&
-                        'name' in resultData
-                    ) {
-                        const toolMessage: CoreToolMessage = {
-                            role: 'tool',
-                            content: [
-                                {
-                                    type: 'tool-result',
-                                    toolCallId: id,
-                                    toolName: resultData.name,
-                                    result: resultData.result,
-                                    isError: false,
-                                } as ToolResultPart,
-                            ],
-                        }
-                        sanitizedMessages.push(toolMessage)
-                    }
-                }
-            }
-
-            // Add assistant message if there are any content parts
-            if (assistantContentParts.length > 0) {
-                const assistantMessage: CoreAssistantMessage = {
+            if (msg.assistant_message) {
+                this.sanitizedMessages.push({
                     role: 'assistant',
-                    content: assistantContentParts,
-                }
-                sanitizedMessages.push(assistantMessage)
+                    content: msg.assistant_message,
+                })
+                console.log('➕ Added assistant message:', {
+                    timestamp: msg.created_at,
+                    contentPreview:
+                        msg.assistant_message.substring(0, 50) + '...',
+                })
             }
-        }
+        })
 
-        return sanitizedMessages
+        console.log('✅ Message history processed:', {
+            totalMessages: this.sanitizedMessages.length,
+        })
+    }
+
+    private async processFullStream(
+        fullStream: any,
+        writer: WritableStreamDefaultWriter,
+        encoder: TextEncoder,
+        collectedContent: string,
+        chatId: string,
+        userId: string
+    ) {
+        let toolCalls: any[] = []
+        let toolResults: any[] = []
+        let appId: string | null = null
+
+        try {
+            // First check if chat already has an associated app
+            const supabase = createRouteHandlerClient({ cookies })
+            const { data: existingChat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', chatId)
+                .single()
+
+            appId = existingChat?.app_id
+
+            // Extract CSV filename from messages
+            let csvFileName = 'data.csv' // default fallback
+            if (this.fileContext?.fileName) {
+                csvFileName = this.fileContext.fileName
+            } else {
+                // Try to find CSV filename in user messages
+                const csvFileNameMatch = this.sanitizedMessages
+                    .filter((msg) => msg.role === 'user')
+                    .map((msg) => {
+                        // Handle different content types
+                        const content =
+                            typeof msg.content === 'string'
+                                ? msg.content
+                                : Array.isArray(msg.content)
+                                  ? msg.content
+                                        .map((part) =>
+                                            typeof part === 'string' ? part : ''
+                                        )
+                                        .join(' ')
+                                  : ''
+
+                        const match = content.match(/['"]([\w\s-]+\.csv)['"]/i)
+                        return match ? match[1] : null
+                    })
+                    .find((name) => name !== null)
+
+                if (csvFileNameMatch) {
+                    csvFileName = csvFileNameMatch
+                }
+            }
+
+            // Use the CSV filename (without extension) as the base for the app name
+            const baseAppName = csvFileName.replace('.csv', '')
+
+            for await (const step of fullStream) {
+                if (
+                    step.type === 'tool-call' &&
+                    step.toolName === 'create_streamlit_app'
+                ) {
+                    try {
+                        const toolInput = step.args
+                        const codeQuery = `${toolInput.query}\n${
+                            this.fileContext
+                                ? `Using file: ${this.fileContext.fileName}`
+                                : ''
+                        }`
+                        const { generatedCode } = await generateCode(
+                            codeQuery,
+                            this.fileContext
+                        )
+
+                        if (generatedCode) {
+                            // Create app if it doesn't exist
+                            if (!appId) {
+                                const { data: newApp, error: appError } =
+                                    await supabase
+                                        .from('apps')
+                                        .insert({
+                                            user_id: userId,
+                                            name: baseAppName, // Use CSV filename without extension
+                                            description: toolInput.query, // Use the query as description
+                                            is_public: false,
+                                            created_at:
+                                                new Date().toISOString(),
+                                            updated_at:
+                                                new Date().toISOString(),
+                                            created_by: userId,
+                                        })
+                                        .select()
+                                        .single()
+
+                                if (appError) throw appError
+                                appId = newApp.id
+
+                                // Link chat to app
+                                await supabase
+                                    .from('chats')
+                                    .update({ app_id: appId })
+                                    .eq('id', chatId)
+                            }
+
+                            if (!appId) {
+                                throw new Error(
+                                    'Failed to create or retrieve app ID'
+                                )
+                            }
+
+                            try {
+                                const versionData = await createVersion(
+                                    appId,
+                                    generatedCode
+                                )
+                                console.log(
+                                    'Version created successfully:',
+                                    versionData
+                                )
+
+                                // Process tool results and write to stream
+                                toolCalls.push({
+                                    id: step.toolCallId,
+                                    name: step.toolName,
+                                    args: step.args || {},
+                                })
+
+                                toolResults.push({
+                                    id: step.toolCallId,
+                                    name: step.toolName,
+                                    result: generatedCode,
+                                })
+
+                                // Write tool call data to stream
+                                const toolCallStartData = `b:${JSON.stringify({
+                                    toolCallId: step.toolCallId,
+                                    toolName: step.toolName,
+                                })}\n\n`
+
+                                const toolCallData = `9:${JSON.stringify({
+                                    toolCallId: step.toolCallId,
+                                    toolName: step.toolName,
+                                    args: step.args || {},
+                                })}\n\n`
+
+                                const toolResultData = `a:${JSON.stringify({
+                                    toolCallId: step.toolCallId,
+                                    result: generatedCode,
+                                })}\n\n`
+
+                                writer.write(encoder.encode(toolCallStartData))
+                                writer.write(encoder.encode(toolCallData))
+                                writer.write(encoder.encode(toolResultData))
+                            } catch (versionError) {
+                                console.error(
+                                    'Failed to create version:',
+                                    versionError
+                                )
+                                throw versionError
+                            }
+                        }
+                    } catch (error) {
+                        console.error(
+                            'Error in code generation or app creation:',
+                            error
+                        )
+                        const errorResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+                        const toolResultData = `a:${JSON.stringify({
+                            toolCallId: step.toolCallId,
+                            result: errorResult,
+                        })}\n\n`
+                        writer.write(encoder.encode(toolResultData))
+                    }
+                } else if (step.type === 'text-delta') {
+                    if (step.content) {
+                        const textData = `0:${JSON.stringify(step.content)}\n\n`
+                        writer.write(encoder.encode(textData))
+                    }
+                } else if (step.type === 'finish') {
+                    if (collectedContent) {
+                        const latestUserMessage = this.sanitizedMessages
+                            .filter((msg) => msg.role === 'user')
+                            .pop()
+
+                        await this.storeMessage(chatId, userId, {
+                            user_message:
+                                typeof latestUserMessage?.content === 'string'
+                                    ? latestUserMessage.content
+                                    : '',
+                            assistant_message: collectedContent,
+                            tool_calls: toolCalls,
+                            tool_results: toolResults,
+                        })
+
+                        const finishData = `d:${JSON.stringify({
+                            finishReason: step.finishReason || 'stop',
+                            usage: {
+                                promptTokens: step.usage?.promptTokens || 0,
+                                completionTokens:
+                                    step.usage?.completionTokens || 0,
+                                totalTokens:
+                                    (step.usage?.promptTokens || 0) +
+                                    (step.usage?.completionTokens || 0),
+                            },
+                        })}\n\n`
+                        writer.write(encoder.encode(finishData))
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Stream processing failed:', {
+                chatId,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                timestamp: new Date().toISOString(),
+            })
+            throw error
+        }
     }
 }

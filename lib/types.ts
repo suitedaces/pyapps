@@ -1,96 +1,144 @@
 import { Json } from '@/lib/database.types'
+import { Message } from 'ai'
 import { z } from 'zod'
 
-export interface ToolCall<NAME extends string, ARGS> {
-    toolCallId: string
-    toolName: NAME
-    args: ARGS
+// Model types
+export interface ModelProvider {
+    id: string
+    streamText: (params: StreamParams) => Promise<void>
 }
 
-export interface ToolResult<NAME extends string, ARGS, RESULT> {
-    toolCallId: string
-    toolName: NAME
-    args: ARGS
-    result: RESULT
+export interface AppVersion {
+    id: string
+    app_id: string
+    version_number: number
+    code: string
+    created_at: string
+    is_current: boolean
 }
 
-export interface ClientMessage {
-    role: 'user' | 'assistant'
+export interface StreamParams {
+    messages: Message[]
+    tools?: Tool[]
+    stream?: boolean
+    onToken: (token: string) => void
+    onToolCall?: (toolInvocation: ToolInvocation) => Promise<void>
+}
+
+// Tool types aligned with Vercel AI SDK
+export interface ToolCallPayload {
+    id: string
+    name: string
+    parameters: Record<string, any>
+}
+
+export interface ToolResultPayload {
+    id: string
+    name: string
     content: string
-    created_at?: Date
-    tool_calls?: ToolCall<string, any>[] | Json | null
-    tool_results?: ToolResult<string, any, any>[] | Json | null
 }
 
-export interface Message {
+// Message types aligned with Vercel AI SDK
+export interface ClientMessage {
+    id: string
+    role: 'system' | 'user' | 'assistant' | 'tool'
+    content: string
+    createdAt: Date
+    toolInvocations?: ToolInvocation[]
+}
+
+// Database message type
+export interface DatabaseMessage {
     id: string
     user_id: string
+    chat_id: string
+    role: 'system' | 'user' | 'assistant' | 'tool'
     user_message: string
     assistant_message: string
-    tool_calls: Json | null
+    tool_calls: ToolCall[] | Json
     tool_results: Json | null
     token_count: number
     created_at: string
 }
-export type StreamChunk =
-    | { type: 'text'; content: string }
-    | {
-          type: 'tool-call'
-          content: { id: string; name: string; parameters: Record<string, any> }
-      }
-    | {
-          type: 'tool-result'
-          content: { id: string; name: string; result: any }
-      }
-    | { type: 'generated_code'; content: string }
-    | { type: 'error'; content: string }
-    | { type: 'text_chunk'; content: string }
-    // Keeping existing types for backward compatibility
-    | {
-          type:
-              | 'text-delta'
-              | 'tool-call'
-              | 'tool-call-delta'
-              | 'tool-call-streaming-start'
-              | 'step-finish'
-              | 'finish'
-              | 'error'
-              | 'generated_code'
-              | 'message_start'
-              | 'content_block_start'
-              | 'content_block_delta'
-              | 'content_block_stop'
-              | 'message_delta'
-              | 'message_stop'
-              | 'code_explanation'
-              | 'tool_use'
-              | 'string'
-          message?: any
-          content_block?: any
-          delta?: any
-          content?: string
-          name?: string
-          textDelta?: string
-      }
 
-export type CSVAnalysis = {
-    totalRows: number
-    columns: {
-        name: string
-        type: string
-    }[]
-    sampleRows: string[][]
-}
-
-export type CreateStreamlitAppTool = {
-    query: string
-    csvAnalysis: CSVAnalysis
-}
-
-export type Tool = {
-    name: string
+// Tool definition aligned with Vercel AI SDK
+export interface Tool {
+    toolName: string
     description: string
-    inputSchema: z.ZodObject<any>
     parameters: z.ZodObject<any>
-    execute: (input: any) => Promise<any>
+    execute: (parameters: Record<string, any>) => Promise<any>
+}
+
+// Model configuration
+export interface LLMModelConfig {
+    model: string
+    temperature?: number
+    maxTokens?: number
+    topP?: number
+    frequencyPenalty?: number
+    presencePenalty?: number
+}
+
+// Add this to your types.ts
+export type LLMModel = {
+    id: string
+    name: string
+    provider: string
+    providerId: string
+}
+
+export interface ToolInvocation {
+    state: 'call' | 'result'
+    toolCallId: string
+    toolName: string
+    args: Record<string, any>
+    result?: any
+}
+
+export interface ToolCall {
+    id: string
+    name: string
+    parameters: any
+}
+
+export interface FileContext {
+    id: string
+    fileName: string
+    fileType: 'csv' | 'json' | 'txt'
+    content?: string
+    analysis?: any
+}
+
+// Add this to your existing types
+export const RequestSchema = z.object({
+    messages: z.array(
+        z.object({
+            content: z.string(),
+            role: z.enum(['user', 'assistant', 'system']),
+            createdAt: z.date().optional(),
+        })
+    ),
+    model: z.object({
+        id: z.string(),
+        provider: z.string(),
+        providerId: z.string(),
+        name: z.string(),
+    }),
+    config: z.object({
+        model: z.string(),
+        temperature: z.number().optional(),
+        maxTokens: z.number().optional(),
+    }),
+    fileId: z.string().optional(),
+    fileName: z.string().optional(),
+    fileContent: z.string().optional(),
+})
+
+export type RequestSchemaType = z.infer<typeof RequestSchema>
+
+export interface VersionMetadata {
+    version_id: string
+    version_number: number
+    app_id: string
+    created_at: string
 }

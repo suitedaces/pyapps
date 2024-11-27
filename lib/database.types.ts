@@ -443,6 +443,42 @@ export interface Database {
                 }
                 Returns: number
             }
+            create_app_version: {
+                Args: {
+                    p_app_id: string
+                    p_code: string
+                }
+                Returns: {
+                    version_id: string
+                    version_number: number
+                    app_id: string
+                    created_at: string
+                }
+            }
+            switch_app_version: {
+                Args: {
+                    p_app_id: string
+                    p_version_id: string
+                }
+                Returns: {
+                    success: boolean
+                    app_id: string
+                    version_id: string
+                    switched_at: string
+                }
+            }
+            get_app_versions: {
+                Args: {
+                    p_app_id: string
+                }
+                Returns: {
+                    id: string
+                    version_number: number
+                    code: string
+                    created_at: string
+                    is_current: boolean
+                }[]
+            }
         }
         Enums: {
             [_ in never]: never

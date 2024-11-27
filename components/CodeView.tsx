@@ -1,44 +1,134 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
 import { highlight, languages } from 'prismjs'
+import { useEffect, useState } from 'react'
+import Editor from 'react-simple-code-editor'
+
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
-import Editor from 'react-simple-code-editor'
 
 interface CodeViewProps {
     code: string
     isGeneratingCode: boolean
 }
 
-export const CodeView: React.FC<CodeViewProps> = ({
-    code,
-    isGeneratingCode,
-}) => {
-    return (
-        <Card className="bg-gray-900 border border-gray-700 h-full max-h-[82vh] flex-grow rounded-lg shadow-lg">
-            <CardContent className="p-0 h-full overflow-auto relative">
-                {isGeneratingCode && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-10">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
+    const [displayCode, setDisplayCode] = useState(code)
+
+    useEffect(() => {
+        if (code) {
+            const formattedCode = code
+                .split('\n')
+                .map((line) => line.trim())
+                .join('\n')
+            setDisplayCode(formattedCode)
+        }
+    }, [code, isGeneratingCode])
+
+    if (isGeneratingCode) {
+        return (
+            <Card className="bg-white border-border h-full">
+                <CardContent className="p-0 h-full flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin text-text" />
+                        <p className="text-sm text-text">Generating code...</p>
                     </div>
-                )}
-                <Editor
-                    value={code}
-                    onValueChange={() => {}}
-                    highlight={(code: string) =>
-                        highlight(code, languages.python, 'python')
-                    }
-                    padding={16}
-                    style={{
-                        fontFamily: '"Fira code", "Fira Mono", monospace',
-                        fontSize: 14,
-                        lineHeight: 1.5,
-                        minHeight: '100%',
-                        overflow: 'auto',
-                    }}
-                    readOnly={true}
-                />
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (!displayCode) {
+        return (
+            <Card className="bg-white border-border h-full">
+                <CardContent className="p-0 h-full flex items-center justify-center">
+                    <p className="text-sm text-text">No code generated yet</p>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow">
+            <CardContent className="p-0 h-full relative">
+                <div className="overflow-auto h-full code-container">
+                    <div className="min-w-max">
+                        <Editor
+                            value={displayCode}
+                            onValueChange={() => {}}
+                            highlight={(code) =>
+                                highlight(code, languages.python, 'python')
+                            }
+                            padding={16}
+                            style={{
+                                fontFamily:
+                                    '"Fira code", "Fira Mono", monospace',
+                                fontSize: 14,
+                                lineHeight: 1.5,
+                                minHeight: '100%',
+                                backgroundColor: 'transparent',
+                                color: '#000',
+                            }}
+                            className="w-full h-full custom-editor"
+                            readOnly={true}
+                        />
+                    </div>
+                </div>
             </CardContent>
+            <style jsx global>{`
+                .code-container {
+                    height: 100%;
+                }
+                .custom-editor {
+                    height: 100%;
+                }
+                .custom-editor textarea,
+                .custom-editor pre {
+                    white-space: pre !important;
+                    min-height: 100% !important;
+                }
+                .code-container::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                .code-container::-webkit-scrollbar-track {
+                    background: #e5e6e9;
+                }
+                .code-container::-webkit-scrollbar-thumb {
+                    background: #212121;
+                    border-radius: 4px;
+                }
+                .code-container::-webkit-scrollbar-thumb:hover {
+                    background: #1b1b1b;
+                }
+                .code-container {
+                    scrollbar-width: thin;
+                    scrollbar-color: #212121 #e5e6e9;
+                }
+                .custom-editor {
+                    padding: 1rem !important;
+                }
+                .custom-editor pre,
+                .custom-editor textarea {
+                    color: #000 !important;
+                }
+                /* Token colors for syntax highlighting */
+                .token.comment {
+                    color: #6b7280;
+                }
+                .token.string {
+                    color: #059669;
+                }
+                .token.number {
+                    color: #7c3aed;
+                }
+                .token.keyword {
+                    color: #2563eb;
+                }
+                .token.function {
+                    color: #0284c7;
+                }
+            `}</style>
         </Card>
     )
 }
