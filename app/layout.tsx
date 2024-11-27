@@ -8,8 +8,8 @@ import { Providers } from './providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-    title: 'grunty - generate apps for your data in seconds',
-    description: 'Analyze CSV files with Streamlit and AI',
+    title: 'py_apps - build & share data apps in seconds',
+    description: 'Build streamlit apps with AI',
 }
 
 export default function RootLayout({

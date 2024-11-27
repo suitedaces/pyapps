@@ -51,7 +51,7 @@ export default function LoginPage() {
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-2xl text-black font-bold text-center">
-                        Login to Grunty 🧐
+                        login to py_apps 
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
