@@ -15,6 +15,7 @@ export interface AppVersion {
     version_number: number
     code: string
     created_at: string
+    updated_at: string
     is_current: boolean
 }
 
@@ -64,11 +65,32 @@ export interface DatabaseMessage {
 
 // Tool definition aligned with Vercel AI SDK
 export interface Tool {
-    toolName: string
-    description: string
-    parameters: z.ZodObject<any>
-    execute: (parameters: Record<string, any>) => Promise<any>
+    toolName: string;
+    description: string;
+    parameters: z.ZodObject<any>;
+    execute?: (args: Record<string, any>) => Promise<any>;
+    streamExecution?: (args: Record<string, any>, signal?: AbortSignal) => AsyncGenerator<ToolStreamResponse>;
 }
+
+// Add StreamingTool interface
+export interface StreamingTool extends Tool {
+    streamExecution: (args: Record<string, any>, signal?: AbortSignal) => AsyncGenerator<ToolStreamResponse>;
+}
+
+// Add ToolStreamResponse type
+export type ToolStreamResponse = {
+    type: 'tool-call-streaming-start';
+    toolCallId: string;
+    toolName: string;
+} | {
+    type: 'tool-call-delta';
+    toolCallId: string;
+    argsTextDelta: string;
+} | {
+    type: 'tool-result';
+    toolCallId: string;
+    result: any;
+};
 
 // Model configuration
 export interface LLMModelConfig {

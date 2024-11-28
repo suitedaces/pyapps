@@ -376,9 +376,9 @@ export default function ChatPageClient({
     // Add debug log for page load
     useEffect(() => {
         if (generatedCode && sandboxId) {
-            updateStreamlitApp(generatedCode, true)
+            updateStreamlitApp(generatedCode, true);
         }
-    }, []) // Empty dependency array for mount only
+    }, [generatedCode, sandboxId, updateStreamlitApp]);
 
     // Modify handleVersionChange
     const handleVersionChange = async (version: AppVersion) => {

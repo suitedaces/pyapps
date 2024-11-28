@@ -8,6 +8,7 @@ import {
     ModelProvider,
     Tool,
     LLMModelConfig,
+    StreamingTool,
 } from './types'
 import { encode } from 'gpt-tokenizer'
 import { createVersion } from '@/lib/supabase'
@@ -45,7 +46,7 @@ export class GruntyAgent {
         chatId: string,
         userId: string,
         messages: CoreMessage[],
-        tools: Tool[],
+        tools: (Tool | StreamingTool)[],
         fileContext?: FileContext
     ) {
         this.fileContext = fileContext
@@ -95,7 +96,7 @@ export class GruntyAgent {
     private async handleStreamProcess(
         writer: WritableStreamDefaultWriter,
         encoder: TextEncoder,
-        tools: Tool[],
+        tools: (Tool | StreamingTool)[],
         chatId: string,
         userId: string
     ) {
@@ -175,8 +176,46 @@ export class GruntyAgent {
     ) {
         let toolCalls: any[] = []
         let toolResults: any[] = []
+        let appId: string | null = null;
+        const versionCreatedForToolCall = new Set<string>();
 
         try {
+            // First check if chat already has an associated app
+            const supabase = createRouteHandlerClient({ cookies })
+            const { data: existingChat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', chatId)
+                .single()
+
+            appId = existingChat?.app_id
+
+            // Extract CSV filename from messages or context
+            let csvFileName = this.fileContext?.fileName || 'data.csv';
+            if (!this.fileContext?.fileName) {
+                const csvFileNameMatch = this.sanitizedMessages
+                    .filter(msg => msg.role === 'user')
+                    .map(msg => {
+                        const content = typeof msg.content === 'string'
+                            ? msg.content
+                            : Array.isArray(msg.content)
+                                ? msg.content.map(part =>
+                                    typeof part === 'string' ? part : ''
+                                ).join(' ')
+                                : '';
+                        const match = content.match(/['"]([\w\s-]+\.csv)['"]/i);
+                        return match ? match[1] : null;
+                    })
+                    .find(name => name !== null);
+
+                if (csvFileNameMatch) {
+                    csvFileName = csvFileNameMatch;
+                }
+            }
+
+            // Use the CSV filename (without extension) as the base for the app name
+            const baseAppName = csvFileName.replace('.csv', '');
+
             for await (const step of fullStream) {
                 console.log('🔄 Processing stream step:', { type: step.type });
 
@@ -186,7 +225,7 @@ export class GruntyAgent {
                         const toolName = step.toolName;
                         const args = step.args || {};
 
-                        console.log('🛠️ Tool call started:', {
+                        console.log('️ Tool call started:', {
                             toolCallId,
                             toolName,
                             args
@@ -225,6 +264,58 @@ export class GruntyAgent {
                                     break;
 
                                 case 'tool-result':
+                                    // Handle app and version creation specifically for create_streamlit_app
+                                    if (part.result &&
+                                        typeof part.result === 'string' &&
+                                        toolName === 'create_streamlit_app' &&
+                                        !versionCreatedForToolCall.has(toolCallId)) {
+
+                                        if (!appId) {
+                                            const { data: newApp, error: appError } = await supabase
+                                                .from('apps')
+                                                .insert({
+                                                    user_id: userId,
+                                                    name: baseAppName,
+                                                    description: args.query || 'Generated App',
+                                                    is_public: false,
+                                                    created_at: new Date().toISOString(),
+                                                    updated_at: new Date().toISOString(),
+                                                    created_by: userId,
+                                                })
+                                                .select()
+                                                .single();
+
+                                            if (appError) throw appError;
+                                            appId = newApp.id;
+
+                                            // Link chat to app
+                                            await supabase
+                                                .from('chats')
+                                                .update({ app_id: appId })
+                                                .eq('id', chatId);
+                                        }
+
+                                        if (!appId) {
+                                            throw new Error('Failed to create or retrieve app ID');
+                                        }
+
+                                        // Create new version
+                                        try {
+                                            const versionData = await createVersion(appId, part.result);
+                                            versionCreatedForToolCall.add(toolCallId);
+
+                                            console.log('✅ Version created successfully:', {
+                                                appId,
+                                                versionNumber: versionData.version_number,
+                                                toolName,
+                                                toolCallId
+                                            });
+                                        } catch (versionError) {
+                                            console.error('❌ Failed to create version:', versionError);
+                                            throw versionError;
+                                        }
+                                    }
+
                                     // Send tool call completion first
                                     writer.write(encoder.encode(`9:${JSON.stringify({
                                         toolCallId,
@@ -419,6 +510,4 @@ export class GruntyAgent {
             throw error
         }
     }
-
-    // ... rest of the existing methods (storeMessage, processMessageHistory, etc.) remain unchanged
 }

@@ -67,13 +67,14 @@ export class StreamlitTool extends BaseStreamingTool {
         }
 
         if (chunk.type === 'content_block_delta' && chunk.delta) {
-          const text = chunk.delta.text || '';
+          const delta = chunk.delta as { type: string; text?: string };
+          const text = delta.text || '';
 
           // Remove markdown backticks if present in the chunk
           const cleanedText = text
-            .replace(/^```python\n/, '')  // Remove opening backticks
-            .replace(/\n```$/, '')        // Remove closing backticks
-            .replace(/```$/, '');         // Remove closing backticks without newline
+            .replace(/^```python\n/, '')
+            .replace(/\n```$/, '')
+            .replace(/```$/, '');
 
           collectedCode += cleanedText;
           chunkCount++;
@@ -84,7 +85,6 @@ export class StreamlitTool extends BaseStreamingTool {
             totalCollected: collectedCode.length
           });
 
-          // Send delta update with cleaned text
           yield this.createToolCallDelta(toolCallId, cleanedText);
 
           progress = Math.min(95, Math.floor((chunkCount / 100) * 100));
@@ -98,15 +98,11 @@ export class StreamlitTool extends BaseStreamingTool {
         preview: collectedCode.substring(0, 100) + '...'
       });
 
-      // Send final result with clean code
+      // Send final result
       yield this.createToolResult(toolCallId, collectedCode);
 
     } catch (error) {
-      console.error('❌ StreamlitTool execution error:', {
-        toolCallId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      console.error('StreamlitTool execution error:', error);
       throw error;
     }
   }

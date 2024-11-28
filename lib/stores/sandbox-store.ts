@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { Sandbox } from 'e2b'
 
 interface SandboxState {
   sandboxId: string | null

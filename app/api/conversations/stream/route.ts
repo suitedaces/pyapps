@@ -5,7 +5,7 @@ import { GruntyAgent } from '@/lib/agent'
 import { getModelClient } from '@/lib/modelProviders'
 import { tools } from '@/lib/tools'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
-import { FileContext, LLMModel, LLMModelConfig } from '@/lib/types'
+import { FileContext, LLMModel, LLMModelConfig, Tool } from '@/lib/types'
 import { Message, convertToCoreMessages } from 'ai'
 import { generateUUID } from '@/lib/utils'
 import { z } from 'zod'
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
             chatId,
             session.user.id,
             convertToCoreMessages(messages),
-            tools,
+            tools as Tool[],
             fileContext
         )
 

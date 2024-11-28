@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from './ui/button'
-import { useEffect, useState, useImperativeHandle, forwardRef } from 'react'
+import { useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react'
 import { AppVersion } from '@/lib/types'
 import { getVersionHistory, switchVersion } from '@/lib/supabase'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -21,10 +21,10 @@ export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorPro
         const [versions, setVersions] = useState<AppVersion[]>([])
         const [currentIndex, setCurrentIndex] = useState<number>(0)
         const [isLoading, setIsLoading] = useState(false)
-        const [isInitialLoad, setIsInitialLoad] = useState(true)
+        const [hasInitialized, setHasInitialized] = useState(false)
 
-        const loadVersions = async () => {
-            if (!appId) return
+        const loadVersions = useCallback(async () => {
+            if (!appId || isLoading) return
 
             setIsLoading(true)
             try {
@@ -34,9 +34,9 @@ export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorPro
                 if (versionsData.length > 0) {
                     setCurrentIndex(0)
 
-                    if (isInitialLoad) {
+                    if (!hasInitialized) {
                         onVersionChange(versionsData[0])
-                        setIsInitialLoad(false)
+                        setHasInitialized(true)
                     }
                 }
             } catch (error) {
@@ -44,18 +44,24 @@ export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorPro
             } finally {
                 setIsLoading(false)
             }
-        }
+        }, [appId, onVersionChange, hasInitialized, isLoading])
 
         useImperativeHandle(ref, () => ({
-            refreshVersions: loadVersions
-        }))
+            refreshVersions: () => {
+                setHasInitialized(false)
+                return loadVersions()
+            }
+        }), [loadVersions])
 
         useEffect(() => {
-            loadVersions()
+            if (appId) {
+                setHasInitialized(false)
+                loadVersions()
+            }
         }, [appId])
 
         const handleVersionChange = async (newIndex: number) => {
-            if (!appId || newIndex < 0 || newIndex >= versions.length) return
+            if (!appId || newIndex < 0 || newIndex >= versions.length || isLoading) return
 
             setIsLoading(true)
             try {
@@ -81,7 +87,17 @@ export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorPro
             handleVersionChange(newIndex)
         }
 
-        if (versions.length === 0) return null
+        useEffect(() => {
+            console.log('VersionSelector state:', {
+                appId,
+                versionsCount: versions.length,
+                currentIndex,
+                isLoading,
+                hasInitialized
+            })
+        }, [appId, versions.length, currentIndex, isLoading, hasInitialized])
+
+        if (versions.length === 0 && !isLoading) return null
 
         return (
             <div className="flex items-center gap-2">
@@ -105,13 +121,15 @@ export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorPro
                     <span className="text-sm font-medium text-gray-700">
                         {isLoading ? (
                             "Loading..."
-                        ) : (
+                        ) : versions.length > 0 ? (
                             <>
                                 Version {versions[currentIndex]?.version_number}
                                 <span className="text-xs text-gray-400 ml-1">
                                     / {versions.length}
                                 </span>
                             </>
+                        ) : (
+                            "No versions"
                         )}
                     </span>
                 </div>
