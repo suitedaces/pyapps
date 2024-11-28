@@ -1,24 +1,25 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { NextRequest } from 'next/server'
 import { GruntyAgent } from '@/lib/agent'
 import { getModelClient } from '@/lib/modelProviders'
-import { tools } from '@/lib/tools'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
-import { FileContext, LLMModel, LLMModelConfig, Tool, StreamingTool } from '@/lib/types'
-import { Message, convertToCoreMessages } from 'ai'
+import { tools } from '@/lib/tools'
+import { FileContext, Tool } from '@/lib/types'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { convertToCoreMessages } from 'ai'
+import { cookies } from 'next/headers'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 
 // Validation schema for request body
 const RequestSchema = z.object({
-    messages: z.array(z.object({
-        content: z.string(),
-        role: z.enum(['user', 'assistant', 'system']),
-        createdAt: z.union([
-            z.date(),
-            z.string().transform((str) => new Date(str))
-        ]).optional(),
-    })),
+    messages: z.array(
+        z.object({
+            content: z.string(),
+            role: z.enum(['user', 'assistant', 'system']),
+            createdAt: z
+                .union([z.date(), z.string().transform((str) => new Date(str))])
+                .optional(),
+        })
+    ),
     model: z.object({
         id: z.string(),
         provider: z.string(),
@@ -35,9 +36,14 @@ const RequestSchema = z.object({
     fileContent: z.string().optional(),
 })
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+    req: NextRequest,
+    { params }: { params: { id: string } }
+) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session) {
         return new Response('Unauthorized', { status: 401 })
@@ -49,7 +55,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     try {
         const body = await req.json()
-        const { messages, model, config, fileId, fileName, fileContent } = await RequestSchema.parseAsync(body)
+        const { messages, model, config, fileId, fileName, fileContent } =
+            await RequestSchema.parseAsync(body)
 
         console.log('🔍 Fetching chat data:', { chatId: params.id })
 
@@ -96,7 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             console.log('📄 File context created:', {
                 fileId: fileData.id,
                 fileName: fileData.file_name,
-                hasAnalysis: !!fileData.analysis
+                hasAnalysis: !!fileData.analysis,
             })
 
             // Update file access timestamp
@@ -108,19 +115,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
         console.log('🎯 Initializing model client:', {
             modelId: model.id,
-            provider: model.provider
+            provider: model.provider,
         })
 
-        const modelClient = getModelClient({
-            id: model.id,
-            provider: model.provider,
-            name: model.name,
-            providerId: model.providerId
-        }, {
-            apiKey: process.env.ANTHROPIC_API_KEY || '',
-            temperature: config?.temperature || 0.7,
-            maxTokens: config?.maxTokens || 4096
-        })
+        const modelClient = getModelClient(
+            {
+                id: model.id,
+                provider: model.provider,
+                name: model.name,
+                providerId: model.providerId,
+            },
+            {
+                apiKey: process.env.ANTHROPIC_API_KEY || '',
+                temperature: config?.temperature || 0.7,
+                maxTokens: config?.maxTokens || 4096,
+            }
+        )
 
         const agent = new GruntyAgent(
             modelClient,
@@ -128,7 +138,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             CHAT_SYSTEM_PROMPT,
             {
                 ...config,
-                model: model.id
+                model: model.id,
             }
         )
 
@@ -136,12 +146,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             chatId: params.id,
             messageCount: messages.length,
             hasFile: !!fileContext,
-            fileInfo: fileContext ? {
-                id: fileContext.id,
-                name: fileContext.fileName,
-                type: fileContext.fileType,
-                hasAnalysis: !!fileContext.analysis
-            } : null
+            fileInfo: fileContext
+                ? {
+                      id: fileContext.id,
+                      name: fileContext.fileName,
+                      type: fileContext.fileType,
+                      hasAnalysis: !!fileContext.analysis,
+                  }
+                : null,
         })
 
         return agent.streamResponse(
@@ -151,18 +163,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             tools as Tool[],
             fileContext
         )
-
     } catch (error) {
         console.error('❌ Error in stream processing:', error)
         return new Response(
             JSON.stringify({
-                error: error instanceof z.ZodError
-                    ? 'Invalid request format'
-                    : 'Internal server error'
+                error:
+                    error instanceof z.ZodError
+                        ? 'Invalid request format'
+                        : 'Internal server error',
             }),
             {
                 status: error instanceof z.ZodError ? 400 : 500,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
             }
         )
     }

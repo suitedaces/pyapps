@@ -12,18 +12,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
 // Version management functions
-export async function createVersion(appId: string, code: string): Promise<VersionMetadata> {
+export async function createVersion(
+    appId: string,
+    code: string
+): Promise<VersionMetadata> {
     try {
         if (!appId || !code) {
             throw new Error('Missing required parameters')
         }
 
         // Create version using RPC
-        const { data, error } = await supabase
-            .rpc('create_app_version', {
-                p_app_id: appId,
-                p_code: code
-            })
+        const { data, error } = await supabase.rpc('create_app_version', {
+            p_app_id: appId,
+            p_code: code,
+        })
 
         if (error) throw error
 
@@ -32,7 +34,7 @@ export async function createVersion(appId: string, code: string): Promise<Versio
             .from('apps')
             .update({
                 current_version_id: data.version_id,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
             })
             .eq('id', appId)
 
@@ -46,13 +48,15 @@ export async function createVersion(appId: string, code: string): Promise<Versio
     }
 }
 
-export async function switchVersion(appId: string, versionId: string): Promise<{ error?: Error }> {
+export async function switchVersion(
+    appId: string,
+    versionId: string
+): Promise<{ error?: Error }> {
     try {
-        const { error: rpcError } = await supabase
-            .rpc('switch_app_version', {
-                p_app_id: appId,
-                p_version_id: versionId
-            })
+        const { error: rpcError } = await supabase.rpc('switch_app_version', {
+            p_app_id: appId,
+            p_version_id: versionId,
+        })
 
         if (rpcError) {
             console.error('Error switching version:', rpcError)
@@ -62,13 +66,15 @@ export async function switchVersion(appId: string, versionId: string): Promise<{
         return {}
     } catch (error) {
         console.error('Error in switchVersion:', error)
-        return { error: error instanceof Error ? error : new Error('Unknown error') }
+        return {
+            error: error instanceof Error ? error : new Error('Unknown error'),
+        }
     }
 }
 
 export async function getVersionHistory(appId: string): Promise<AppVersion[]> {
     try {
-        console.log('Fetching versions for app:', appId);
+        console.log('Fetching versions for app:', appId)
         const { data, error } = await supabase
             .from('app_versions')
             .select('*')
@@ -80,13 +86,13 @@ export async function getVersionHistory(appId: string): Promise<AppVersion[]> {
             throw error
         }
 
-        console.log('Fetched versions:', data);
+        console.log('Fetched versions:', data)
 
         // Transform data to include is_current
         if (data && data.length > 0) {
             return data.map((version, index) => ({
                 ...version,
-                is_current: index === 0 // Mark only the latest version as current
+                is_current: index === 0, // Mark only the latest version as current
             })) as AppVersion[]
         }
 

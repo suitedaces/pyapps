@@ -1,46 +1,57 @@
-"use client";
+'use client'
 
-import { App, ExecutionResult } from "@/lib/schema";
-import { Message as AIMessage, ToolInvocation } from "ai";
-import { motion } from "framer-motion";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Markdown } from "./markdown";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Terminal } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useAuth } from '@/contexts/AuthContext'
+import { App, ExecutionResult } from '@/lib/schema'
+import { cn } from '@/lib/utils'
+import { Message as AIMessage, ToolInvocation } from 'ai'
+import { motion } from 'framer-motion'
+import { Terminal } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Markdown } from './markdown'
 
 interface MessageProps extends AIMessage {
-    isLastMessage?: boolean;
+    isLastMessage?: boolean
     object?: App
     result?: ExecutionResult
     onObjectClick?: (preview: {
-        object: App | undefined,
+        object: App | undefined
         result: ExecutionResult | undefined
     }) => void
     onToolResultClick?: (result: string) => void
     onCodeClick?: (messageId: string) => void
 }
-export function Message({ role, content, id, isLastMessage = false, object, result, toolInvocations, onObjectClick, onToolResultClick, onCodeClick }: MessageProps) {
-    const isUser = role === "user";
-    const { session } = useAuth();
-    const user = session?.user;
+export function Message({
+    role,
+    content,
+    id,
+    isLastMessage = false,
+    object,
+    result,
+    toolInvocations,
+    onObjectClick,
+    onToolResultClick,
+    onCodeClick,
+}: MessageProps) {
+    const isUser = role === 'user'
+    const { session } = useAuth()
+    const user = session?.user
 
     const streamlitResult = toolInvocations?.find(
-        invocation =>
+        (invocation) =>
             invocation.toolName === 'create_streamlit_app' &&
             invocation.state === 'result' &&
             'result' in invocation
-    ) as (ToolInvocation & { result: string }) | undefined;
+    ) as (ToolInvocation & { result: string }) | undefined
 
     const renderPreviewButton = () => {
         if (object) {
             return (
                 <div
                     onClick={() => {
-                        onObjectClick?.({ object, result });
-                        onCodeClick?.(id);
+                        onObjectClick?.({ object, result })
+                        onCodeClick?.(id)
                     }}
                     className="py-2 my-4 pl-2 w-full md:w-max flex items-center border rounded-xl select-none hover:bg-white dark:hover:bg-white/5 hover:cursor-pointer"
                 >
@@ -56,13 +67,13 @@ export function Message({ role, content, id, isLastMessage = false, object, resu
                         </span>
                     </div>
                 </div>
-            );
+            )
         } else if (streamlitResult) {
             return (
                 <div
                     onClick={() => {
-                        onToolResultClick?.(streamlitResult.result);
-                        onCodeClick?.(id);
+                        onToolResultClick?.(streamlitResult.result)
+                        onCodeClick?.(id)
                     }}
                     className="py-2 my-4 pl-2 w-full md:w-max flex items-center border rounded-xl select-none hover:bg-white dark:hover:bg-white/5 hover:cursor-pointer"
                 >
@@ -78,10 +89,10 @@ export function Message({ role, content, id, isLastMessage = false, object, resu
                         </span>
                     </div>
                 </div>
-            );
+            )
         }
-        return null;
-    };
+        return null
+    }
 
     return (
         <motion.div
@@ -89,7 +100,11 @@ export function Message({ role, content, id, isLastMessage = false, object, resu
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className={cn("flex w-full", isUser ? "justify-end" : "justify-start", "mb-4")}
+            className={cn(
+                'flex w-full',
+                isUser ? 'justify-end' : 'justify-start',
+                'mb-4'
+            )}
         >
             {!isUser && (
                 <div className="flex flex-row items-start w-full">
@@ -105,12 +120,16 @@ export function Message({ role, content, id, isLastMessage = false, object, resu
 
             {isUser && (
                 <div className="flex flex-row items-start gap-2 max-w-[85%]">
-                    <div className="grow shrink mx-2 p-4 rounded-lg bg-background border border-border text-foreground">
-                        <div className="whitespace-pre-wrap break-words">
+                    <div className="grow shrink mx-2 p-4 rounded-lg bg-background border border-border text-foreground overflow-auto">
+                        <div className="whitespace-pre-wrap break-words max-w-full">
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                    p: ({ children }) => <div className="mb-4 last:mb-0">{children}</div>,
+                                    p: ({ children }) => (
+                                        <div className="mb-4 last:mb-0">
+                                            {children}
+                                        </div>
+                                    ),
                                 }}
                             >
                                 {content}
@@ -121,18 +140,18 @@ export function Message({ role, content, id, isLastMessage = false, object, resu
                         {user?.user_metadata?.avatar_url ? (
                             <AvatarImage
                                 src={user.user_metadata.avatar_url}
-                                alt={user.user_metadata.full_name || "User"}
+                                alt={user.user_metadata.full_name || 'User'}
                             />
                         ) : (
                             <AvatarFallback>
                                 {user?.user_metadata?.full_name?.[0]?.toUpperCase() ||
                                     user?.email?.[0]?.toUpperCase() ||
-                                    "U"}
+                                    'U'}
                             </AvatarFallback>
                         )}
                     </Avatar>
                 </div>
             )}
         </motion.div>
-    );
+    )
 }

@@ -1,7 +1,7 @@
 import { Json } from '@/lib/database.types'
+import { App, ExecutionResult } from '@/lib/schema'
 import { Message } from 'ai'
 import { z } from 'zod'
-import { App, ExecutionResult } from '@/lib/schema'
 
 // Model types
 export interface ModelProvider {
@@ -65,32 +65,41 @@ export interface DatabaseMessage {
 
 // Tool definition aligned with Vercel AI SDK
 export interface Tool {
-    toolName: string;
-    description: string;
-    parameters: z.ZodObject<any>;
-    execute?: (args: Record<string, any>) => Promise<any>;
-    streamExecution?: (args: Record<string, any>, signal?: AbortSignal) => AsyncGenerator<ToolStreamResponse>;
+    toolName: string
+    description: string
+    parameters: z.ZodObject<any>
+    execute?: (args: Record<string, any>) => Promise<any>
+    streamExecution?: (
+        args: Record<string, any>,
+        signal?: AbortSignal
+    ) => AsyncGenerator<ToolStreamResponse>
 }
 
 // Add StreamingTool interface
 export interface StreamingTool extends Tool {
-    streamExecution: (args: Record<string, any>, signal?: AbortSignal) => AsyncGenerator<ToolStreamResponse>;
+    streamExecution: (
+        args: Record<string, any>,
+        signal?: AbortSignal
+    ) => AsyncGenerator<ToolStreamResponse>
 }
 
 // Add ToolStreamResponse type
-export type ToolStreamResponse = {
-    type: 'tool-call-streaming-start';
-    toolCallId: string;
-    toolName: string;
-} | {
-    type: 'tool-call-delta';
-    toolCallId: string;
-    argsTextDelta: string;
-} | {
-    type: 'tool-result';
-    toolCallId: string;
-    result: any;
-};
+export type ToolStreamResponse =
+    | {
+          type: 'tool-call-streaming-start'
+          toolCallId: string
+          toolName: string
+      }
+    | {
+          type: 'tool-call-delta'
+          toolCallId: string
+          argsTextDelta: string
+      }
+    | {
+          type: 'tool-result'
+          toolCallId: string
+          result: any
+      }
 
 // Model configuration
 export interface LLMModelConfig {
@@ -125,20 +134,22 @@ export interface ToolCall {
 }
 
 export interface FileContext {
-    id: string;
-    fileName: string;
-    fileType: 'csv' | 'json' | 'txt';
-    content?: string;
-    analysis?: any;
+    id: string
+    fileName: string
+    fileType: 'csv' | 'json' | 'txt'
+    content?: string
+    analysis?: any
 }
 
 // Add this to your existing types
 export const RequestSchema = z.object({
-    messages: z.array(z.object({
-        content: z.string(),
-        role: z.enum(['user', 'assistant', 'system']),
-        createdAt: z.date().optional(),
-    })),
+    messages: z.array(
+        z.object({
+            content: z.string(),
+            role: z.enum(['user', 'assistant', 'system']),
+            createdAt: z.date().optional(),
+        })
+    ),
     model: z.object({
         id: z.string(),
         provider: z.string(),
@@ -158,10 +169,10 @@ export const RequestSchema = z.object({
 export type RequestSchemaType = z.infer<typeof RequestSchema>
 
 export interface VersionMetadata {
-    version_id: string;
-    version_number: number;
-    app_id: string;
-    created_at: string;
+    version_id: string
+    version_number: number
+    app_id: string
+    created_at: string
 }
 
 export interface CustomMessage extends Message {

@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, Globe } from 'lucide-react'
-import { useRef, forwardRef, useImperativeHandle } from 'react'
+import { Globe, Loader2 } from 'lucide-react'
+import { forwardRef, useImperativeHandle, useRef } from 'react'
 
 interface StreamlitPreviewProps {
     url: string | null
@@ -11,10 +11,10 @@ export interface StreamlitPreviewRef {
     refreshIframe: () => void
 }
 
-export const StreamlitPreview = forwardRef<StreamlitPreviewRef, StreamlitPreviewProps>(({ 
-    url, 
-    isGeneratingCode
-}, ref) => {
+export const StreamlitPreview = forwardRef<
+    StreamlitPreviewRef,
+    StreamlitPreviewProps
+>(({ url, isGeneratingCode }, ref) => {
     const iframeRef = useRef<HTMLIFrameElement>(null)
 
     // Expose refreshIframe method through ref
@@ -23,7 +23,7 @@ export const StreamlitPreview = forwardRef<StreamlitPreviewRef, StreamlitPreview
             if (iframeRef.current) {
                 iframeRef.current.src = iframeRef.current.src
             }
-        }
+        },
     }))
 
     const content = (
@@ -62,15 +62,13 @@ export const StreamlitPreview = forwardRef<StreamlitPreviewRef, StreamlitPreview
                 />
             )}
         </div>
-    );
+    )
 
     return (
         <Card className="bg-background h-full">
-            <CardContent className="p-0 h-full">
-                {content}
-            </CardContent>
+            <CardContent className="p-0 h-full">{content}</CardContent>
         </Card>
-    );
+    )
 })
 
 StreamlitPreview.displayName = 'StreamlitPreview'

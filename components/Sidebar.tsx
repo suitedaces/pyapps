@@ -1,39 +1,35 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { usePathname, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { motion } from 'framer-motion'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useEffect, useState } from 'react'
 import { Session } from '@supabase/supabase-js'
+import { motion } from 'framer-motion'
 import {
-    MessageSquare,
-    FolderOpen,
     AppWindow,
+    ChevronDown,
+    ChevronLeft,
+    FolderOpen,
     LogOut,
     Menu,
+    MessageSquare,
     Plus,
-    ChevronDown,
-    ChevronUp
 } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
+import { Logo } from '@/components/core/Logo'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import {
-    Sheet,
-    SheetContent,
-    SheetTrigger,
-} from '@/components/ui/sheet'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import {
     Tooltip,
     TooltipContent,
-    TooltipTrigger,
     TooltipProvider,
+    TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Logo } from '@/components/core/Logo'
 
 interface SidebarProps {
     defaultCollapsed?: boolean
@@ -48,14 +44,14 @@ interface SidebarProps {
 // First, let's update the NavItem interface to ensure proper typing
 interface NavItemProps {
     item: {
-        title: string;
-        icon: any;
-        href: string;
-        pattern: RegExp;
-        collapsible?: boolean;
-    };
-    collapsed: boolean;
-    onToggle?: () => void;
+        title: string
+        icon: any
+        href: string
+        pattern: RegExp
+        collapsible?: boolean
+    }
+    collapsed: boolean
+    onToggle?: () => void
 }
 
 export function Sidebar({
@@ -109,22 +105,33 @@ export function Sidebar({
     ]
 
     // Update the ChatList component
-    const ChatList = ({ collapsed, chats = [], currentChatId, onChatSelect }: {
-        collapsed: boolean;
-        chats: any[];
-        currentChatId?: string | null;
-        onChatSelect?: (chatId: string) => void;
+    const ChatList = ({
+        collapsed,
+        chats = [],
+        currentChatId,
+        onChatSelect,
+    }: {
+        collapsed: boolean
+        chats: any[]
+        currentChatId?: string | null
+        onChatSelect?: (chatId: string) => void
     }) => {
         // When collapsed, only show the current chat or the first chat
-        const chatsToShow = collapsed 
-            ? [currentChatId ? chats.find(chat => chat.id === currentChatId) : chats[0]].filter(Boolean)
-            : chats.slice(0, 5);
+        const chatsToShow = collapsed
+            ? [
+                  currentChatId
+                      ? chats.find((chat) => chat.id === currentChatId)
+                      : chats[0],
+              ].filter(Boolean)
+            : chats.slice(0, 5)
 
         return (
-            <div className={cn(
-                "flex flex-col gap-1",
-                collapsed ? "px-1" : "px-2"
-            )}>
+            <div
+                className={cn(
+                    'flex flex-col gap-1',
+                    collapsed ? 'px-1' : 'px-2'
+                )}
+            >
                 <ScrollArea className="flex-1 w-full">
                     {chatsToShow.map((chat: any) => (
                         <TooltipProvider key={chat.id}>
@@ -133,18 +140,22 @@ export function Sidebar({
                                     <Button
                                         variant="ghost"
                                         className={cn(
-                                            "w-full mb-1 relative group text-left",
-                                            collapsed ? "justify-center px-2" : "justify-start",
+                                            'w-full mb-1 relative group text-left',
+                                            collapsed
+                                                ? 'justify-center px-2'
+                                                : 'justify-start',
                                             chat.id === currentChatId
-                                                ? "bg-white/20 text-white hover:bg-white/20"
-                                                : "text-white hover:bg-white/10 hover:text-white"
+                                                ? 'bg-white/20 text-white hover:bg-white/20'
+                                                : 'text-white hover:bg-white/10 hover:text-white'
                                         )}
                                         onClick={() => onChatSelect?.(chat.id)}
                                     >
-                                        <MessageSquare className={cn(
-                                            "h-4 w-4 shrink-0",
-                                            collapsed ? "mx-auto" : "mr-2"
-                                        )} />
+                                        <MessageSquare
+                                            className={cn(
+                                                'h-4 w-4 shrink-0',
+                                                collapsed ? 'mx-auto' : 'mr-2'
+                                            )}
+                                        />
                                         {!collapsed && (
                                             <span className="truncate text-left">
                                                 {chat.title || 'New'}
@@ -181,32 +192,46 @@ export function Sidebar({
                                 className={cn(
                                     'w-full justify-start gap-2',
                                     'text-white hover:bg-white/10 hover:text-white',
-                                    isActive && 'bg-white/20 text-white hover:bg-white/20'
+                                    isActive &&
+                                        'bg-white/20 text-white hover:bg-white/20'
                                 )}
                                 onClick={isChatsItem ? onToggle : undefined}
                                 asChild={!isChatsItem}
                             >
                                 {!isChatsItem ? (
                                     <Link href={item.href}>
-                                        <item.icon className={cn(
-                                            'h-4 w-4 text-white',
-                                            collapsed ? 'mx-auto' : 'mr-2'
-                                        )} />
-                                        {!collapsed && <span className="text-white">{item.title}</span>}
+                                        <item.icon
+                                            className={cn(
+                                                'h-4 w-4 text-white',
+                                                collapsed ? 'mx-auto' : 'mr-2'
+                                            )}
+                                        />
+                                        {!collapsed && (
+                                            <span className="text-white">
+                                                {item.title}
+                                            </span>
+                                        )}
                                     </Link>
                                 ) : (
                                     <>
-                                        <item.icon className={cn(
-                                            'h-4 w-4 text-white',
-                                            collapsed ? 'mx-auto' : 'mr-2'
-                                        )} />
+                                        <item.icon
+                                            className={cn(
+                                                'h-4 w-4 text-white',
+                                                collapsed ? 'mx-auto' : 'mr-2'
+                                            )}
+                                        />
                                         {!collapsed && (
                                             <div className="flex items-center justify-between w-full">
-                                                <span className="text-white">{item.title}</span>
-                                                <ChevronDown className={cn(
-                                                    'h-4 w-4 transition-transform text-white',
-                                                    !isChatsCollapsed && 'rotate-90'
-                                                )} />
+                                                <span className="text-white">
+                                                    {item.title}
+                                                </span>
+                                                <ChevronDown
+                                                    className={cn(
+                                                        'h-4 w-4 transition-transform text-white',
+                                                        !isChatsCollapsed &&
+                                                            'rotate-90'
+                                                    )}
+                                                />
                                             </div>
                                         )}
                                     </>
@@ -215,7 +240,10 @@ export function Sidebar({
                         </div>
                     </TooltipTrigger>
                     {collapsed && (
-                        <TooltipContent side="right" className="flex items-center gap-4">
+                        <TooltipContent
+                            side="right"
+                            className="flex items-center gap-4"
+                        >
                             {item.title}
                         </TooltipContent>
                     )}
@@ -235,7 +263,10 @@ export function Sidebar({
             <SheetContent side="left" className="w-72 p-0">
                 <div className="h-full flex flex-col">
                     <div className="p-4">
-                        <Link href="/" className="flex items-center gap-2 font-semibold">
+                        <Link
+                            href="/"
+                            className="flex items-center gap-2 font-semibold"
+                        >
                             py_app
                         </Link>
                     </div>
@@ -248,7 +279,8 @@ export function Sidebar({
                                     collapsed={false}
                                 />
                             ))}
-                            {(pathname === '/' || pathname.startsWith('/chat')) && (
+                            {(pathname === '/' ||
+                                pathname.startsWith('/chat')) && (
                                 <ChatList
                                     collapsed={false}
                                     chats={chats}
@@ -264,7 +296,7 @@ export function Sidebar({
                             {subNavItems.map((item) => (
                                 <NavItem
                                     key={item.href}
-                                    item={{...item, collapsible: true}}
+                                    item={{ ...item, collapsible: true }}
                                     collapsed={false}
                                 />
                             ))}
@@ -295,16 +327,20 @@ export function Sidebar({
             <motion.div
                 initial={false}
                 animate={{
-                    width: collapsed ? 'var(--collapsed-width)' : 'var(--expanded-width)',
+                    width: collapsed
+                        ? 'var(--collapsed-width)'
+                        : 'var(--expanded-width)',
                 }}
                 className={cn(
                     'hidden md:flex h-screen border-r bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60 relative',
                     className
                 )}
-                style={{
-                    '--collapsed-width': '4rem',
-                    '--expanded-width': '14rem',
-                } as React.CSSProperties}
+                style={
+                    {
+                        '--collapsed-width': '4rem',
+                        '--expanded-width': '14rem',
+                    } as React.CSSProperties
+                }
             >
                 <div className="flex h-full w-full flex-col gap-4">
                     <div className="flex h-14 items-center justify-between px-4">
@@ -315,10 +351,12 @@ export function Sidebar({
                                 className={cn('h-6 w-6')}
                                 onClick={() => onCollapsedChange?.(!collapsed)}
                             >
-                                <ChevronDown className={cn(
-                                    'h-4 w-4 transition-transform text-white',
-                                    collapsed && 'rotate-180'
-                                )} />
+                                <ChevronLeft
+                                    className={cn(
+                                        'h-4 w-4 transition-transform text-white',
+                                        collapsed && 'rotate-180'
+                                    )}
+                                />
                             </Button>
                         ) : (
                             <div className="flex items-center justify-between w-full">
@@ -327,9 +365,11 @@ export function Sidebar({
                                     variant="ghost"
                                     size="icon"
                                     className={cn('h-6 w-6 ml-2')}
-                                    onClick={() => onCollapsedChange?.(!collapsed)}
+                                    onClick={() =>
+                                        onCollapsedChange?.(!collapsed)
+                                    }
                                 >
-                                    <ChevronDown className="h-4 w-4 text-white" />
+                                    <ChevronLeft className="h-4 w-4 text-white" />
                                 </Button>
                             </div>
                         )}
@@ -347,11 +387,13 @@ export function Sidebar({
                                 )}
                                 onClick={handleNewChat}
                             >
-                                <Plus className={cn(
-                                    'h-4 w-4',
-                                    collapsed ? 'mx-auto' : 'mr-2'
-                                )} />
-                                {!collapsed && "New"}
+                                <Plus
+                                    className={cn(
+                                        'h-4 w-4',
+                                        collapsed ? 'mx-auto' : 'mr-2'
+                                    )}
+                                />
+                                {!collapsed && 'New'}
                             </Button>
 
                             {mainNavItems.map((item) => (
@@ -359,25 +401,34 @@ export function Sidebar({
                                     key={item.href}
                                     item={item}
                                     collapsed={collapsed}
-                                    onToggle={item.collapsible ? () => setIsChatsCollapsed(!isChatsCollapsed) : undefined}
+                                    onToggle={
+                                        item.collapsible
+                                            ? () =>
+                                                  setIsChatsCollapsed(
+                                                      !isChatsCollapsed
+                                                  )
+                                            : undefined
+                                    }
                                 />
                             ))}
 
-                            {(pathname === '/' || pathname.startsWith('/chat')) && !isChatsCollapsed && (
-                                <ChatList
-                                    collapsed={collapsed}
-                                    chats={chats}
-                                    currentChatId={currentChatId}
-                                    onChatSelect={onChatSelect}
-                                />
-                            )}
+                            {(pathname === '/' ||
+                                pathname.startsWith('/chat')) &&
+                                !isChatsCollapsed && (
+                                    <ChatList
+                                        collapsed={collapsed}
+                                        chats={chats}
+                                        currentChatId={currentChatId}
+                                        onChatSelect={onChatSelect}
+                                    />
+                                )}
 
                             <Separator className="my-4 bg-gray-700" />
 
                             {subNavItems.map((item) => (
                                 <NavItem
                                     key={item.href}
-                                    item={{...item, collapsible: true}}
+                                    item={{ ...item, collapsible: true }}
                                     collapsed={collapsed}
                                 />
                             ))}
@@ -392,22 +443,34 @@ export function Sidebar({
                                     <TooltipTrigger asChild>
                                         <Button
                                             variant="ghost"
-                                            size={collapsed ? 'icon' : 'default'}
+                                            size={
+                                                collapsed ? 'icon' : 'default'
+                                            }
                                             className={cn(
                                                 'w-full justify-start gap-2 text-white hover:bg-red-500/20 hover:text-red-400 group',
                                                 collapsed ? 'mx-auto' : 'mr-2'
                                             )}
                                             onClick={handleSignOut}
                                         >
-                                            <LogOut className={cn(
-                                                'h-4 w-4 text-white group-hover:text-red-400',
-                                                collapsed ? 'mx-auto' : 'mr-2'
-                                            )} />
-                                            {!collapsed && <span className="text-white group-hover:text-red-400">Sign out</span>}
+                                            <LogOut
+                                                className={cn(
+                                                    'h-4 w-4 text-white group-hover:text-red-400',
+                                                    collapsed
+                                                        ? 'mx-auto'
+                                                        : 'mr-2'
+                                                )}
+                                            />
+                                            {!collapsed && (
+                                                <span className="text-white group-hover:text-red-400">
+                                                    Sign out
+                                                </span>
+                                            )}
                                         </Button>
                                     </TooltipTrigger>
                                     {collapsed && (
-                                        <TooltipContent side="right">Sign out</TooltipContent>
+                                        <TooltipContent side="right">
+                                            Sign out
+                                        </TooltipContent>
                                     )}
                                 </Tooltip>
                             </TooltipProvider>
@@ -418,23 +481,42 @@ export function Sidebar({
                                 <TooltipProvider>
                                     <Tooltip delayDuration={0}>
                                         <TooltipTrigger asChild>
-                                            <div className={cn(
-                                                'flex items-center gap-2 rounded-lg px-2 py-2',
-                                                collapsed ? 'justify-center' : 'justify-start'
-                                            )}>
+                                            <div
+                                                className={cn(
+                                                    'flex items-center gap-2 rounded-lg px-2 py-2',
+                                                    collapsed
+                                                        ? 'justify-center'
+                                                        : 'justify-start'
+                                                )}
+                                            >
                                                 <Avatar className="h-8 w-8">
                                                     <AvatarImage
-                                                        src={session.user.user_metadata?.avatar_url}
-                                                        alt={session.user.user_metadata?.full_name || 'User'}
+                                                        src={
+                                                            session.user
+                                                                .user_metadata
+                                                                ?.avatar_url
+                                                        }
+                                                        alt={
+                                                            session.user
+                                                                .user_metadata
+                                                                ?.full_name ||
+                                                            'User'
+                                                        }
                                                     />
                                                     <AvatarFallback>
-                                                        {session.user.user_metadata?.full_name?.[0] || 'U'}
+                                                        {session.user
+                                                            .user_metadata
+                                                            ?.full_name?.[0] ||
+                                                            'U'}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 {!collapsed && (
                                                     <div className="flex flex-col">
                                                         <span className="text-sm font-medium text-white">
-                                                            {session.user.user_metadata?.full_name || 'User'}
+                                                            {session.user
+                                                                .user_metadata
+                                                                ?.full_name ||
+                                                                'User'}
                                                         </span>
                                                         <span className="text-xs text-gray-400">
                                                             {session.user.email}
@@ -444,11 +526,17 @@ export function Sidebar({
                                             </div>
                                         </TooltipTrigger>
                                         {collapsed && (
-                                            <TooltipContent side="right" className="flex flex-col gap-1">
+                                            <TooltipContent
+                                                side="right"
+                                                className="flex flex-col gap-1"
+                                            >
                                                 <span className="font-medium">
-                                                    {session.user.user_metadata?.full_name || 'User'}
+                                                    {session.user.user_metadata
+                                                        ?.full_name || 'User'}
                                                 </span>
-                                                <span className="text-xs">{session.user.email}</span>
+                                                <span className="text-xs">
+                                                    {session.user.email}
+                                                </span>
                                             </TooltipContent>
                                         )}
                                     </Tooltip>

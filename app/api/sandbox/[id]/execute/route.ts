@@ -9,7 +9,9 @@ export async function POST(
 ) {
     // Get user session - need this for auth
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
 
     // Kick them out if not logged in
     if (!session) {
@@ -46,7 +48,6 @@ export async function POST(
         // Get the URL where the app is running and send it back
         const url = sandbox.getHostname(8501)
         return NextResponse.json({ url: `https://${url}` })
-
     } catch (error) {
         // Something went wrong - log it and let the user know
         console.error('Sandbox execution error:', error)

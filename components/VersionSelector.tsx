@@ -1,11 +1,17 @@
 'use client'
 
-import { Button } from './ui/button'
-import { useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react'
-import { AppVersion } from '@/lib/types'
 import { getVersionHistory, switchVersion } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { AppVersion } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+    forwardRef,
+    useCallback,
+    useEffect,
+    useImperativeHandle,
+    useState,
+} from 'react'
+import { Button } from './ui/button'
 
 interface VersionSelectorProps {
     appId: string
@@ -16,142 +22,151 @@ export interface VersionSelectorRef {
     refreshVersions: () => void
 }
 
-export const VersionSelector = forwardRef<VersionSelectorRef, VersionSelectorProps>(
-    function VersionSelector({ appId, onVersionChange }, ref) {
-        const [versions, setVersions] = useState<AppVersion[]>([])
-        const [currentIndex, setCurrentIndex] = useState<number>(0)
-        const [isLoading, setIsLoading] = useState(false)
-        const [hasInitialized, setHasInitialized] = useState(false)
+export const VersionSelector = forwardRef<
+    VersionSelectorRef,
+    VersionSelectorProps
+>(function VersionSelector({ appId, onVersionChange }, ref) {
+    const [versions, setVersions] = useState<AppVersion[]>([])
+    const [currentIndex, setCurrentIndex] = useState<number>(0)
+    const [isLoading, setIsLoading] = useState(false)
+    const [hasInitialized, setHasInitialized] = useState(false)
 
-        const loadVersions = useCallback(async () => {
-            if (!appId || isLoading) return
+    const loadVersions = useCallback(async () => {
+        if (!appId || isLoading) return
 
-            setIsLoading(true)
-            try {
-                const versionsData = await getVersionHistory(appId)
-                setVersions(versionsData)
+        setIsLoading(true)
+        try {
+            const versionsData = await getVersionHistory(appId)
+            setVersions(versionsData)
 
-                if (versionsData.length > 0) {
-                    setCurrentIndex(0)
+            if (versionsData.length > 0) {
+                setCurrentIndex(0)
 
-                    if (!hasInitialized) {
-                        onVersionChange(versionsData[0])
-                        setHasInitialized(true)
-                    }
+                if (!hasInitialized) {
+                    onVersionChange(versionsData[0])
+                    setHasInitialized(true)
                 }
-            } catch (error) {
-                console.error('Failed to fetch versions:', error)
-            } finally {
-                setIsLoading(false)
             }
-        }, [appId, onVersionChange, hasInitialized, isLoading])
+        } catch (error) {
+            console.error('Failed to fetch versions:', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }, [appId, onVersionChange, hasInitialized, isLoading])
 
-        useImperativeHandle(ref, () => ({
+    useImperativeHandle(
+        ref,
+        () => ({
             refreshVersions: () => {
                 setHasInitialized(false)
                 return loadVersions()
-            }
-        }), [loadVersions])
+            },
+        }),
+        [loadVersions]
+    )
 
-        useEffect(() => {
-            if (appId) {
-                setHasInitialized(false)
-                loadVersions()
-            }
-        }, [appId])
+    useEffect(() => {
+        if (appId) {
+            setHasInitialized(false)
+            loadVersions()
+        }
+    }, [appId])
 
-        const handleVersionChange = async (newIndex: number) => {
-            if (!appId || newIndex < 0 || newIndex >= versions.length || isLoading) return
+    const handleVersionChange = async (newIndex: number) => {
+        if (!appId || newIndex < 0 || newIndex >= versions.length || isLoading)
+            return
 
-            setIsLoading(true)
-            try {
-                const selectedVersion = versions[newIndex]
-                await switchVersion(appId, selectedVersion.id)
+        setIsLoading(true)
+        try {
+            const selectedVersion = versions[newIndex]
+            await switchVersion(appId, selectedVersion.id)
 
-                setCurrentIndex(newIndex)
-                setVersions(prev => prev.map((v, idx) => ({
+            setCurrentIndex(newIndex)
+            setVersions((prev) =>
+                prev.map((v, idx) => ({
                     ...v,
-                    is_current: idx === newIndex
-                })))
+                    is_current: idx === newIndex,
+                }))
+            )
 
-                onVersionChange(selectedVersion)
-            } catch (error) {
-                console.error('Failed to switch version:', error)
-            } finally {
-                setIsLoading(false)
-            }
+            onVersionChange(selectedVersion)
+        } catch (error) {
+            console.error('Failed to switch version:', error)
+        } finally {
+            setIsLoading(false)
         }
-
-        const navigateVersion = (direction: 'prev' | 'next') => {
-            const newIndex = direction === 'prev' ? currentIndex + 1 : currentIndex - 1
-            handleVersionChange(newIndex)
-        }
-
-        useEffect(() => {
-            console.log('VersionSelector state:', {
-                appId,
-                versionsCount: versions.length,
-                currentIndex,
-                isLoading,
-                hasInitialized
-            })
-        }, [appId, versions.length, currentIndex, isLoading, hasInitialized])
-
-        if (versions.length === 0 && !isLoading) return null
-
-        return (
-            <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => navigateVersion('prev')}
-                    disabled={isLoading || currentIndex === versions.length - 1}
-                    className={cn(
-                        "h-8 w-8",
-                        "bg-white hover:bg-gray-100",
-                        "border border-gray-200",
-                        "text-gray-700",
-                        "transition-all duration-200"
-                    )}
-                >
-                    <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                <div className="flex items-center justify-center min-w-[120px] px-3 py-1.5 bg-white border border-gray-200 rounded-md">
-                    <span className="text-sm font-medium text-gray-700">
-                        {isLoading ? (
-                            "Loading..."
-                        ) : versions.length > 0 ? (
-                            <>
-                                Version {versions[currentIndex]?.version_number}
-                                <span className="text-xs text-gray-400 ml-1">
-                                    / {versions.length}
-                                </span>
-                            </>
-                        ) : (
-                            "No versions"
-                        )}
-                    </span>
-                </div>
-
-                <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => navigateVersion('next')}
-                    disabled={isLoading || currentIndex === 0}
-                    className={cn(
-                        "h-8 w-8",
-                        "bg-white hover:bg-gray-100",
-                        "border border-gray-200",
-                        "text-gray-700",
-                        "transition-all duration-200"
-                    )}
-                >
-                    <ChevronRight className="h-4 w-4" />
-                </Button>
-            </div>
-        )
     }
-)
+
+    const navigateVersion = (direction: 'prev' | 'next') => {
+        const newIndex =
+            direction === 'prev' ? currentIndex + 1 : currentIndex - 1
+        handleVersionChange(newIndex)
+    }
+
+    useEffect(() => {
+        console.log('VersionSelector state:', {
+            appId,
+            versionsCount: versions.length,
+            currentIndex,
+            isLoading,
+            hasInitialized,
+        })
+    }, [appId, versions.length, currentIndex, isLoading, hasInitialized])
+
+    if (versions.length === 0 && !isLoading) return null
+
+    return (
+        <div className="flex items-center gap-2">
+            <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateVersion('prev')}
+                disabled={isLoading || currentIndex === versions.length - 1}
+                className={cn(
+                    'h-8 w-8',
+                    'bg-white hover:bg-gray-100',
+                    'border border-gray-200',
+                    'text-gray-700',
+                    'transition-all duration-200'
+                )}
+            >
+                <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center justify-center min-w-[120px] px-3 py-1.5 bg-white border border-gray-200 rounded-md">
+                <span className="text-sm font-medium text-gray-700">
+                    {isLoading ? (
+                        'Loading...'
+                    ) : versions.length > 0 ? (
+                        <>
+                            Version {versions[currentIndex]?.version_number}
+                            <span className="text-xs text-gray-400 ml-1">
+                                / {versions.length}
+                            </span>
+                        </>
+                    ) : (
+                        'No versions'
+                    )}
+                </span>
+            </div>
+
+            <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateVersion('next')}
+                disabled={isLoading || currentIndex === 0}
+                className={cn(
+                    'h-8 w-8',
+                    'bg-white hover:bg-gray-100',
+                    'border border-gray-200',
+                    'text-gray-700',
+                    'transition-all duration-200'
+                )}
+            >
+                <ChevronRight className="h-4 w-4" />
+            </Button>
+        </div>
+    )
+})
 
 VersionSelector.displayName = 'VersionSelector'

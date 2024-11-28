@@ -1,25 +1,26 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { NextRequest } from 'next/server'
 import { GruntyAgent } from '@/lib/agent'
 import { getModelClient } from '@/lib/modelProviders'
-import { tools } from '@/lib/tools'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
-import { FileContext, LLMModel, LLMModelConfig, Tool } from '@/lib/types'
-import { Message, convertToCoreMessages } from 'ai'
+import { tools } from '@/lib/tools'
+import { FileContext, Tool } from '@/lib/types'
 import { generateUUID } from '@/lib/utils'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { convertToCoreMessages } from 'ai'
+import { cookies } from 'next/headers'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 
 // Validation schema for request body
 const RequestSchema = z.object({
-    messages: z.array(z.object({
-        content: z.string(),
-        role: z.enum(['user', 'assistant', 'system']),
-        createdAt: z.union([
-            z.date(),
-            z.string().transform((str) => new Date(str))
-        ]).optional(),
-    })),
+    messages: z.array(
+        z.object({
+            content: z.string(),
+            role: z.enum(['user', 'assistant', 'system']),
+            createdAt: z
+                .union([z.date(), z.string().transform((str) => new Date(str))])
+                .optional(),
+        })
+    ),
     model: z.object({
         id: z.string(),
         provider: z.string(),
@@ -38,7 +39,9 @@ const RequestSchema = z.object({
 
 export async function POST(req: NextRequest) {
     const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
     const chatId = generateUUID()
     if (!session) {
         return new Response('Unauthorized', { status: 401 })
@@ -53,7 +56,8 @@ export async function POST(req: NextRequest) {
             requestBody: body.body,
         })
 
-        const { messages, model, config, fileId, fileName, fileContent } = await RequestSchema.parseAsync(body)
+        const { messages, model, config, fileId, fileName, fileContent } =
+            await RequestSchema.parseAsync(body)
 
         console.log('🔍 Parsed request body:', {
             hasFileId: !!fileId,
@@ -77,7 +81,7 @@ export async function POST(req: NextRequest) {
                 return new Response('File not found', { status: 404 })
             }
 
-            console.log('📄 File data fetched:', fileData);
+            console.log('📄 File data fetched:', fileData)
 
             fileContext = {
                 id: fileData.id,
@@ -90,27 +94,27 @@ export async function POST(req: NextRequest) {
             console.log('📄 File context created:', {
                 fileId: fileData.id,
                 fileName: fileData.file_name,
-                hasAnalysis: !!fileData.analysis
+                hasAnalysis: !!fileData.analysis,
             })
 
             await supabase
                 .from('files')
                 .update({
                     last_accessed: new Date().toISOString(),
-                    chat_id: chatId
+                    chat_id: chatId,
                 })
                 .eq('id', fileData.id)
         }
 
-        const { error: chatError } = await supabase
-            .from('chats')
-            .insert([{
+        const { error: chatError } = await supabase.from('chats').insert([
+            {
                 id: chatId,
                 user_id: session.user.id,
                 name: messages[0].content.slice(0, 50) + '...',
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            }])
+                updated_at: new Date().toISOString(),
+            },
+        ])
 
         if (chatError) {
             console.error('❌ Error creating chat:', chatError)
@@ -120,7 +124,7 @@ export async function POST(req: NextRequest) {
         if (fileContext?.id) {
             console.log('🔄 Updating file with chat ID:', {
                 fileId: fileContext.id,
-                chatId
+                chatId,
             })
 
             const { error: fileUpdateError } = await supabase
@@ -129,25 +133,31 @@ export async function POST(req: NextRequest) {
                 .eq('id', fileContext.id)
 
             if (fileUpdateError) {
-                console.error('❌ Error updating file with chat_id:', fileUpdateError)
+                console.error(
+                    '❌ Error updating file with chat_id:',
+                    fileUpdateError
+                )
             }
         }
 
         console.log('🎯 Initializing model client:', {
             modelId: model.id,
-            provider: model.provider
+            provider: model.provider,
         })
 
-        const modelClient = getModelClient({
-            id: model.id,
-            provider: model.provider,
-            name: model.name,
-            providerId: model.providerId
-        }, {
-            apiKey: process.env.ANTHROPIC_API_KEY || '',
-            temperature: config?.temperature || 0.7,
-            maxTokens: config?.maxTokens || 4096
-        })
+        const modelClient = getModelClient(
+            {
+                id: model.id,
+                provider: model.provider,
+                name: model.name,
+                providerId: model.providerId,
+            },
+            {
+                apiKey: process.env.ANTHROPIC_API_KEY || '',
+                temperature: config?.temperature || 0.7,
+                maxTokens: config?.maxTokens || 4096,
+            }
+        )
 
         const agent = new GruntyAgent(
             modelClient,
@@ -155,7 +165,7 @@ export async function POST(req: NextRequest) {
             CHAT_SYSTEM_PROMPT,
             {
                 ...config,
-                model: model.id
+                model: model.id,
             }
         )
 
@@ -163,15 +173,17 @@ export async function POST(req: NextRequest) {
             chatId,
             messageCount: messages.length,
             hasFile: !!fileContext,
-            fileInfo: fileContext ? {
-                id: fileContext.id,
-                name: fileContext.fileName,
-                type: fileContext.fileType,
-                hasAnalysis: !!fileContext.analysis
-            } : null
+            fileInfo: fileContext
+                ? {
+                      id: fileContext.id,
+                      name: fileContext.fileName,
+                      type: fileContext.fileType,
+                      hasAnalysis: !!fileContext.analysis,
+                  }
+                : null,
         })
 
-        console.log("🚀 ~ fileContext", fileContext);
+        console.log('🚀 ~ fileContext', fileContext)
 
         const agentResponse = await agent.streamResponse(
             chatId,
@@ -189,23 +201,23 @@ export async function POST(req: NextRequest) {
             headers: {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
+                Connection: 'keep-alive',
                 'x-chat-id': chatId,
                 'x-file-id': fileContext?.id || '',
-            }
+            },
         })
-
     } catch (error) {
         console.error('❌ Error in stream processing:', error)
         return new Response(
             JSON.stringify({
-                error: error instanceof z.ZodError
-                    ? 'Invalid request format'
-                    : 'Internal server error'
+                error:
+                    error instanceof z.ZodError
+                        ? 'Invalid request format'
+                        : 'Internal server error',
             }),
             {
                 status: error instanceof z.ZodError ? 400 : 500,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
             }
         )
     }

@@ -1,27 +1,34 @@
-import { X } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { ScrollArea } from './ui/scroll-area'
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { z } from 'zod'
+import { ScrollArea } from './ui/scroll-area'
 
 // File validation schema
 const FileValidationSchema = z.object({
-    file: z.instanceof(File).refine(
-        (file) => {
-            const validExtensions = ['.csv', '.json', '.txt']
-            return validExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
-        },
-        { message: 'Invalid file type. Please upload a CSV, JSON, or TXT file.' }
-    ).refine(
-        (file) => file.size <= 5 * 1024 * 1024,
-        { message: 'File size must be less than 5MB.' }
-    )
+    file: z
+        .instanceof(File)
+        .refine(
+            (file) => {
+                const validExtensions = ['.csv', '.json', '.txt']
+                return validExtensions.some((ext) =>
+                    file.name.toLowerCase().endsWith(ext)
+                )
+            },
+            {
+                message:
+                    'Invalid file type. Please upload a CSV, JSON, or TXT file.',
+            }
+        )
+        .refine((file) => file.size <= 5 * 1024 * 1024, {
+            message: 'File size must be less than 5MB.',
+        }),
 })
 
 interface FilePreviewProps {
@@ -50,9 +57,10 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
                 const text = await readFileContent(file)
                 setPreview(text)
             } catch (err) {
-                const errorMessage = err instanceof z.ZodError
-                    ? err.errors[0].message
-                    : 'Error loading file preview'
+                const errorMessage =
+                    err instanceof z.ZodError
+                        ? err.errors[0].message
+                        : 'Error loading file preview'
                 setError(errorMessage)
                 onError?.(errorMessage)
             } finally {
@@ -80,7 +88,9 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
 
                 // For CSV files, validate structure with more lenient checks
                 if (file.name.toLowerCase().endsWith('.csv')) {
-                    const lines = content.split('\n').filter(line => line.trim())
+                    const lines = content
+                        .split('\n')
+                        .filter((line) => line.trim())
                     if (lines.length < 1) {
                         reject(new Error('CSV file appears to be empty'))
                         return
@@ -107,7 +117,7 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
 
     const isPreviewable = (file: File) => {
         const validExtensions = ['.csv', '.txt', '.json']
-        return validExtensions.some(ext =>
+        return validExtensions.some((ext) =>
             file.name.toLowerCase().endsWith(ext)
         )
     }
@@ -130,7 +140,7 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.2 }}
                         onAnimationComplete={() => {
-                            console.log("🟡 FilePreview: animation completed")
+                            console.log('🟡 FilePreview: animation completed')
                         }}
                         className="bg-slate-50 dark:bg-slate-900 rounded-t-xl border-x border-t"
                     >
@@ -138,7 +148,11 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
                             <motion.div
                                 className={`relative bg-white dark:bg-slate-800 rounded-lg border p-3 w-44 cursor-pointer
                   ${error ? 'border-red-500' : 'hover:border-primary/50'} transition-colors`}
-                                onClick={() => isPreviewable(file) && !error && setIsPreviewOpen(true)}
+                                onClick={() =>
+                                    isPreviewable(file) &&
+                                    !error &&
+                                    setIsPreviewOpen(true)
+                                }
                                 whileHover={{ scale: error ? 1 : 1.02 }}
                                 whileTap={{ scale: error ? 1 : 0.98 }}
                             >
@@ -168,7 +182,10 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
                                         </span>
                                     ) : (
                                         <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-1 rounded w-full text-center">
-                                            {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                                            {file.name
+                                                .split('.')
+                                                .pop()
+                                                ?.toUpperCase() || 'FILE'}
                                         </span>
                                     )}
                                 </div>
@@ -183,7 +200,9 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <span>Preview:</span>
-                            <span className="font-normal text-muted-foreground">{file.name}</span>
+                            <span className="font-normal text-muted-foreground">
+                                {file.name}
+                            </span>
                         </DialogTitle>
                     </DialogHeader>
                     <ScrollArea className="flex-1 h-[calc(80vh-100px)] mt-4 border rounded-md bg-slate-100">

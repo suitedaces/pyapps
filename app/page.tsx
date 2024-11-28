@@ -1,38 +1,34 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { Chat } from '@/components/Chat'
+import { Logo } from '@/components/core/Logo'
+import { TypingText } from '@/components/core/typing-text'
 import LoginPage from '@/components/LoginPage'
+import { PreviewPanel } from '@/components/PreviewPanel'
+import { Sidebar } from '@/components/Sidebar'
+import { StreamlitPreviewRef } from '@/components/StreamlitPreview'
+import { Button } from '@/components/ui/button'
 import {
+    ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
-import { Sidebar } from '@/components/Sidebar'
 import { useAuth } from '@/contexts/AuthContext'
-import { generateUUID } from "@/lib/utils";
-import { useQuery } from '@tanstack/react-query'
-import { TypingText } from '@/components/core/typing-text'
-import { Logo } from '@/components/core/Logo'
 import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Globe } from 'lucide-react'
-import { PreviewPanel } from '@/components/PreviewPanel'
-import { StreamlitPreview, StreamlitPreviewRef } from '@/components/StreamlitPreview'
-import { ResizableHandle } from '@/components/ui/resizable'
+import { cn, generateUUID } from '@/lib/utils'
+import { useQuery } from '@tanstack/react-query'
 import { Message } from 'ai'
 import { useChat } from 'ai/react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { useLocalStorage } from 'usehooks-ts'
-import { LLMModelConfig } from '@/lib/types'
-import modelsList from '@/lib/models.json'
 import { VersionSelector } from '@/components/VersionSelector'
-import { AppVersion } from '@/lib/types'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { createVersion } from '@/lib/supabase'
+import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
-import { Input } from '@/components/ui/input'
+import { createVersion } from '@/lib/supabase'
+import { AppVersion, LLMModelConfig } from '@/lib/types'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useLocalStorage } from 'usehooks-ts'
 
 // Add CustomHandle component
 const CustomHandle = ({ ...props }) => (
@@ -51,7 +47,8 @@ export default function Home() {
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [loading, setLoading] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
-    const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
+    const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } =
+        useSidebar()
     const { session, isLoading: isAuthLoading } = useAuth()
     const [showTypingText, setShowTypingText] = useState(true)
     const [activeTab, setActiveTab] = useState('preview')
@@ -65,7 +62,9 @@ export default function Home() {
 
     // Sandbox state
     const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
+    const [sandboxErrors, setSandboxErrors] = useState<
+        Array<{ message: string }>
+    >([])
     const resizableGroupRef = useRef<any>(null)
 
     // App state
@@ -96,7 +95,9 @@ export default function Home() {
     const fetchMessages = useCallback(async (chatId: string) => {
         try {
             setLoading(true)
-            const response = await fetch(`/api/conversations/${chatId}/messages`)
+            const response = await fetch(
+                `/api/conversations/${chatId}/messages`
+            )
             if (!response.ok) throw new Error('Failed to fetch messages')
             const data = await response.json()
 
@@ -129,18 +130,24 @@ export default function Home() {
     }, [])
 
     // Handle chat creation callback
-    const handleChatCreated = useCallback((chatId: string) => {
-        setShowTypingText(false)
-        setCurrentChatId(chatId)
-        fetchMessages(chatId)
-    }, [fetchMessages])
+    const handleChatCreated = useCallback(
+        (chatId: string) => {
+            setShowTypingText(false)
+            setCurrentChatId(chatId)
+            fetchMessages(chatId)
+        },
+        [fetchMessages]
+    )
 
     // Update handleChatSelect to fetch messages and hide typing text
-    const handleChatSelect = useCallback((chatId: string) => {
-        setShowTypingText(false)
-        setCurrentChatId(chatId)
-        fetchMessages(chatId)
-    }, [fetchMessages])
+    const handleChatSelect = useCallback(
+        (chatId: string) => {
+            setShowTypingText(false)
+            setCurrentChatId(chatId)
+            fetchMessages(chatId)
+        },
+        [fetchMessages]
+    )
 
     // Handle new chat creation
     const handleNewChat = useCallback(async () => {
@@ -160,15 +167,17 @@ export default function Home() {
     const {
         messages,
         isLoading: chatLoading,
-        setMessages
+        setMessages,
     } = useChat({
-        api: currentChatId ? `/api/conversations/${currentChatId}/stream` : '/api/conversations/stream',
+        api: currentChatId
+            ? `/api/conversations/${currentChatId}/stream`
+            : '/api/conversations/stream',
         id: currentChatId ?? undefined,
         initialMessages,
         body: {
             model: currentModel,
             config: languageModel,
-            experimental_streamData: true
+            experimental_streamData: true,
         },
         maxSteps: 10,
         onResponse: (response) => {
@@ -179,9 +188,10 @@ export default function Home() {
         onFinish: async (message) => {
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
-                    .filter(invocation =>
-                        invocation.toolName === 'create_streamlit_app' &&
-                        invocation.state === 'result'
+                    .filter(
+                        (invocation) =>
+                            invocation.toolName === 'create_streamlit_app' &&
+                            invocation.state === 'result'
                     )
                     .pop()
 
@@ -202,19 +212,27 @@ export default function Home() {
                             let appId = chat?.app_id
 
                             if (!appId) {
-                                const { data: app, error: appError } = await supabase
-                                    .from('apps')
-                                    .insert({
-                                        user_id: session.user.id,
-                                        name: messages[0].content.slice(0, 50) + '...',
-                                        description: 'Streamlit app created from chat',
-                                        is_public: false,
-                                        created_at: new Date().toISOString(),
-                                        updated_at: new Date().toISOString(),
-                                        created_by: session.user.id
-                                    })
-                                    .select()
-                                    .single()
+                                const { data: app, error: appError } =
+                                    await supabase
+                                        .from('apps')
+                                        .insert({
+                                            user_id: session.user.id,
+                                            name:
+                                                messages[0].content.slice(
+                                                    0,
+                                                    50
+                                                ) + '...',
+                                            description:
+                                                'Streamlit app created from chat',
+                                            is_public: false,
+                                            created_at:
+                                                new Date().toISOString(),
+                                            updated_at:
+                                                new Date().toISOString(),
+                                            created_by: session.user.id,
+                                        })
+                                        .select()
+                                        .single()
 
                                 if (appError) throw appError
                                 appId = app.id
@@ -231,9 +249,11 @@ export default function Home() {
                             if (versionSelectorRef.current) {
                                 await versionSelectorRef.current.refreshVersions()
                             }
-
                         } catch (error) {
-                            console.error('Failed to handle version creation:', error)
+                            console.error(
+                                'Failed to handle version creation:',
+                                error
+                            )
                         } finally {
                             setIsCreatingVersion(false)
                         }
@@ -247,15 +267,15 @@ export default function Home() {
                     role: 'assistant' as const,
                     content: message.content,
                     createdAt: new Date(),
-                    toolInvocations: message.toolInvocations
+                    toolInvocations: message.toolInvocations,
                 }
 
-                setMessages(prev => [...prev, assistantMessage])
+                setMessages((prev) => [...prev, assistantMessage])
             }
         },
         onError: (error) => {
             setIsGeneratingCode(false)
-        }
+        },
     })
 
     useEffect(() => {
@@ -266,11 +286,7 @@ export default function Home() {
     }, [chatLoading])
 
     // Sandbox state management
-    const {
-        initializeSandbox,
-        killSandbox,
-        updateSandbox
-    } = useSandboxStore()
+    const { initializeSandbox, killSandbox, updateSandbox } = useSandboxStore()
 
     useEffect(() => {
         initializeSandbox()
@@ -281,13 +297,16 @@ export default function Home() {
     }, [initializeSandbox, killSandbox])
 
     // Add streamlit update function
-    const updateStreamlitApp = useCallback(async (code: string, forceExecute: boolean = false) => {
-        const url = await updateSandbox(code, forceExecute)
-        if (url) {
-            setStreamlitUrl(url)
-            setIsGeneratingCode(false)
-        }
-    }, [updateSandbox])
+    const updateStreamlitApp = useCallback(
+        async (code: string, forceExecute: boolean = false) => {
+            const url = await updateSandbox(code, forceExecute)
+            if (url) {
+                setStreamlitUrl(url)
+                setIsGeneratingCode(false)
+            }
+        },
+        [updateSandbox]
+    )
 
     // Initialize sandbox on mount
     useEffect(() => {
@@ -306,17 +325,9 @@ export default function Home() {
     // Update URL without navigation using replaceState
     useEffect(() => {
         if (currentChatId) {
-            window.history.replaceState(
-                null,
-                '',
-                `/chat/${currentChatId}`
-            )
+            window.history.replaceState(null, '', `/chat/${currentChatId}`)
         } else {
-            window.history.replaceState(
-                null,
-                '',
-                '/'
-            )
+            window.history.replaceState(null, '', '/')
         }
     }, [currentChatId])
 
@@ -324,11 +335,11 @@ export default function Home() {
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
         if (lastMessage?.toolInvocations?.length) {
-            const streamlitCall = lastMessage.toolInvocations
-                .find(invocation =>
+            const streamlitCall = lastMessage.toolInvocations.find(
+                (invocation) =>
                     invocation.toolName === 'create_streamlit_app' &&
                     invocation.state === 'result'
-                )
+            )
 
             if (streamlitCall?.state === 'result') {
                 setGeneratedCode(streamlitCall.result)
@@ -341,47 +352,55 @@ export default function Home() {
     // Fetch tool results from messages when ChatID changes!
     useEffect(() => {
         async function fetchToolResults() {
-            if (!currentChatId) return;
+            if (!currentChatId) return
 
             try {
-                const response = await fetch(`/api/conversations/${currentChatId}/messages`);
+                const response = await fetch(
+                    `/api/conversations/${currentChatId}/messages`
+                )
                 if (!response.ok) {
-                    throw new Error('Failed to fetch messages');
+                    throw new Error('Failed to fetch messages')
                 }
 
-                const data = await response.json();
+                const data = await response.json()
 
                 const streamlitCode = data.messages
-                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                    .filter(
+                        (msg: any) =>
+                            msg.tool_results && Array.isArray(msg.tool_results)
+                    )
                     .map((msg: any) => {
-                        const toolResult = msg.tool_results[0];
-                        if (toolResult && toolResult.name === 'create_streamlit_app') {
-                            return toolResult.result;
+                        const toolResult = msg.tool_results[0]
+                        if (
+                            toolResult &&
+                            toolResult.name === 'create_streamlit_app'
+                        ) {
+                            return toolResult.result
                         }
-                        return null;
+                        return null
                     })
                     .filter(Boolean)
-                    .pop();
+                    .pop()
 
                 if (streamlitCode) {
-                    setGeneratedCode(streamlitCode);
+                    setGeneratedCode(streamlitCode)
                     if (!isGeneratingCode) {
-                        await updateStreamlitApp(streamlitCode);
+                        await updateStreamlitApp(streamlitCode)
                     }
                 }
             } catch (error) {
-                console.error('Error fetching tool results:', error);
+                console.error('Error fetching tool results:', error)
             }
         }
 
-        fetchToolResults();
-    }, [currentChatId, updateStreamlitApp, isGeneratingCode]);
+        fetchToolResults()
+    }, [currentChatId, updateStreamlitApp, isGeneratingCode])
 
     // Add version change handler
     const isVersionSwitching = useRef(false)
     const versionSelectorRef = useRef<{
         refreshVersions: () => void
-    } | null>(null);
+    } | null>(null)
 
     const handleVersionChange = async (version: AppVersion) => {
         if (!version.code) {
@@ -396,7 +415,7 @@ export default function Home() {
             console.log('🔄 Version switch initiated:', {
                 versionId: version.id,
                 appId: currentApp?.id,
-                versionNumber: version.version_number
+                versionNumber: version.version_number,
             })
 
             setGeneratedCode(version.code)
@@ -469,13 +488,17 @@ export default function Home() {
     }, [])
 
     const handleCodeViewToggle = useCallback(() => {
-        setShowCodeView(prev => !prev)
+        setShowCodeView((prev) => !prev)
     }, [])
 
     const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
 
     if (isAuthLoading) {
-        return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                Loading...
+            </div>
+        )
     }
 
     if (!session) {
@@ -498,7 +521,7 @@ export default function Home() {
                             className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
                             style={{
                                 left: '4rem',
-                                right: 0
+                                right: 0,
                             }}
                         >
                             <div className="px-4">
@@ -506,15 +529,21 @@ export default function Home() {
                             </div>
                         </div>
                     )}
-                    <main className={cn(
-                        "flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative",
-                        "h-screen pt-14"
-                    )}>
+                    <main
+                        className={cn(
+                            'flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative',
+                            'h-screen pt-14'
+                        )}
+                    >
                         <ResizablePanelGroup
                             direction="horizontal"
                             ref={resizableGroupRef}
                         >
-                            <ResizablePanel defaultSize={65} minSize={45} className='relative'>
+                            <ResizablePanel
+                                defaultSize={40}
+                                minSize={30}
+                                className="relative"
+                            >
                                 {showTypingText && (
                                     <div className="absolute w-full top-1/3 transform z-50">
                                         <TypingText
@@ -525,34 +554,39 @@ export default function Home() {
                                     </div>
                                 )}
                                 <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                <Chat
-                                    chatId={currentChatId}
-                                    initialMessages={initialMessages}
-                                    onChatCreated={handleChatCreated}
-                                    onChatSubmit={handleChatSubmit}
-                                    onChatFinish={handleChatFinish}
-                                    onUpdateStreamlit={updateStreamlitApp}
-                                    setActiveTab={setActiveTab}
-                                    setIsRightContentVisible={setIsRightContentVisible}
-                                    onCodeClick={() => {
-                                        setActiveTab('code')
-                                        setIsRightContentVisible(prev => !prev)
-                                        if (resizableGroupRef.current) {
-                                            setTimeout(() => {
-                                                resizableGroupRef.current.resetLayout()
-                                            }, 0)
+                                    <Chat
+                                        chatId={currentChatId}
+                                        initialMessages={initialMessages}
+                                        onChatCreated={handleChatCreated}
+                                        onChatSubmit={handleChatSubmit}
+                                        onChatFinish={handleChatFinish}
+                                        onUpdateStreamlit={updateStreamlitApp}
+                                        setActiveTab={setActiveTab}
+                                        setIsRightContentVisible={
+                                            setIsRightContentVisible
                                         }
-                                    }}
-                                />
+                                        onCodeClick={() => {
+                                            setActiveTab('code')
+                                            setIsRightContentVisible(
+                                                (prev) => !prev
+                                            )
+                                            if (resizableGroupRef.current) {
+                                                setTimeout(() => {
+                                                    resizableGroupRef.current.resetLayout()
+                                                }, 0)
+                                            }
+                                        }}
+                                    />
                                 </div>
                             </ResizablePanel>
 
                             {isRightContentVisible && (
                                 <>
-                                    <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
+                                    <CustomHandle className="bg-gradient-to-l from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
                                     <ResizablePanel
-                                        minSize={40}
-                                        className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
+                                        defaultSize={60}
+                                        minSize={45}
+                                        className="w-full lg:w-1/2 p-2 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                                     >
                                         <PreviewPanel
                                             streamlitUrl={streamlitUrl}
@@ -560,39 +594,42 @@ export default function Home() {
                                             isGeneratingCode={isGeneratingCode}
                                             showCodeView={showCodeView}
                                             onRefresh={handleRefresh}
-                                            onCodeViewToggle={handleCodeViewToggle}
+                                            onCodeViewToggle={
+                                                handleCodeViewToggle
+                                            }
                                         />
                                     </ResizablePanel>
                                 </>
                             )}
-                            <div className="absolute top-2 right-4 flex gap-4 z-30">
-                                {currentApp?.id && (
-                                    <VersionSelector
-                                        appId={currentApp.id}
-                                        onVersionChange={handleVersionChange}
-                                        ref={versionSelectorRef}
-                                    />
-                                )}
-                                <Button
-                                    onClick={toggleRightContent}
-                                    className={cn(
-                                        "bg-black hover:bg-black/90",
-                                        "text-white",
-                                        "border border-transparent",
-                                        "transition-all duration-200 ease-in-out",
-                                        "shadow-lg hover:shadow-xl",
-                                        "rounded-lg"
-                                    )}
-                                    size="icon"
-                                >
-                                    {isRightContentVisible ? (
-                                        <ChevronRight className="h-4 w-4" />
-                                    ) : (
-                                        <ChevronLeft className="h-4 w-4" />
-                                    )}
-                                </Button>
-                            </div>
                         </ResizablePanelGroup>
+
+                        <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
+                            {currentApp?.id && (
+                                <VersionSelector
+                                    appId={currentApp.id}
+                                    onVersionChange={handleVersionChange}
+                                    ref={versionSelectorRef}
+                                />
+                            )}
+                            <Button
+                                onClick={toggleRightContent}
+                                className={cn(
+                                    'bg-black hover:bg-black/90',
+                                    'text-white',
+                                    'border border-transparent',
+                                    'transition-all duration-200 ease-in-out',
+                                    'shadow-lg hover:shadow-xl',
+                                    'rounded-lg'
+                                )}
+                                size="icon"
+                            >
+                                {isRightContentVisible ? (
+                                    <ChevronRight className="h-4 w-4" />
+                                ) : (
+                                    <ChevronLeft className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
                     </main>
                 </div>
             </div>
