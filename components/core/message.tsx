@@ -10,9 +10,11 @@ import { Terminal } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Markdown } from './markdown'
+import { MessageButton } from './message-button'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
+    isLoading?: boolean
     object?: App
     result?: ExecutionResult
     onObjectClick?: (preview: {
@@ -33,65 +35,28 @@ export function Message({
     onObjectClick,
     onToolResultClick,
     onCodeClick,
+    isLoading,
 }: MessageProps) {
     const isUser = role === 'user'
     const { session } = useAuth()
     const user = session?.user
 
-    const streamlitResult = toolInvocations?.find(
-        (invocation) =>
-            invocation.toolName === 'create_streamlit_app' &&
-            invocation.state === 'result' &&
-            'result' in invocation
-    ) as (ToolInvocation & { result: string }) | undefined
-
     const renderPreviewButton = () => {
-        if (object) {
-            return (
-                <div
-                    onClick={() => {
-                        onObjectClick?.({ object, result })
-                        onCodeClick?.(id)
-                    }}
-                    className="py-2 my-4 pl-2 w-full md:w-max flex items-center border rounded-xl select-none hover:bg-white dark:hover:bg-white/5 hover:cursor-pointer"
-                >
-                    <div className="rounded-[0.5rem] w-10 h-10 bg-black/5 dark:bg-white/5 self-stretch flex items-center justify-center">
-                        <Terminal strokeWidth={2} className="text-[#FF8800]" />
-                    </div>
-                    <div className="pl-2 pr-4 flex flex-col">
-                        <span className="font-bold font-sans text-sm text-primary">
-                            {object.title}
-                        </span>
-                        <span className="font-sans text-sm text-muted-foreground">
-                            Click to see code
-                        </span>
-                    </div>
-                </div>
-            )
-        } else if (streamlitResult) {
-            return (
-                <div
-                    onClick={() => {
-                        onToolResultClick?.(streamlitResult.result)
-                        onCodeClick?.(id)
-                    }}
-                    className="py-2 my-4 pl-2 w-full md:w-max flex items-center border rounded-xl select-none hover:bg-white dark:hover:bg-white/5 hover:cursor-pointer"
-                >
-                    <div className="rounded-[0.5rem] w-10 h-10 bg-black/5 dark:bg-white/5 self-stretch flex items-center justify-center">
-                        <Terminal strokeWidth={2} className="text-[#FF8800]" />
-                    </div>
-                    <div className="pl-2 pr-4 flex flex-col">
-                        <span className="font-bold font-sans text-sm text-primary">
-                            Streamlit App Code
-                        </span>
-                        <span className="font-sans text-sm text-muted-foreground">
-                            Click to see code
-                        </span>
-                    </div>
-                </div>
-            )
-        }
-        return null
+        if (!toolInvocations?.length && !object) return null
+
+        return (
+            <MessageButton
+                toolInvocations={toolInvocations}
+                object={object}
+                result={result}
+                onObjectClick={onObjectClick}
+                onToolResultClick={onToolResultClick}
+                onCodeClick={onCodeClick}
+                messageId={id}
+                isLastMessage={isLastMessage}
+                isLoading={isLoading}
+            />
+        )
     }
 
     return (

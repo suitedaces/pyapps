@@ -12,6 +12,7 @@ import { useChat } from 'ai/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
+import { useToolState } from '@/lib/stores/tool-state-store'
 
 interface ChatProps {
     chatId?: string | null
@@ -98,6 +99,25 @@ export function Chat({
                     newChatIdRef.current = newChatId
                 }
             }
+
+            const toolCallId = response.headers.get('x-tool-call-id')
+            const toolName = response.headers.get('x-tool-name')
+            const toolProgress = response.headers.get('x-tool-progress')
+            const toolTotalChunks = response.headers.get('x-tool-total-chunks')
+            const toolDelta = response.headers.get('x-tool-delta')
+
+            if (toolCallId && toolName) {
+                if (toolDelta) {
+                    updateToolCallDelta(
+                        toolCallId,
+                        toolDelta,
+                        toolProgress ? parseInt(toolProgress) : undefined,
+                        toolTotalChunks ? parseInt(toolTotalChunks) : undefined
+                    )
+                } else {
+                    startToolCall(toolCallId, toolName)
+                }
+            }
         },
         onFinish: async (message) => {
             console.log('Message steps:', message)
@@ -119,13 +139,10 @@ export function Chat({
             }
 
             if (message.toolInvocations?.length) {
-                const streamlitCall = message.toolInvocations
-                    .filter(
-                        (invocation) =>
-                            invocation.toolName === 'create_streamlit_app' &&
-                            invocation.state === 'result'
-                    )
-                    .pop()
+                const toolCall = message.toolInvocations[0]
+                if (toolCall.toolCallId) {
+                    completeToolCall(toolCall.toolCallId)
+                }
             }
 
             onChatFinish?.()
@@ -331,6 +348,8 @@ export function Chat({
         [input, setAiMessages]
     )
 
+    const { startToolCall, updateToolCallDelta, completeToolCall } = useToolState()
+
     return (
         <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">
             <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
@@ -342,6 +361,7 @@ export function Chat({
                                 isLastMessage={index === messages.length - 1}
                                 object={(message as CustomMessage).object}
                                 result={(message as CustomMessage).result}
+                                isLoading={isLoading}
                                 onObjectClick={({ object, result }) => {
                                     setCurrentPreview?.({ object, result })
                                     if (object?.code) {
