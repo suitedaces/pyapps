@@ -7,13 +7,11 @@ export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
-    // Get user session - need this for auth
     const supabase = createRouteHandlerClient({ cookies })
     const {
         data: { session },
     } = await supabase.auth.getSession()
 
-    // Kick them out if not logged in
     if (!session) {
         return NextResponse.json(
             { error: 'Not authenticated' },
@@ -22,37 +20,50 @@ export async function POST(
     }
 
     try {
-        // Get the code from request body - we need this to run in sandbox
-        const { code } = await req.json()
-        if (!code) {
+        const body = await req.json()
+        console.log('Received request body:', body)
+
+        const codeContent = typeof body.code === 'object' && body.code.code
+            ? body.code.code
+            : body.code
+
+        if (!codeContent || typeof codeContent !== 'string') {
+            console.error('Invalid code format:', body.code)
             return NextResponse.json(
-                { error: 'No code provided' },
+                { error: 'Invalid code format. Expected string.' },
                 { status: 400 }
             )
         }
 
-        // Reconnect to existing sandbox using ID from URL
+        console.log('Connecting to sandbox:', params.id)
         const sandbox = await Sandbox.reconnect(params.id)
 
-        // Write the Python code to a file in sandbox
-        await sandbox.filesystem.write('/app/app.py', code)
+        console.log('Writing code to sandbox:', codeContent.substring(0, 100) + '...')
+        await sandbox.filesystem.write('/app/app.py', codeContent)
 
-        // Fire up streamlit with the code
-        // Added logs so we can debug if something breaks
+        console.log('Starting Streamlit process')
         const process = await sandbox.process.start({
             cmd: 'streamlit run /app/app.py',
             onStdout: (data) => console.log('Streamlit stdout:', data),
             onStderr: (data) => console.error('Streamlit stderr:', data),
         })
 
-        // Get the URL where the app is running and send it back
         const url = sandbox.getHostname(8501)
+        console.log('Sandbox URL:', url)
+
         return NextResponse.json({ url: `https://${url}` })
     } catch (error) {
-        // Something went wrong - log it and let the user know
-        console.error('Sandbox execution error:', error)
+        console.error('Detailed sandbox execution error:', {
+            error,
+            message: error.message,
+            stack: error.stack,
+        })
+
         return NextResponse.json(
-            { error: 'Failed to execute code in sandbox' },
+            {
+                error: 'Failed to execute code in sandbox',
+                details: error.message
+            },
             { status: 500 }
         )
     }

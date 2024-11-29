@@ -12,12 +12,7 @@ export const fileContextSchema = z
 // Schema for Streamlit tool result
 export const streamlitResultSchema = z.object({
     code: z.string(),
-    requiredLibraries: z.array(z.object({
-        name: z.string(),
-        version: z.string().optional(),
-        installed: z.boolean().optional(),
-        error: z.string().optional()
-    }))
+    requiredLibraries: z.array(z.string())
 })
 
 // Schema for Streamlit tool arguments

@@ -3,7 +3,7 @@ import { CoreMessage, LanguageModelV1, streamText } from 'ai'
 import { encode } from 'gpt-tokenizer'
 import { cookies } from 'next/headers'
 import { createVersion } from './supabase'
-import { toolRegistry } from './tools/registry'
+import { toolManager } from './tools/registry'
 import { LLMModelConfig, ModelProvider, StreamingTool, Tool } from './types'
 
 interface FileContext {
@@ -229,7 +229,7 @@ export class GruntyAgent {
                             args,
                         })
 
-                        const tool = toolRegistry.get(toolName)
+                        const tool = toolManager.get(toolName)
                         if (!tool) {
                             throw new Error(`Tool ${toolName} not found`)
                         }
@@ -246,7 +246,7 @@ export class GruntyAgent {
                         )
 
                         // Stream tool execution
-                        for await (const part of toolRegistry.streamToolExecution(
+                        for await (const part of toolManager.streamToolExecution(
                             toolCallId,
                             toolName,
                             { ...args, fileContext: this.fileContext }

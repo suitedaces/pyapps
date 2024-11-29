@@ -1,16 +1,13 @@
-import { Anthropic } from '@anthropic-ai/sdk'
+import { anthropic } from '@ai-sdk/anthropic'
 import { BaseStreamingTool } from '../base'
 import { ToolStreamResponse } from '../types'
 import { streamlitAppSchema, StreamlitToolArgs, StreamlitToolResult } from './types'
+import { generateText, streamText } from 'ai'
 
 export class StreamlitTool extends BaseStreamingTool {
     toolName = 'create_streamlit_app'
     description = 'Generates Python (Streamlit) code based on a given query and file context'
     parameters = streamlitAppSchema
-
-    private anthropic = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-    })
 
     async *streamExecution(
         args: StreamlitToolArgs,
@@ -18,109 +15,75 @@ export class StreamlitTool extends BaseStreamingTool {
     ): AsyncGenerator<ToolStreamResponse> {
         const toolCallId = crypto.randomUUID()
 
-        console.log('🚀 StreamlitTool execution started:', {
-            toolCallId,
-            hasFileContext: !!args.fileContext,
-            query: args.query.substring(0, 100) + '...',
-        })
-
         try {
             await this.validateArgs(args)
-            console.log('✅ Arguments validated successfully')
 
             this.updateState(toolCallId, {
                 status: 'starting',
                 args,
             })
 
-            // Start with streaming start
-            yield this.createToolCallStart(toolCallId)
-
             const systemPrompt = this.createSystemPrompt(args.fileContext)
             const userQuery = this.formatQuery(args.query, args.fileContext)
 
-            console.log('📤 Sending request to Anthropic:', {
-                model: 'claude-3-5-sonnet-20241022',
-                systemPromptLength: systemPrompt.length,
-                userQueryLength: userQuery.length,
-                hasFileContext: !!args.fileContext,
-            })
-
-            const stream = await this.anthropic.messages.create({
-                model: 'claude-3-5-sonnet-20241022',
-                max_tokens: 2000,
+            const { textStream } = await streamText({
+                model: anthropic('claude-3-5-sonnet-20240620'),
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userQuery }
+                ],
+                maxTokens: 2000,
                 temperature: 0.7,
-                system: systemPrompt,
-                messages: [{ role: 'user', content: userQuery }],
-                stream: true,
             })
 
             let collectedCode = ''
             let progress = 0
             let chunkCount = 0
 
-            // Process the stream
-            for await (const chunk of stream) {
-                if (signal?.aborted) {
-                    console.log('⚠️ Stream aborted by signal')
-                    break
+            for await (const chunk of textStream) {
+                if (signal?.aborted) break
+
+                const cleanedText = chunk
+                    .replace(/^```python\n?/, '')
+                    .replace(/^python\n/, '')
+                    .replace(/\n```$/, '')
+                    .replace(/```$/, '')
+
+                collectedCode += cleanedText
+                chunkCount++
+
+                if (cleanedText.trim()) {
+                    yield this.createToolCallDelta(toolCallId, cleanedText)
                 }
 
-                if (chunk.type === 'content_block_delta' && chunk.delta) {
-                    const delta = chunk.delta as { type: string; text?: string }
-                    const text = delta.text || ''
-
-                    // Enhanced cleaning logic to remove markdown and language identifier
-                    const cleanedText = text
-                        .replace(/^```python\n?/, '') // Remove opening ```python
-                        .replace(/^python\n/, '')     // Remove standalone "python" line
-                        .replace(/\n```$/, '')        // Remove closing ```
-                        .replace(/```$/, '')          // Remove closing ``` without newline
-
-                    collectedCode += cleanedText
-                    chunkCount++
-
-                    console.log('📦 Processing chunk:', {
-                        chunkNumber: chunkCount,
-                        chunkLength: cleanedText.length,
-                        totalCollected: collectedCode.length,
-                    })
-
-                    // Only yield if there's actual content after cleaning
-                    if (cleanedText.trim()) {
-                        yield this.createToolCallDelta(toolCallId, cleanedText)
-                    }
-
-                    progress = Math.min(95, Math.floor((chunkCount / 100) * 100))
-                    console.log('🔄 Progress:', { progress, chunkCount })
+                progress = Math.min(95, Math.floor((chunkCount / 100) * 100))
+                if (progress % 10 === 0) {
+                    yield this.reportProgress(toolCallId, progress)
                 }
             }
 
-            // Extract required libraries from the code
             const requiredLibraries = this.extractRequiredLibraries(collectedCode)
 
-            // Create final result object
             const result: StreamlitToolResult = {
                 code: collectedCode,
-                requiredLibraries: requiredLibraries.map(lib => ({
-                    name: lib,
-                    version: undefined,
-                    installed: false
-                }))
+                requiredLibraries: requiredLibraries
             }
 
-            console.log('✅ Stream processing completed:', {
-                totalChunks: chunkCount,
-                totalLength: collectedCode.length,
-                requiredLibraries,
-                preview: collectedCode.substring(0, 100) + '...',
+            console.log('📦 Final StreamlitTool result:', {
+                codeLength: result.code.length,
+                codePreview: result.code.substring(0, 100) + '...',
+                requiredLibraries: result.requiredLibraries,
+                librariesCount: result.requiredLibraries.length,
             })
 
-            // Send final result
+            console.log('🔍 Full result details:', JSON.stringify(result, null, 2))
+
             yield this.createToolResult(toolCallId, result)
         } catch (error) {
             console.error('StreamlitTool execution error:', error)
             throw error
+        } finally {
+            this.cleanup(toolCallId)
         }
     }
 

@@ -1,19 +1,19 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { toolRegistry } from './tools/registry'
+import { toolManager } from './tools/registry'
 import { StreamlitTool } from './tools/streamlit'
 import { StreamingTool } from './tools/types'
 
 // Initialize and register all tools
 const streamlitTool = new StreamlitTool()
-toolRegistry.register(streamlitTool)
+toolManager.register(streamlitTool)
 
 // Export tools for use in the application
-export const tools = toolRegistry.getAllTools()
+export const tools = toolManager.getAllTools()
 
 // Helper to get tool by name
 export function getToolByName(name: string): StreamingTool | undefined {
-    return toolRegistry.get(name)
+    return toolManager.get(name)
 }
 
 // Enhanced tool execution with streaming and database integration
@@ -32,7 +32,7 @@ export async function executeToolCall(
 
     try {
         // Validate the tool call first
-        const validation = await toolRegistry.validateToolCall(
+        const validation = await toolManager.validateToolCall(
             toolInvocation.toolName,
             args
         )
@@ -45,7 +45,7 @@ export async function executeToolCall(
         let isInterrupted = false
 
         // Use registry's streamToolExecution for better stream management
-        for await (const part of toolRegistry.streamToolExecution(
+        for await (const part of toolManager.streamToolExecution(
             toolCallId,
             toolInvocation.toolName,
             args
@@ -66,7 +66,7 @@ export async function executeToolCall(
 
             // Check for manual interruption
             if (signal?.aborted) {
-                toolRegistry.abortToolExecution(toolCallId)
+                toolManager.abortToolExecution(toolCallId)
                 break
             }
         }
