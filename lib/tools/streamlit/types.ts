@@ -9,6 +9,17 @@ export const fileContextSchema = z
     })
     .optional()
 
+// Schema for Streamlit tool result
+export const streamlitResultSchema = z.object({
+    code: z.string(),
+    requiredLibraries: z.array(z.object({
+        name: z.string(),
+        version: z.string().optional(),
+        installed: z.boolean().optional(),
+        error: z.string().optional()
+    }))
+})
+
 // Schema for Streamlit tool arguments
 export const streamlitAppSchema = z.object({
     query: z
@@ -21,3 +32,4 @@ export const streamlitAppSchema = z.object({
 })
 
 export type StreamlitToolArgs = z.infer<typeof streamlitAppSchema>
+export type StreamlitToolResult = z.infer<typeof streamlitResultSchema>

@@ -1,12 +1,11 @@
 import { Anthropic } from '@anthropic-ai/sdk'
 import { BaseStreamingTool } from '../base'
 import { ToolStreamResponse } from '../types'
-import { streamlitAppSchema, StreamlitToolArgs } from './types'
+import { streamlitAppSchema, StreamlitToolArgs, StreamlitToolResult } from './types'
 
 export class StreamlitTool extends BaseStreamingTool {
     toolName = 'create_streamlit_app'
-    description =
-        'Generates Python (Streamlit) code based on a given query and file context'
+    description = 'Generates Python (Streamlit) code based on a given query and file context'
     parameters = streamlitAppSchema
 
     private anthropic = new Anthropic({
@@ -71,11 +70,12 @@ export class StreamlitTool extends BaseStreamingTool {
                     const delta = chunk.delta as { type: string; text?: string }
                     const text = delta.text || ''
 
-                    // Remove markdown backticks if present in the chunk
+                    // Enhanced cleaning logic to remove markdown and language identifier
                     const cleanedText = text
-                        .replace(/^```python\n/, '')
-                        .replace(/\n```$/, '')
-                        .replace(/```$/, '')
+                        .replace(/^```python\n?/, '') // Remove opening ```python
+                        .replace(/^python\n/, '')     // Remove standalone "python" line
+                        .replace(/\n```$/, '')        // Remove closing ```
+                        .replace(/```$/, '')          // Remove closing ``` without newline
 
                     collectedCode += cleanedText
                     chunkCount++
@@ -86,41 +86,67 @@ export class StreamlitTool extends BaseStreamingTool {
                         totalCollected: collectedCode.length,
                     })
 
-                    yield this.createToolCallDelta(toolCallId, cleanedText)
+                    // Only yield if there's actual content after cleaning
+                    if (cleanedText.trim()) {
+                        yield this.createToolCallDelta(toolCallId, cleanedText)
+                    }
 
-                    progress = Math.min(
-                        95,
-                        Math.floor((chunkCount / 100) * 100)
-                    )
+                    progress = Math.min(95, Math.floor((chunkCount / 100) * 100))
                     console.log('🔄 Progress:', { progress, chunkCount })
                 }
+            }
+
+            // Extract required libraries from the code
+            const requiredLibraries = this.extractRequiredLibraries(collectedCode)
+
+            // Create final result object
+            const result: StreamlitToolResult = {
+                code: collectedCode,
+                requiredLibraries: requiredLibraries.map(lib => ({
+                    name: lib,
+                    version: undefined,
+                    installed: false
+                }))
             }
 
             console.log('✅ Stream processing completed:', {
                 totalChunks: chunkCount,
                 totalLength: collectedCode.length,
+                requiredLibraries,
                 preview: collectedCode.substring(0, 100) + '...',
             })
 
             // Send final result
-            yield this.createToolResult(toolCallId, collectedCode)
+            yield this.createToolResult(toolCallId, result)
         } catch (error) {
             console.error('StreamlitTool execution error:', error)
             throw error
         }
     }
 
+    private extractRequiredLibraries(code: string): string[] {
+        const importRegex = /^(?:import|from)\s+([a-zA-Z0-9_]+)/gm
+        const libraries = new Set<string>()
+
+        let match
+        while ((match = importRegex.exec(code)) !== null) {
+            libraries.add(match[1])
+        }
+
+        return Array.from(libraries)
+    }
+
     private createSystemPrompt(
         fileContext?: StreamlitToolArgs['fileContext']
     ): string {
         return `You are a Python code generation assistant specializing in Streamlit apps.
-These are the packages installed where your code will run: [streamlit, pandas, numpy, matplotlib, requests, seaborn, plotly].
-${fileContext ? `You are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}" at path "/app/${fileContext.fileName}".` : ''}
 Generate a complete, runnable Streamlit app based on the given query.
+${fileContext ? `You are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}" at path "/app/${fileContext.fileName}".` : ''}
 IMPORTANT: Always use the FULL PATH "/app/${fileContext?.fileName}" when reading the CSV file.
 DO NOT use relative paths, always use the absolute path starting with "/app/".
 DO NOT use "st.experimental_rerun()" at any cost.
-Only respond with the code, no potential errors, no explanations!`
+Only respond with the code, no potential errors, no explanations!
+Include all necessary imports at the beginning of the file.`
     }
 
     private formatQuery(
