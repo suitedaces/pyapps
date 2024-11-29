@@ -35,6 +35,30 @@ export class ToolManager {
         return Array.from(this.tools.values())
     }
 
+    async validateToolCall(
+        toolName: string,
+        args: Record<string, any>
+    ): Promise<{ valid: boolean; error?: string }> {
+        const tool = this.tools.get(toolName)
+
+        if (!tool) {
+            return {
+                valid: false,
+                error: `Tool "${toolName}" not found`,
+            }
+        }
+
+        try {
+            await tool.parameters.parseAsync(args)
+            return { valid: true }
+        } catch (error) {
+            return {
+                valid: false,
+                error: `Invalid arguments for tool "${toolName}": ${error}`,
+            }
+        }
+    }
+
     private async rateLimit(toolCallId: string, minInterval = 10): Promise<void> {
         const toolCall = this.activeToolCalls.get(toolCallId)
         if (!toolCall) return

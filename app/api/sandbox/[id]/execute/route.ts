@@ -53,16 +53,25 @@ export async function POST(
 
         return NextResponse.json({ url: `https://${url}` })
     } catch (error) {
+        // Type guard for Error objects
+        const errorMessage = error instanceof Error
+            ? error.message
+            : 'An unknown error occurred'
+
+        const errorStack = error instanceof Error
+            ? error.stack
+            : undefined
+
         console.error('Detailed sandbox execution error:', {
             error,
-            message: error.message,
-            stack: error.stack,
+            message: errorMessage,
+            stack: errorStack,
         })
 
         return NextResponse.json(
             {
                 error: 'Failed to execute code in sandbox',
-                details: error.message
+                details: errorMessage
             },
             { status: 500 }
         )
