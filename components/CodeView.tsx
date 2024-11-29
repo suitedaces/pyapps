@@ -13,16 +13,27 @@ interface CodeViewProps {
 }
 
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
-    const [displayCode, setDisplayCode] = useState(code || '')
+    const [displayCode, setDisplayCode] = useState('')
 
     useEffect(() => {
-        if (typeof code === 'string') {
-            const formattedCode = code
-                .split('\n')
-                .map((line) => line.trim())
-                .join('\n')
-            setDisplayCode(formattedCode)
-        } else {
+        if (code && !isGeneratingCode) {
+            try {
+                const codeStr = typeof code === 'object' && code.code 
+                    ? code.code 
+                    : String(code)
+
+                const formattedCode = codeStr
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .join('\n')
+                setDisplayCode(formattedCode)
+                console.log('Code type:', typeof code)
+                console.log('Formatted code:', formattedCode)
+            } catch (error) {
+                console.error('Error formatting code:', error)
+                setDisplayCode(typeof code === 'string' ? code : '')
+            }
+        } else if (!code) {
             setDisplayCode('')
         }
     }, [code, isGeneratingCode])
@@ -67,7 +78,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                                     )
                                 } catch (error) {
                                     console.error('Highlighting error:', error)
-                                    return codeToHighlight
+                                    return String(codeToHighlight)
                                 }
                             }}
                             padding={16}
