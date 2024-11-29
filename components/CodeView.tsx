@@ -13,15 +13,17 @@ interface CodeViewProps {
 }
 
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
-    const [displayCode, setDisplayCode] = useState(code)
+    const [displayCode, setDisplayCode] = useState(code || '')
 
     useEffect(() => {
-        if (code) {
+        if (typeof code === 'string') {
             const formattedCode = code
                 .split('\n')
                 .map((line) => line.trim())
                 .join('\n')
             setDisplayCode(formattedCode)
+        } else {
+            setDisplayCode('')
         }
     }, [code, isGeneratingCode])
 
@@ -56,9 +58,18 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                         <Editor
                             value={displayCode}
                             onValueChange={() => {}}
-                            highlight={(code) =>
-                                highlight(code, languages.python, 'python')
-                            }
+                            highlight={(codeToHighlight) => {
+                                try {
+                                    return highlight(
+                                        String(codeToHighlight),
+                                        languages.python,
+                                        'python'
+                                    )
+                                } catch (error) {
+                                    console.error('Highlighting error:', error)
+                                    return codeToHighlight
+                                }
+                            }}
                             padding={16}
                             style={{
                                 fontFamily:
