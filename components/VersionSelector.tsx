@@ -70,7 +70,7 @@ export const VersionSelector = forwardRef<
             setHasInitialized(false)
             loadVersions()
         }
-    }, [appId])
+    }, [appId, loadVersions])
 
     const handleVersionChange = async (newIndex: number) => {
         if (!appId || newIndex < 0 || newIndex >= versions.length || isLoading)

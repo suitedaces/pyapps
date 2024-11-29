@@ -8,7 +8,7 @@ import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 
 interface CodeViewProps {
-    code: string
+    code: string | { code: string }
     isGeneratingCode: boolean
 }
 
@@ -18,8 +18,8 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     useEffect(() => {
         if (code && !isGeneratingCode) {
             try {
-                const codeStr = typeof code === 'object' && code.code 
-                    ? code.code 
+                const codeStr = typeof code === 'object' && 'code' in code
+                    ? code.code
                     : String(code)
 
                 const formattedCode = codeStr
