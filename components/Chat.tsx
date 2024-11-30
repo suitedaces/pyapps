@@ -369,7 +369,7 @@ export function Chat({
 
     return (
         <div className={cn(
-            "flex flex-col relative bg-background text-foreground border border-border rounded-2xl",
+            "flex flex-col relative bg-background text-foreground",
             "h-[calc(100vh-7rem)]",
             "overflow-hidden"
         )}>
