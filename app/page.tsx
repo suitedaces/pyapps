@@ -2,7 +2,6 @@
 
 import { Chat } from '@/components/Chat'
 import { Logo } from '@/components/core/Logo'
-import { TypingText } from '@/components/core/typing-text'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { Sidebar } from '@/components/Sidebar'
@@ -51,7 +50,6 @@ export default function Home() {
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } =
         useSidebar()
     const { session, isLoading: isAuthLoading } = useAuth()
-    const [showTypingText, setShowTypingText] = useState(true)
     const [activeTab, setActiveTab] = useState('preview')
 
     // Right panel state
@@ -136,7 +134,6 @@ export default function Home() {
     // Handle chat creation callback
     const handleChatCreated = useCallback(
         (chatId: string) => {
-            setShowTypingText(false)
             setCurrentChatId(chatId)
             fetchMessages(chatId)
         },
@@ -146,7 +143,7 @@ export default function Home() {
     // Update handleChatSelect to fetch messages and hide typing text
     const handleChatSelect = useCallback(
         (chatId: string) => {
-            setShowTypingText(false)
+            setIsChatCentered(false)
             setCurrentChatId(chatId)
             fetchMessages(chatId)
         },
@@ -166,7 +163,6 @@ export default function Home() {
 
     // Modify handleChatSubmit to trigger the slide animation
     const handleChatSubmit = useCallback(() => {
-        setShowTypingText(false)
         setIsChatCentered(false)
     }, [])
 
@@ -562,20 +558,6 @@ export default function Home() {
                                     }}
                                     transition={{ duration: 0.5, ease: "easeInOut" }}
                                 >
-                                    {showTypingText && (
-                                        <motion.div 
-                                            className="absolute w-full top-1/3 transform z-50"
-                                            initial={{ opacity: 1 }}
-                                            animate={{ opacity: isChatCentered ? 1 : 0 }}
-                                            transition={{ duration: 0.3 }}
-                                        >
-                                            <TypingText
-                                                text="From Data to App, in seconds."
-                                                className="text-black font-semibold text-4xl whitespace-nowrap"
-                                                show={showTypingText}
-                                            />
-                                        </motion.div>
-                                    )}
                                     <div className={cn(
                                         "w-full max-w-[800px] mx-auto h-full"
                                     )}>
