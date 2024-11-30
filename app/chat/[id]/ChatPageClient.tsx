@@ -2,7 +2,7 @@
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-import { Chat } from '@/components/Chat'
+import { Playground } from '@/components/Playground'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { Button } from '@/components/ui/button'
@@ -88,29 +88,6 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const [showTypingText, setShowTypingText] = useState(true)
     const [activeTab, setActiveTab] = useState('preview')
 
-    // Code and preview state
-    const [generatedCode, setGeneratedCode] = useState<string>('')
-    const [isGeneratingCode, setIsGeneratingCode] = useState(false)
-    const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
-    const [showCodeView, setShowCodeView] = useState(false)
-
-    const handleRefresh = async () => {
-        if (sandboxId && session?.user?.id) {
-            try {
-                setIsGeneratingCode(true)
-                await updateStreamlitApp(generatedCode, true)
-            } catch (error) {
-                console.error('Error refreshing app:', error)
-            } finally {
-                setIsGeneratingCode(false)
-            }
-        }
-    }
-
-    const handleCodeViewToggle = () => {
-        setShowCodeView(!showCodeView)
-    }
-
     // Version switching stuff
     const isVersionSwitching = useRef(false)
     const versionSelectorRef = useRef<{
@@ -130,151 +107,12 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const { session, isLoading } = useAuth()
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
-    // Chat handling with AI SDK
-    const {
-        messages,
-        isLoading: chatLoading,
-        setMessages,
-    } = useChat({
-        api: currentChatId
-            ? `/api/conversations/${currentChatId}/stream`
-            : '/api/conversations/stream',
-        id: currentChatId ?? undefined,
-        initialMessages,
-        body: {
-            model: currentModel,
-            config: languageModel,
-            experimental_streamData: true,
-        },
-        maxSteps: 10,
-        onResponse: (response) => {
-            if (!response.ok) {
-                return
-            }
-        },
-        onFinish: async (message) => {
-            if (message.toolInvocations?.length) {
-                const streamlitCall = message.toolInvocations
-                    .filter(
-                        (invocation) =>
-                            invocation.toolName === 'create_streamlit_app' &&
-                            invocation.state === 'result'
-                    )
-                    .pop()
-
-                if (streamlitCall?.state === 'result') {
-                    const code = streamlitCall.result
-                    if (code) {
-                        setIsCreatingVersion(true)
-                        setGeneratedCode(code)
-                        await updateStreamlitApp(code)
-
-                        if (session?.user?.id) {
-                            try {
-                                let appId = await getOrCreateApp(
-                                    currentChatId,
-                                    session.user.id
-                                )
-                                const versionData = await createVersion(
-                                    appId,
-                                    code
-                                )
-                                setCurrentApp({ id: appId })
-
-                                if (versionSelectorRef.current) {
-                                    await versionSelectorRef.current.refreshVersions()
-                                }
-                            } catch (error) {
-                                setIsCreatingVersion(false)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (message.content.trim()) {
-                const assistantMessage = {
-                    id: Date.now().toString(),
-                    role: 'assistant' as const,
-                    content: message.content,
-                    createdAt: new Date(),
-                    toolInvocations: message.toolInvocations,
-                }
-
-                setMessages((prev) => [...prev, assistantMessage])
-            }
-        },
-        onError: (error) => {
-            setIsGeneratingCode(false)
-        },
-    })
-
-    useEffect(() => {
-        if (chatLoading) {
-            setIsGeneratingCode(true)
-            setGeneratedCode('')
-        }
-    }, [chatLoading])
-
     //  sandbox state
     const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [sandboxErrors, setSandboxErrors] = useState<
         Array<{ message: string }>
     >([])
 
-    // Sandbox store hooks
-    const { initializeSandbox, killSandbox, updateSandbox } = useSandboxStore()
-
-    // Add a ref to track initialization
-    const initializationComplete = useRef(false)
-    const initializationPromise = useRef<Promise<void> | null>(null)
-
-    // Modified initialization function that returns a promise
-    const ensureSandboxInitialized = useCallback(async () => {
-        if (initializationComplete.current) {
-            return
-        }
-
-        if (!initializationPromise.current) {
-            initializationPromise.current = (async () => {
-                await initializeSandbox()
-                initializationComplete.current = true
-            })()
-        }
-
-        return initializationPromise.current
-    }, [initializeSandbox])
-
-    // Modified updateStreamlitApp to ensure initialization
-    const updateStreamlitApp = useCallback(
-        async (code: string, forceExecute = false) => {
-            await ensureSandboxInitialized()
-
-            const url = await updateSandbox(code, forceExecute)
-            if (url) {
-                setStreamlitUrl(url)
-                setIsGeneratingCode(false)
-            }
-        },
-        [updateSandbox, ensureSandboxInitialized]
-    )
-
-    useEffect(() => {
-        const lastMessage = messages[messages.length - 1]
-        if (lastMessage?.toolInvocations?.length) {
-            const streamlitCall = lastMessage.toolInvocations.find(
-                (invocation) =>
-                    invocation.toolName === 'create_streamlit_app' &&
-                    invocation.state === 'result'
-            )
-
-            if (streamlitCall?.state === 'result') {
-                setGeneratedCode(streamlitCall.result)
-                setIsGeneratingCode(false)
-                updateStreamlitApp(streamlitCall.result)
-            }
-        }
-    }, [messages, updateStreamlitApp])
 
     const resizableGroupRef = useRef<any>(null)
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
@@ -361,12 +199,6 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         [router]
     )
 
-    const handleNewChat = useCallback(async () => {
-        setCurrentChatId(null)
-        router.replace('/', { scroll: false })
-        return Promise.resolve()
-    }, [router])
-
     // Handle chat creation callback
     const handleChatCreated = useCallback(
         (chatId: string) => {
@@ -388,82 +220,34 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
 
     const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
 
-    // Add debug log for page load
-    useEffect(() => {
-        if (generatedCode && sandboxId) {
-            updateStreamlitApp(generatedCode, true)
-        }
-    }, [generatedCode, sandboxId, updateStreamlitApp])
-
     // Modify handleVersionChange
-    const handleVersionChange = async (version: AppVersion) => {
-        if (!version.code) {
-            return
-        }
+    // const handleVersionChange = async (version: AppVersion) => {
+    //     if (!version.code) {
+    //         return
+    //     }
 
-        isVersionSwitching.current = true
-        setIsGeneratingCode(true)
+    //     isVersionSwitching.current = true
+    //     setIsGeneratingCode(true)
 
-        try {
-            await ensureSandboxInitialized()
-            setGeneratedCode(version.code)
-            await updateStreamlitApp(version.code, true)
-        } catch (error) {
-            setSandboxErrors((prev) => [
-                ...prev,
-                {
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : 'Error updating version',
-                },
-            ])
-        } finally {
-            setIsGeneratingCode(false)
-            isVersionSwitching.current = false
-        }
-    }
-
-    // Modify cleanup
-    useEffect(() => {
-        return () => {
-            killSandbox()
-            initializationComplete.current = false
-            initializationPromise.current = null
-        }
-    }, [killSandbox])
-
-    // Modify fetchAppId
-    const fetchAppId = useCallback(async () => {
-        if (!currentChatId) return
-
-        const { data: chat } = await supabase
-            .from('chats')
-            .select('app_id')
-            .eq('id', currentChatId)
-            .single()
-
-        if (chat?.app_id) {
-            setCurrentApp({ id: chat.app_id })
-
-            const { data: versions } = await supabase
-                .from('versions')
-                .select('*')
-                .eq('app_id', chat.app_id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single()
-
-            if (versions?.code) {
-                setGeneratedCode(versions.code)
-                await updateStreamlitApp(versions.code, true)
-            }
-        }
-    }, [currentChatId, supabase, updateStreamlitApp])
-
-    useEffect(() => {
-        fetchAppId()
-    }, [fetchAppId])
+    //     try {
+    //         await ensureSandboxInitialized()
+    //         setGeneratedCode(version.code)
+    //         await updateStreamlitApp(version.code, true)
+    //     } catch (error) {
+    //         setSandboxErrors((prev) => [
+    //             ...prev,
+    //             {
+    //                 message:
+    //                     error instanceof Error
+    //                         ? error.message
+    //                         : 'Error updating version',
+    //             },
+    //         ])
+    //     } finally {
+    //         setIsGeneratingCode(false)
+    //         isVersionSwitching.current = false
+    //     }
+    // }
 
     const handleChatFinish = useCallback(() => {
         if (versionSelectorRef.current) {
@@ -471,79 +255,9 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         }
     }, [])
 
-    const CustomHandle = ({ ...props }) => (
-        <ResizableHandle {...props} withHandle className="relative">
-            <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
-                <div className="h-8 w-1 rounded-full bg-black" />
-            </div>
-        </ResizableHandle>
-    )
-
     const handleChatSubmit = useCallback(() => {
         setShowTypingText(false)
     }, [])
-
-    // Add this function before the useEffect hooks
-    const fetchToolResults = useCallback(async () => {
-        if (!currentChatId) return
-
-        try {
-            const response = await fetch(
-                `/api/conversations/${currentChatId}/messages`
-            )
-            if (!response.ok) throw new Error('Failed to fetch messages')
-
-            const data = await response.json()
-            
-            // Find the last Streamlit code generation result
-            const streamlitCode = data.messages
-                .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
-                .map((msg: any) => {
-                    const toolResult = msg.tool_results[0]
-                    if (toolResult && toolResult.name === 'create_streamlit_app') {
-                        return toolResult.result
-                    }
-                    return null
-                })
-                .filter(Boolean)
-                .pop()
-
-            if (streamlitCode) {
-                setGeneratedCode(streamlitCode)
-                // Force execute the code when loading an existing chat
-                await updateStreamlitApp(streamlitCode, true)
-            }
-        } catch (error) {
-            console.error('Error fetching tool results:', error)
-        }
-    }, [currentChatId, updateStreamlitApp])
-
-    // The existing useEffect will now work with the defined function
-    useEffect(() => {
-        const initializeChatAndSandbox = async () => {
-            if (currentChatId) {
-                await ensureSandboxInitialized()
-                await fetchToolResults()
-            }
-        }
-        
-        initializeChatAndSandbox()
-    }, [currentChatId, fetchToolResults, ensureSandboxInitialized])
-
-    useEffect(() => {
-        if (generatedCode) {
-            setIsRightContentVisible(true)
-        }
-    }, [generatedCode])
-
-    useEffect(() => {
-        console.log('Current state:', {
-            currentChatId,
-            generatedCode: !!generatedCode,
-            streamlitUrl,
-            isRightContentVisible
-        })
-    }, [currentChatId, generatedCode, streamlitUrl, isRightContentVisible])
 
     if (isLoading) {
         return <div>Loading...</div>
@@ -587,61 +301,32 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                         'h-screen pt-14'
                     )}
                 >
-                    <ResizablePanelGroup
-                        direction="horizontal"
-                        ref={resizableGroupRef}
-                    >
-                        <ResizablePanel defaultSize={40} minSize={30}>
-                            <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                <div className="max-w-[800px] mx-auto w-full h-full">
-                                    <Chat
-                                        chatId={currentChatId}
-                                        initialMessages={initialMessages}
-                                        onChatCreated={handleChatCreated}
-                                        onChatSubmit={handleChatSubmit}
-                                        onChatFinish={handleChatFinish}
-                                        onUpdateStreamlit={updateStreamlitApp}
-                                        setActiveTab={setActiveTab}
-                                        setIsRightContentVisible={
-                                            setIsRightContentVisible
-                                        }
-                                        onCodeClick={() => {
-                                            setActiveTab('code')
-                                            setIsRightContentVisible(true)
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </ResizablePanel>
-
-                        {isRightContentVisible && (
-                            <>
-                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
-                                <ResizablePanel
-                                    defaultSize={60}
-                                    minSize={40}
-                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
-                                >
-                                    <PreviewPanel
-                                        streamlitUrl={streamlitUrl}
-                                        generatedCode={generatedCode}
-                                        isGeneratingCode={isGeneratingCode}
-                                        showCodeView={showCodeView}
-                                        onRefresh={handleRefresh}
-                                        onCodeViewToggle={handleCodeViewToggle}
-                                    />
-                                </ResizablePanel>
-                            </>
-                        )}
-                    </ResizablePanelGroup>
+                    <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
+                        <div className="mx-auto w-full h-full">
+                            <Playground
+                                chatId={currentChatId}
+                                initialMessages={initialMessages}
+                                onChatCreated={handleChatCreated}
+                                onChatSubmit={handleChatSubmit}
+                                onChatFinish={handleChatFinish}
+                                setActiveTab={setActiveTab}
+                                isRightContentVisible={isRightContentVisible}
+                                setIsRightContentVisible={setIsRightContentVisible}
+                                onCodeClick={() => {
+                                    setActiveTab('code')
+                                    setIsRightContentVisible(true)
+                                }}
+                            />
+                        </div>
+                    </div>
                     <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
-                        {currentApp && (
+{/*                         {currentApp && (
                             <VersionSelector
                                 appId={currentApp.id}
                                 onVersionChange={handleVersionChange}
                                 ref={versionSelectorRef}
                             />
-                        )}
+                        )} */}
 
                         <Button
                             onClick={toggleRightContent}
