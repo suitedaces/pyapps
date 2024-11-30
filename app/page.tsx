@@ -546,7 +546,7 @@ export default function Home() {
                                 minSize={30}
                                 className="relative"
                             >
-                                <motion.div 
+                                <motion.div
                                     className={cn(
                                         "w-full flex flex-col",
                                         isChatCentered ? "h-screen justify-center" : "h-[calc(100vh-4rem)]"

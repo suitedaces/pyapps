@@ -756,16 +756,16 @@ export function Playground({
                 <ResizablePanel defaultSize={40} minSize={30}>
                     {/* Main Chat Panel */}
                     <div className={cn(
-                        "flex flex-col relative bg-background text-foreground border border-border rounded-2xl",
-                        isChatCentered ? "h-full" : "h-full"
+                        "flex flex-col relative bg-background text-foreground",
+                        "h-[calc(100vh-7rem)]",
+                        "overflow-hidden"
                     )}>
-                        {/* Messages Section */}
                         <motion.div
                             className={cn(
-                                "flex-grow",
+                                "flex-1 overflow-hidden",
                                 isChatCentered ? "opacity-0" : "opacity-100"
                             )}
-                            initial={false}
+                            initial={isCreatingChat ? false : { opacity: 0, height: 0 }}
                             animate={{
                                 opacity: isChatCentered ? 0 : 1,
                                 height: isChatCentered ? 0 : "auto"
@@ -775,7 +775,6 @@ export function Playground({
                             {renderMessages()}
                         </motion.div>
 
-                        {/* Error States */}
                         {errorState && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
@@ -784,20 +783,39 @@ export function Playground({
                                 className="p-4 text-center"
                             >
                                 <p className="text-red-500 mb-2">{errorState.message}</p>
-                                <Button onClick={() => setErrorState(null)} variant="secondary" size="sm">
+                                <Button
+                                    onClick={() => setErrorState(null)}
+                                    variant="secondary"
+                                    size="sm"
+                                >
                                     Dismiss
                                 </Button>
                             </motion.div>
                         )}
 
-                        {/* Chat Input */}
+                        {fileUploadState.error && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="p-4 text-center"
+                            >
+                                <p className="text-red-500 mb-2">{fileUploadState.error}</p>
+                                <Button
+                                    onClick={resetFileUploadState}
+                                    variant="secondary"
+                                    size="sm"
+                                >
+                                    Dismiss
+                                </Button>
+                            </motion.div>
+                        )}
+
                         <motion.div
-                            className="w-full"
+                            className="w-full border-t bg-background pb-2"
                             initial={false}
                             animate={{
-                                position: "relative",
-                                y: isChatCentered ? "-50vh" : 0,
-                                marginTop: isChatCentered ? "auto" : 0
+                                y: isChatCentered ? "-50vh" : 0
                             }}
                             transition={{
                                 duration: 0.5,
@@ -809,8 +827,9 @@ export function Playground({
                                 isLoading={isLoading}
                                 className={cn(
                                     "transition-all duration-500",
-                                    isChatCentered && "p-6 border-t shadow-lg"
+                                    isChatCentered ? "p-6" : "p-4"
                                 )}
+                                isCentered={isChatCentered}
                             />
                         </motion.div>
                     </div>
