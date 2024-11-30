@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 import { useToolState } from '@/lib/stores/tool-state-store'
+import { cn } from '@/lib/utils'
 
 interface ChatProps {
     chatId?: string | null
@@ -27,6 +28,7 @@ interface ChatProps {
     setIsRightContentVisible?: (
         visible: boolean | ((prev: boolean) => boolean)
     ) => void
+    isChatCentered?: boolean
 }
 
 interface FileUploadState {
@@ -46,6 +48,7 @@ export function Chat({
     onCodeClick,
     setActiveTab,
     setIsRightContentVisible,
+    isChatCentered = false,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -179,9 +182,14 @@ export function Chat({
         return await response.json()
     }
 
+    const [isCreatingChat, setIsCreatingChat] = useState(false)
+
     const handleChatSubmit = async (content: string, file?: File) => {
         try {
             onChatSubmit?.()
+            if (!chatId) {
+                setIsCreatingChat(true)
+            }
 
             // Handle file upload case
             if (file) {
@@ -351,50 +359,67 @@ export function Chat({
     const { startToolCall, updateToolCallDelta, completeToolCall } = useToolState()
 
     return (
-        <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">
-            <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
-                <AnimatePresence initial={false}>
-                    {messages.map((message, index) => (
-                        <div key={message.id}>
-                            <AIMessage
-                                {...message}
-                                isLastMessage={index === messages.length - 1}
-                                object={(message as CustomMessage).object}
-                                result={(message as CustomMessage).result}
-                                isLoading={isLoading}
-                                onObjectClick={({ object, result }) => {
-                                    setCurrentPreview?.({ object, result })
-                                    if (object?.code) {
-                                        onUpdateStreamlit?.(object.code)
-                                    }
-                                }}
-                                onToolResultClick={(result) => {
-                                    onUpdateStreamlit?.(result)
-                                }}
-                                onCodeClick={(messageId: string) => {
-                                    setAiMessages((prevMessages: Message[]) =>
-                                        prevMessages.map((msg: Message) =>
-                                            msg.id === messageId
-                                                ? {
-                                                      ...msg,
-                                                      isCodeVisible: !(
-                                                          msg as CustomMessage
-                                                      ).isCodeVisible,
-                                                  }
-                                                : msg
+        <div className={cn(
+            "flex flex-col relative bg-background text-foreground border border-border rounded-2xl",
+            isChatCentered ? "h-full" : "h-full"
+        )}>
+            <motion.div
+                className={cn(
+                    "flex-grow",
+                    isChatCentered ? "opacity-0" : "opacity-100"
+                )}
+                initial={isCreatingChat ? false : { opacity: 0, height: 0 }}
+                animate={{ 
+                    opacity: isChatCentered ? 0 : 1,
+                    height: isChatCentered ? 0 : "auto"
+                }}
+                transition={{ duration: 0.5 }}
+            >
+                <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
+                    <AnimatePresence mode="wait" initial={!isCreatingChat}>
+                        {messages.map((message, index) => (
+                            <div key={message.id}>
+                                <AIMessage
+                                    {...message}
+                                    isLastMessage={index === messages.length - 1}
+                                    isCreatingChat={isCreatingChat}
+                                    object={(message as CustomMessage).object}
+                                    result={(message as CustomMessage).result}
+                                    isLoading={isLoading}
+                                    onObjectClick={({ object, result }) => {
+                                        setCurrentPreview?.({ object, result })
+                                        if (object?.code) {
+                                            onUpdateStreamlit?.(object.code)
+                                        }
+                                    }}
+                                    onToolResultClick={(result) => {
+                                        onUpdateStreamlit?.(result)
+                                    }}
+                                    onCodeClick={(messageId: string) => {
+                                        setAiMessages((prevMessages: Message[]) =>
+                                            prevMessages.map((msg: Message) =>
+                                                msg.id === messageId
+                                                    ? {
+                                                          ...msg,
+                                                          isCodeVisible: !(
+                                                              msg as CustomMessage
+                                                          ).isCodeVisible,
+                                                      }
+                                                    : msg
+                                            )
                                         )
-                                    )
-                                    setActiveTab?.('code')
-                                    setIsRightContentVisible?.(
-                                        (prev: boolean) => !prev
-                                    )
-                                }}
-                            />
-                        </div>
-                    ))}
-                </AnimatePresence>
-                <div ref={messagesEndRef} />
-            </ScrollArea>
+                                        setActiveTab?.('code')
+                                        setIsRightContentVisible?.(
+                                            (prev: boolean) => !prev
+                                        )
+                                    }}
+                                />
+                            </div>
+                        ))}
+                    </AnimatePresence>
+                    <div ref={messagesEndRef} />
+                </ScrollArea>
+            </motion.div>
 
             {errorState && (
                 <motion.div
@@ -432,7 +457,28 @@ export function Chat({
                 </motion.div>
             )}
 
-            <Chatbar onSubmit={handleChatSubmit} isLoading={isLoading} />
+            <motion.div
+                className="w-full"
+                initial={false}
+                animate={{
+                    position: "relative",
+                    y: isChatCentered ? "-50vh" : 0,
+                    marginTop: isChatCentered ? "auto" : 0
+                }}
+                transition={{ 
+                    duration: 0.5, 
+                    ease: [0.32, 0.72, 0, 1] // Custom easing for more natural motion
+                }}
+            >
+                <Chatbar 
+                    onSubmit={handleChatSubmit} 
+                    isLoading={isLoading}
+                    className={cn(
+                        "transition-all duration-500",
+                        isChatCentered && "p-6 border-t shadow-lg"
+                    )}
+                />
+            </motion.div>
         </div>
     )
 }

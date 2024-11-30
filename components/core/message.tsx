@@ -23,6 +23,7 @@ interface MessageProps extends AIMessage {
     }) => void
     onToolResultClick?: (result: string) => void
     onCodeClick?: (messageId: string) => void
+    isCreatingChat?: boolean
 }
 export function Message({
     role,
@@ -36,6 +37,7 @@ export function Message({
     onToolResultClick,
     onCodeClick,
     isLoading,
+    isCreatingChat = false,
 }: MessageProps) {
     const isUser = role === 'user'
     const { session } = useAuth()
@@ -62,8 +64,9 @@ export function Message({
     return (
         <motion.div
             key={id}
-            initial={{ opacity: 0, y: 5 }}
+            initial={isCreatingChat ? false : { opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={isCreatingChat ? { opacity: 0 } : undefined}
             transition={{ duration: 0.2 }}
             className={cn(
                 'flex w-full',

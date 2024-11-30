@@ -531,22 +531,24 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                <Chat
-                                    chatId={currentChatId}
-                                    initialMessages={initialMessages}
-                                    onChatCreated={handleChatCreated}
-                                    onChatSubmit={handleChatSubmit}
-                                    onChatFinish={handleChatFinish}
-                                    onUpdateStreamlit={updateStreamlitApp}
-                                    setActiveTab={setActiveTab}
-                                    setIsRightContentVisible={
-                                        setIsRightContentVisible
-                                    }
-                                    onCodeClick={() => {
-                                        setActiveTab('code')
-                                        setIsRightContentVisible(true)
-                                    }}
-                                />
+                                <div className="max-w-[800px] mx-auto w-full h-full">
+                                    <Chat
+                                        chatId={currentChatId}
+                                        initialMessages={initialMessages}
+                                        onChatCreated={handleChatCreated}
+                                        onChatSubmit={handleChatSubmit}
+                                        onChatFinish={handleChatFinish}
+                                        onUpdateStreamlit={updateStreamlitApp}
+                                        setActiveTab={setActiveTab}
+                                        setIsRightContentVisible={
+                                            setIsRightContentVisible
+                                        }
+                                        onCodeClick={() => {
+                                            setActiveTab('code')
+                                            setIsRightContentVisible(true)
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </ResizablePanel>
 

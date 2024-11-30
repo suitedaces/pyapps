@@ -10,9 +10,16 @@ import * as React from 'react'
 interface ChatbarProps {
     onSubmit: (content: string, file?: File) => Promise<void>
     isLoading: boolean
+    className?: string
+    isCentered?: boolean
 }
 
-export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
+export default function Chatbar({ 
+    onSubmit, 
+    isLoading, 
+    className,
+    isCentered = false 
+}: ChatbarProps) {
     const [message, setMessage] = React.useState('')
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -56,10 +63,13 @@ export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
     }
 
     return (
-        <div className="p-4 border-t bg-background">
+        <div className={cn("border-t bg-background", className)}>
             <form
                 onSubmit={handleSubmit}
-                className="flex flex-col gap-4 max-w-[800px] mx-auto"
+                className={cn(
+                    "flex flex-col gap-4 mx-auto",
+                    isCentered ? "max-w-[100%]" : "max-w-[800px]"
+                )}
             >
                 {file && (
                     <FilePreview file={file} onRemove={handleRemoveFile} />
@@ -72,45 +82,62 @@ export default function Chatbar({ onSubmit, isLoading }: ChatbarProps) {
                         onKeyDown={handleKeyDown}
                         placeholder="Type a message..."
                         className={cn(
-                            'min-h-[56px] w-full resize-none rounded-lg pr-24 py-4',
+                            'w-full resize-none rounded-lg pr-24',
                             'focus-visible:ring-1 focus-visible:ring-offset-0',
                             'scrollbar-thumb-rounded scrollbar-track-rounded',
-                            'scrollbar-thin scrollbar-thumb-border'
+                            'scrollbar-thin scrollbar-thumb-border',
+                            isCentered ? 'min-h-[80px] py-6 text-lg' : 'min-h-[56px] py-4'
                         )}
                         disabled={isLoading}
                     />
 
-                    <div className="absolute right-2 flex items-center gap-2">
+                    <div className={cn(
+                        "absolute right-2 flex items-center gap-2",
+                        isCentered && "right-4 gap-3"
+                    )}>
                         <input
                             type="file"
                             ref={fileInputRef}
                             className="hidden"
-                            onChange={(e) =>
-                                setFile(e.target.files?.[0] || null)
-                            }
+                            onChange={(e) => setFile(e.target.files?.[0] || null)}
                         />
 
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9"
+                            className={cn(
+                                "h-9 w-9",
+                                isCentered && "h-11 w-11"
+                            )}
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isLoading}
                         >
-                            <PaperclipIcon className="h-5 w-5" />
+                            <PaperclipIcon className={cn(
+                                "h-5 w-5",
+                                isCentered && "h-6 w-6"
+                            )} />
                         </Button>
 
                         <Button
                             type="submit"
                             size="icon"
-                            className="h-9 w-9"
+                            className={cn(
+                                "h-9 w-9",
+                                isCentered && "h-11 w-11"
+                            )}
                             disabled={isLoading || (!message.trim() && !file)}
                         >
                             {isLoading ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
+                                <Loader2 className={cn(
+                                    "h-5 w-5 animate-spin",
+                                    isCentered && "h-6 w-6"
+                                )} />
                             ) : (
-                                <SendIcon className="h-5 w-5" />
+                                <SendIcon className={cn(
+                                    "h-5 w-5",
+                                    isCentered && "h-6 w-6"
+                                )} />
                             )}
                         </Button>
                     </div>

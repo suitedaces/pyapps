@@ -21,6 +21,7 @@ import { Message } from 'ai'
 import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 
 import { VersionSelector } from '@/components/VersionSelector'
 import modelsList from '@/lib/models.json'
@@ -69,6 +70,9 @@ export default function Home() {
 
     // App state
     const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
+
+    // Add new state for chat position
+    const [isChatCentered, setIsChatCentered] = useState(true)
 
     // Fetch chats for sidebar
     const { data: sidebarChats, isLoading: isLoadingChats } = useQuery({
@@ -160,8 +164,10 @@ export default function Home() {
         }
     }, [handleChatCreated])
 
+    // Modify handleChatSubmit to trigger the slide animation
     const handleChatSubmit = useCallback(() => {
         setShowTypingText(false)
+        setIsChatCentered(false)
     }, [])
 
     const {
@@ -544,40 +550,57 @@ export default function Home() {
                                 minSize={30}
                                 className="relative"
                             >
-                                {showTypingText && (
-                                    <div className="absolute w-full top-1/3 transform z-50">
-                                        <TypingText
-                                            text="From Data to App, in seconds."
-                                            className="text-black font-semibold text-4xl whitespace-nowrap"
-                                            show={showTypingText}
+                                <motion.div 
+                                    className={cn(
+                                        "w-full flex flex-col",
+                                        isChatCentered ? "h-screen justify-center" : "h-[calc(100vh-4rem)]"
+                                    )}
+                                    initial={false}
+                                    animate={{
+                                        height: isChatCentered ? "100vh" : "calc(100vh - 4rem)",
+                                        justifyContent: isChatCentered ? "center" : "flex-start"
+                                    }}
+                                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                                >
+                                    {showTypingText && (
+                                        <motion.div 
+                                            className="absolute w-full top-1/3 transform z-50"
+                                            initial={{ opacity: 1 }}
+                                            animate={{ opacity: isChatCentered ? 1 : 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <TypingText
+                                                text="From Data to App, in seconds."
+                                                className="text-black font-semibold text-4xl whitespace-nowrap"
+                                                show={showTypingText}
+                                            />
+                                        </motion.div>
+                                    )}
+                                    <div className={cn(
+                                        "w-full max-w-[800px] mx-auto h-full"
+                                    )}>
+                                        <Chat
+                                            chatId={currentChatId}
+                                            initialMessages={initialMessages}
+                                            onChatCreated={handleChatCreated}
+                                            onChatSubmit={handleChatSubmit}
+                                            onChatFinish={handleChatFinish}
+                                            onUpdateStreamlit={updateStreamlitApp}
+                                            setActiveTab={setActiveTab}
+                                            setIsRightContentVisible={setIsRightContentVisible}
+                                            isChatCentered={isChatCentered}
+                                            onCodeClick={() => {
+                                                setActiveTab('code')
+                                                setIsRightContentVisible(true)
+                                                if (resizableGroupRef.current) {
+                                                    setTimeout(() => {
+                                                        resizableGroupRef.current.resetLayout()
+                                                    }, 0)
+                                                }
+                                            }}
                                         />
                                     </div>
-                                )}
-                                <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                    <Chat
-                                        chatId={currentChatId}
-                                        initialMessages={initialMessages}
-                                        onChatCreated={handleChatCreated}
-                                        onChatSubmit={handleChatSubmit}
-                                        onChatFinish={handleChatFinish}
-                                        onUpdateStreamlit={updateStreamlitApp}
-                                        setActiveTab={setActiveTab}
-                                        setIsRightContentVisible={
-                                            setIsRightContentVisible
-                                        }
-                                        onCodeClick={() => {
-                                            setActiveTab('code')
-                                            setIsRightContentVisible(
-                                                (prev) => !prev
-                                            )
-                                            if (resizableGroupRef.current) {
-                                                setTimeout(() => {
-                                                    resizableGroupRef.current.resetLayout()
-                                                }, 0)
-                                            }
-                                        }}
-                                    />
-                                </div>
+                                </motion.div>
                             </ResizablePanel>
 
                             {isRightContentVisible && (

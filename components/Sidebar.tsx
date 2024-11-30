@@ -267,7 +267,7 @@ export function Sidebar({
                             href="/"
                             className="flex items-center gap-2 font-semibold"
                         >
-                            py_app
+                            py_apps
                         </Link>
                     </div>
                     <ScrollArea className="flex-1 p-4">

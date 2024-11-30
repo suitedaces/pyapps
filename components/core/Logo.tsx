@@ -65,7 +65,7 @@ export function Logo({
                     >
                         |
                     </span>
-                    <span className="app text-gray-500 text-2xl">app</span>
+                    <span className="app text-gray-500 text-2xl">apps</span>
                     <div
                         className={cn(
                             'absolute bottom-0 left-0 w-full h-px',
