@@ -376,47 +376,45 @@ export function Chat({
                 transition={{ duration: 0.5 }}
             >
                 <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
-                    <AnimatePresence mode="wait" initial={!isCreatingChat}>
-                        {messages.map((message, index) => (
-                            <div key={message.id}>
-                                <AIMessage
-                                    {...message}
-                                    isLastMessage={index === messages.length - 1}
-                                    isCreatingChat={isCreatingChat}
-                                    object={(message as CustomMessage).object}
-                                    result={(message as CustomMessage).result}
-                                    isLoading={isLoading}
-                                    onObjectClick={({ object, result }) => {
-                                        setCurrentPreview?.({ object, result })
-                                        if (object?.code) {
-                                            onUpdateStreamlit?.(object.code)
-                                        }
-                                    }}
-                                    onToolResultClick={(result) => {
-                                        onUpdateStreamlit?.(result)
-                                    }}
-                                    onCodeClick={(messageId: string) => {
-                                        setAiMessages((prevMessages: Message[]) =>
-                                            prevMessages.map((msg: Message) =>
-                                                msg.id === messageId
-                                                    ? {
-                                                          ...msg,
-                                                          isCodeVisible: !(
-                                                              msg as CustomMessage
-                                                          ).isCodeVisible,
-                                                      }
-                                                    : msg
-                                            )
+                    {messages.map((message, index) => (
+                        <div key={message.id}>
+                            <AIMessage
+                                {...message}
+                                isLastMessage={index === messages.length - 1}
+                                isCreatingChat={isCreatingChat}
+                                object={(message as CustomMessage).object}
+                                result={(message as CustomMessage).result}
+                                isLoading={isLoading}
+                                onObjectClick={({ object, result }) => {
+                                    setCurrentPreview?.({ object, result })
+                                    if (object?.code) {
+                                        onUpdateStreamlit?.(object.code)
+                                    }
+                                }}
+                                onToolResultClick={(result) => {
+                                    onUpdateStreamlit?.(result)
+                                }}
+                                onCodeClick={(messageId: string) => {
+                                    setAiMessages((prevMessages: Message[]) =>
+                                        prevMessages.map((msg: Message) =>
+                                            msg.id === messageId
+                                                ? {
+                                                      ...msg,
+                                                      isCodeVisible: !(
+                                                          msg as CustomMessage
+                                                      ).isCodeVisible,
+                                                  }
+                                                : msg
                                         )
-                                        setActiveTab?.('code')
-                                        setIsRightContentVisible?.(
-                                            (prev: boolean) => !prev
-                                        )
-                                    }}
-                                />
-                            </div>
-                        ))}
-                    </AnimatePresence>
+                                    )
+                                    setActiveTab?.('code')
+                                    setIsRightContentVisible?.(
+                                        (prev: boolean) => !prev
+                                    )
+                                }}
+                            />
+                        </div>
+                    ))}
                     <div ref={messagesEndRef} />
                 </ScrollArea>
             </motion.div>
