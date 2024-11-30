@@ -203,47 +203,56 @@ export function Chat({
 
             // Handle file upload case
             if (file) {
-                const fileData = await uploadFile(file)
-                const fileContent = await file.text()
+                setFileUploadState(prev => ({ ...prev, isUploading: true }))
+                
+                try {
+                    const fileData = await uploadFile(file)
+                    const fileContent = await file.text()
 
-                // Sanitize content
-                const sanitizedContent = fileContent
-                    .split('\n')
-                    .map((row) => row.replace(/[\r\n]+/g, ''))
-                    .join('\n')
+                    // Sanitize content
+                    const sanitizedContent = fileContent
+                        .split('\n')
+                        .map((row) => row.replace(/[\r\n]+/g, ''))
+                        .join('\n')
 
-                const rows = sanitizedContent.split('\n')
-                const columnNames = rows[0]
-                const previewRows = rows.slice(1, 6).join('\n')
-                const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+                    const rows = sanitizedContent.split('\n')
+                    const columnNames = rows[0]
+                    const previewRows = rows.slice(1, 6).join('\n')
+                    const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
 
-                // const message = content.trim() ||
-                //     `Create a Streamlit app to visualize this data from "/app/${file.name}". The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
+                    const message =
+                        content.trim() ||
+                        `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
 
-                const message =
-                    content.trim() ||
-                    `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
-
-                await append(
-                    {
-                        content: message,
-                        role: 'user',
-                        createdAt: new Date(),
-                    },
-                    {
-                        body: {
-                            fileId: fileData.id,
-                            fileName: file.name,
-                            fileContent: sanitizedContent,
+                    await append(
+                        {
+                            content: message,
+                            role: 'user',
+                            createdAt: new Date(),
                         },
-                    }
-                )
+                        {
+                            body: {
+                                fileId: fileData.id,
+                                fileName: file.name,
+                                fileContent: sanitizedContent,
+                            },
+                        }
+                    )
 
-                // Reset file state
-                setAttachedFile(null)
-                resetFileUploadState()
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = ''
+                    // Reset file state after successful upload
+                    setAttachedFile(null)
+                    resetFileUploadState()
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = ''
+                    }
+                } catch (error) {
+                    console.error('Error uploading file:', error)
+                    setFileUploadState(prev => ({
+                        ...prev,
+                        error: 'Failed to upload file. Please try again.',
+                        isUploading: false
+                    }))
+                    return // Return early on file upload error
                 }
             }
             // Handle regular text message case
