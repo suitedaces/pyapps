@@ -63,16 +63,19 @@ export default function Chatbar({
     }
 
     return (
-        <div className={cn("border-t bg-background", className)}>
+        <div className={className}>
             <form
                 onSubmit={handleSubmit}
                 className={cn(
-                    "flex flex-col gap-4 mx-auto",
+                    "flex flex-col gap-2",
+                    "mx-auto",
                     isCentered ? "max-w-[100%]" : "max-w-[800px]"
                 )}
             >
                 {file && (
-                    <FilePreview file={file} onRemove={handleRemoveFile} />
+                    <div className="mb-2">
+                        <FilePreview file={file} onRemove={handleRemoveFile} />
+                    </div>
                 )}
 
                 <div className="relative flex items-center">
@@ -86,6 +89,7 @@ export default function Chatbar({
                             'focus-visible:ring-1 focus-visible:ring-offset-0',
                             'scrollbar-thumb-rounded scrollbar-track-rounded',
                             'scrollbar-thin scrollbar-thumb-border',
+                            'max-h-[120px]',
                             isCentered ? 'min-h-[80px] py-6 text-lg' : 'min-h-[56px] py-4'
                         )}
                         disabled={isLoading}

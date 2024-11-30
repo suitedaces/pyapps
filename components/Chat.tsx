@@ -370,11 +370,12 @@ export function Chat({
     return (
         <div className={cn(
             "flex flex-col relative bg-background text-foreground border border-border rounded-2xl",
-            "h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)]"
+            "h-[calc(100vh-7rem)]",
+            "overflow-hidden"
         )}>
-            <motion.div
+            <motion.div 
                 className={cn(
-                    "flex-grow",
+                    "flex-1 overflow-hidden",
                     isChatCentered ? "opacity-0" : "opacity-100"
                 )}
                 initial={isCreatingChat ? false : { opacity: 0, height: 0 }}
@@ -387,9 +388,10 @@ export function Chat({
                 <ScrollArea 
                     ref={scrollAreaRef}
                     className={cn(
-                        "flex-grow p-4 space-y-4 w-full",
-                        "h-[calc(100vh-12rem)]",
-                        "max-w-[800px] m-auto"
+                        "h-full",
+                        "p-4 space-y-4 w-full",
+                        "max-w-[800px] m-auto",
+                        "pb-6"
                     )}
                 >
                     <div className="scroll-smooth">
@@ -457,12 +459,10 @@ export function Chat({
             )}
 
             <motion.div
-                className="w-full sticky bottom-0 bg-background"
+                className="w-full border-t bg-background pb-2"
                 initial={false}
                 animate={{
-                    position: "relative",
-                    y: isChatCentered ? "-50vh" : 0,
-                    marginTop: isChatCentered ? "auto" : 0
+                    y: isChatCentered ? "-50vh" : 0
                 }}
                 transition={{ 
                     duration: 0.5, 
@@ -474,9 +474,9 @@ export function Chat({
                     isLoading={isLoading}
                     className={cn(
                         "transition-all duration-500",
-                        isChatCentered ? "p-6 border-t" : "p-4",
-                        "bg-background"
+                        isChatCentered ? "p-6" : "p-4"
                     )}
+                    isCentered={isChatCentered}
                 />
             </motion.div>
         </div>
