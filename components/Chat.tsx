@@ -391,48 +391,32 @@ export function Chat({
                         "h-[calc(100vh-12rem)]",
                         "max-w-[800px] m-auto"
                     )}
-                    viewportClassName="scroll-smooth"
                 >
-                    {messages.map((message, index) => (
-                        <div key={message.id}>
-                            <AIMessage
-                                {...message}
-                                isLastMessage={index === messages.length - 1}
-                                isCreatingChat={isCreatingChat}
-                                object={(message as CustomMessage).object}
-                                result={(message as CustomMessage).result}
-                                isLoading={isLoading}
-                                onObjectClick={({ object, result }) => {
-                                    setCurrentPreview?.({ object, result })
-                                    if (object?.code) {
-                                        onUpdateStreamlit?.(object.code)
-                                    }
-                                }}
-                                onToolResultClick={(result) => {
-                                    onUpdateStreamlit?.(result)
-                                }}
-                                onCodeClick={(messageId: string) => {
-                                    setAiMessages((prevMessages: Message[]) =>
-                                        prevMessages.map((msg: Message) =>
-                                            msg.id === messageId
-                                                ? {
-                                                      ...msg,
-                                                      isCodeVisible: !(
-                                                          msg as CustomMessage
-                                                      ).isCodeVisible,
-                                                  }
-                                                : msg
-                                        )
-                                    )
-                                    setActiveTab?.('code')
-                                    setIsRightContentVisible?.(
-                                        (prev: boolean) => !prev
-                                    )
-                                }}
-                            />
-                        </div>
-                    ))}
-                    <div ref={messagesEndRef} />
+                    <div className="scroll-smooth">
+                        {messages.map((message, index) => (
+                            <div key={message.id}>
+                                <AIMessage
+                                    {...message}
+                                    isLastMessage={index === messages.length - 1}
+                                    isCreatingChat={isCreatingChat}
+                                    object={(message as CustomMessage).object}
+                                    result={(message as CustomMessage).result}
+                                    isLoading={isLoading}
+                                    onObjectClick={({ object, result }) => {
+                                        setCurrentPreview?.({ object, result })
+                                        if (object?.code) {
+                                            onUpdateStreamlit?.(object.code)
+                                        }
+                                    }}
+                                    onToolResultClick={(result) => {
+                                        onUpdateStreamlit?.(result)
+                                    }}
+                                    onCodeClick={onCodeClick}
+                                />
+                            </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
                 </ScrollArea>
             </motion.div>
 
