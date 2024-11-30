@@ -10,7 +10,7 @@ import { CustomMessage, LLMModelConfig } from '@/lib/types'
 import { Message } from 'ai'
 import { useChat } from 'ai/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 import { useToolState } from '@/lib/stores/tool-state-store'
 import { cn } from '@/lib/utils'
@@ -358,10 +358,19 @@ export function Chat({
 
     const { startToolCall, updateToolCallDelta, completeToolCall } = useToolState()
 
+    const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            const scrollArea = scrollAreaRef.current
+            scrollArea.scrollTop = scrollArea.scrollHeight
+        }
+    }, [messages])
+
     return (
         <div className={cn(
             "flex flex-col relative bg-background text-foreground border border-border rounded-2xl",
-            isChatCentered ? "h-full" : "h-full"
+            "h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)]"
         )}>
             <motion.div
                 className={cn(
@@ -375,7 +384,15 @@ export function Chat({
                 }}
                 transition={{ duration: 0.5 }}
             >
-                <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
+                <ScrollArea 
+                    ref={scrollAreaRef}
+                    className={cn(
+                        "flex-grow p-4 space-y-4 w-full",
+                        "h-[calc(100vh-12rem)]",
+                        "max-w-[800px] m-auto"
+                    )}
+                    viewportClassName="scroll-smooth"
+                >
                     {messages.map((message, index) => (
                         <div key={message.id}>
                             <AIMessage
@@ -456,7 +473,7 @@ export function Chat({
             )}
 
             <motion.div
-                className="w-full"
+                className="w-full sticky bottom-0 bg-background"
                 initial={false}
                 animate={{
                     position: "relative",
@@ -465,7 +482,7 @@ export function Chat({
                 }}
                 transition={{ 
                     duration: 0.5, 
-                    ease: [0.32, 0.72, 0, 1] // Custom easing for more natural motion
+                    ease: [0.32, 0.72, 0, 1]
                 }}
             >
                 <Chatbar 
@@ -473,7 +490,8 @@ export function Chat({
                     isLoading={isLoading}
                     className={cn(
                         "transition-all duration-500",
-                        isChatCentered && "p-6 border-t shadow-lg"
+                        isChatCentered ? "p-6 border-t" : "p-4",
+                        "bg-background"
                     )}
                 />
             </motion.div>
