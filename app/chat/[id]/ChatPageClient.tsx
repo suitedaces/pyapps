@@ -483,6 +483,68 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         setShowTypingText(false)
     }, [])
 
+    // Add this function before the useEffect hooks
+    const fetchToolResults = useCallback(async () => {
+        if (!currentChatId) return
+
+        try {
+            const response = await fetch(
+                `/api/conversations/${currentChatId}/messages`
+            )
+            if (!response.ok) throw new Error('Failed to fetch messages')
+
+            const data = await response.json()
+            
+            // Find the last Streamlit code generation result
+            const streamlitCode = data.messages
+                .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                .map((msg: any) => {
+                    const toolResult = msg.tool_results[0]
+                    if (toolResult && toolResult.name === 'create_streamlit_app') {
+                        return toolResult.result
+                    }
+                    return null
+                })
+                .filter(Boolean)
+                .pop()
+
+            if (streamlitCode) {
+                setGeneratedCode(streamlitCode)
+                // Force execute the code when loading an existing chat
+                await updateStreamlitApp(streamlitCode, true)
+            }
+        } catch (error) {
+            console.error('Error fetching tool results:', error)
+        }
+    }, [currentChatId, updateStreamlitApp])
+
+    // The existing useEffect will now work with the defined function
+    useEffect(() => {
+        const initializeChatAndSandbox = async () => {
+            if (currentChatId) {
+                await ensureSandboxInitialized()
+                await fetchToolResults()
+            }
+        }
+        
+        initializeChatAndSandbox()
+    }, [currentChatId, fetchToolResults, ensureSandboxInitialized])
+
+    useEffect(() => {
+        if (generatedCode) {
+            setIsRightContentVisible(true)
+        }
+    }, [generatedCode])
+
+    useEffect(() => {
+        console.log('Current state:', {
+            currentChatId,
+            generatedCode: !!generatedCode,
+            streamlitUrl,
+            isRightContentVisible
+        })
+    }, [currentChatId, generatedCode, streamlitUrl, isRightContentVisible])
+
     if (isLoading) {
         return <div>Loading...</div>
     }

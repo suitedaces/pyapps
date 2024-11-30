@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Globe, Loader2 } from 'lucide-react'
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
 
 interface StreamlitPreviewProps {
     url: string | null
@@ -16,15 +16,46 @@ export const StreamlitPreview = forwardRef<
     StreamlitPreviewProps
 >(({ url, isGeneratingCode }, ref) => {
     const iframeRef = useRef<HTMLIFrameElement>(null)
+    const retryTimeoutRef = useRef<NodeJS.Timeout>()
+
+    // Function to refresh iframe
+    const refreshIframe = () => {
+        if (iframeRef.current) {
+            iframeRef.current.src = iframeRef.current.src
+        }
+    }
 
     // Expose refreshIframe method through ref
     useImperativeHandle(ref, () => ({
-        refreshIframe: () => {
-            if (iframeRef.current) {
-                iframeRef.current.src = iframeRef.current.src
-            }
-        },
+        refreshIframe
     }))
+
+    // Auto-refresh logic when URL changes
+    useEffect(() => {
+        if (url) {
+            // Initial refresh after 2 seconds
+            retryTimeoutRef.current = setTimeout(() => {
+                refreshIframe()
+            }, 2000)
+
+            // Cleanup timeout
+            return () => {
+                if (retryTimeoutRef.current) {
+                    clearTimeout(retryTimeoutRef.current)
+                }
+            }
+        }
+    }, [url])
+
+    // Handle iframe load error
+    const handleIframeError = () => {
+        if (iframeRef.current) {
+            // Retry after 2 seconds if there's an error
+            retryTimeoutRef.current = setTimeout(() => {
+                refreshIframe()
+            }, 2000)
+        }
+    }
 
     const content = (
         <div className="h-full relative">
@@ -59,6 +90,7 @@ export const StreamlitPreview = forwardRef<
                     src={url}
                     className="w-full h-full border-0"
                     allow="accelerometer; camera; gyroscope; microphone"
+                    onError={handleIframeError}
                 />
             )}
         </div>
