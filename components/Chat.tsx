@@ -122,7 +122,7 @@ export function Chat({
                 }
             }
         },
-        onFinish: async (message) => {
+        onFinish: async (message: CustomMessage) => {
             console.log('Message steps:', message)
             setErrorState(null)
             setAttachedFile(null)
@@ -146,6 +146,16 @@ export function Chat({
                 if (toolCall.toolCallId) {
                     completeToolCall(toolCall.toolCallId)
                 }
+            }
+
+            const finishStep = {
+                type: 'finish',
+                finishReason: 'complete'
+            }
+
+            const updatedMessage = {
+                ...message,
+                steps: [...(message.steps || []), finishStep]
             }
 
             onChatFinish?.()
