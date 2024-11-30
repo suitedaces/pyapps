@@ -24,6 +24,13 @@ export default function Chatbar({
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
 
+    const handleFileChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0]
+        if (selectedFile) {
+            setFile(selectedFile)
+        }
+    }, [])
+
     const handleRemoveFile = React.useCallback(() => {
         setFile(null)
         if (fileInputRef.current) {
@@ -34,19 +41,18 @@ export default function Chatbar({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (message.trim() || file) {
-            // Store current values before clearing
             const currentMessage = message
             const currentFile = file
 
             // Clear form
             setMessage('')
-            handleRemoveFile()
+            setFile(null)
 
             try {
                 await onSubmit(currentMessage, currentFile || undefined)
             } catch (error) {
                 console.error('Failed to send message:', error)
-                // Optionally restore values on err
+                // Restore values on error
                 setMessage(currentMessage)
                 setFile(currentFile)
             }
@@ -83,14 +89,11 @@ export default function Chatbar({
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Type a message..."
+                        placeholder={file ? 'File attached. Add a message or press Send.' : 'Type your message...'}
                         className={cn(
-                            'w-full resize-none rounded-lg pr-24',
-                            'focus-visible:ring-1 focus-visible:ring-offset-0',
-                            'scrollbar-thumb-rounded scrollbar-track-rounded',
-                            'scrollbar-thin scrollbar-thumb-border',
-                            'max-h-[120px]',
-                            isCentered ? 'min-h-[80px] py-6 text-lg' : 'min-h-[56px] py-4'
+                            "min-h-[60px] w-full resize-none bg-background pr-24",
+                            "rounded-xl",
+                            isCentered && "min-h-[80px] text-lg"
                         )}
                         disabled={isLoading}
                     />
@@ -103,7 +106,8 @@ export default function Chatbar({
                             type="file"
                             ref={fileInputRef}
                             className="hidden"
-                            onChange={(e) => setFile(e.target.files?.[0] || null)}
+                            onChange={handleFileChange}
+                            accept=".csv"
                         />
 
                         <Button

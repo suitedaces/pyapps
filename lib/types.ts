@@ -179,4 +179,9 @@ export interface CustomMessage extends Message {
     object?: App
     result?: ExecutionResult
     isCodeVisible?: boolean
+    steps?: Array<{
+        type: string
+        finishReason?: string
+        [key: string]: any
+    }>
 }
