@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { createVersion } from './supabase'
 import { toolManager } from './tools/registry'
 import { LLMModelConfig, ModelProvider, StreamingTool, Tool } from './types'
+import { completeToolStream, updateToolDelta, generate } from './actions';
 
 interface FileContext {
     fileName: string
@@ -258,6 +259,9 @@ export class GruntyAgent {
                                     'argsTextDelta' in part
                                         ? part.argsTextDelta.length
                                         : undefined,
+                                content: 'argsTextDelta' in part
+                                    ? part
+                                    : undefined,
                             })
 
                             switch (part.type) {
@@ -271,6 +275,16 @@ export class GruntyAgent {
                                             })}\n\n`
                                         )
                                     )
+
+                                    // Update tool delta with proper error handling
+                                    try {
+                                        const success = await updateToolDelta(part.argsTextDelta)
+                                        if (!success) {
+                                            console.warn('⚠️ Failed to update tool delta')
+                                        }
+                                    } catch (error) {
+                                        console.error('❌ Error updating tool delta:', error)
+                                    }
                                     break
 
                                 case 'tool-result':
@@ -320,6 +334,8 @@ export class GruntyAgent {
                                                 'Failed to create or retrieve app ID'
                                             )
                                         }
+
+                                        completeToolStream();
 
                                         // Create new version
                                         try {
