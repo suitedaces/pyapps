@@ -112,25 +112,3 @@ export async function completeToolStream() {
         console.warn('⚠️ No stream to complete')
     }
 }
-
-const initialAIState: {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    id?: string;
-}[] = [];
-
-const initialUIState: {
-    id: number;
-    display: React.ReactNode;
-}[] = [];
-
-// Create and export the AI instance
-export const AI = createAI({
-    actions: {
-        generate,
-        updateToolDelta,
-        completeToolStream
-    },
-    initialUIState,
-    initialAIState,
-});

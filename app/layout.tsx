@@ -5,6 +5,8 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 
+import { AI } from '@/lib/ai-config'
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -23,7 +25,9 @@ export default function RootLayout({
                 <Providers>
                     <AuthProvider>
                         <SidebarProvider>
+                            <AI>
                                 {children}
+                            </AI>
                         </SidebarProvider>
                     </AuthProvider>
                 </Providers>

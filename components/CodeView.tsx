@@ -8,7 +8,7 @@ import { readStreamableValue, useActions } from 'ai/rsc'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
-import { type AI } from '@/lib/actions'
+import { type AI } from '@/lib/ai-config'
 
 interface CodeViewProps {
     code: string | { code: string }
