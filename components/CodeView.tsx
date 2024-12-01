@@ -4,50 +4,68 @@ import { highlight, languages } from 'prismjs'
 import { useEffect, useState } from 'react'
 import Editor from 'react-simple-code-editor'
 
-import { readStreamableValue } from 'ai/rsc'
+import { readStreamableValue, useActions } from 'ai/rsc'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
-import { generate } from '@/lib/actions'
+import { type AI } from '@/lib/actions'
 
 interface CodeViewProps {
     code: string | { code: string }
     isGeneratingCode: boolean
 }
 
+interface CodeViewState {
+    displayCode: string
+    isStreaming: boolean
+    error: string | null
+}
+
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
-    const [generation, setGeneration] = useState('');
+
+    const { generate } = useActions<typeof AI>()
+
+    const [state, setState] = useState<CodeViewState>({
+        displayCode: '',
+        isStreaming: false,
+        error: null
+    })
 
     useEffect(() => {
         if (isGeneratingCode) {
-            const startStreaming = async () => {
-                try {
-                    const streamable = await generate();
-                    const stream = readStreamableValue<string>(streamable);
-
-                    for await (const chunk of stream) {
-                        console.log('📥 Stream Update:', {
-                            data: chunk,
-                            timestamp: new Date().toISOString()
-                        });
-
-                        // Format and update display
-                        const formattedCode = String(chunk)
-                            .split('\n')
-                            .map(line => line.trim())
-                            .join('\n');
-
-                        setDisplayCode(formattedCode);
-                    }
-                } catch (error) {
-                    console.error('Error in streaming:', error);
-                }
-            };
-
-            startStreaming();
+            handleCodeStreaming()
         }
-    }, [isGeneratingCode]);
+    }, [isGeneratingCode])
+
+    const handleCodeStreaming = async () => {
+        try {
+            setState(prev => ({ ...prev, isStreaming: true }))
+            const streamable = await generate()
+
+            // Read and process the stream
+            for await (const chunk of readStreamableValue(streamable)) {
+                console.log('📥 Stream Update:', {
+                    chunk,
+                    timestamp: new Date().toISOString()
+                })
+
+                setState(prev => ({
+                    ...prev,
+                    displayCode: prev.displayCode + chunk
+                }))
+            }
+        } catch (error) {
+            console.error('Error in streaming:', error)
+            setState(prev => ({
+                ...prev,
+                error: 'Error streaming code'
+            }))
+        } finally {
+            setState(prev => ({ ...prev, isStreaming: false }))
+        }
+    }
+
 
 
     // Log when code updates

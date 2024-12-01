@@ -22,7 +22,9 @@ export default function RootLayout({
             <body className={inter.className}>
                 <Providers>
                     <AuthProvider>
-                        <SidebarProvider>{children}</SidebarProvider>
+                        <SidebarProvider>
+                                {children}
+                        </SidebarProvider>
                     </AuthProvider>
                 </Providers>
             </body>
