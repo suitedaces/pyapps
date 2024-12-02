@@ -304,10 +304,17 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                             })
                         }
                         if (msg.assistant_message) {
+                            // Include tool calls and results in assistant messages
                             messages.push({
                                 id: `${msg.id}-assistant`,
                                 role: 'assistant',
                                 content: msg.assistant_message,
+                                toolInvocations: msg.tool_calls?.map((call: any) => ({
+                                    toolCallId: call.id,
+                                    toolName: call.name,
+                                    state: 'result',
+                                    result: call.result
+                                })) || [],
                             })
                         }
                         return messages
@@ -494,7 +501,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
             if (!response.ok) throw new Error('Failed to fetch messages')
 
             const data = await response.json()
-            
+
             // Find the last Streamlit code generation result
             const streamlitCode = data.messages
                 .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
@@ -526,7 +533,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                 await fetchToolResults()
             }
         }
-        
+
         initializeChatAndSandbox()
     }, [currentChatId, fetchToolResults, ensureSandboxInitialized])
 

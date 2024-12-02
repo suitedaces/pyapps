@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Markdown } from './markdown'
 import { MessageButton } from './message-button'
+import { useEffect } from 'react'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean

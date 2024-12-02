@@ -109,6 +109,14 @@ export function Chat({
             const toolTotalChunks = response.headers.get('x-tool-total-chunks')
             const toolDelta = response.headers.get('x-tool-delta')
 
+            console.log('Tool Call Headers:', {
+                toolCallId,
+                toolName,
+                toolProgress,
+                toolTotalChunks,
+                toolDelta
+            })
+
             if (toolCallId && toolName) {
                 if (toolDelta) {
                     updateToolCallDelta(
@@ -123,7 +131,12 @@ export function Chat({
             }
         },
         onFinish: async (message: CustomMessage) => {
-            console.log('Message steps:', message)
+            console.log('Message finished:', {
+                messageId: message.id,
+                hasToolInvocations: !!message.toolInvocations?.length,
+                toolInvocations: message.toolInvocations
+            })
+
             setErrorState(null)
             setAttachedFile(null)
             resetFileUploadState()
@@ -204,7 +217,7 @@ export function Chat({
             // Handle file upload case
             if (file) {
                 setFileUploadState(prev => ({ ...prev, isUploading: true }))
-                
+
                 try {
                     const fileData = await uploadFile(file)
                     const fileContent = await file.text()
@@ -274,19 +287,37 @@ export function Chat({
         }
     }
 
+    // Debug initial messages
+    useEffect(() => {
+        console.log('Initial Messages Debug:', {
+            count: initialMessages.length,
+            messages: initialMessages.map(msg => ({
+                id: msg.id,
+                role: msg.role,
+                hasToolInvocations: !!(msg as any).toolInvocations?.length,
+                toolInvocations: (msg as any).toolInvocations
+            }))
+        });
+    }, [initialMessages]);
+
     const messages = useMemo(() => {
         const messageMap = new Map()
 
         ;[...initialMessages, ...aiMessages].forEach((msg) => {
-            const key = `${msg.role}:${msg.content}`
+            const key = `${msg.role}:${msg.content}:${msg.id}`
+
             if (
                 !messageMap.has(key) ||
+                (msg as any).toolInvocations?.length ||
                 (msg.createdAt &&
                     (!messageMap.get(key).createdAt ||
                         new Date(msg.createdAt) >
                             new Date(messageMap.get(key).createdAt)))
             ) {
-                messageMap.set(key, msg)
+                messageMap.set(key, {
+                    ...msg,
+                    toolInvocations: (msg as any).toolInvocations || []
+                })
             }
         })
 
@@ -296,8 +327,24 @@ export function Chat({
             return timeA - timeB
         })
 
+        console.log('Final processed messages:', dedupedMessages.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            hasToolInvocations: !!(msg as any).toolInvocations?.length,
+            toolInvocations: (msg as any).toolInvocations
+        })));
+
         return dedupedMessages
     }, [initialMessages, aiMessages])
+
+    useEffect(() => {
+        console.log('Processed Messages:', messages.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            hasToolInvocations: !!(msg as any).toolInvocations?.length,
+            toolInvocations: (msg as any).toolInvocations
+        })))
+    }, [messages])
 
     const handleResponseError = (response: Response) => {
         const errorMessage =
@@ -392,19 +439,19 @@ export function Chat({
             "h-[calc(100vh-7rem)]",
             "overflow-hidden"
         )}>
-            <motion.div 
+            <motion.div
                 className={cn(
                     "flex-1 overflow-hidden",
                     isChatCentered ? "opacity-0" : "opacity-100"
                 )}
                 initial={isCreatingChat ? false : { opacity: 0, height: 0 }}
-                animate={{ 
+                animate={{
                     opacity: isChatCentered ? 0 : 1,
                     height: isChatCentered ? 0 : "auto"
                 }}
                 transition={{ duration: 0.5 }}
             >
-                <ScrollArea 
+                <ScrollArea
                     ref={scrollAreaRef}
                     className={cn(
                         "h-full",
@@ -483,13 +530,13 @@ export function Chat({
                 animate={{
                     y: isChatCentered ? "-50vh" : 0
                 }}
-                transition={{ 
-                    duration: 0.5, 
+                transition={{
+                    duration: 0.5,
                     ease: [0.32, 0.72, 0, 1]
                 }}
             >
-                <Chatbar 
-                    onSubmit={handleChatSubmit} 
+                <Chatbar
+                    onSubmit={handleChatSubmit}
                     isLoading={isLoading}
                     className={cn(
                         "transition-all duration-500",

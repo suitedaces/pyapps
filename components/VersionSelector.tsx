@@ -36,19 +36,28 @@ export const VersionSelector = forwardRef<
 
         setIsLoading(true)
         try {
+            console.log('Loading versions for app:', appId)
             const versionsData = await getVersionHistory(appId)
-            setVersions(versionsData)
+            console.log('Loaded versions:', versionsData)
 
-            if (versionsData.length > 0) {
-                setCurrentIndex(0)
+            if (versionsData && Array.isArray(versionsData)) {
+                setVersions(versionsData)
 
-                if (!hasInitialized) {
-                    onVersionChange(versionsData[0])
-                    setHasInitialized(true)
+                if (versionsData.length > 0) {
+                    setCurrentIndex(0)
+
+                    if (!hasInitialized) {
+                        onVersionChange(versionsData[0])
+                        setHasInitialized(true)
+                    }
                 }
+            } else {
+                console.error('Invalid versions data received:', versionsData)
+                setVersions([])
             }
         } catch (error) {
             console.error('Failed to fetch versions:', error)
+            setVersions([])
         } finally {
             setIsLoading(false)
         }
@@ -57,9 +66,9 @@ export const VersionSelector = forwardRef<
     useImperativeHandle(
         ref,
         () => ({
-            refreshVersions: () => {
+            refreshVersions: async () => {
                 setHasInitialized(false)
-                return loadVersions()
+                await loadVersions()
             },
         }),
         [loadVersions]
@@ -67,18 +76,23 @@ export const VersionSelector = forwardRef<
 
     useEffect(() => {
         if (appId) {
+            console.log('VersionSelector mounted with appId:', appId)
             setHasInitialized(false)
             loadVersions()
         }
     }, [appId, loadVersions])
 
     const handleVersionChange = async (newIndex: number) => {
-        if (!appId || newIndex < 0 || newIndex >= versions.length || isLoading)
+        if (!appId || newIndex < 0 || newIndex >= versions.length || isLoading) {
+            console.log('Invalid version change:', { appId, newIndex, versionsLength: versions.length, isLoading })
             return
+        }
 
         setIsLoading(true)
         try {
             const selectedVersion = versions[newIndex]
+            console.log('Switching to version:', selectedVersion)
+
             await switchVersion(appId, selectedVersion.id)
 
             setCurrentIndex(newIndex)
