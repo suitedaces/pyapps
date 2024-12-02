@@ -38,9 +38,22 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         }
     }, [isGeneratingCode])
 
+    useEffect(() => {
+        if (!state.isStreaming && code) {
+            const finalCode = typeof code === 'object' && 'code' in code
+                ? code.code
+                : String(code)
+
+            setState(prev => ({
+                ...prev,
+                displayCode: finalCode
+            }))
+        }
+    }, [code, state.isStreaming])
+
     const handleCodeStreaming = async () => {
         try {
-            setState(prev => ({ ...prev, isStreaming: true }))
+            setState(prev => ({ ...prev, isStreaming: true, displayCode: '' }))
             const streamable = await generate()
 
             // Read and process the stream
@@ -50,9 +63,11 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                     timestamp: new Date().toISOString()
                 })
 
+                const cleanChunk = String(chunk).replace(/\[object Object\]/g, '')
+
                 setState(prev => ({
                     ...prev,
-                    displayCode: prev.displayCode + chunk
+                    displayCode: prev.displayCode + cleanChunk
                 }))
             }
         } catch (error) {
@@ -65,8 +80,6 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
             setState(prev => ({ ...prev, isStreaming: false }))
         }
     }
-
-
 
     // Log when code updates
     useEffect(() => {
@@ -110,20 +123,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         }
     }, [isGeneratingCode])
 
-    if (isGeneratingCode) {
-        return (
-            <Card className="bg-white border-border h-full">
-                <CardContent className="p-0 h-full flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-text" />
-                        <p className="text-sm text-text">Generating code...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        )
-    }
-
-    if (!displayCode) {
+    if (!state.displayCode && !state.isStreaming && !code) {
         return (
             <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
@@ -139,18 +139,17 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                 <div className="overflow-auto h-full code-container">
                     <div className="min-w-max">
                         <Editor
-                            value={displayCode}
-                            onValueChange={() => { }}
-                            highlight={(codeToHighlight) => {
+                            value={state.displayCode || ''}
+                            onValueChange={() => {}}
+                            highlight={(code) => {
                                 try {
                                     return highlight(
-                                        String(codeToHighlight),
+                                        code,
                                         languages.python,
                                         'python'
                                     )
                                 } catch (error) {
-                                    console.error('Highlighting error:', error)
-                                    return String(codeToHighlight)
+                                    return code
                                 }
                             }}
                             padding={16}
@@ -168,6 +167,13 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                         />
                     </div>
                 </div>
+
+                {state.isStreaming && (
+                    <div className="absolute top-2 right-2 flex items-center gap-2 bg-black/10 px-2 py-1 rounded">
+                        <Loader2 className="h-4 w-4 animate-spin text-text" />
+                        <span className="text-xs">Streaming...</span>
+                    </div>
+                )}
             </CardContent>
             <style jsx global>{`
                 .code-container {

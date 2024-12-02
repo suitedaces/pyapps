@@ -71,15 +71,11 @@ export async function updateToolDelta(delta: string) {
 
     if (globalStreamable) {
         try {
-            const currentValue = await streamable.value
-            const newValue = currentValue + delta
 
-            await streamable.update(newValue)
+            await streamable.update(delta)
 
             console.log('✅ Stream Updated:', {
-                currentLength: currentValue,
                 deltaLength: delta.length,
-                newLength: newValue.length,
                 lastChunk: delta
             })
             return true
