@@ -335,8 +335,6 @@ export class GruntyAgent {
                                             )
                                         }
 
-                                        completeToolStream();
-
                                         // Create new version
                                         try {
                                             const versionData =
@@ -366,6 +364,8 @@ export class GruntyAgent {
                                             throw versionError
                                         }
                                     }
+
+                                    await completeToolStream()
 
                                     // Send tool call completion first
                                     writer.write(

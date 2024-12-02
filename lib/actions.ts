@@ -71,7 +71,6 @@ export async function updateToolDelta(delta: string) {
 
     if (globalStreamable) {
         try {
-
             await streamable.update(delta)
 
             console.log('✅ Stream Updated:', {
@@ -85,7 +84,6 @@ export async function updateToolDelta(delta: string) {
         }
     }
 
-    console.warn('⚠️ No active stream found for update')
     return false
 }
 

@@ -53,8 +53,13 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
 
     const handleCodeStreaming = async () => {
         try {
-            setState(prev => ({ ...prev, isStreaming: true, displayCode: '' }))
+            setState(prev => ({
+                ...prev,
+                displayCode: ''
+            }))
+
             const streamable = await generate()
+            let accumulatedCode = ''
 
             // Read and process the stream
             for await (const chunk of readStreamableValue(streamable)) {
@@ -64,20 +69,27 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                 })
 
                 const cleanChunk = String(chunk).replace(/\[object Object\]/g, '')
+                accumulatedCode += cleanChunk
 
                 setState(prev => ({
                     ...prev,
-                    displayCode: prev.displayCode + cleanChunk
+                    displayCode: accumulatedCode,
+                    isStreaming: true,
                 }))
             }
+
+            setState(prev => ({
+                ...prev,
+                displayCode: accumulatedCode,
+                isStreaming: false
+            }))
         } catch (error) {
             console.error('Error in streaming:', error)
             setState(prev => ({
                 ...prev,
-                error: 'Error streaming code'
+                error: 'Error streaming code',
+                isStreaming: false
             }))
-        } finally {
-            setState(prev => ({ ...prev, isStreaming: false }))
         }
     }
 
@@ -140,7 +152,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                     <div className="min-w-max">
                         <Editor
                             value={state.displayCode || ''}
-                            onValueChange={() => {}}
+                            onValueChange={() => { }}
                             highlight={(code) => {
                                 try {
                                     return highlight(
