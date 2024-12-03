@@ -13,13 +13,14 @@ CREATE TABLE public.files (
     file_name TEXT NOT NULL,
     file_type TEXT NOT NULL,
     file_size BIGINT NOT NULL,
-    file_url TEXT NOT NULL,
-    backup_url TEXT,
+    s3_key TEXT NOT NULL,
+    s3_url TEXT NOT NULL,
     content_hash TEXT,
     analysis JSONB,
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    last_accessed TIMESTAMPTZ DEFAULT now()
 );
 
 -- Apps table

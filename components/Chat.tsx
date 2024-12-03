@@ -14,6 +14,7 @@ import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 import { useToolState } from '@/lib/stores/tool-state-store'
 import { cn } from '@/lib/utils'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 
 interface ChatProps {
     chatId?: string | null
@@ -214,7 +215,6 @@ export function Chat({
                 setIsCreatingChat(true)
             }
 
-            // Handle file upload case
             if (file) {
                 setFileUploadState(prev => ({ ...prev, isUploading: true }))
 
@@ -265,11 +265,9 @@ export function Chat({
                         error: 'Failed to upload file. Please try again.',
                         isUploading: false
                     }))
-                    return // Return early on file upload error
+                    return
                 }
-            }
-            // Handle regular text message case
-            else if (content.trim()) {
+            } else if (content.trim()) {
                 await append({
                     content: content.trim(),
                     role: 'user',
@@ -433,6 +431,8 @@ export function Chat({
         }
     }, [messages])
 
+    const { error: sandboxError, clearError } = useSandboxStore()
+
     return (
         <div className={cn(
             "flex flex-col relative bg-background text-foreground",
@@ -516,6 +516,24 @@ export function Chat({
                     <p className="text-red-500 mb-2">{fileUploadState.error}</p>
                     <Button
                         onClick={resetFileUploadState}
+                        variant="secondary"
+                        size="sm"
+                    >
+                        Dismiss
+                    </Button>
+                </motion.div>
+            )}
+
+            {sandboxError && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="p-4 text-center"
+                >
+                    <p className="text-red-500 mb-2">Sandbox error: {sandboxError}</p>
+                    <Button
+                        onClick={clearError}
                         variant="secondary"
                         size="sm"
                     >

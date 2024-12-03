@@ -1,15 +1,15 @@
 # This is a config for E2B sandbox template.
-# You can use 'template_id' (y8cln8sbdr37yfpngsg5) or 'template_name (streamlit-sandbox-me) from this config to spawn a sandbox:
+# You can use 'template_id' (t8lmf01jbiymqo3nttkk) or 'template_name (streamlit-sandbox-s3) from this config to spawn a sandbox:
 
 # Python SDK
 # from e2b import Sandbox
-# sandbox = Sandbox(template='streamlit-sandbox-me')
+# sandbox = Sandbox(template='streamlit-sandbox-s3')
 
 # JS SDK
 # import { Sandbox } from 'e2b'
-# const sandbox = await Sandbox.create({ template: 'streamlit-sandbox-me' })
+# const sandbox = await Sandbox.create({ template: 'streamlit-sandbox-s3' })
 
-team_id = "10ac061b-6394-4bee-af80-9d3f3df672e5"
+team_id = "66f03438-ea40-419a-b50f-37834062a46f"
 dockerfile = "e2b.Dockerfile"
-template_name = "streamlit-sandbox-me"
-template_id = "y8cln8sbdr37yfpngsg5"
+template_name = "streamlit-sandbox-s3"
+template_id = "t8lmf01jbiymqo3nttkk"

@@ -16,13 +16,12 @@ export interface Database {
                     file_name: string
                     file_type: string
                     file_size: number
-                    file_url: string
-                    backup_url: string | null
-                    content_hash: string | null
+                    s3_key: string
                     analysis: Json | null
                     expires_at: string | null
                     created_at: string
                     updated_at: string
+                    last_accessed: string
                 }
                 Insert: {
                     id?: string
@@ -30,13 +29,12 @@ export interface Database {
                     file_name: string
                     file_type: string
                     file_size: number
-                    file_url: string
-                    backup_url?: string | null
-                    content_hash?: string | null
+                    s3_key: string
                     analysis?: Json | null
                     expires_at?: string | null
                     created_at?: string
                     updated_at?: string
+                    last_accessed?: string
                 }
                 Update: {
                     id?: string
@@ -44,13 +42,12 @@ export interface Database {
                     file_name?: string
                     file_type?: string
                     file_size?: number
-                    file_url?: string
-                    backup_url?: string | null
-                    content_hash?: string | null
+                    s3_key?: string
                     analysis?: Json | null
                     expires_at?: string | null
                     created_at?: string
                     updated_at?: string
+                    last_accessed?: string
                 }
                 Relationships: [
                     {
