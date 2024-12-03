@@ -138,7 +138,7 @@ export interface FileContext {
     fileName: string
     fileType: 'csv' | 'json' | 'txt'
     content?: string
-    analysis?: any
+    analysis: any
 }
 
 // Add this to your existing types

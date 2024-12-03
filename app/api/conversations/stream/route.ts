@@ -87,8 +87,8 @@ export async function POST(req: NextRequest) {
                 id: fileData.id,
                 fileName: fileData.file_name,
                 fileType: fileData.file_type as 'csv' | 'json' | 'txt',
-                content: fileContent,
-                analysis: fileData.analysis,
+                content: fileContent || undefined,
+                analysis: fileData.analysis
             }
 
             console.log('📄 File context created:', {

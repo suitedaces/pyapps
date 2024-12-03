@@ -223,40 +223,22 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     >([])
 
     // Sandbox store hooks
-    const { initializeSandbox, killSandbox, updateSandbox } = useSandboxStore()
+    const { killSandbox, updateSandbox } = useSandboxStore()
 
     // Add a ref to track initialization
     const initializationComplete = useRef(false)
     const initializationPromise = useRef<Promise<void> | null>(null)
 
-    // Modified initialization function that returns a promise
-    const ensureSandboxInitialized = useCallback(async () => {
-        if (initializationComplete.current) {
-            return
-        }
-
-        if (!initializationPromise.current) {
-            initializationPromise.current = (async () => {
-                await initializeSandbox()
-                initializationComplete.current = true
-            })()
-        }
-
-        return initializationPromise.current
-    }, [initializeSandbox])
-
-    // Modified updateStreamlitApp to ensure initialization
+    // Simplify updateStreamlitApp
     const updateStreamlitApp = useCallback(
         async (code: string, forceExecute = false) => {
-            await ensureSandboxInitialized()
-
             const url = await updateSandbox(code, forceExecute)
             if (url) {
                 setStreamlitUrl(url)
                 setIsGeneratingCode(false)
             }
         },
-        [updateSandbox, ensureSandboxInitialized]
+        [updateSandbox]
     )
 
     useEffect(() => {
@@ -395,41 +377,30 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         }
     }, [generatedCode, sandboxId, updateStreamlitApp])
 
-    // Modify handleVersionChange
+    // Update version change handler
     const handleVersionChange = async (version: AppVersion) => {
-        if (!version.code) {
-            return
-        }
+        if (!version.code) return
 
         isVersionSwitching.current = true
         setIsGeneratingCode(true)
 
         try {
-            await ensureSandboxInitialized()
             setGeneratedCode(version.code)
             await updateStreamlitApp(version.code, true)
         } catch (error) {
-            setSandboxErrors((prev) => [
-                ...prev,
-                {
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : 'Error updating version',
-                },
-            ])
+            setSandboxErrors((prev) => [...prev, {
+                message: error instanceof Error ? error.message : 'Error updating version'
+            }])
         } finally {
             setIsGeneratingCode(false)
             isVersionSwitching.current = false
         }
     }
 
-    // Modify cleanup
+    // Simplify cleanup
     useEffect(() => {
         return () => {
             killSandbox()
-            initializationComplete.current = false
-            initializationPromise.current = null
         }
     }, [killSandbox])
 
@@ -522,13 +493,12 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     useEffect(() => {
         const initializeChatAndSandbox = async () => {
             if (currentChatId) {
-                await ensureSandboxInitialized()
                 await fetchToolResults()
             }
         }
         
         initializeChatAndSandbox()
-    }, [currentChatId, fetchToolResults, ensureSandboxInitialized])
+    }, [currentChatId, fetchToolResults])
 
     useEffect(() => {
         if (generatedCode) {
