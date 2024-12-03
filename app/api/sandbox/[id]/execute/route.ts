@@ -21,7 +21,6 @@ export async function POST(
 
     try {
         const body = await req.json()
-        console.log('Received request body:', body)
 
         const codeContent = typeof body.code === 'object' && body.code.code
             ? body.code.code
