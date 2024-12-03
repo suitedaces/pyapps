@@ -104,9 +104,9 @@ export class StreamlitTool extends BaseStreamingTool {
     ): string {
         return `You are a Python code generation assistant specializing in Streamlit apps.
 Generate a complete, runnable Streamlit app based on the given query.
-${fileContext ? `You are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}" at path "/app/${fileContext.fileName}".` : ''}
-IMPORTANT: Always use the FULL PATH "/app/${fileContext?.fileName}" when reading the CSV file.
-DO NOT use relative paths, always use the absolute path starting with "/app/".
+${fileContext ? `You are working with a ${fileContext.fileType.toUpperCase()} file at path "/app/s3/data/${fileContext.fileName}".` : ''}
+IMPORTANT: Always use the FULL PATH "/app/s3/data/<filename>" when reading files.
+DO NOT use relative paths, always use the absolute path starting with "/app/s3/data/
 DO NOT use "st.experimental_rerun()" at any cost.
 Only respond with the code, no potential errors, no explanations!
 Include all necessary imports at the beginning of the file.`
@@ -117,7 +117,7 @@ Include all necessary imports at the beginning of the file.`
         fileContext?: StreamlitToolArgs['fileContext']
     ): string {
         const filePathNote = fileContext
-            ? `\nIMPORTANT: Use the exact file path "/app/${fileContext.fileName}" to read the CSV file.`
+            ? `\nIMPORTANT: Use the exact file path "/app/s3/data/${fileContext.fileName}" to read the file.`
             : ''
 
         return `${query}${filePathNote}${

@@ -1,5 +1,6 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { Sandbox } from 'e2b'
+import type { ProcessMessage } from 'e2b'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -37,6 +38,17 @@ export async function POST(
 
         console.log('Connecting to sandbox:', params.id)
         const sandbox = await Sandbox.reconnect(params.id)
+
+        console.log('Checking mounted directory contents...')
+        await sandbox.process.start({
+            cmd: 'ls -la /app/s3',
+            onStdout: (data: ProcessMessage) => {
+                console.log('S3 Mount Contents:', data.line)
+            },
+            onStderr: (data: ProcessMessage) => {
+                console.error('LS Error:', data.line)
+            }
+        })
 
         console.log('Writing code to sandbox:', codeContent.substring(0, 100) + '...')
         await sandbox.filesystem.write('/app/app.py', codeContent)

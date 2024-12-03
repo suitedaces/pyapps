@@ -58,4 +58,8 @@ export async function getFileFromS3(key: string): Promise<Buffer> {
   const response = await s3Client.send(command)
   const byteArray = await response.Body!.transformToByteArray()
   return Buffer.concat([Buffer.from(byteArray)])
-} 
+}
+
+export const getS3Key = (userId: string, fileName: string): string => {
+    return `${userId}/data/${fileName}`;
+};

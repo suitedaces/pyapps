@@ -119,6 +119,7 @@ async function handleStreamlitResult(
         const appId = chat?.app_id
         const baseAppName =
             fileContext?.fileName?.replace('.csv', '') || 'streamlit-app'
+        const filePath = fileContext ? `/app/s3/${fileContext.userId}/data/${fileContext.fileName}` : null
 
         if (!appId) {
             // Create new app if doesn't exist
