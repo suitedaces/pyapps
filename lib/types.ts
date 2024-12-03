@@ -134,11 +134,11 @@ export interface ToolCall {
 }
 
 export interface FileContext {
-    userId: string
+    id: string
     fileName: string
     fileType: 'csv' | 'json' | 'txt'
     content?: string
-    analysis?: any
+    analysis: any
 }
 
 // Add this to your existing types

@@ -59,11 +59,7 @@ export default function Home() {
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
-    // Sandbox state
-    const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [sandboxErrors, setSandboxErrors] = useState<
-        Array<{ message: string }>
-    >([])
+
     const resizableGroupRef = useRef<any>(null)
 
     // App state
@@ -182,16 +178,16 @@ export default function Home() {
             experimental_streamData: true,
         },
         maxSteps: 10,
-        onResponse: (response) => {
+        onResponse: (response: Response) => {
             if (!response.ok) {
                 return
             }
         },
-        onFinish: async (message) => {
+        onFinish: async (message: Message) => {
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .filter(
-                        (invocation) =>
+                        (invocation: any) =>
                             invocation.toolName === 'create_streamlit_app' &&
                             invocation.state === 'result'
                     )
@@ -272,10 +268,10 @@ export default function Home() {
                     toolInvocations: message.toolInvocations,
                 }
 
-                setMessages((prev) => [...prev, assistantMessage])
+                setMessages((prev: Message[]) => [...prev, assistantMessage])
             }
         },
-        onError: (error) => {
+        onError: (error: any) => {
             setIsGeneratingCode(false)
         },
     })
@@ -619,7 +615,6 @@ export default function Home() {
                                     'shadow-lg hover:shadow-xl',
                                     'rounded-lg'
                                 )}
-                                size="icon"
                             >
                                 {isRightContentVisible ? (
                                     <ChevronRight className="h-4 w-4" />
