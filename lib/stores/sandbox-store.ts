@@ -4,43 +4,53 @@ interface SandboxState {
     sandboxId: string | null
     isInitializing: boolean
     lastExecutedCode: string | null
-    initializeSandbox: () => Promise<void>
+    error: string | null
+    updateSandbox: (code: string, forceExecute?: boolean) => Promise<string | null>
     killSandbox: () => Promise<void>
-    updateSandbox: (
-        code: string,
-        forceExecute: boolean
-    ) => Promise<string | null>
+    clearError: () => void
 }
 
 export const useSandboxStore = create<SandboxState>((set, get) => ({
     sandboxId: null,
     isInitializing: false,
     lastExecutedCode: null,
+    error: null,
 
-    initializeSandbox: async () => {
-        const state = get()
-        if (state.isInitializing || state.sandboxId) return
+    updateSandbox: async (code: string, forceExecute: boolean = false) => {
+        const { sandboxId, lastExecutedCode } = get()
 
-        set({ isInitializing: true })
+        if (!forceExecute && code === lastExecutedCode) {
+            return null
+        }
 
         try {
-            const response = await fetch('/api/sandbox/init', {
+            set({ isInitializing: true, error: null })
+            const response = await fetch(`/api/sandbox/${sandboxId || 'new'}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
             })
 
             if (!response.ok) {
-                throw new Error('Failed to initialize sandbox')
+                const errorData = await response.json()
+                throw new Error(errorData.details || 'Failed to execute code')
             }
 
             const data = await response.json()
-            set({
+            set({ 
+                lastExecutedCode: code,
                 sandboxId: data.sandboxId,
-                isInitializing: false,
+                isInitializing: false 
             })
+            return data.url
         } catch (error) {
-            console.error('Sandbox initialization error:', error)
-            set({ isInitializing: false })
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update sandbox'
+            set({ 
+                error: errorMessage,
+                isInitializing: false 
+            })
+            console.error('Error updating sandbox:', error)
+            return null
         }
     },
 
@@ -48,6 +58,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
         const { sandboxId } = get()
         if (sandboxId) {
             try {
+                set({ error: null })
                 await fetch(`/api/sandbox/${sandboxId}/kill`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -55,39 +66,12 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 })
                 set({ sandboxId: null })
             } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Failed to kill sandbox'
+                set({ error: errorMessage })
                 console.error('Error killing sandbox:', error)
             }
         }
     },
 
-    updateSandbox: async (code: string, forceExecute: boolean = false) => {
-        const { sandboxId, lastExecutedCode } = get()
-
-        if (!sandboxId) {
-            return null
-        }
-
-        if (!forceExecute && code === lastExecutedCode) {
-            return null
-        }
-
-        try {
-            const response = await fetch(`/api/sandbox/${sandboxId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
-
-            if (!response.ok) {
-                throw new Error(`Failed to execute code: ${response.status}`)
-            }
-
-            const data = await response.json()
-            set({ lastExecutedCode: code })
-            return data.url
-        } catch (error) {
-            console.error('Error updating sandbox:', error)
-            return null
-        }
-    },
+    clearError: () => set({ error: null })
 }))

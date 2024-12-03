@@ -288,17 +288,15 @@ export default function Home() {
     }, [chatLoading])
 
     // Sandbox state management
-    const { initializeSandbox, killSandbox, updateSandbox } = useSandboxStore()
+    const { killSandbox, updateSandbox } = useSandboxStore()
 
     useEffect(() => {
-        initializeSandbox()
-
         return () => {
             killSandbox()
         }
-    }, [initializeSandbox, killSandbox])
+    }, [killSandbox])
 
-    // Add streamlit update function
+    // Update streamlit app function
     const updateStreamlitApp = useCallback(
         async (code: string, forceExecute: boolean = false) => {
             const url = await updateSandbox(code, forceExecute)
@@ -309,11 +307,6 @@ export default function Home() {
         },
         [updateSandbox]
     )
-
-    // Initialize sandbox on mount
-    useEffect(() => {
-        initializeSandbox()
-    }, [initializeSandbox])
 
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
