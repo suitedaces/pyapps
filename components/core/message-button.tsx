@@ -36,7 +36,7 @@ export function MessageButton({
         if (!toolInvocations?.length) return null
 
         const toolCall = toolInvocations.find(
-            (inv) => inv.toolName === 'create_streamlit_app'
+            (inv) => inv.toolName === 'create_streamlit_app' || inv.state === 'result'
         )
 
         if (!toolCall) return null
@@ -58,11 +58,11 @@ export function MessageButton({
             onObjectClick?.({ object, result })
             onCodeClick?.(messageId)
         } else if (toolInvocations?.length) {
-            const streamlitCall = toolInvocations.find(
-                (inv) => inv.toolName === 'create_streamlit_app' && inv.state === 'result'
+            const toolCall = toolInvocations.find(
+                (inv) => (inv.toolName === 'create_streamlit_app' || inv.state === 'result') && inv.result
             )
-            if (streamlitCall?.result) {
-                onToolResultClick?.(streamlitCall.result)
+            if (toolCall?.result) {
+                onToolResultClick?.(toolCall.result)
                 onCodeClick?.(messageId)
             }
         }
@@ -106,10 +106,10 @@ export function MessageButton({
                     return 'Starting Code Generation...'
                 }
                 if (currentToolCall.state === 'delta') {
-                    return 'Generating Streamlit App...'
+                    return 'Generating Code...'
                 }
             }
-            return object ? object.title : 'Streamlit App Code'
+            return object ? object.title : 'View Tool Results'
         })()
 
         const subtitle = (() => {
@@ -121,7 +121,7 @@ export function MessageButton({
                     return 'Generating code...'
                 }
             }
-            return 'Click to see code'
+            return 'Click to see results'
         })()
 
         return (

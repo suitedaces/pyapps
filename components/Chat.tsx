@@ -204,7 +204,7 @@ export function Chat({
 
             if (file) {
                 setFileUploadState(prev => ({ ...prev, isUploading: true }))
-                
+
                 try {
                     const fileData = await uploadFile(file)
                     const fileContent = await file.text()
@@ -282,7 +282,8 @@ export function Chat({
                 (msg.createdAt &&
                     (!messageMap.get(key).createdAt ||
                         new Date(msg.createdAt) >
-                            new Date(messageMap.get(key).createdAt)))
+                            new Date(messageMap.get(key).createdAt))) ||
+                (msg.toolInvocations?.length && !messageMap.get(key).toolInvocations)
             ) {
                 messageMap.set(key, msg)
             }
@@ -392,19 +393,19 @@ export function Chat({
             "h-[calc(100vh-7rem)]",
             "overflow-hidden"
         )}>
-            <motion.div 
+            <motion.div
                 className={cn(
                     "flex-1 overflow-hidden",
                     isChatCentered ? "opacity-0" : "opacity-100"
                 )}
                 initial={isCreatingChat ? false : { opacity: 0, height: 0 }}
-                animate={{ 
+                animate={{
                     opacity: isChatCentered ? 0 : 1,
                     height: isChatCentered ? 0 : "auto"
                 }}
                 transition={{ duration: 0.5 }}
             >
-                <ScrollArea 
+                <ScrollArea
                     ref={scrollAreaRef}
                     className={cn(
                         "h-full",
@@ -422,6 +423,7 @@ export function Chat({
                                     isCreatingChat={isCreatingChat}
                                     object={(message as CustomMessage).object}
                                     result={(message as CustomMessage).result}
+                                    toolInvocations={(message as CustomMessage).toolInvocations}
                                     isLoading={isLoading}
                                     onObjectClick={({ object, result }) => {
                                         setCurrentPreview?.({ object, result })
@@ -501,13 +503,13 @@ export function Chat({
                 animate={{
                     y: isChatCentered ? "-50vh" : 0
                 }}
-                transition={{ 
-                    duration: 0.5, 
+                transition={{
+                    duration: 0.5,
                     ease: [0.32, 0.72, 0, 1]
                 }}
             >
-                <Chatbar 
-                    onSubmit={handleChatSubmit} 
+                <Chatbar
+                    onSubmit={handleChatSubmit}
                     isLoading={isLoading}
                     className={cn(
                         "transition-all duration-500",

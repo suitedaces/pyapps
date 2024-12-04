@@ -114,6 +114,12 @@ export default function Home() {
                         id: `${msg.id}-assistant`,
                         role: 'assistant',
                         content: msg.assistant_message,
+                        toolInvocations: msg.tool_calls?.map((call: any) => ({
+                            toolCallId: call.id,
+                            toolName: call.name,
+                            state: 'result',
+                            result: call.result
+                        })) || [],
                     })
                 }
                 return messages
@@ -535,7 +541,7 @@ export default function Home() {
                                 minSize={30}
                                 className="relative"
                             >
-                                <motion.div 
+                                <motion.div
                                     className={cn(
                                         "w-full flex flex-col",
                                         isChatCentered ? "h-screen justify-center" : "h-[calc(100vh-4rem)]"
