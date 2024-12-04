@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { createVersion } from './supabase'
 import { toolManager } from './tools/registry'
 import { LLMModelConfig, ModelProvider, StreamingTool, Tool } from './types'
+import { completeToolStream, updateToolDelta, generate } from './actions';
 
 interface FileContext {
     fileName: string
@@ -271,6 +272,15 @@ export class GruntyAgent {
                                             })}\n\n`
                                         )
                                     )
+
+                                    try {
+                                        const success = await updateToolDelta(part.argsTextDelta)
+                                        if (!success) {
+                                            console.warn('⚠️ Failed to update tool delta')
+                                        }
+                                    } catch (error) {
+                                        console.error('❌ Error updating tool delta:', error)
+                                    }
                                     break
 
                                 case 'tool-result':
@@ -350,6 +360,8 @@ export class GruntyAgent {
                                             throw versionError
                                         }
                                     }
+
+                                    await completeToolStream()
 
                                     // Send tool call completion first
                                     writer.write(

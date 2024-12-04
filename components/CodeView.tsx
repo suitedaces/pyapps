@@ -4,6 +4,10 @@ import { highlight, languages } from 'prismjs'
 import { useEffect, useState } from 'react'
 import Editor from 'react-simple-code-editor'
 
+import { readStreamableValue, useActions } from 'ai/rsc'
+import { type AI } from '@/lib/ai-config'
+
+
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 
@@ -12,8 +16,83 @@ interface CodeViewProps {
     isGeneratingCode: boolean
 }
 
+interface CodeViewState {
+    displayCode: string
+    isStreaming: boolean
+    error: string | null
+}
+
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
+
+    const { generate } = useActions<typeof AI>()
+
+    const [state, setState] = useState<CodeViewState>({
+        displayCode: '',
+        isStreaming: false,
+        error: null
+    })
+
+    useEffect(() => {
+        if (isGeneratingCode) {
+            handleCodeStreaming()
+        }
+    }, [isGeneratingCode])
+
+    useEffect(() => {
+        if (!state.isStreaming && code) {
+            const finalCode = typeof code === 'object' && 'code' in code
+                ? code.code
+                : String(code)
+
+            setState(prev => ({
+                ...prev,
+                displayCode: finalCode
+            }))
+        }
+    }, [code, state.isStreaming])
+
+    const handleCodeStreaming = async () => {
+        try {
+            setState(prev => ({
+                ...prev,
+                displayCode: ''
+            }))
+
+            const streamable = await generate()
+            let accumulatedCode = ''
+
+            // Read and process the stream
+            for await (const chunk of readStreamableValue(streamable)) {
+                console.log('📥 Stream Update:', {
+                    chunk,
+                    timestamp: new Date().toISOString()
+                })
+
+                const cleanChunk = String(chunk).replace(/\[object Object\]/g, '')
+                accumulatedCode += cleanChunk
+
+                setState(prev => ({
+                    ...prev,
+                    displayCode: accumulatedCode,
+                    isStreaming: true,
+                }))
+            }
+
+            setState(prev => ({
+                ...prev,
+                displayCode: accumulatedCode,
+                isStreaming: false
+            }))
+        } catch (error) {
+            console.error('Error in streaming:', error)
+            setState(prev => ({
+                ...prev,
+                error: 'Error streaming code',
+                isStreaming: false
+            }))
+        }
+    }
 
     useEffect(() => {
         if (code && !isGeneratingCode) {
@@ -38,20 +117,28 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         }
     }, [code, isGeneratingCode])
 
-    if (isGeneratingCode) {
-        return (
-            <Card className="bg-white border-border h-full">
-                <CardContent className="p-0 h-full flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-text" />
-                        <p className="text-sm text-text">Generating code...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        )
-    }
+    // if (isGeneratingCode) {
+    //     return (
+    //         <Card className="bg-white border-border h-full">
+    //             <CardContent className="p-0 h-full flex items-center justify-center">
+    //                 <div className="flex flex-col items-center gap-2">
+    //                     <Loader2 className="h-8 w-8 animate-spin text-text" />
+    //                     <p className="text-sm text-text">Generating code...</p>
+    //                 </div>
+    //             </CardContent>
+    //         </Card>
+    //     )
+    // }
 
-    if (!displayCode) {
+    useEffect(() => {
+        if (isGeneratingCode) {
+            console.log('🎬 CodeView: Generation Started')
+        } else {
+            console.log('🎭 CodeView: Generation Complete')
+        }
+    }, [isGeneratingCode])
+
+    if (!state.displayCode && !state.isStreaming) {
         return (
             <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
@@ -61,13 +148,14 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         )
     }
 
+
     return (
         <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow">
             <CardContent className="p-0 h-full relative">
                 <div className="overflow-auto h-full code-container">
                     <div className="min-w-max">
                         <Editor
-                            value={displayCode}
+                            value={state.displayCode || ''}
                             onValueChange={() => {}}
                             highlight={(codeToHighlight) => {
                                 try {
@@ -96,6 +184,13 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                         />
                     </div>
                 </div>
+
+                {state.isStreaming && (
+                    <div className="absolute top-2 right-2 flex items-center gap-2 bg-black/10 px-2 py-1 rounded">
+                        <Loader2 className="h-4 w-4 animate-spin text-text" />
+                        <span className="text-xs">Streaming...</span>
+                    </div>
+                )}
             </CardContent>
             <style jsx global>{`
                 .code-container {

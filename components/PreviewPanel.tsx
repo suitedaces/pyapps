@@ -47,7 +47,7 @@ export function PreviewPanel({
 
     return (
         <div className="relative h-full">
-            {showOverlay && (
+            {/* {showOverlay && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
                     <div className="flex flex-col items-center gap-3">
                         <Loader2 className="h-8 w-8 animate-spin" />
@@ -56,7 +56,7 @@ export function PreviewPanel({
                         </p>
                     </div>
                 </div>
-            )}
+            )} */}
             <div className="h-full flex flex-col">
                 <div className="flex items-center gap-2 p-2 border-b bg-muted/40">
                     <div className="flex items-center flex-grow gap-2 px-2 py-1.5 bg-background rounded-md border shadow-sm">

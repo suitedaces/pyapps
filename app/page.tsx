@@ -588,16 +588,14 @@ export default function Home() {
                                         minSize={45}
                                         className="w-full lg:w-1/2 p-2 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
                                     >
-                                        <PreviewPanel
-                                            streamlitUrl={streamlitUrl}
-                                            generatedCode={generatedCode}
-                                            isGeneratingCode={isGeneratingCode}
-                                            showCodeView={showCodeView}
-                                            onRefresh={handleRefresh}
-                                            onCodeViewToggle={
-                                                handleCodeViewToggle
-                                            }
-                                        />
+                                    <PreviewPanel
+                                        streamlitUrl={streamlitUrl}
+                                        generatedCode={generatedCode}
+                                        isGeneratingCode={isGeneratingCode}
+                                        showCodeView={showCodeView}
+                                        onRefresh={handleRefresh}
+                                        onCodeViewToggle={handleCodeViewToggle}
+                                    />
                                     </ResizablePanel>
                                 </>
                             )}
