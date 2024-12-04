@@ -6,8 +6,6 @@ import './globals.css'
 import { Providers } from './providers'
 import { AI } from '@/lib/ai-config'
 
-import { AI } from '@/lib/ai-config'
-
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
