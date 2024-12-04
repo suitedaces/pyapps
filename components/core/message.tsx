@@ -65,7 +65,7 @@ export function Message({
     return (
         <motion.div
             key={id}
-            initial={isCreatingChat ? false : { opacity: 0, y: 5 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             exit={isCreatingChat ? { opacity: 0 } : undefined}
             transition={{ duration: 0.2 }}

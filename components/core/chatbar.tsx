@@ -75,7 +75,8 @@ export default function Chatbar({
                 className={cn(
                     "flex flex-col gap-2",
                     "mx-auto",
-                    isCentered ? "max-w-[100%]" : "max-w-[800px]"
+                    isCentered ? "max-w-[100%]" : "max-w-[800px]",
+                    "transition-none"
                 )}
             >
                 {file && (

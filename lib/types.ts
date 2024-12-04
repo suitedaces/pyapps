@@ -185,3 +185,5 @@ export interface CustomMessage extends Message {
         [key: string]: any
     }>
 }
+
+export type { Message } from 'ai'

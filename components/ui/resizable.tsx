@@ -39,4 +39,12 @@ const ResizableHandle = ({
     </ResizablePrimitive.PanelResizeHandle>
 )
 
-export { ResizableHandle, ResizablePanel, ResizablePanelGroup }
+const CustomHandle = ({ ...props }) => (
+    <ResizableHandle {...props} withHandle className="relative">
+        <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
+            <div className="h-8 w-1 rounded-full bg-black" />
+        </div>
+    </ResizableHandle>
+)
+
+export { CustomHandle, ResizableHandle, ResizablePanel, ResizablePanelGroup }

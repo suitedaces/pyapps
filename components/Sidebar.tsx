@@ -15,7 +15,7 @@ import {
     Plus,
 } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { Logo } from '@/components/core/Logo'
@@ -66,6 +66,7 @@ export function Sidebar({
     const [isChatsCollapsed, setIsChatsCollapsed] = useState(false)
     const [session, setSession] = useState<Session | null>(null)
     const pathname = usePathname()
+    const router = useRouter()
     const supabase = createClientComponentClient()
 
     useEffect(() => {
@@ -116,24 +117,17 @@ export function Sidebar({
         currentChatId?: string | null
         onChatSelect?: (chatId: string) => void
     }) => {
-        // When collapsed, only show the current chat or the first chat
-        const chatsToShow = collapsed
-            ? [
-                  currentChatId
-                      ? chats.find((chat) => chat.id === currentChatId)
-                      : chats[0],
-              ].filter(Boolean)
-            : chats.slice(0, 5)
+        const router = useRouter()
+
+        const handleChatClick = (chatId: string) => {
+            router.push(`/chat/${chatId}`)
+            onChatSelect?.(chatId)
+        }
 
         return (
-            <div
-                className={cn(
-                    'flex flex-col gap-1',
-                    collapsed ? 'px-1' : 'px-2'
-                )}
-            >
+            <div className={cn('flex flex-col gap-1', collapsed ? 'px-1' : 'px-2')}>
                 <ScrollArea className="flex-1 w-full">
-                    {chatsToShow.map((chat: any) => (
+                    {chats.map((chat: any) => (
                         <TooltipProvider key={chat.id}>
                             <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
@@ -141,14 +135,13 @@ export function Sidebar({
                                         variant="ghost"
                                         className={cn(
                                             'w-full mb-1 relative group text-left',
-                                            collapsed
-                                                ? 'justify-center px-2'
-                                                : 'justify-start',
+                                            collapsed ? 'justify-center px-2' : 'justify-start',
                                             chat.id === currentChatId
                                                 ? 'bg-white/20 text-white hover:bg-white/20'
                                                 : 'text-white hover:bg-white/10 hover:text-white'
                                         )}
-                                        onClick={() => onChatSelect?.(chat.id)}
+                                        onClick={() => handleChatClick(chat.id)}
+                                        disabled={chat.id === currentChatId}
                                     >
                                         <MessageSquare
                                             className={cn(
@@ -158,14 +151,14 @@ export function Sidebar({
                                         />
                                         {!collapsed && (
                                             <span className="truncate text-left">
-                                                {chat.title || 'New'}
+                                                {chat.title || 'New Chat'}
                                             </span>
                                         )}
                                     </Button>
                                 </TooltipTrigger>
                                 {collapsed && (
                                     <TooltipContent side="right">
-                                        {chat.title || 'New'}
+                                        {chat.title || 'New Chat'}
                                     </TooltipContent>
                                 )}
                             </Tooltip>

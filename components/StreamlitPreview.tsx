@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Globe, Loader2 } from 'lucide-react'
-import { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useEffect, useCallback } from 'react'
 
 interface StreamlitPreviewProps {
     url: string | null
@@ -18,34 +18,30 @@ export const StreamlitPreview = forwardRef<
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const retryTimeoutRef = useRef<NodeJS.Timeout>()
 
-    // Function to refresh iframe
-    const refreshIframe = () => {
-        if (iframeRef.current) {
-            iframeRef.current.src = iframeRef.current.src
-        }
-    }
-
-    // Expose refreshIframe method through ref
-    useImperativeHandle(ref, () => ({
-        refreshIframe
-    }))
-
-    // Auto-refresh logic when URL changes
-    useEffect(() => {
-        if (url) {
-            // Initial refresh after 2 seconds
-            retryTimeoutRef.current = setTimeout(() => {
-                refreshIframe()
-            }, 2000)
-
-            // Cleanup timeout
-            return () => {
-                if (retryTimeoutRef.current) {
-                    clearTimeout(retryTimeoutRef.current)
+    const refreshIframe = useCallback(() => {
+        if (iframeRef.current && url) {
+            const currentSrc = iframeRef.current.src
+            iframeRef.current.src = ''
+            setTimeout(() => {
+                if (iframeRef.current) {
+                    iframeRef.current.src = currentSrc || url
                 }
-            }
+            }, 100)
         }
     }, [url])
+
+    useImperativeHandle(ref, () => ({
+        refreshIframe
+    }), [refreshIframe])
+
+    // Clear retry timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current)
+            }
+        }
+    }, [])
 
     // Handle iframe load error
     const handleIframeError = () => {

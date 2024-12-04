@@ -298,10 +298,22 @@ export function Chat({
         });
     }, [initialMessages]);
 
+    // Add this effect to handle route transitions
+    useEffect(() => {
+        if (chatId && initialMessages.length > 0) {
+            setAiMessages(initialMessages)
+        }
+    }, [chatId, initialMessages, setAiMessages])
+
+    // Update the messages memo to prevent re-renders during route changes
     const messages = useMemo(() => {
         const messageMap = new Map()
 
-        ;[...initialMessages, ...aiMessages].forEach((msg) => {
+        const allMessages = chatId 
+            ? initialMessages 
+            : [...initialMessages, ...aiMessages]
+
+        allMessages.forEach((msg) => {
             const key = `${msg.role}:${msg.content}:${msg.id}`
 
             if (
@@ -320,21 +332,12 @@ export function Chat({
             }
         })
 
-        const dedupedMessages = Array.from(messageMap.values()).sort((a, b) => {
+        return Array.from(messageMap.values()).sort((a, b) => {
             const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
             const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
             return timeA - timeB
         })
-
-        console.log('Final processed messages:', dedupedMessages.map(msg => ({
-            id: msg.id,
-            role: msg.role,
-            hasToolInvocations: !!(msg as any).toolInvocations?.length,
-            toolInvocations: (msg as any).toolInvocations
-        })));
-
-        return dedupedMessages
-    }, [initialMessages, aiMessages])
+    }, [chatId, initialMessages, aiMessages])
 
     useEffect(() => {
         console.log('Processed Messages:', messages.map(msg => ({
