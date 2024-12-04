@@ -5,10 +5,11 @@ import { useEffect, useState } from 'react'
 import Editor from 'react-simple-code-editor'
 
 import { readStreamableValue, useActions } from 'ai/rsc'
+import { type AI } from '@/lib/ai-config'
+
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
-import { type AI } from '@/lib/ai-config'
 
 interface CodeViewProps {
     code: string | { code: string }
@@ -93,17 +94,6 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         }
     }
 
-    // Log when code updates
-    useEffect(() => {
-        if (displayCode) {
-            console.log('🔄 Code Updated:', {
-                length: displayCode.length,
-                preview: displayCode.substring(0, 50),
-                timestamp: new Date().toISOString()
-            })
-        }
-    }, [displayCode])
-
     useEffect(() => {
         if (code && !isGeneratingCode) {
             try {
@@ -127,6 +117,19 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         }
     }, [code, isGeneratingCode])
 
+    // if (isGeneratingCode) {
+    //     return (
+    //         <Card className="bg-white border-border h-full">
+    //             <CardContent className="p-0 h-full flex items-center justify-center">
+    //                 <div className="flex flex-col items-center gap-2">
+    //                     <Loader2 className="h-8 w-8 animate-spin text-text" />
+    //                     <p className="text-sm text-text">Generating code...</p>
+    //                 </div>
+    //             </CardContent>
+    //         </Card>
+    //     )
+    // }
+
     useEffect(() => {
         if (isGeneratingCode) {
             console.log('🎬 CodeView: Generation Started')
@@ -135,7 +138,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         }
     }, [isGeneratingCode])
 
-    if (!state.displayCode && !state.isStreaming && !code) {
+    if (!state.displayCode && !state.isStreaming) {
         return (
             <Card className="bg-white border-border h-full">
                 <CardContent className="p-0 h-full flex items-center justify-center">
@@ -145,6 +148,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         )
     }
 
+
     return (
         <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow">
             <CardContent className="p-0 h-full relative">
@@ -152,16 +156,17 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                     <div className="min-w-max">
                         <Editor
                             value={state.displayCode || ''}
-                            onValueChange={() => { }}
-                            highlight={(code) => {
+                            onValueChange={() => {}}
+                            highlight={(codeToHighlight) => {
                                 try {
                                     return highlight(
-                                        code,
+                                        String(codeToHighlight),
                                         languages.python,
                                         'python'
                                     )
                                 } catch (error) {
-                                    return code
+                                    console.error('Highlighting error:', error)
+                                    return String(codeToHighlight)
                                 }
                             }}
                             padding={16}

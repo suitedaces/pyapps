@@ -35,8 +35,9 @@ export function MessageButton({
     const currentToolState = useMemo(() => {
         if (!toolInvocations?.length) return null
 
-        // Check for any tool call
-        const toolCall = toolInvocations[0]
+        const toolCall = toolInvocations.find(
+            (inv) => inv.toolName === 'create_streamlit_app' || inv.state === 'result'
+        )
 
         if (isLastMessage) {
             const loadingState = loadingStates[toolCall.toolCallId]
@@ -65,14 +66,10 @@ export function MessageButton({
             onObjectClick?.({ object, result })
             onCodeClick?.(messageId)
         } else if (toolInvocations?.length) {
-            // Find completed tool calls
-            const completedTools = toolInvocations.filter(inv =>
-                inv.state === 'result' || inv.result
+            const toolCall = toolInvocations.find(
+                (inv) => (inv.toolName === 'create_streamlit_app' || inv.state === 'result') && inv.result
             )
-
-            if (completedTools.length > 0) {
-                // Use the first completed tool's result
-                const toolCall = completedTools[0]
+            if (toolCall?.result) {
                 onToolResultClick?.(toolCall.result)
                 onCodeClick?.(messageId)
             }
@@ -119,19 +116,10 @@ export function MessageButton({
                     return 'Starting Tool Execution...'
                 }
                 if (currentToolCall.state === 'delta') {
-                    return 'Executing Tool...'
+                    return 'Generating Code...'
                 }
             }
-
-            if (object) return object.title
-
-            if (toolInvocations?.length) {
-                const completedTool = toolInvocations.find(inv => inv.state === 'result' || inv.result)
-                if (completedTool) {
-                    return `${completedTool.toolName} Result`
-                }
-            }
-            return 'Tool Result'
+            return object ? object.title : 'View Tool Results'
         })()
 
         const subtitle = (() => {
@@ -143,7 +131,7 @@ export function MessageButton({
                     return 'Processing...'
                 }
             }
-            return 'Click to see result'
+            return 'Click to see results'
         })()
 
         return (

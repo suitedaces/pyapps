@@ -310,7 +310,8 @@ export function Chat({
                 (msg.createdAt &&
                     (!messageMap.get(key).createdAt ||
                         new Date(msg.createdAt) >
-                            new Date(messageMap.get(key).createdAt)))
+                            new Date(messageMap.get(key).createdAt))) ||
+                (msg.toolInvocations?.length && !messageMap.get(key).toolInvocations)
             ) {
                 messageMap.set(key, {
                     ...msg,
@@ -469,6 +470,7 @@ export function Chat({
                                     isCreatingChat={isCreatingChat}
                                     object={(message as CustomMessage).object}
                                     result={(message as CustomMessage).result}
+                                    toolInvocations={(message as CustomMessage).toolInvocations}
                                     isLoading={isLoading}
                                     onObjectClick={({ object, result }) => {
                                         setCurrentPreview?.({ object, result })

@@ -276,7 +276,6 @@ export class GruntyAgent {
                                         )
                                     )
 
-                                    // Update tool delta with proper error handling
                                     try {
                                         const success = await updateToolDelta(part.argsTextDelta)
                                         if (!success) {

@@ -198,7 +198,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                     role: 'assistant' as const,
                     content: message.content,
                     createdAt: new Date(),
-                    toolInvocations: message.toolInvocations,
+                    toolInvocations: message.toolInvocations || [],
                 }
 
                 setMessages((prev) => [...prev, assistantMessage])
@@ -264,57 +264,54 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const router = useRouter()
     const { id } = useParams()
 
+    const fetchMessages = useCallback(async (chatId: string) => {
+        try {
+            setLoading(true)
+            const response = await fetch(
+                `/api/conversations/${chatId}/messages`
+            )
+            if (!response.ok) throw new Error('Failed to fetch messages')
+            const data = await response.json()
+
+            // Transform messages to the format expected by the AI SDK
+            const messages: Message[] = data.messages.flatMap((msg: any) => {
+                const messages: Message[] = []
+                if (msg.user_message) {
+                    messages.push({
+                        id: `${msg.id}-user`,
+                        role: 'user',
+                        content: msg.user_message,
+                    })
+                }
+                if (msg.assistant_message) {
+                    messages.push({
+                        id: `${msg.id}-assistant`,
+                        role: 'assistant',
+                        content: msg.assistant_message,
+                        toolInvocations: msg.tool_calls?.map((call: any) => ({
+                            toolCallId: call.id,
+                            toolName: call.name,
+                            state: 'result',
+                            result: call.result
+                        })) || [],
+                    })
+                }
+                return messages
+            })
+
+            setInitialMessages(messages)
+        } catch (error) {
+            console.error('Error fetching messages:', error)
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
     useEffect(() => {
-        async function fetchMessages() {
-            try {
-                setLoading(true)
-                const response = await fetch(
-                    `/api/conversations/${id}/messages`
-                )
-                if (!response.ok) throw new Error('Failed to fetch messages')
-                const data = await response.json()
-
-                // Transform messages to the format expected by the AI SDK
-                const messages: Message[] = data.messages.flatMap(
-                    (msg: any) => {
-                        const messages: Message[] = []
-                        if (msg.user_message) {
-                            messages.push({
-                                id: `${msg.id}-user`,
-                                role: 'user',
-                                content: msg.user_message,
-                            })
-                        }
-                        if (msg.assistant_message) {
-                            // Include tool calls and results in assistant messages
-                            messages.push({
-                                id: `${msg.id}-assistant`,
-                                role: 'assistant',
-                                content: msg.assistant_message,
-                                toolInvocations: msg.tool_calls?.map((call: any) => ({
-                                    toolCallId: call.id,
-                                    toolName: call.name,
-                                    state: 'result',
-                                    result: call.result
-                                })) || [],
-                            })
-                        }
-                        return messages
-                    }
-                )
-
-                setInitialMessages(messages)
-            } catch (error) {
-                console.error('Error fetching messages:', error)
-            } finally {
-                setLoading(false)
-            }
+        if (id && typeof id === 'string') {
+            fetchMessages(id)
         }
-
-        if (id) {
-            fetchMessages()
-        }
-    }, [id])
+    }, [id, fetchMessages])
 
     const fetchAndSetChats = useCallback(async () => {
         try {

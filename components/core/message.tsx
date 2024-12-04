@@ -82,7 +82,19 @@ export function Message({
                     </Avatar>
                     <div className="mx-2 p-4 break-words w-full">
                         <Markdown>{content}</Markdown>
-                        {renderPreviewButton()}
+                        {((toolInvocations || []).length > 0 || object) && (
+                            <MessageButton
+                                toolInvocations={toolInvocations || []}
+                                object={object}
+                                result={result}
+                                onObjectClick={onObjectClick}
+                                onToolResultClick={onToolResultClick}
+                                onCodeClick={onCodeClick}
+                                messageId={id}
+                                isLastMessage={isLastMessage}
+                                isLoading={isLoading}
+                            />
+                        )}
                     </div>
                 </div>
             )}
