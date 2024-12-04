@@ -44,7 +44,6 @@ export default function Home() {
 
     // Chat and UI state
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
-    const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [loading, setLoading] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } =
@@ -136,26 +135,117 @@ export default function Home() {
         [fetchMessages]
     )
 
-    // Update handleChatSelect to fetch messages and hide typing text
-    const handleChatSelect = useCallback(
-        (chatId: string) => {
-            setIsChatCentered(false)
-            setCurrentChatId(chatId)
-            fetchMessages(chatId)
+    // First, define the sandbox-related functions
+    const { killSandbox, updateSandbox } = useSandboxStore()
+
+    useEffect(() => {
+        return () => {
+            killSandbox()
+        }
+    }, [killSandbox])
+
+    // Then define updateStreamlitApp
+    const updateStreamlitApp = useCallback(
+        async (code: string, forceExecute = false) => {
+            if (!code) {
+                setStreamlitUrl(null)
+                setIsGeneratingCode(false)
+                return
+            }
+
+            const url = await updateSandbox(code, forceExecute)
+            if (url) {
+                setStreamlitUrl(url)
+                setIsGeneratingCode(false)
+            }
         },
-        [fetchMessages]
+        [updateSandbox]
     )
 
-    // Handle new chat creation
-    const handleNewChat = useCallback(async () => {
-        setIsCreatingChat(true)
+    // Now we can define handleChatSelect which depends on updateStreamlitApp
+    const handleChatSelect = useCallback(async (chatId: string) => {
+        setStreamlitUrl(null)
+        setIsGeneratingCode(true)
+        setCurrentChatId(chatId)
+        
         try {
-            const newChatId = generateUUID()
-            handleChatCreated(newChatId)
+            const response = await fetch(`/api/conversations/${chatId}/messages`)
+            if (!response.ok) throw new Error('Failed to fetch messages')
+            
+            const data = await response.json()
+            
+            const { data: chat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', chatId)
+                .single()
+
+            if (chat?.app_id) {
+                const { data: latestVersion } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (latestVersion?.code) {
+                    setGeneratedCode(latestVersion.code)
+                    await updateStreamlitApp(latestVersion.code, true)
+                    setCurrentApp({ id: chat.app_id })
+                }
+            } else {
+                const streamlitCode = data.messages
+                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                    .map((msg: any) => {
+                        const toolResult = msg.tool_results[0]
+                        if (toolResult && toolResult.name === 'create_streamlit_app') {
+                            return toolResult.result
+                        }
+                        return null
+                    })
+                    .filter(Boolean)
+                    .pop()
+
+                if (streamlitCode) {
+                    setGeneratedCode(streamlitCode)
+                    await updateStreamlitApp(streamlitCode, true)
+                }
+            }
+
+            const messages: Message[] = data.messages.flatMap((msg: any) => {
+                const messages: Message[] = []
+                if (msg.user_message) {
+                    messages.push({
+                        id: `${msg.id}-user`,
+                        role: 'user',
+                        content: msg.user_message,
+                    })
+                }
+                if (msg.assistant_message) {
+                    messages.push({
+                        id: `${msg.id}-assistant`,
+                        role: 'assistant',
+                        content: msg.assistant_message,
+                    })
+                }
+                return messages
+            })
+            setInitialMessages(messages)
+            
+        } catch (error) {
+            console.error('Error loading chat:', error)
         } finally {
-            setIsCreatingChat(false)
+            setIsGeneratingCode(false)
         }
-    }, [handleChatCreated])
+    }, [supabase, updateStreamlitApp])
+
+    // Handle new chat creation
+    const handleNewChat = useCallback(() => {
+        setStreamlitUrl(null)
+        setGeneratedCode('')
+        setCurrentChatId(null)
+    }, [])
 
     // Modify handleChatSubmit to trigger the slide animation
     const handleChatSubmit = useCallback(() => {
@@ -282,27 +372,6 @@ export default function Home() {
             setGeneratedCode('')
         }
     }, [chatLoading])
-
-    // Sandbox state management
-    const { killSandbox, updateSandbox } = useSandboxStore()
-
-    useEffect(() => {
-        return () => {
-            killSandbox()
-        }
-    }, [killSandbox])
-
-    // Update streamlit app function
-    const updateStreamlitApp = useCallback(
-        async (code: string, forceExecute: boolean = false) => {
-            const url = await updateSandbox(code, forceExecute)
-            if (url) {
-                setStreamlitUrl(url)
-                setIsGeneratingCode(false)
-            }
-        },
-        [updateSandbox]
-    )
 
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
