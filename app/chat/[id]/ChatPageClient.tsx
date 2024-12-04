@@ -308,7 +308,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     }, [])
 
     useEffect(() => {
-        if (id) {
+        if (id && typeof id === 'string') {
             fetchMessages(id)
         }
     }, [id, fetchMessages])

@@ -81,9 +81,9 @@ export function Message({
                     </Avatar>
                     <div className="mx-2 p-4 break-words w-full">
                         <Markdown>{content}</Markdown>
-                        {(toolInvocations?.length > 0 || object) && (
+                        {((toolInvocations || []).length > 0 || object) && (
                             <MessageButton
-                                toolInvocations={toolInvocations}
+                                toolInvocations={toolInvocations || []}
                                 object={object}
                                 result={result}
                                 onObjectClick={onObjectClick}
