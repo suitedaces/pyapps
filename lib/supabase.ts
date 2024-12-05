@@ -74,6 +74,7 @@ export async function switchVersion(
 
 export async function getVersionHistory(appId: string): Promise<AppVersion[]> {
     try {
+        console.log('Fetching versions for app:', appId)
         const { data, error } = await supabase
             .from('app_versions')
             .select('*')
@@ -85,15 +86,10 @@ export async function getVersionHistory(appId: string): Promise<AppVersion[]> {
             throw error
         }
 
-        // Set the latest version as current and transform data to match AppVersion type
-        if (data && data.length > 0) {
-            const latestVersion = data[0]
-            await supabase
-                .from('apps')
-                .update({ current_version_id: latestVersion.id })
-                .eq('id', appId)
+        console.log('Fetched versions:', data)
 
-            // Transform data to include is_current
+        // Transform data to include is_current
+        if (data && data.length > 0) {
             return data.map((version, index) => ({
                 ...version,
                 is_current: index === 0, // Mark only the latest version as current

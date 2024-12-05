@@ -2,7 +2,7 @@ import { GruntyAgent } from '@/lib/agent'
 import { getModelClient } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
-import { FileContext } from '@/lib/types'
+import { FileContext, Tool } from '@/lib/types'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { convertToCoreMessages } from 'ai'
 import { cookies } from 'next/headers'
@@ -15,7 +15,9 @@ const RequestSchema = z.object({
         z.object({
             content: z.string(),
             role: z.enum(['user', 'assistant', 'system']),
-            createdAt: z.date().optional(),
+            createdAt: z
+                .union([z.date(), z.string().transform((str) => new Date(str))])
+                .optional(),
         })
     ),
     model: z.object({
@@ -94,8 +96,8 @@ export async function POST(
                 id: fileData.id,
                 fileName: fileData.file_name,
                 fileType: fileData.file_type as 'csv' | 'json' | 'txt',
-                content: fileContent,
-                analysis: fileData.analysis,
+                content: fileContent || undefined,
+                analysis: fileData.analysis
             }
 
             console.log('📄 File context created:', {
@@ -158,7 +160,7 @@ export async function POST(
             params.id,
             session.user.id,
             convertToCoreMessages(messages),
-            tools,
+            tools as Tool[],
             fileContext
         )
     } catch (error) {

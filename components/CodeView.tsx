@@ -6,36 +6,41 @@ import Editor from 'react-simple-code-editor'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
+import { LoadingSandbox } from '@/components/LoadingSandbox'
 
 interface CodeViewProps {
-    code: string
+    code: string | { code: string }
     isGeneratingCode: boolean
 }
 
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
-    const [displayCode, setDisplayCode] = useState(code)
+    const [displayCode, setDisplayCode] = useState('')
 
     useEffect(() => {
-        if (code) {
-            const formattedCode = code
-                .split('\n')
-                .map((line) => line.trim())
-                .join('\n')
-            setDisplayCode(formattedCode)
+        if (code && !isGeneratingCode) {
+            try {
+                const codeStr = typeof code === 'object' && 'code' in code
+                    ? code.code
+                    : String(code)
+
+                const formattedCode = codeStr
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .join('\n')
+                setDisplayCode(formattedCode)
+                console.log('Code type:', typeof code)
+                console.log('Formatted code:', formattedCode)
+            } catch (error) {
+                console.error('Error formatting code:', error)
+                setDisplayCode(typeof code === 'string' ? code : '')
+            }
+        } else if (!code) {
+            setDisplayCode('')
         }
     }, [code, isGeneratingCode])
 
     if (isGeneratingCode) {
-        return (
-            <Card className="bg-white border-border h-full">
-                <CardContent className="p-0 h-full flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-text" />
-                        <p className="text-sm text-text">Generating code...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        )
+        return <LoadingSandbox message="Generating code..." />
     }
 
     if (!displayCode) {
@@ -56,9 +61,18 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                         <Editor
                             value={displayCode}
                             onValueChange={() => {}}
-                            highlight={(code) =>
-                                highlight(code, languages.python, 'python')
-                            }
+                            highlight={(codeToHighlight) => {
+                                try {
+                                    return highlight(
+                                        String(codeToHighlight),
+                                        languages.python,
+                                        'python'
+                                    )
+                                } catch (error) {
+                                    console.error('Highlighting error:', error)
+                                    return String(codeToHighlight)
+                                }
+                            }}
                             padding={16}
                             style={{
                                 fontFamily:

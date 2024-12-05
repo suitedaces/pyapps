@@ -10,7 +10,6 @@ import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-
 import { Message } from 'ai'
 
 import {
@@ -85,13 +84,14 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const [loading, setLoading] = useState(false)
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } =
         useSidebar()
+    const [showTypingText, setShowTypingText] = useState(true)
+    const [activeTab, setActiveTab] = useState('preview')
 
     // Code and preview state
     const [generatedCode, setGeneratedCode] = useState<string>('')
     const [isGeneratingCode, setIsGeneratingCode] = useState(false)
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
     const [showCodeView, setShowCodeView] = useState(false)
-    const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
 
     const handleRefresh = async () => {
         if (sandboxId && session?.user?.id) {
@@ -222,40 +222,61 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     >([])
 
     // Sandbox store hooks
-    const { initializeSandbox, killSandbox, updateSandbox } = useSandboxStore()
+    const { killSandbox, updateSandbox } = useSandboxStore()
 
-    // Add a ref to track initialization
-    const initializationComplete = useRef(false)
-    const initializationPromise = useRef<Promise<void> | null>(null)
 
-    // Modified initialization function that returns a promise
-    const ensureSandboxInitialized = useCallback(async () => {
-        if (initializationComplete.current) {
-            return
-        }
+    // Add a loading state ref to prevent multiple executions
+    const isExecutingRef = useRef(false)
 
-        if (!initializationPromise.current) {
-            initializationPromise.current = (async () => {
-                await initializeSandbox()
-                initializationComplete.current = true
-            })()
-        }
+    // Add new state for sandbox loading
+    const [isLoadingSandbox, setIsLoadingSandbox] = useState(false)
 
-        return initializationPromise.current
-    }, [initializeSandbox])
-
-    // Modified updateStreamlitApp to ensure initialization
+    // Modify updateStreamlitApp
     const updateStreamlitApp = useCallback(
         async (code: string, forceExecute = false) => {
-            await ensureSandboxInitialized()
+            if (!code) {
+                setStreamlitUrl(null)
+                setIsGeneratingCode(false)
+                return null
+            }
 
-            const url = await updateSandbox(code, forceExecute)
-            if (url) {
-                setStreamlitUrl(url)
+            // Prevent multiple simultaneous executions
+            if (isExecutingRef.current) {
+                console.log('⚠️ Already executing, skipping...')
+                return null
+            }
+
+            isExecutingRef.current = true
+            setIsLoadingSandbox(true)  // Show loading state while sandbox executes
+
+            try {
+                // Try up to 3 times
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        console.log(` Attempt ${attempt} to update sandbox...`)
+                        const url = await updateSandbox(code, forceExecute)
+                        if (url) {
+                            console.log('✅ Sandbox updated successfully')
+                            setStreamlitUrl(url)
+                            return url
+                        }
+                    } catch (error) {
+                        console.error(`❌ Attempt ${attempt} failed:`, error)
+                        if (attempt === 3) throw error
+                        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+                    }
+                }
+                return null
+            } catch (error) {
+                console.error('❌ All attempts to update sandbox failed:', error)
+                return null
+            } finally {
+                isExecutingRef.current = false
+                setIsLoadingSandbox(false)  // Hide loading state when done
                 setIsGeneratingCode(false)
             }
         },
-        [updateSandbox, ensureSandboxInitialized]
+        [updateSandbox]
     )
 
     useEffect(() => {
@@ -279,52 +300,91 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
 
     const router = useRouter()
-    const { id } = useParams()
+    const { id } = useParams() as { id: string }
 
-    useEffect(() => {
-        async function fetchMessages() {
-            try {
-                setLoading(true)
-                const response = await fetch(
-                    `/api/conversations/${id}/messages`
-                )
-                if (!response.ok) throw new Error('Failed to fetch messages')
-                const data = await response.json()
+    // First, define loadAppAndVersion
+    const loadAppAndVersion = useCallback(async () => {
+        if (!currentChatId) return
+        
+        try {
+            const { data: chat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', currentChatId)
+                .single()
 
-                // Transform messages to the format expected by the AI SDK
-                const messages: Message[] = data.messages.flatMap(
-                    (msg: any) => {
-                        const messages: Message[] = []
-                        if (msg.user_message) {
-                            messages.push({
-                                id: `${msg.id}-user`,
-                                role: 'user',
-                                content: msg.user_message,
-                            })
-                        }
-                        if (msg.assistant_message) {
-                            messages.push({
-                                id: `${msg.id}-assistant`,
-                                role: 'assistant',
-                                content: msg.assistant_message,
-                            })
-                        }
-                        return messages
-                    }
-                )
+            if (chat?.app_id) {
+                setCurrentApp({ id: chat.app_id })
+                const { data: versions } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
 
-                setInitialMessages(messages)
-            } catch (error) {
-                console.error('Error fetching messages:', error)
-            } finally {
-                setLoading(false)
+                if (versions?.code) {
+                    setGeneratedCode(versions.code)
+                    await updateStreamlitApp(versions.code, true)
+                    setIsRightContentVisible(true)
+                }
             }
+        } catch (error) {
+            console.error('Error loading app:', error)
         }
+    }, [currentChatId, supabase, updateStreamlitApp])
 
-        if (id) {
-            fetchMessages()
+    // Then define loadChat
+    const loadChat = useCallback(async (chatId: string) => {
+        console.log('🔄 Loading chat:', chatId)
+        setIsGeneratingCode(true)
+        try {
+            const response = await fetch(`/api/conversations/${chatId}/messages`)
+            if (!response.ok) throw new Error('Failed to fetch messages')
+            const data = await response.json()
+            console.log('📥 Received messages:', data.messages)
+            
+            const messages: Message[] = data.messages.flatMap((msg: any) => {
+                const messages: Message[] = []
+                if (msg.user_message) {
+                    messages.push({
+                        id: `${msg.id}-user`,
+                        role: 'user',
+                        content: msg.user_message,
+                    })
+                }
+                if (msg.assistant_message) {
+                    messages.push({
+                        id: `${msg.id}-assistant`,
+                        role: 'assistant',
+                        content: msg.assistant_message,
+                    })
+                }
+                return messages
+            })
+
+            console.log('✨ Transformed messages:', messages)
+            setInitialMessages(messages)
+            await loadAppAndVersion()
+        } catch (error) {
+            console.error('❌ Error loading chat:', error)
+        } finally {
+            setIsGeneratingCode(false)
         }
-    }, [id])
+    }, [loadAppAndVersion, setInitialMessages, setIsGeneratingCode])
+
+    // Finally use it in useEffect
+    useEffect(() => {
+        if (id && id === currentChatId) {
+            setCurrentChatId(id)
+            loadChat(id)
+        }
+    }, [id, currentChatId, loadChat])
+
+    // Update chat selection handler
+    const handleChatSelect = useCallback((chatId: string) => {
+        router.push(`/chat/${chatId}`)
+    }, [router])
 
     const fetchAndSetChats = useCallback(async () => {
         try {
@@ -352,14 +412,6 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         }
     }, [])
 
-    const handleChatSelect = useCallback(
-        (chatId: string) => {
-            setCurrentChatId(chatId)
-            router.replace(`/chat/${chatId}`, { scroll: false })
-        },
-        [router]
-    )
-
     const handleNewChat = useCallback(async () => {
         setCurrentChatId(null)
         router.replace('/', { scroll: false })
@@ -369,6 +421,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     // Handle chat creation callback
     const handleChatCreated = useCallback(
         (chatId: string) => {
+            setShowTypingText(false)
             setCurrentChatId(chatId)
             router.replace(`/chat/${chatId}`)
         },
@@ -391,71 +444,72 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         if (generatedCode && sandboxId) {
             updateStreamlitApp(generatedCode, true)
         }
-    }, [])
+    }, [generatedCode, sandboxId, updateStreamlitApp])
 
-    // Modify handleVersionChange
+    // Update version change handler
     const handleVersionChange = async (version: AppVersion) => {
-        if (!version.code) {
-            return
-        }
+        if (!version.code) return
 
         isVersionSwitching.current = true
         setIsGeneratingCode(true)
 
         try {
-            await ensureSandboxInitialized()
             setGeneratedCode(version.code)
             await updateStreamlitApp(version.code, true)
         } catch (error) {
-            setSandboxErrors((prev) => [
-                ...prev,
-                {
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : 'Error updating version',
-                },
-            ])
+            setSandboxErrors((prev) => [...prev, {
+                message: error instanceof Error ? error.message : 'Error updating version'
+            }])
         } finally {
             setIsGeneratingCode(false)
             isVersionSwitching.current = false
         }
     }
 
-    // Modify cleanup
+    // Simplify cleanup
     useEffect(() => {
         return () => {
             killSandbox()
-            initializationComplete.current = false
-            initializationPromise.current = null
         }
     }, [killSandbox])
 
-    // Modify fetchAppId
+    // Modify fetchAppId to handle errors better
     const fetchAppId = useCallback(async () => {
         if (!currentChatId) return
-
-        const { data: chat } = await supabase
-            .from('chats')
-            .select('app_id')
-            .eq('id', currentChatId)
-            .single()
-
-        if (chat?.app_id) {
-            setCurrentApp({ id: chat.app_id })
-
-            const { data: versions } = await supabase
-                .from('versions')
-                .select('*')
-                .eq('app_id', chat.app_id)
-                .order('created_at', { ascending: false })
-                .limit(1)
+        
+        try {
+            console.log('🔍 Fetching app for chat:', currentChatId)
+            const { data: chat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', currentChatId)
                 .single()
 
-            if (versions?.code) {
-                setGeneratedCode(versions.code)
-                await updateStreamlitApp(versions.code, true)
+            if (chat?.app_id) {
+                console.log('📱 Found app:', chat.app_id)
+                setCurrentApp({ id: chat.app_id })
+
+                const { data: versions } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (versions?.code) {
+                    console.log('📦 Found latest version, executing code...')
+                    setGeneratedCode(versions.code)
+                    await updateStreamlitApp(versions.code, true)
+                    setIsRightContentVisible(true)
+                } else {
+                    console.log('⚠️ No code found in versions')
+                }
+            } else {
+                console.log('ℹ️ No app found for chat')
             }
+        } catch (error) {
+            console.error('❌ Error fetching app:', error)
         }
     }, [currentChatId, supabase, updateStreamlitApp])
 
@@ -476,6 +530,86 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
             </div>
         </ResizableHandle>
     )
+
+    const handleChatSubmit = useCallback(() => {
+        setShowTypingText(false)
+    }, [])
+
+    // Add this function before the useEffect hooks
+    const fetchToolResults = useCallback(async () => {
+        if (!currentChatId) return
+
+        try {
+            const response = await fetch(
+                `/api/conversations/${currentChatId}/messages`
+            )
+            if (!response.ok) throw new Error('Failed to fetch messages')
+
+            const data = await response.json()
+            
+            // Find the last Streamlit code generation result
+            const streamlitCode = data.messages
+                .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                .map((msg: any) => {
+                    const toolResult = msg.tool_results[0]
+                    if (toolResult && toolResult.name === 'create_streamlit_app') {
+                        return toolResult.result
+                    }
+                    return null
+                })
+                .filter(Boolean)
+                .pop()
+
+            if (streamlitCode) {
+                setGeneratedCode(streamlitCode)
+                // Force execute the code when loading an existing chat
+                await updateStreamlitApp(streamlitCode, true)
+            }
+        } catch (error) {
+            console.error('Error fetching tool results:', error)
+        }
+    }, [currentChatId, updateStreamlitApp])
+
+    // The existing useEffect will now work with the defined function
+    useEffect(() => {
+        const initializeChatAndSandbox = async () => {
+            if (currentChatId) {
+                await fetchToolResults()
+            }
+        }
+        
+        initializeChatAndSandbox()
+    }, [currentChatId, fetchToolResults])
+
+    useEffect(() => {
+        if (generatedCode) {
+            setIsRightContentVisible(true)
+        }
+    }, [generatedCode])
+
+    useEffect(() => {
+        console.log('Current state:', {
+            currentChatId,
+            generatedCode: !!generatedCode,
+            streamlitUrl,
+            isRightContentVisible
+        })
+    }, [currentChatId, generatedCode, streamlitUrl, isRightContentVisible])
+
+    // Add cleanup on unmount
+    useEffect(() => {
+        return () => {
+            isExecutingRef.current = false
+        }
+    }, [])
+
+    // Add this useEffect to sync messages when initialMessages changes
+    useEffect(() => {
+        if (initialMessages.length > 0) {
+            console.log('🔄 Syncing messages:', initialMessages)
+            setMessages(initialMessages)
+        }
+    }, [initialMessages, setMessages])
 
     if (isLoading) {
         return <div>Loading...</div>
@@ -525,12 +659,24 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                <Chat
-                                    chatId={currentChatId}
-                                    initialMessages={initialMessages}
-                                    onChatCreated={handleChatCreated}
-                                    onChatFinish={handleChatFinish}
-                                />
+                                <div className="max-w-[800px] mx-auto w-full h-full">
+                                    <Chat
+                                        chatId={currentChatId}
+                                        initialMessages={initialMessages}
+                                        onChatCreated={handleChatCreated}
+                                        onChatSubmit={handleChatSubmit}
+                                        onChatFinish={handleChatFinish}
+                                        onUpdateStreamlit={updateStreamlitApp}
+                                        setActiveTab={setActiveTab}
+                                        setIsRightContentVisible={
+                                            setIsRightContentVisible
+                                        }
+                                        onCodeClick={() => {
+                                            setActiveTab('code')
+                                            setIsRightContentVisible(true)
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </ResizablePanel>
 
@@ -546,6 +692,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                                         streamlitUrl={streamlitUrl}
                                         generatedCode={generatedCode}
                                         isGeneratingCode={isGeneratingCode}
+                                        isLoadingSandbox={isLoadingSandbox}
                                         showCodeView={showCodeView}
                                         onRefresh={handleRefresh}
                                         onCodeViewToggle={handleCodeViewToggle}

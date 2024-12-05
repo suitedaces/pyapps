@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { uploadToS3 } from '@/lib/s3'
 
 // File metadata validation schema
 const FileMetadataSchema = z.object({
@@ -45,91 +46,60 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const supabase = createRouteHandlerClient({ cookies })
-    const {
-        data: { user },
-        error: userError,
-    } = await supabase.auth.getUser()
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
 
-    if (userError || !user) {
-        return NextResponse.json(
-            { error: 'Not authenticated' },
-            { status: 401 }
-        )
+    if (!session) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
     try {
-        const formData = await req.formData()
-        const file = formData.get('file') as File
+        const formData = await req.formData();
+        const file = formData.get('file') as File;
 
         if (!file) {
-            return NextResponse.json(
-                { error: 'No file provided' },
-                { status: 400 }
-            )
+            return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
         const metadata = await FileMetadataSchema.parseAsync({
             fileName: file.name,
-            fileType: file.name.split('.').pop()?.toLowerCase() as
-                | 'csv'
-                | 'json'
-                | 'txt',
+            fileType: file.name.split('.').pop()?.toLowerCase() as 'csv' | 'json' | 'txt',
             fileSize: file.size,
             chatId: formData.get('chatId')?.toString(),
-        })
+        });
 
-        const fileContent = await file.text()
-        const sanitizedContent = fileContent
-            .split('\n')
-            .map((row) => row.replace(/[\r\n]+/g, ''))
-            .join('\n')
+        const fileContent = await file.text();
+        
+        // Upload to S3 in userId/data/ prefix
+        const s3Key = `${session.user.id}/data/${metadata.fileName}`;
+        await uploadToS3(Buffer.from(fileContent), s3Key, `text/${metadata.fileType}`);
 
-        const fileId = generateUUID()
-        const fileUrl = `/files/${fileId}/${metadata.fileName}`
-        const backupUrl = `/backup/files/${fileId}/${metadata.fileName}`
-
-        let analysis = null
+        let analysis = null;
         if (metadata.fileType === 'csv') {
-            analysis = await analyzeFile(fileContent, 'csv', { detailed: true })
+            analysis = await analyzeFile(fileContent, 'csv', { detailed: true });
         }
 
         const { data, error } = await supabase
             .from('files')
             .insert({
-                id: fileId,
-                user_id: user.id,
-                chat_id: metadata.chatId,
+                user_id: session.user.id,
                 file_name: metadata.fileName,
                 file_type: metadata.fileType,
                 file_size: metadata.fileSize,
-                file_url: fileUrl,
-                backup_url: backupUrl,
-                content_hash: sanitizedContent,
+                s3_key: s3Key,
                 analysis,
                 created_at: new Date().toISOString(),
                 expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                last_accessed: new Date().toISOString(),
             })
             .select()
-            .single()
+            .single();
 
-        if (error) throw error
+        if (error) throw error;
 
-        return NextResponse.json({
-            id: fileId,
-            fileName: metadata.fileName,
-            fileType: metadata.fileType,
-            analysis,
-        })
+        return NextResponse.json(data);
     } catch (error) {
-        return NextResponse.json(
-            {
-                error:
-                    error instanceof z.ZodError
-                        ? 'Invalid file data'
-                        : 'Failed to upload file',
-            },
-            { status: 500 }
-        )
+        console.error('Failed to upload file:', error);
+        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
     }
 }

@@ -2,32 +2,71 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
+import { App, ExecutionResult } from '@/lib/schema'
 import { cn } from '@/lib/utils'
-import { Message as AIMessage } from 'ai'
+import { Message as AIMessage, ToolInvocation } from 'ai'
 import { motion } from 'framer-motion'
+import { Terminal } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Markdown } from './markdown'
+import { MessageButton } from './message-button'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
+    isLoading?: boolean
+    object?: App
+    result?: ExecutionResult
+    onObjectClick?: (preview: {
+        object: App | undefined
+        result: ExecutionResult | undefined
+    }) => void
+    onToolResultClick?: (result: string) => void
+    onCodeClick?: (messageId: string) => void
+    isCreatingChat?: boolean
 }
-
 export function Message({
     role,
     content,
     id,
     isLastMessage = false,
+    object,
+    result,
+    toolInvocations,
+    onObjectClick,
+    onToolResultClick,
+    onCodeClick,
+    isLoading,
+    isCreatingChat = false,
 }: MessageProps) {
     const isUser = role === 'user'
     const { session } = useAuth()
     const user = session?.user
 
+    const renderPreviewButton = () => {
+        if (!toolInvocations?.length && !object) return null
+
+        return (
+            <MessageButton
+                toolInvocations={toolInvocations}
+                object={object}
+                result={result}
+                onObjectClick={onObjectClick}
+                onToolResultClick={onToolResultClick}
+                onCodeClick={onCodeClick}
+                messageId={id}
+                isLastMessage={isLastMessage}
+                isLoading={isLoading}
+            />
+        )
+    }
+
     return (
         <motion.div
             key={id}
-            initial={{ opacity: 0, y: 5 }}
+            initial={isCreatingChat ? false : { opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={isCreatingChat ? { opacity: 0 } : undefined}
             transition={{ duration: 0.2 }}
             className={cn(
                 'flex w-full',
@@ -42,6 +81,7 @@ export function Message({
                     </Avatar>
                     <div className="mx-2 p-4 break-words w-full">
                         <Markdown>{content}</Markdown>
+                        {renderPreviewButton()}
                     </div>
                 </div>
             )}

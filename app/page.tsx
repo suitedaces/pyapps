@@ -2,7 +2,6 @@
 
 import { Chat } from '@/components/Chat'
 import { Logo } from '@/components/core/Logo'
-import { TypingText } from '@/components/core/typing-text'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { Sidebar } from '@/components/Sidebar'
@@ -21,6 +20,7 @@ import { Message } from 'ai'
 import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 
 import { VersionSelector } from '@/components/VersionSelector'
 import modelsList from '@/lib/models.json'
@@ -44,13 +44,12 @@ export default function Home() {
 
     // Chat and UI state
     const [currentChatId, setCurrentChatId] = useState<string | null>(null)
-    const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [loading, setLoading] = useState(false)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } =
         useSidebar()
     const { session, isLoading: isAuthLoading } = useAuth()
-    const [showTypingText, setShowTypingText] = useState(true)
+    const [activeTab, setActiveTab] = useState('preview')
 
     // Right panel state
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
@@ -59,15 +58,14 @@ export default function Home() {
     const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
-    // Sandbox state
-    const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [sandboxErrors, setSandboxErrors] = useState<
-        Array<{ message: string }>
-    >([])
+
     const resizableGroupRef = useRef<any>(null)
 
     // App state
     const [currentApp, setCurrentApp] = useState<{ id: string } | null>(null)
+
+    // Add new state for chat position
+    const [isChatCentered, setIsChatCentered] = useState(true)
 
     // Fetch chats for sidebar
     const { data: sidebarChats, isLoading: isLoadingChats } = useQuery({
@@ -131,36 +129,127 @@ export default function Home() {
     // Handle chat creation callback
     const handleChatCreated = useCallback(
         (chatId: string) => {
-            setShowTypingText(false)
             setCurrentChatId(chatId)
             fetchMessages(chatId)
         },
         [fetchMessages]
     )
 
-    // Update handleChatSelect to fetch messages and hide typing text
-    const handleChatSelect = useCallback(
-        (chatId: string) => {
-            setShowTypingText(false)
-            setCurrentChatId(chatId)
-            fetchMessages(chatId)
+    // First, define the sandbox-related functions
+    const { killSandbox, updateSandbox } = useSandboxStore()
+
+    useEffect(() => {
+        return () => {
+            killSandbox()
+        }
+    }, [killSandbox])
+
+    // Then define updateStreamlitApp
+    const updateStreamlitApp = useCallback(
+        async (code: string, forceExecute = false) => {
+            if (!code) {
+                setStreamlitUrl(null)
+                setIsGeneratingCode(false)
+                return
+            }
+
+            const url = await updateSandbox(code, forceExecute)
+            if (url) {
+                setStreamlitUrl(url)
+                setIsGeneratingCode(false)
+            }
         },
-        [fetchMessages]
+        [updateSandbox]
     )
+
+    // Now we can define handleChatSelect which depends on updateStreamlitApp
+    const handleChatSelect = useCallback(async (chatId: string) => {
+        setStreamlitUrl(null)
+        setIsGeneratingCode(true)
+        setCurrentChatId(chatId)
+        
+        try {
+            const response = await fetch(`/api/conversations/${chatId}/messages`)
+            if (!response.ok) throw new Error('Failed to fetch messages')
+            
+            const data = await response.json()
+            
+            const { data: chat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', chatId)
+                .single()
+
+            if (chat?.app_id) {
+                const { data: latestVersion } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (latestVersion?.code) {
+                    setGeneratedCode(latestVersion.code)
+                    await updateStreamlitApp(latestVersion.code, true)
+                    setCurrentApp({ id: chat.app_id })
+                }
+            } else {
+                const streamlitCode = data.messages
+                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                    .map((msg: any) => {
+                        const toolResult = msg.tool_results[0]
+                        if (toolResult && toolResult.name === 'create_streamlit_app') {
+                            return toolResult.result
+                        }
+                        return null
+                    })
+                    .filter(Boolean)
+                    .pop()
+
+                if (streamlitCode) {
+                    setGeneratedCode(streamlitCode)
+                    await updateStreamlitApp(streamlitCode, true)
+                }
+            }
+
+            const messages: Message[] = data.messages.flatMap((msg: any) => {
+                const messages: Message[] = []
+                if (msg.user_message) {
+                    messages.push({
+                        id: `${msg.id}-user`,
+                        role: 'user',
+                        content: msg.user_message,
+                    })
+                }
+                if (msg.assistant_message) {
+                    messages.push({
+                        id: `${msg.id}-assistant`,
+                        role: 'assistant',
+                        content: msg.assistant_message,
+                    })
+                }
+                return messages
+            })
+            setInitialMessages(messages)
+            
+        } catch (error) {
+            console.error('Error loading chat:', error)
+        } finally {
+            setIsGeneratingCode(false)
+        }
+    }, [supabase, updateStreamlitApp])
 
     // Handle new chat creation
-    const handleNewChat = useCallback(async () => {
-        setIsCreatingChat(true)
-        try {
-            const newChatId = generateUUID()
-            handleChatCreated(newChatId)
-        } finally {
-            setIsCreatingChat(false)
-        }
-    }, [handleChatCreated])
+    const handleNewChat = useCallback(() => {
+        setStreamlitUrl(null)
+        setGeneratedCode('')
+        setCurrentChatId(null)
+    }, [])
 
+    // Modify handleChatSubmit to trigger the slide animation
     const handleChatSubmit = useCallback(() => {
-        setShowTypingText(false)
+        setIsChatCentered(false)
     }, [])
 
     const {
@@ -179,16 +268,16 @@ export default function Home() {
             experimental_streamData: true,
         },
         maxSteps: 10,
-        onResponse: (response) => {
+        onResponse: (response: Response) => {
             if (!response.ok) {
                 return
             }
         },
-        onFinish: async (message) => {
+        onFinish: async (message: Message) => {
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .filter(
-                        (invocation) =>
+                        (invocation: any) =>
                             invocation.toolName === 'create_streamlit_app' &&
                             invocation.state === 'result'
                     )
@@ -269,10 +358,10 @@ export default function Home() {
                     toolInvocations: message.toolInvocations,
                 }
 
-                setMessages((prev) => [...prev, assistantMessage])
+                setMessages((prev: Message[]) => [...prev, assistantMessage])
             }
         },
-        onError: (error) => {
+        onError: (error: any) => {
             setIsGeneratingCode(false)
         },
     })
@@ -283,34 +372,6 @@ export default function Home() {
             setGeneratedCode('')
         }
     }, [chatLoading])
-
-    // Sandbox state management
-    const { initializeSandbox, killSandbox, updateSandbox } = useSandboxStore()
-
-    useEffect(() => {
-        initializeSandbox()
-
-        return () => {
-            killSandbox()
-        }
-    }, [initializeSandbox, killSandbox])
-
-    // Add streamlit update function
-    const updateStreamlitApp = useCallback(
-        async (code: string, forceExecute: boolean = false) => {
-            const url = await updateSandbox(code, forceExecute)
-            if (url) {
-                setStreamlitUrl(url)
-                setIsGeneratingCode(false)
-            }
-        },
-        [updateSandbox]
-    )
-
-    // Initialize sandbox on mount
-    useEffect(() => {
-        initializeSandbox()
-    }, [initializeSandbox])
 
     const toggleRightContent = useCallback(() => {
         setIsRightContentVisible((prev) => !prev)
@@ -543,24 +604,43 @@ export default function Home() {
                                 minSize={30}
                                 className="relative"
                             >
-                                {showTypingText && (
-                                    <div className="absolute w-full top-1/3 transform z-50">
-                                        <TypingText
-                                            text="From Data to App, in seconds."
-                                            className="text-black font-semibold text-4xl whitespace-nowrap"
-                                            show={showTypingText}
+                                <motion.div 
+                                    className={cn(
+                                        "w-full flex flex-col",
+                                        isChatCentered ? "h-screen justify-center" : "h-[calc(100vh-4rem)]"
+                                    )}
+                                    initial={false}
+                                    animate={{
+                                        height: isChatCentered ? "100vh" : "calc(100vh - 4rem)",
+                                        justifyContent: isChatCentered ? "center" : "flex-start"
+                                    }}
+                                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                                >
+                                    <div className={cn(
+                                        "w-full max-w-[800px] mx-auto h-full"
+                                    )}>
+                                        <Chat
+                                            chatId={currentChatId}
+                                            initialMessages={initialMessages}
+                                            onChatCreated={handleChatCreated}
+                                            onChatSubmit={handleChatSubmit}
+                                            onChatFinish={handleChatFinish}
+                                            onUpdateStreamlit={updateStreamlitApp}
+                                            setActiveTab={setActiveTab}
+                                            setIsRightContentVisible={setIsRightContentVisible}
+                                            isChatCentered={isChatCentered}
+                                            onCodeClick={() => {
+                                                setActiveTab('code')
+                                                setIsRightContentVisible(true)
+                                                if (resizableGroupRef.current) {
+                                                    setTimeout(() => {
+                                                        resizableGroupRef.current.resetLayout()
+                                                    }, 0)
+                                                }
+                                            }}
                                         />
                                     </div>
-                                )}
-                                <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
-                                    <Chat
-                                        chatId={currentChatId}
-                                        initialMessages={initialMessages}
-                                        onChatCreated={handleChatCreated}
-                                        onChatSubmit={handleChatSubmit}
-                                        onChatFinish={handleChatFinish}
-                                    />
-                                </div>
+                                </motion.div>
                             </ResizablePanel>
 
                             {isRightContentVisible && (
@@ -604,7 +684,6 @@ export default function Home() {
                                     'shadow-lg hover:shadow-xl',
                                     'rounded-lg'
                                 )}
-                                size="icon"
                             >
                                 {isRightContentVisible ? (
                                     <ChevronRight className="h-4 w-4" />

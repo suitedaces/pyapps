@@ -15,8 +15,8 @@ import {
     Plus,
 } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
 
 import { Logo } from '@/components/core/Logo'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -66,6 +66,7 @@ export function Sidebar({
     const [isChatsCollapsed, setIsChatsCollapsed] = useState(false)
     const [session, setSession] = useState<Session | null>(null)
     const pathname = usePathname()
+    const router = useRouter()
     const supabase = createClientComponentClient()
 
     useEffect(() => {
@@ -267,7 +268,7 @@ export function Sidebar({
                             href="/"
                             className="flex items-center gap-2 font-semibold"
                         >
-                            py_app
+                            py_apps
                         </Link>
                     </div>
                     <ScrollArea className="flex-1 p-4">
@@ -548,6 +549,10 @@ export function Sidebar({
             </motion.div>
         )
     }
+
+    const handleChatSelect = useCallback((chatId: string) => {
+        router.push(`/chat/${chatId}`)
+    }, [router])
 
     return (
         <TooltipProvider>

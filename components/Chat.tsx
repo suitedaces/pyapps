@@ -5,12 +5,17 @@ import { Message as AIMessage } from '@/components/core/message'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import modelsList from '@/lib/models.json'
-import { LLMModelConfig } from '@/lib/types'
+import { App, ExecutionResult } from '@/lib/schema'
+import { CustomMessage, LLMModelConfig } from '@/lib/types'
 import { Message } from 'ai'
 import { useChat } from 'ai/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
+import { useToolState } from '@/lib/stores/tool-state-store'
+import { cn } from '@/lib/utils'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { TypingText } from '@/components/core/typing-text'
 
 interface ChatProps {
     chatId?: string | null
@@ -20,6 +25,12 @@ interface ChatProps {
     onUpdateStreamlit?: (message: string) => void
     onChatSubmit?: () => void
     onChatFinish?: () => void
+    onCodeClick?: () => void
+    setActiveTab?: (tab: string) => void
+    setIsRightContentVisible?: (
+        visible: boolean | ((prev: boolean) => boolean)
+    ) => void
+    isChatCentered?: boolean
 }
 
 interface FileUploadState {
@@ -36,6 +47,10 @@ export function Chat({
     onUpdateStreamlit,
     onChatSubmit,
     onChatFinish,
+    onCodeClick,
+    setActiveTab,
+    setIsRightContentVisible,
+    isChatCentered = false,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -76,10 +91,15 @@ export function Chat({
             model: currentModel,
             config: languageModel,
         },
+        sendExtraMessageFields: true,
         onResponse: async (response) => {
             if (!response.ok) {
                 handleResponseError(response)
                 return
+            }
+
+            if (!chatId) {
+                onUpdateStreamlit?.('')
             }
 
             if (!chatId) {
@@ -88,11 +108,32 @@ export function Chat({
                     newChatIdRef.current = newChatId
                 }
             }
+
+            const toolCallId = response.headers.get('x-tool-call-id')
+            const toolName = response.headers.get('x-tool-name')
+            const toolProgress = response.headers.get('x-tool-progress')
+            const toolTotalChunks = response.headers.get('x-tool-total-chunks')
+            const toolDelta = response.headers.get('x-tool-delta')
+
+            if (toolCallId && toolName) {
+                if (toolDelta) {
+                    updateToolCallDelta(
+                        toolCallId,
+                        toolDelta,
+                        toolProgress ? parseInt(toolProgress) : undefined,
+                        toolTotalChunks ? parseInt(toolTotalChunks) : undefined
+                    )
+                } else {
+                    startToolCall(toolCallId, toolName)
+                }
+            }
         },
-        onFinish: async (message) => {
+        onFinish: async (message: CustomMessage) => {
+            console.log('Message steps:', message)
             setErrorState(null)
             setAttachedFile(null)
             resetFileUploadState()
+
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
             }
@@ -107,13 +148,20 @@ export function Chat({
             }
 
             if (message.toolInvocations?.length) {
-                const streamlitCall = message.toolInvocations
-                    .filter(
-                        (invocation) =>
-                            invocation.toolName === 'create_streamlit_app' &&
-                            invocation.state === 'result'
-                    )
-                    .pop()
+                const toolCall = message.toolInvocations[0]
+                if (toolCall.toolCallId) {
+                    completeToolCall(toolCall.toolCallId)
+                }
+            }
+
+            const finishStep = {
+                type: 'finish',
+                finishReason: 'complete'
+            }
+
+            const updatedMessage = {
+                ...message,
+                steps: [...(message.steps || []), finishStep]
             }
 
             onChatFinish?.()
@@ -150,57 +198,68 @@ export function Chat({
         return await response.json()
     }
 
+    const [isCreatingChat, setIsCreatingChat] = useState(false)
+
     const handleChatSubmit = async (content: string, file?: File) => {
         try {
             onChatSubmit?.()
-
-            // Handle file upload case
-            if (file) {
-                const fileData = await uploadFile(file)
-                const fileContent = await file.text()
-
-                // Sanitize content
-                const sanitizedContent = fileContent
-                    .split('\n')
-                    .map((row) => row.replace(/[\r\n]+/g, ''))
-                    .join('\n')
-
-                const rows = sanitizedContent.split('\n')
-                const columnNames = rows[0]
-                const previewRows = rows.slice(1, 6).join('\n')
-                const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
-
-                // const message = content.trim() ||
-                //     `Create a Streamlit app to visualize this data from "/app/${file.name}". The file is at '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`;
-
-                const message =
-                    content.trim() ||
-                    `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
-
-                await append(
-                    {
-                        content: message,
-                        role: 'user',
-                        createdAt: new Date(),
-                    },
-                    {
-                        body: {
-                            fileId: fileData.id,
-                            fileName: file.name,
-                            fileContent: sanitizedContent,
-                        },
-                    }
-                )
-
-                // Reset file state
-                setAttachedFile(null)
-                resetFileUploadState()
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = ''
-                }
+            if (!chatId) {
+                setIsCreatingChat(true)
             }
-            // Handle regular text message case
-            else if (content.trim()) {
+
+            if (file) {
+                setFileUploadState(prev => ({ ...prev, isUploading: true }))
+                
+                try {
+                    const fileData = await uploadFile(file)
+                    const fileContent = await file.text()
+
+                    // Sanitize content
+                    const sanitizedContent = fileContent
+                        .split('\n')
+                        .map((row) => row.replace(/[\r\n]+/g, ''))
+                        .join('\n')
+
+                    const rows = sanitizedContent.split('\n')
+                    const columnNames = rows[0]
+                    const previewRows = rows.slice(1, 6).join('\n')
+                    const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+                    const message =
+                        content.trim() ||
+                        `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+
+                    await append(
+                        {
+                            content: message,
+                            role: 'user',
+                            createdAt: new Date(),
+                        },
+                        {
+                            body: {
+                                fileId: fileData.id,
+                                fileName: file.name,
+                                fileContent: sanitizedContent,
+                            },
+                        }
+                    )
+
+                    // Reset file state after successful upload
+                    setAttachedFile(null)
+                    resetFileUploadState()
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = ''
+                    }
+                } catch (error) {
+                    console.error('Error uploading file:', error)
+                    setFileUploadState(prev => ({
+                        ...prev,
+                        error: 'Failed to upload file. Please try again.',
+                        isUploading: false
+                    }))
+                    return
+                }
+            } else if (content.trim()) {
                 await append({
                     content: content.trim(),
                     role: 'user',
@@ -293,21 +352,121 @@ export function Chat({
         ? 'File attached. Remove file to type a message.'
         : 'Type your message...'
 
+    const [currentPreview, setCurrentPreview] = useState<{
+        object: App | undefined
+        result: ExecutionResult | undefined
+    }>({
+        object: undefined,
+        result: undefined,
+    })
+
+    const handleSubmit = useCallback(
+        async (e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault()
+            if (!input.trim()) return
+
+            const userMessage: CustomMessage = {
+                id: Date.now().toString(),
+                role: 'user',
+                content: input.trim(),
+                createdAt: new Date(),
+                isCodeVisible: false,
+            }
+
+            setAiMessages((prev) => [...prev, userMessage])
+        },
+        [input, setAiMessages]
+    )
+
+    const { startToolCall, updateToolCallDelta, completeToolCall } = useToolState()
+
+    const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            const scrollArea = scrollAreaRef.current
+            scrollArea.scrollTop = scrollArea.scrollHeight
+        }
+    }, [messages])
+
+    const { error: sandboxError, clearError } = useSandboxStore()
+
+    const [showTypingText, setShowTypingText] = useState(true)
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            setShowTypingText(false)
+        }
+    }, [messages])
+
     return (
-        <div className="flex flex-col h-full relative bg-background text-foreground border border-border rounded-2xl">
-            <ScrollArea className="flex-grow p-4 space-y-4 w-full h-full max-w-[800px] m-auto">
-                <AnimatePresence initial={false}>
-                    {messages.map((message, index) => (
-                        <div key={message.id}>
-                            <AIMessage
-                                {...message}
-                                isLastMessage={index === messages.length - 1}
-                            />
-                        </div>
-                    ))}
-                </AnimatePresence>
-                <div ref={messagesEndRef} />
-            </ScrollArea>
+        <div className={cn(
+            "flex flex-col relative bg-background text-foreground",
+            "h-[calc(100vh-7rem)]",
+            "overflow-hidden"
+        )}>
+            <TypingText
+                text="from data to app, in seconds."
+                speed={50}
+                className={cn(
+                    "text-3xl font-medium tracking-tight",
+                    "absolute left-1/2 -translate-x-1/2",
+                    "top-32",
+                    "bg-gradient-to-r from-foreground to-foreground/70",
+                    "bg-clip-text text-transparent",
+                    isChatCentered ? "opacity-100" : "opacity-0",
+                    "transition-opacity duration-500"
+                )}
+                show={showTypingText && isChatCentered}
+            />
+            <motion.div 
+                className={cn(
+                    "flex-1 overflow-hidden",
+                    isChatCentered ? "opacity-0" : "opacity-100"
+                )}
+                initial={isCreatingChat ? false : { opacity: 0, height: 0 }}
+                animate={{ 
+                    opacity: isChatCentered ? 0 : 1,
+                    height: isChatCentered ? 0 : "auto"
+                }}
+                transition={{ duration: 0.5 }}
+            >
+                <ScrollArea 
+                    ref={scrollAreaRef}
+                    className={cn(
+                        "h-full",
+                        "p-4 space-y-4 w-full",
+                        "max-w-[800px] m-auto",
+                        "pb-6"
+                    )}
+                >
+                    <div className="scroll-smooth">
+                        {messages.map((message, index) => (
+                            <div key={message.id}>
+                                <AIMessage
+                                    {...message}
+                                    isLastMessage={index === messages.length - 1}
+                                    isCreatingChat={isCreatingChat}
+                                    object={(message as CustomMessage).object}
+                                    result={(message as CustomMessage).result}
+                                    isLoading={isLoading}
+                                    onObjectClick={({ object, result }) => {
+                                        setCurrentPreview?.({ object, result })
+                                        if (object?.code) {
+                                            onUpdateStreamlit?.(object.code)
+                                        }
+                                    }}
+                                    onToolResultClick={(result) => {
+                                        onUpdateStreamlit?.(result)
+                                    }}
+                                    onCodeClick={onCodeClick}
+                                />
+                            </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
+                </ScrollArea>
+            </motion.div>
 
             {errorState && (
                 <motion.div
@@ -345,7 +504,45 @@ export function Chat({
                 </motion.div>
             )}
 
-            <Chatbar onSubmit={handleChatSubmit} isLoading={isLoading} />
+            {sandboxError && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="p-4 text-center"
+                >
+                    <p className="text-red-500 mb-2">Sandbox error: {sandboxError}</p>
+                    <Button
+                        onClick={clearError}
+                        variant="secondary"
+                        size="sm"
+                    >
+                        Dismiss
+                    </Button>
+                </motion.div>
+            )}
+
+            <motion.div
+                className="w-full border-t bg-background pb-2"
+                initial={false}
+                animate={{
+                    y: isChatCentered ? "-50vh" : 0
+                }}
+                transition={{ 
+                    duration: 0.5, 
+                    ease: [0.32, 0.72, 0, 1]
+                }}
+            >
+                <Chatbar 
+                    onSubmit={handleChatSubmit} 
+                    isLoading={isLoading}
+                    className={cn(
+                        "transition-all duration-500",
+                        isChatCentered ? "p-6" : "p-4"
+                    )}
+                    isCentered={isChatCentered}
+                />
+            </motion.div>
         </div>
     )
 }
