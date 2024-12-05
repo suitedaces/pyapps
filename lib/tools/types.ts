@@ -1,56 +1,37 @@
+import { CoreTool, ToolExecutionOptions } from 'ai'
 import { z } from 'zod'
 
-export type ToolCallStreamingPart = {
-    type: 'tool-call-streaming-start'
-    toolCallId: string
-    toolName: string
+// Simplified tool types
+export type ToolResult = {
+    content: string
+    metadata?: Record<string, any>
 }
 
-export type ToolCallPart = {
-    type: 'tool-call'
-    toolCallId: string
-    toolName: string
-    args: Record<string, any>
+export interface CustomToolOptions extends ToolExecutionOptions {
+    fileContext?: {
+        fileName: string
+        fileType: string
+        content?: string
+        analysis?: any
+    }
 }
 
-export type ToolCallDeltaPart = {
-    type: 'tool-call-delta'
-    toolCallId: string
-    argsTextDelta: string
-}
-
-export type ToolResultPart = {
-    type: 'tool-result'
-    toolCallId: string
-    result: any
-}
-
-export type ToolStreamResponse =
-    | ToolCallStreamingPart
-    | ToolCallPart
-    | ToolCallDeltaPart
-    | ToolResultPart
-
-export interface StreamingTool {
+export type Tool = {
     toolName: string
     description: string
-    parameters: z.ZodSchema
-    streamExecution: (
-        args: any,
-        signal?: AbortSignal
-    ) => AsyncGenerator<ToolStreamResponse>
+    schema: z.ZodObject<any>
+    execute: (args: any, options: CustomToolOptions) => Promise<ToolResult>
 }
+// Streamlit specific types
+export const streamlitAppSchema = z.object({
+    query: z.string().min(1, 'Query cannot be empty'),
+    fileContext: z
+        .object({
+            fileName: z.string(),
+            fileType: z.enum(['csv', 'json']),
+            analysis: z.any().optional(),
+        })
+        .optional(),
+})
 
-export type ToolCallState = {
-    toolCallId: string
-    toolName: string
-    args: any
-    status: 'starting' | 'streaming' | 'complete' | 'error'
-    progress?: number
-    metadata?: {
-        progress?: number
-        status?: string
-        [key: string]: any
-    }
-    error?: string
-}
+export type StreamlitToolArgs = z.infer<typeof streamlitAppSchema>

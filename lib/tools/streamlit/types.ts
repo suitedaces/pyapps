@@ -5,7 +5,7 @@ export const fileContextSchema = z
     .object({
         fileName: z.string(),
         fileType: z.enum(['csv', 'json']),
-        analysis: z.any().optional(),
+        analysis: z.record(z.any()).optional(), 
     })
     .optional()
 

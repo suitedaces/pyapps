@@ -1,7 +1,7 @@
 import { GruntyAgent } from '@/lib/agent'
 import { getModelClient } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
-import { tools } from '@/lib/tools'
+import { getTools } from '@/lib/tools/index'
 import { FileContext, Tool } from '@/lib/types'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { convertToCoreMessages } from 'ai'
@@ -160,7 +160,7 @@ export async function POST(
             params.id,
             session.user.id,
             convertToCoreMessages(messages),
-            tools as Tool[],
+            getTools(),
             fileContext
         )
     } catch (error) {

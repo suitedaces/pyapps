@@ -1,129 +1,92 @@
 import { anthropic } from '@ai-sdk/anthropic'
-import { BaseStreamingTool } from '../base'
-import { ToolStreamResponse } from '../types'
-import { streamlitAppSchema, StreamlitToolArgs, StreamlitToolResult } from './types'
-import { generateText, streamText } from 'ai'
+import { StreamlitToolArgs, Tool } from '../types'
+import { streamObject, ToolExecutionOptions } from 'ai'
+import { streamlitAppSchema } from './types'
+import { z } from 'zod'
 
-export class StreamlitTool extends BaseStreamingTool {
-    toolName = 'create_streamlit_app'
-    description = 'Generates Python (Streamlit) code based on a given query and file context'
-    parameters = streamlitAppSchema
+// Define the response schema
+const pythonCodeSchema = z.object({
+  code: z.string().describe('The Python code for the Streamlit application')
+})
 
-    async *streamExecution(
-        args: StreamlitToolArgs,
-        signal?: AbortSignal
-    ): AsyncGenerator<ToolStreamResponse> {
-        const toolCallId = crypto.randomUUID()
+type PythonCodeResponse = z.infer<typeof pythonCodeSchema>
 
-        try {
-            await this.validateArgs(args)
+const extractRequiredLibraries = (code: string): string[] => {
+  const importRegex = /^(?:import|from)\s+([a-zA-Z0-9_]+)/gm
+  const libraries = new Set<string>()
 
-            this.updateState(toolCallId, {
-                status: 'starting',
-                args,
-            })
+  let match
+  while ((match = importRegex.exec(code)) !== null) {
+    libraries.add(match[1])
+  }
 
-            const systemPrompt = this.createSystemPrompt(args.fileContext)
-            const userQuery = this.formatQuery(args.query, args.fileContext)
+  return Array.from(libraries)
+}
 
-            const { textStream } = await streamText({
-                model: anthropic('claude-3-5-sonnet-20240620'),
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userQuery }
-                ],
-                maxTokens: 2000,
-                temperature: 0.7,
-            })
+const getFilePath = (fileName: string) => {
+  // Remove any leading slashes and ensure correct path
+  const cleanFileName = fileName.replace(/^\/+/, '')
+  return `/app/s3/data/${cleanFileName}`
+}
 
-            let collectedCode = ''
-            let progress = 0
-            let chunkCount = 0
+export const streamlitTool: Tool = {
+  toolName: 'create_streamlit_app',
+  description: 'Generates Python (Streamlit) code based on a given query and file context',
+  schema: streamlitAppSchema,
 
-            for await (const chunk of textStream) {
-                if (signal?.aborted) break
+  execute: async (args: StreamlitToolArgs, options?: ToolExecutionOptions) => {
+    try {
+      const filePath = args.fileContext ? getFilePath(args.fileContext.fileName) : undefined
 
-                const cleanedText = chunk
-                    .replace(/^```python\n?/, '')
-                    .replace(/^python\n/, '')
-                    .replace(/\n```$/, '')
-                    .replace(/```$/, '')
-
-                collectedCode += cleanedText
-                chunkCount++
-
-                if (cleanedText.trim()) {
-                    yield this.createToolCallDelta(toolCallId, cleanedText)
-                }
-
-                progress = Math.min(95, Math.floor((chunkCount / 100) * 100))
-                if (progress % 10 === 0) {
-                    yield this.reportProgress(toolCallId, progress)
-                }
-            }
-
-            const requiredLibraries = this.extractRequiredLibraries(collectedCode)
-
-            const result: StreamlitToolResult = {
-                code: collectedCode,
-                requiredLibraries: requiredLibraries
-            }
-
-            console.log('📦 Final StreamlitTool result:', {
-                codeLength: result.code.length,
-                codePreview: result.code.substring(0, 100) + '...',
-                requiredLibraries: result.requiredLibraries,
-                librariesCount: result.requiredLibraries.length,
-            })
-
-            console.log('🔍 Full result details:', JSON.stringify(result, null, 2))
-
-            yield this.createToolResult(toolCallId, result)
-        } catch (error) {
-            console.error('StreamlitTool execution error:', error)
-            throw error
-        } finally {
-            this.cleanup(toolCallId)
-        }
-    }
-
-    private extractRequiredLibraries(code: string): string[] {
-        const importRegex = /^(?:import|from)\s+([a-zA-Z0-9_]+)/gm
-        const libraries = new Set<string>()
-
-        let match
-        while ((match = importRegex.exec(code)) !== null) {
-            libraries.add(match[1])
-        }
-
-        return Array.from(libraries)
-    }
-
-    private createSystemPrompt(
-        fileContext?: StreamlitToolArgs['fileContext']
-    ): string {
-        return `You are a Python code generation assistant specializing in Streamlit apps.
+      const systemPrompt = `You are a Python code generation assistant specializing in Streamlit apps.
 Generate a complete, runnable Streamlit app based on the given query.
-${fileContext ? `You are working with a ${fileContext.fileType.toUpperCase()} file at path "/app/s3/data/${fileContext.fileName}".` : ''}
-IMPORTANT: Always use the FULL PATH "/app/s3/data/<filename>" when reading files.
-DO NOT use relative paths, always use the absolute path starting with "/app/s3/data/
+${args.fileContext ? `You are working with a ${args.fileContext.fileType.toUpperCase()} file at path "${filePath}".` : ''}
+IMPORTANT: Always use the FULL PATH when reading files.
 DO NOT use "st.experimental_rerun()" at any cost.
 Only respond with the code, no potential errors, no explanations!
 Include all necessary imports at the beginning of the file.`
-    }
 
-    private formatQuery(
-        query: string,
-        fileContext?: StreamlitToolArgs['fileContext']
-    ): string {
-        const filePathNote = fileContext
-            ? `\nIMPORTANT: Use the exact file path "/app/s3/data/${fileContext.fileName}" to read the file.`
-            : ''
+      const userQuery = `${args.query}${
+        args.fileContext ? `\nIMPORTANT: Use the exact file path "${filePath}" to read the file.` : ''
+      }${args.fileContext?.analysis ? `\n\nFile Analysis:\n${JSON.stringify(args.fileContext.analysis, null, 2)}` : ''}`
 
-        return `${query}${filePathNote}${
-            fileContext?.analysis
-                ? `\n\nFile Analysis:\n${JSON.stringify(fileContext.analysis, null, 2)}`
-                : ''
-        }`
+      console.log(" Starting streamObject request with:", { userQuery })
+
+      let finalPythonCode = ''
+
+      const { partialObjectStream } = streamObject({
+        model: anthropic('claude-3-5-sonnet-20241022'),
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userQuery }
+        ],
+        schema: pythonCodeSchema,
+        output: 'object'
+      })
+
+      // Stream and collect the Python code
+      for await (const partialObject of partialObjectStream) {
+        const { code } = partialObject
+        if (!code) continue;
+        console.log("🔧 Received partial Python code chunk, length:", code)
+        finalPythonCode = code
+      }
+
+      console.log("✅ Final Python code assembled, length:", finalPythonCode.length)
+
+      // Extract required libraries and return the complete result
+      const requiredLibraries = extractRequiredLibraries(finalPythonCode)
+      console.log("📚 Extracted required libraries:", requiredLibraries)
+
+      return {
+        content: finalPythonCode,
+        metadata: {
+          requiredLibraries
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error in streamlit tool execution:", error)
+      throw new Error(error instanceof Error ? error.message : 'Unknown error in streamlit tool execution')
     }
+  }
 }
