@@ -5,7 +5,7 @@ import { z } from 'zod'
 export type ToolResult = {
     content: string
     metadata?: Record<string, any>
-}
+} | Response
 
 export interface CustomToolOptions extends ToolExecutionOptions {
     fileContext?: {
@@ -22,6 +22,7 @@ export type Tool = {
     schema: z.ZodObject<any>
     execute: (args: any, options: CustomToolOptions) => Promise<ToolResult>
 }
+
 // Streamlit specific types
 export const streamlitAppSchema = z.object({
     query: z.string().min(1, 'Query cannot be empty'),

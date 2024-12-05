@@ -4,18 +4,14 @@ import { highlight, languages } from 'prismjs'
 import { useEffect, useState } from 'react'
 import Editor from 'react-simple-code-editor'
 
-import { readStreamableValue, useActions } from 'ai/rsc'
-import { type AI } from '@/lib/ai-config'
-
 import { experimental_useObject as useObject } from 'ai/react'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
-import { streamlitResultSchema } from '@/lib/tools/streamlit/types'
 import { LoadingSandbox } from '@/components/LoadingSandbox'
 
 interface CodeViewProps {
-    code: string | { code: string }
+    code: string | undefined
     isGeneratingCode: boolean
 }
 
@@ -27,130 +23,47 @@ interface CodeViewState {
 
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
-
-    const { object } = useObject({
-        api: '/api/conversations/stream',
-        schema: streamlitResultSchema,
-        onFinish: (result) => {
-            console.log('🚀 Streamlit result:', result)
-            console.log('🚀 Object:', object)
-        }
-    })
-
-    const { generate } = useActions<typeof AI>()
-
     const [state, setState] = useState<CodeViewState>({
         displayCode: '',
         isStreaming: false,
         error: null
     })
 
-    useEffect(() => {
-        if (isGeneratingCode) {
-            handleCodeStreaming()
-        }
-    }, [isGeneratingCode])
+    // useEffect(() => {
+    //     if (!state.isStreaming && code) {
+    //         const finalCode = typeof code === 'object' && 'code' in code
+    //             ? code.code
+    //             : String(code)
 
-    useEffect(() => {
-        if (!state.isStreaming && code) {
-            const finalCode = typeof code === 'object' && 'code' in code
-                ? code.code
-                : String(code)
+    //         setState(prev => ({
+    //             ...prev,
+    //             displayCode: finalCode
+    //         }))
+    //     }
+    // }, [code, state.isStreaming])
 
-            setState(prev => ({
-                ...prev,
-                displayCode: finalCode
-            }))
-        }
-    }, [code, state.isStreaming])
+    // useEffect(() => {
+    //     if (code && !isGeneratingCode) {
+    //         try {
+    //             const codeStr = typeof code === 'object' && 'code' in code
+    //                 ? code.code
+    //                 : String(code)
 
-    const handleCodeStreaming = async () => {
-        try {
-            setState(prev => ({
-                ...prev,
-                displayCode: ''
-            }))
-
-            const streamable = await generate()
-            let accumulatedCode = ''
-
-            // Read and process the stream
-            for await (const chunk of readStreamableValue(streamable)) {
-                console.log('📥 Stream Update:', {
-                    chunk,
-                    timestamp: new Date().toISOString()
-                })
-
-                const cleanChunk = String(chunk).replace(/\[object Object\]/g, '')
-                accumulatedCode += cleanChunk
-
-                setState(prev => ({
-                    ...prev,
-                    displayCode: accumulatedCode,
-                    isStreaming: true,
-                }))
-            }
-
-            setState(prev => ({
-                ...prev,
-                displayCode: accumulatedCode,
-                isStreaming: false
-            }))
-        } catch (error) {
-            console.error('Error in streaming:', error)
-            setState(prev => ({
-                ...prev,
-                error: 'Error streaming code',
-                isStreaming: false
-            }))
-        }
-    }
-
-    useEffect(() => {
-        if (code && !isGeneratingCode) {
-            try {
-                const codeStr = typeof code === 'object' && 'code' in code
-                    ? code.code
-                    : String(code)
-
-                const formattedCode = codeStr
-                    .split('\n')
-                    .map((line) => line.trim())
-                    .join('\n')
-                setDisplayCode(formattedCode)
-                console.log('Code type:', typeof code)
-                console.log('Formatted code:', formattedCode)
-            } catch (error) {
-                console.error('Error formatting code:', error)
-                setDisplayCode(typeof code === 'string' ? code : '')
-            }
-        } else if (!code) {
-            setDisplayCode('')
-        }
-    }, [code, isGeneratingCode])
-
-    if (isGeneratingCode) {
-        return <LoadingSandbox message="Generating code..." />
-    }
-
-    useEffect(() => {
-        if (isGeneratingCode) {
-            console.log('🎬 CodeView: Generation Started')
-        } else {
-            console.log('🎭 CodeView: Generation Complete')
-        }
-    }, [isGeneratingCode])
-
-    if (!state.displayCode && !state.isStreaming) {
-        return (
-            <Card className="bg-white border-border h-full">
-                <CardContent className="p-0 h-full flex items-center justify-center">
-                    <p className="text-sm text-text">No code generated yet</p>
-                </CardContent>
-            </Card>
-        )
-    }
-
+    //             const formattedCode = codeStr
+    //                 .split('\n')
+    //                 .map((line) => line.trim())
+    //                 .join('\n')
+    //             setDisplayCode(formattedCode)
+    //             console.log('Code type:', typeof code)
+    //             console.log('Formatted code:', formattedCode)
+    //         } catch (error) {
+    //             console.error('Error formatting code:', error)
+    //             setDisplayCode(typeof code === 'string' ? code : '')
+    //         }
+    //     } else if (!code) {
+    //         setDisplayCode('')
+    //     }
+    // }, [code, isGeneratingCode])
 
     return (
         <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow">
@@ -187,13 +100,6 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                         />
                     </div>
                 </div>
-
-                {state.isStreaming && (
-                    <div className="absolute top-2 right-2 flex items-center gap-2 bg-black/10 px-2 py-1 rounded">
-                        <Loader2 className="h-4 w-4 animate-spin text-text" />
-                        <span className="text-xs">Streaming...</span>
-                    </div>
-                )}
             </CardContent>
             <style jsx global>{`
                 .code-container {

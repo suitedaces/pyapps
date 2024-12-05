@@ -12,14 +12,14 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { Code, Globe, Layout, RefreshCcw, Loader2 } from 'lucide-react'
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { CodeView } from './CodeView'
 import { LoadingSandbox } from '@/components/LoadingSandbox'
 import { AnimatePresence } from 'framer-motion'
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
-    generatedCode: string
+    generatedCode: string | undefined
     isGeneratingCode: boolean
     isLoadingSandbox?: boolean
     showCodeView: boolean
@@ -46,6 +46,13 @@ export function PreviewPanel({
         }
         onRefresh?.()
     }
+
+    console.log('PreviewPanel Props:', {
+        streamlitUrl,
+        generatedCode,
+        isGeneratingCode,
+        showCodeView
+    })
 
     return (
         <div className="relative h-full">
@@ -116,14 +123,10 @@ export function PreviewPanel({
                 <div className="flex-grow relative">
                     {showCodeView ? (
                         <div className="h-full overflow-auto">
-                            {isGeneratingCode ? (
-                                <LoadingSandbox message="Generating code..." />
-                            ) : (
-                                <CodeView
-                                    code={generatedCode}
-                                    isGeneratingCode={isGeneratingCode}
-                                />
-                            )}
+                            <CodeView
+                                code={generatedCode}
+                                isGeneratingCode={isGeneratingCode}
+                            />
                         </div>
                     ) : (
                         <StreamlitPreview

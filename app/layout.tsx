@@ -24,9 +24,7 @@ export default function RootLayout({
                 <Providers>
                     <AuthProvider>
                         <SidebarProvider>
-                            <AI>
-                                {children}
-                            </AI>
+                            {children}
                         </SidebarProvider>
                     </AuthProvider>
                 </Providers>

@@ -30,6 +30,8 @@ import { createVersion } from '@/lib/supabase'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useLocalStorage } from 'usehooks-ts'
+import { experimental_useObject as useObject } from 'ai/react'
+import { streamlitResultSchema } from '@/lib/tools/streamlit/types'
 
 interface ChatPageClientProps {
     initialChat: any
@@ -129,6 +131,30 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const { session, isLoading } = useAuth()
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
 
+    // Add useObject hook for code streaming
+    const { object: streamedCode, submit: submitCode } = useObject({
+        api: currentChatId
+            ? `/api/conversations/${currentChatId}/stream`
+            : '/api/conversations/stream',
+        schema: streamlitResultSchema,
+        id: 'code-stream',
+        onFinish: ({ object, error }) => {
+            console.log('🚀 Code streaming completed:', object)
+            if (error) {
+                console.error('❌ Schema validation error:', error)
+                return
+            }
+            if (object?.code) {
+                setGeneratedCode(object.code)
+                updateStreamlitApp(object.code)
+            }
+        },
+        onError: (error) => {
+            console.error('❌ Stream error:', error)
+            setIsGeneratingCode(false)
+        }
+    })
+
     // Chat handling with AI SDK
     const {
         messages,
@@ -165,8 +191,17 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                     const code = streamlitCall.result
                     if (code) {
                         setIsCreatingVersion(true)
-                        setGeneratedCode(code)
-                        await updateStreamlitApp(code)
+                        // Parse the code result before setting it
+                        try {
+                            const parsedResult = typeof code === 'string' ? JSON.parse(code) : code
+                            setGeneratedCode(parsedResult.code)
+                            // Use submitCode to start streaming
+                            submitCode(parsedResult.code)
+                        } catch (error) {
+                            console.error('Failed to parse code:', error)
+                            setGeneratedCode(code)
+                            submitCode(code)
+                        }
 
                         if (session?.user?.id) {
                             try {
@@ -556,7 +591,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                 .map((msg: any) => {
                     const toolResult = msg.tool_results[0]
                     if (toolResult && toolResult.name === 'create_streamlit_app') {
-                        return toolResult.result
+                        return toolResult.result.code
                     }
                     return null
                 })
@@ -564,6 +599,8 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                 .pop()
 
             if (streamlitCode) {
+                console.log('📦 Found Streamlit code:', streamlitCode);
+
                 setGeneratedCode(streamlitCode)
                 // Force execute the code when loading an existing chat
                 await updateStreamlitApp(streamlitCode, true)
@@ -693,7 +730,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                                 >
                                     <PreviewPanel
                                         streamlitUrl={streamlitUrl}
-                                        generatedCode={generatedCode}
+                                        generatedCode={streamedCode?.code}
                                         isGeneratingCode={isGeneratingCode}
                                         isLoadingSandbox={isLoadingSandbox}
                                         showCodeView={showCodeView}

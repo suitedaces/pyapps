@@ -41,7 +41,7 @@ async function killStreamlitProcess(sandbox: Sandbox) {
         await sandbox.process.start({
             cmd: 'pkill -f "streamlit run" || true'
         })
-        
+
         // Remove existing app file
         await sandbox.process.start({
             cmd: 'rm -f /app/app.py'
@@ -49,7 +49,7 @@ async function killStreamlitProcess(sandbox: Sandbox) {
 
         // Small delay to ensure process is fully terminated
         await new Promise(resolve => setTimeout(resolve, 500))
-        
+
         console.log('✅ Cleaned up existing Streamlit process and app file')
     } catch (error) {
         console.error('❌ Error during cleanup:', error)
@@ -76,9 +76,23 @@ export async function POST(
         const body = await req.json()
         console.log('Received request body:', body)
 
-        const codeContent = typeof body.code === 'object' && body.code.code
-            ? body.code.code
-            : body.code
+        // Parse code content from various possible formats
+        let codeContent: string
+        try {
+            if (typeof body.code === 'string') {
+                // Try parsing if it's a JSON string
+                const parsed = JSON.parse(body.code)
+                codeContent = parsed.content || body.code
+            } else if (typeof body.code === 'object') {
+                // If it's already an object, extract content
+                codeContent = body.code.content || body.code.code || body.code
+            } else {
+                codeContent = String(body.code)
+            }
+        } catch {
+            // If parsing fails, use the original code
+            codeContent = String(body.code)
+        }
 
         if (!codeContent || typeof codeContent !== 'string') {
             console.error('Invalid code format:', body.code)

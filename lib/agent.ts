@@ -14,15 +14,6 @@ interface FileContext {
     analysis?: any
 }
 
-// Add the StreamlitToolResult interface at the top of the file
-interface StreamlitToolResult {
-    content: string;
-    metadata?: {
-        requiredLibraries?: string[];
-        version?: any;
-    };
-}
-
 // Main agent class that handles chat streaming and tool execution
 export class GruntyAgent {
     private model: ModelProvider
@@ -198,7 +189,8 @@ export class GruntyAgent {
                             )
                         ])
 
-                        // Handle Streamlit app creation and versioning
+                        // Comment out Streamlit versioning code
+                        /*
                         if (toolName === 'create_streamlit_app') {
                             try {
                                 console.log('📱 Creating/updating Streamlit app')
@@ -243,6 +235,7 @@ export class GruntyAgent {
                                 console.error('❌ Failed to create app/version:', error)
                             }
                         }
+                        */
 
                         // Track the tool result with any additional metadata
                         toolResults.push({
@@ -250,7 +243,8 @@ export class GruntyAgent {
                             toolName,
                             result,
                             timestamp: new Date().toISOString(),
-                            metadata: (result as StreamlitToolResult).metadata
+                            // Comment out metadata reference since StreamlitToolResult is commented
+                            // metadata: (result as StreamlitToolResult).metadata
                         })
 
                         // 3. Send tool result
