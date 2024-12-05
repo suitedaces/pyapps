@@ -249,9 +249,17 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
     }, [])
 
     const handleChatCreated = useCallback((chatId: string) => {
-        setShowTypingText(false)
-        setCurrentChatId(chatId)
-
+        if (isNewChat) {
+            // First navigate
+            router.replace(`/chat/${chatId}`);
+            return; // Let the chat/[id] page handle initialization
+        }
+        
+        // Only handle state updates if not navigating
+        setShowTypingText(false);
+        setCurrentChatId(chatId);
+        
+        // Refresh the chat list
         const loadChats = async () => {
             try {
                 const response = await fetch('/api/conversations')
@@ -263,10 +271,6 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
             }
         }
         loadChats()
-
-        if (isNewChat) {
-            router.replace(`/chat/${chatId}`)
-        }
     }, [router, isNewChat])
 
     const toggleRightContent = useCallback(() => {
@@ -337,14 +341,12 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
                 setLoading(true)
                 setIsGeneratingCode(true)
 
-                const [messagesResponse, chatResponse] = await Promise.all([
-                    fetch(`/api/conversations/${currentChatId}/messages`),
-                    supabase.from('chats').select('app_id').eq('id', currentChatId).single()
-                ])
-
+                // Fetch messages
+                const messagesResponse = await fetch(`/api/conversations/${currentChatId}/messages`)
                 if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                 const data = await messagesResponse.json()
 
+                // Process messages and look for tool results
                 const messages: Message[] = data.messages.flatMap((msg: any) => {
                     const messages: Message[] = []
                     if (msg.user_message) {
@@ -367,23 +369,25 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
                 setInitialMessages(messages)
                 setMessages(messages)
 
-                const chat = chatResponse.data
-                if (chat?.app_id) {
-                    const { data: latestVersion } = await supabase
-                        .from('versions')
-                        .select('*')
-                        .eq('app_id', chat.app_id)
-                        .order('created_at', { ascending: false })
-                        .limit(1)
-                        .single()
+                // Find the latest Streamlit code from tool results
+                const streamlitCode = data.messages
+                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                    .map((msg: any) => {
+                        const toolResult = msg.tool_results[0]
+                        if (toolResult && toolResult.name === 'create_streamlit_app') {
+                            return toolResult.result
+                        }
+                        return null
+                    })
+                    .filter(Boolean)
+                    .pop()
 
-                    if (latestVersion?.code) {
-                        setGeneratedCode(latestVersion.code)
-                        await updateStreamlitApp(latestVersion.code, true)
-                        setCurrentApp({ id: chat.app_id })
-                        setIsRightContentVisible(true)
-                    }
+                if (streamlitCode) {
+                    setGeneratedCode(streamlitCode)
+                    await updateStreamlitApp(streamlitCode, true)
+                    setIsRightContentVisible(true)
                 }
+
             } catch (error) {
                 console.error('Error initializing chat:', error)
             } finally {
@@ -393,7 +397,7 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
         }
 
         initializeChat()
-    }, [currentChatId, supabase, updateStreamlitApp, setMessages])
+    }, [currentChatId, updateStreamlitApp, setMessages])
 
     // Cleanup effect
     useEffect(() => {
