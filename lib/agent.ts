@@ -144,6 +144,14 @@ export class GruntyAgent {
                     const { toolCallId, toolName, args } = step
                     console.log('🛠️ Tool call initiated:', { toolCallId, toolName })
 
+                    // Track the tool call
+                    toolCalls.push({
+                        toolCallId,
+                        toolName,
+                        args,
+                        timestamp: new Date().toISOString()
+                    })
+
                     const tool = tools.find(t => t.toolName === toolName)
                     if (!tool) {
                         console.error(`❌ Tool ${toolName} not found`)
@@ -181,6 +189,14 @@ export class GruntyAgent {
                             )
                         ])
 
+                        // Track the tool result
+                        toolResults.push({
+                            toolCallId,
+                            toolName,
+                            result,
+                            timestamp: new Date().toISOString()
+                        })
+
                         // 3. Send tool result
                         const resultMessage = {
                             toolCallId,
@@ -198,6 +214,15 @@ export class GruntyAgent {
                         console.log('📤 Sending tool call:', toolCallMessage)
                         await writer.write(encoder.encode(`9:${JSON.stringify(toolCallMessage)}\n\n`))
                     } catch (error) {
+                        // Track failed executions too
+                        toolResults.push({
+                            toolCallId,
+                            toolName,
+                            error: error instanceof Error ? error.message : 'Unknown error',
+                            timestamp: new Date().toISOString(),
+                            status: 'error'
+                        })
+
                         console.error('❌ Tool execution error:', error)
                         await writer.write(encoder.encode(`e:${JSON.stringify({
                             toolCallId,
@@ -251,16 +276,17 @@ export class GruntyAgent {
 
                 const userMessageContent = getUserMessageContent(latestUserMessage)
 
-                console.log('📝 Processing user message:', {
-                    originalContent: latestUserMessage?.content,
-                    processedContent: userMessageContent,
+                console.log('📝 Processing complete message:', {
+                    contentLength: collectedContent.length,
+                    toolCallsCount: toolCalls.length,
+                    toolResultsCount: toolResults.length
                 })
 
                 await this.storeMessage(chatId, userId, {
                     user_message: userMessageContent,
                     assistant_message: collectedContent,
                     tool_calls: toolCalls,
-                    tool_results: toolResults,
+                    tool_results: toolResults
                 })
             }
         } catch (error) {

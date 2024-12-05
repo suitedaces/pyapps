@@ -7,9 +7,11 @@ import Editor from 'react-simple-code-editor'
 import { readStreamableValue, useActions } from 'ai/rsc'
 import { type AI } from '@/lib/ai-config'
 
+import { experimental_useObject as useObject } from 'ai/react'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
+import { streamlitResultSchema } from '@/lib/tools/streamlit/types'
 
 interface CodeViewProps {
     code: string | { code: string }
@@ -24,6 +26,15 @@ interface CodeViewState {
 
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
+
+    const { object } = useObject({
+        api: '/api/conversations/stream',
+        schema: streamlitResultSchema,
+        onFinish: (result) => {
+            console.log('🚀 Streamlit result:', result)
+            console.log('🚀 Object:', object)
+        }
+    })
 
     const { generate } = useActions<typeof AI>()
 
