@@ -76,12 +76,8 @@ Include all necessary imports at the beginning of the file.`
         ],
         schema: pythonCodeSchema,
         output: 'object',
-        onCompletion: () => {
-          console.log("✨ Stream completed successfully")
-        }
       })
 
-      streamCleanup = result.cleanup
 
       // Process stream with timeout
       await withTimeout(
