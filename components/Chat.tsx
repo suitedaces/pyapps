@@ -15,6 +15,7 @@ import { useLocalStorage } from 'usehooks-ts'
 import { useToolState } from '@/lib/stores/tool-state-store'
 import { cn } from '@/lib/utils'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { TypingText } from '@/components/core/typing-text'
 
 interface ChatProps {
     chatId?: string | null
@@ -95,6 +96,10 @@ export function Chat({
             if (!response.ok) {
                 handleResponseError(response)
                 return
+            }
+
+            if (!chatId) {
+                onUpdateStreamlit?.('')
             }
 
             if (!chatId) {
@@ -434,12 +439,34 @@ export function Chat({
 
     const { error: sandboxError, clearError } = useSandboxStore()
 
+    const [showTypingText, setShowTypingText] = useState(true)
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            setShowTypingText(false)
+        }
+    }, [messages])
+
     return (
         <div className={cn(
             "flex flex-col relative bg-background text-foreground",
             "h-[calc(100vh-7rem)]",
             "overflow-hidden"
         )}>
+            <TypingText
+                text="from data to app, in seconds."
+                speed={50}
+                className={cn(
+                    "text-3xl font-medium tracking-tight",
+                    "absolute left-1/2 -translate-x-1/2",
+                    "top-32",
+                    "bg-gradient-to-r from-foreground to-foreground/70",
+                    "bg-clip-text text-transparent",
+                    isChatCentered ? "opacity-100" : "opacity-0",
+                    "transition-opacity duration-500"
+                )}
+                show={showTypingText && isChatCentered}
+            />
             <motion.div
                 className={cn(
                     "flex-1 overflow-hidden",

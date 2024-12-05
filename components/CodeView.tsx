@@ -12,6 +12,7 @@ import { experimental_useObject as useObject } from 'ai/react'
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
 import { streamlitResultSchema } from '@/lib/tools/streamlit/types'
+import { LoadingSandbox } from '@/components/LoadingSandbox'
 
 interface CodeViewProps {
     code: string | { code: string }
@@ -128,18 +129,9 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
         }
     }, [code, isGeneratingCode])
 
-    // if (isGeneratingCode) {
-    //     return (
-    //         <Card className="bg-white border-border h-full">
-    //             <CardContent className="p-0 h-full flex items-center justify-center">
-    //                 <div className="flex flex-col items-center gap-2">
-    //                     <Loader2 className="h-8 w-8 animate-spin text-text" />
-    //                     <p className="text-sm text-text">Generating code...</p>
-    //                 </div>
-    //             </CardContent>
-    //         </Card>
-    //     )
-    // }
+    if (isGeneratingCode) {
+        return <LoadingSandbox message="Generating code..." />
+    }
 
     useEffect(() => {
         if (isGeneratingCode) {

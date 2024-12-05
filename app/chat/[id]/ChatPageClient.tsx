@@ -10,7 +10,6 @@ import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-
 import { Message } from 'ai'
 
 import {
@@ -225,16 +224,55 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     // Sandbox store hooks
     const { killSandbox, updateSandbox } = useSandboxStore()
 
-    // Add a ref to track initialization
-    const initializationComplete = useRef(false)
-    const initializationPromise = useRef<Promise<void> | null>(null)
 
-    // Simplify updateStreamlitApp
+    // Add a loading state ref to prevent multiple executions
+    const isExecutingRef = useRef(false)
+
+    // Add new state for sandbox loading
+    const [isLoadingSandbox, setIsLoadingSandbox] = useState(false)
+
+    // Modify updateStreamlitApp
     const updateStreamlitApp = useCallback(
         async (code: string, forceExecute = false) => {
-            const url = await updateSandbox(code, forceExecute)
-            if (url) {
-                setStreamlitUrl(url)
+            if (!code) {
+                setStreamlitUrl(null)
+                setIsGeneratingCode(false)
+                return null
+            }
+
+            // Prevent multiple simultaneous executions
+            if (isExecutingRef.current) {
+                console.log('⚠️ Already executing, skipping...')
+                return null
+            }
+
+            isExecutingRef.current = true
+            setIsLoadingSandbox(true)  // Show loading state while sandbox executes
+
+            try {
+                // Try up to 3 times
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        console.log(` Attempt ${attempt} to update sandbox...`)
+                        const url = await updateSandbox(code, forceExecute)
+                        if (url) {
+                            console.log('✅ Sandbox updated successfully')
+                            setStreamlitUrl(url)
+                            return url
+                        }
+                    } catch (error) {
+                        console.error(`❌ Attempt ${attempt} failed:`, error)
+                        if (attempt === 3) throw error
+                        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+                    }
+                }
+                return null
+            } catch (error) {
+                console.error('❌ All attempts to update sandbox failed:', error)
+                return null
+            } finally {
+                isExecutingRef.current = false
+                setIsLoadingSandbox(false)  // Hide loading state when done
                 setIsGeneratingCode(false)
             }
         },
@@ -262,18 +300,50 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
 
     const router = useRouter()
-    const { id } = useParams()
+    const { id } = useParams() as { id: string }
 
-    const fetchMessages = useCallback(async (chatId: string) => {
+    // First, define loadAppAndVersion
+    const loadAppAndVersion = useCallback(async () => {
+        if (!currentChatId) return
+
         try {
-            setLoading(true)
-            const response = await fetch(
-                `/api/conversations/${chatId}/messages`
-            )
+            const { data: chat } = await supabase
+                .from('chats')
+                .select('app_id')
+                .eq('id', currentChatId)
+                .single()
+
+            if (chat?.app_id) {
+                setCurrentApp({ id: chat.app_id })
+                const { data: versions } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (versions?.code) {
+                    setGeneratedCode(versions.code)
+                    await updateStreamlitApp(versions.code, true)
+                    setIsRightContentVisible(true)
+                }
+            }
+        } catch (error) {
+            console.error('Error loading app:', error)
+        }
+    }, [currentChatId, supabase, updateStreamlitApp])
+
+    // Then define loadChat
+    const loadChat = useCallback(async (chatId: string) => {
+        console.log('🔄 Loading chat:', chatId)
+        setIsGeneratingCode(true)
+        try {
+            const response = await fetch(`/api/conversations/${chatId}/messages`)
             if (!response.ok) throw new Error('Failed to fetch messages')
             const data = await response.json()
+            console.log('📥 Received messages:', data.messages)
 
-            // Transform messages to the format expected by the AI SDK
             const messages: Message[] = data.messages.flatMap((msg: any) => {
                 const messages: Message[] = []
                 if (msg.user_message) {
@@ -288,30 +358,33 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                         id: `${msg.id}-assistant`,
                         role: 'assistant',
                         content: msg.assistant_message,
-                        toolInvocations: msg.tool_calls?.map((call: any) => ({
-                            toolCallId: call.id,
-                            toolName: call.name,
-                            state: 'result',
-                            result: call.result
-                        })) || [],
                     })
                 }
                 return messages
             })
 
+            console.log('✨ Transformed messages:', messages)
             setInitialMessages(messages)
+            await loadAppAndVersion()
         } catch (error) {
-            console.error('Error fetching messages:', error)
+            console.error('❌ Error loading chat:', error)
         } finally {
-            setLoading(false)
+            setIsGeneratingCode(false)
         }
-    }, [])
+    }, [loadAppAndVersion, setInitialMessages, setIsGeneratingCode])
 
+    // Finally use it in useEffect
     useEffect(() => {
-        if (id && typeof id === 'string') {
-            fetchMessages(id)
+        if (id && id === currentChatId) {
+            setCurrentChatId(id)
+            loadChat(id)
         }
-    }, [id, fetchMessages])
+    }, [id, currentChatId, loadChat])
+
+    // Update chat selection handler
+    const handleChatSelect = useCallback((chatId: string) => {
+        router.push(`/chat/${chatId}`)
+    }, [router])
 
     const fetchAndSetChats = useCallback(async () => {
         try {
@@ -338,14 +411,6 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
             setCurrentChatId(chatId)
         }
     }, [])
-
-    const handleChatSelect = useCallback(
-        (chatId: string) => {
-            setCurrentChatId(chatId)
-            router.replace(`/chat/${chatId}`, { scroll: false })
-        },
-        [router]
-    )
 
     const handleNewChat = useCallback(async () => {
         setCurrentChatId(null)
@@ -408,80 +473,43 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         }
     }, [killSandbox])
 
-    // Modify fetchAppId
+    // Modify fetchAppId to handle errors better
     const fetchAppId = useCallback(async () => {
-        console.log('🔍 fetchAppId called with currentChatId:', currentChatId);
-
-        if (!currentChatId) {
-            console.log('❌ No currentChatId available')
-            return
-        }
+        if (!currentChatId) return
 
         try {
-            // Log the query we're about to make
-            console.log('🔍 Querying chats table for id:', currentChatId);
-
-            const { data: chat, error: chatError } = await supabase
+            console.log('🔍 Fetching app for chat:', currentChatId)
+            const { data: chat } = await supabase
                 .from('chats')
-                .select('app_id, id')  // Also select id for debugging
+                .select('app_id')
                 .eq('id', currentChatId)
                 .single()
 
-            if (chatError) {
-                console.error('❌ Error fetching chat:', chatError)
-                return
-            }
+            if (chat?.app_id) {
+                console.log('📱 Found app:', chat.app_id)
+                setCurrentApp({ id: chat.app_id })
 
-            console.log('📱 Fetched chat data:', chat)
+                const { data: versions } = await supabase
+                    .from('versions')
+                    .select('*')
+                    .eq('app_id', chat.app_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single()
 
-            if (!chat) {
-                console.log('❌ No chat found for id:', currentChatId);
-                return;
-            }
-
-            if (!chat.app_id) {
-                console.log('❌ No app_id found in chat:', chat);
-                return;
-            }
-
-            // Set current app before fetching versions
-            setCurrentApp({ id: chat.app_id })
-            console.log('✅ Set current app:', chat.app_id)
-
-            // Verify the app exists
-            const { data: app, error: appError } = await supabase
-                .from('apps')
-                .select('*')
-                .eq('id', chat.app_id)
-                .single()
-
-            if (appError) {
-                console.error('❌ Error verifying app:', appError)
-                return
-            }
-
-            console.log('✅ Verified app exists:', app)
-
-            // Then fetch versions
-            const { data: versions, error: versionsError } = await supabase
-                .from('app_versions')
-                .select('*')
-                .eq('app_id', chat.app_id)
-                .order('created_at', { ascending: false })
-
-            if (versionsError) {
-                console.error('❌ Error fetching versions:', versionsError)
-                return
-            }
-
-            console.log('📱 Fetched versions:', versions)
-
-            if (versions?.[0]?.code) {
-                setGeneratedCode(versions[0].code)
-                await updateStreamlitApp(versions[0].code, true)
+                if (versions?.code) {
+                    console.log('📦 Found latest version, executing code...')
+                    setGeneratedCode(versions.code)
+                    await updateStreamlitApp(versions.code, true)
+                    setIsRightContentVisible(true)
+                } else {
+                    console.log('⚠️ No code found in versions')
+                }
+            } else {
+                console.log('ℹ️ No app found for chat')
             }
         } catch (error) {
-            console.error('❌ Error in fetchAppId:', error)
+            console.error('❌ Error fetching app:', error)
         }
     }, [currentChatId, supabase, updateStreamlitApp])
 
@@ -571,6 +599,21 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
         })
     }, [currentChatId, generatedCode, streamlitUrl, isRightContentVisible])
 
+    // Add cleanup on unmount
+    useEffect(() => {
+        return () => {
+            isExecutingRef.current = false
+        }
+    }, [])
+
+    // Add this useEffect to sync messages when initialMessages changes
+    useEffect(() => {
+        if (initialMessages.length > 0) {
+            console.log('🔄 Syncing messages:', initialMessages)
+            setMessages(initialMessages)
+        }
+    }, [initialMessages, setMessages])
+
     if (isLoading) {
         return <div>Loading...</div>
     }
@@ -652,6 +695,7 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                                         streamlitUrl={streamlitUrl}
                                         generatedCode={generatedCode}
                                         isGeneratingCode={isGeneratingCode}
+                                        isLoadingSandbox={isLoadingSandbox}
                                         showCodeView={showCodeView}
                                         onRefresh={handleRefresh}
                                         onCodeViewToggle={handleCodeViewToggle}

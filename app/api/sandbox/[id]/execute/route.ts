@@ -35,6 +35,27 @@ async function cleanupOldSandboxes(sandboxes: Sandbox[], keepSandboxId?: string)
     }
 }
 
+async function killStreamlitProcess(sandbox: Sandbox) {
+    try {
+        // Kill any running streamlit processes
+        await sandbox.process.start({
+            cmd: 'pkill -f "streamlit run" || true'
+        })
+        
+        // Remove existing app file
+        await sandbox.process.start({
+            cmd: 'rm -f /app/app.py'
+        })
+
+        // Small delay to ensure process is fully terminated
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        console.log('✅ Cleaned up existing Streamlit process and app file')
+    } catch (error) {
+        console.error('❌ Error during cleanup:', error)
+    }
+}
+
 export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
@@ -74,12 +95,12 @@ export async function POST(
         if (params.id !== 'new' && existingSandboxes.some(s => s.id === params.id)) {
             // Reconnect to specific sandbox if ID provided and exists
             sandbox = await Sandbox.reconnect(params.id)
-            // Cleanup other sandboxes
+            await killStreamlitProcess(sandbox)  // Kill process and clean up
             await cleanupOldSandboxes(existingSandboxes, params.id)
         } else if (existingSandboxes.length > 0) {
             // Reuse the first existing sandbox
             sandbox = existingSandboxes[0]
-            // Cleanup other sandboxes
+            await killStreamlitProcess(sandbox)  // Kill process and clean up
             await cleanupOldSandboxes(existingSandboxes, sandbox.id)
         } else {
             // Create new sandbox if none exist
@@ -135,7 +156,7 @@ export async function POST(
         }
 
         // Write and execute code
-        console.log('Writing code to sandbox...')
+        console.log('Writing code to sandbox: ', codeContent)
         await sandbox.filesystem.write('/app/app.py', codeContent)
 
         console.log('Starting Streamlit process')

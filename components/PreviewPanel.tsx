@@ -14,29 +14,31 @@ import { cn } from '@/lib/utils'
 import { Code, Globe, Layout, RefreshCcw, Loader2 } from 'lucide-react'
 import { useRef } from 'react'
 import { CodeView } from './CodeView'
+import { LoadingSandbox } from '@/components/LoadingSandbox'
+import { AnimatePresence } from 'framer-motion'
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
     generatedCode: string
     isGeneratingCode: boolean
-    isInitializing?: boolean
+    isLoadingSandbox?: boolean
     showCodeView: boolean
-    onRefresh: () => void
-    onCodeViewToggle: () => void
+    onRefresh?: () => void
+    onCodeViewToggle?: () => void
 }
 
 export function PreviewPanel({
     streamlitUrl,
     generatedCode,
     isGeneratingCode,
-    isInitializing,
+    isLoadingSandbox = false,
     showCodeView,
     onRefresh,
     onCodeViewToggle,
 }: PreviewPanelProps) {
     const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
 
-    const showOverlay = isGeneratingCode || isInitializing
+    const showOverlay = isGeneratingCode || isLoadingSandbox
 
     const handleRefresh = () => {
         if (streamlitPreviewRef.current) {
@@ -47,16 +49,13 @@ export function PreviewPanel({
 
     return (
         <div className="relative h-full">
-            {/* {showOverlay && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
-                    <div className="flex flex-col items-center gap-3">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <p className="text-sm text-muted-foreground">
-                            {isInitializing ? 'Initializing sandbox...' : 'Generating code...'}
-                        </p>
-                    </div>
-                </div>
-            )} */}
+            <AnimatePresence>
+                {showOverlay && (
+                    <LoadingSandbox
+                        message={isLoadingSandbox ? 'Preparing your sandbox...' : 'Generating your code...'}
+                    />
+                )}
+            </AnimatePresence>
             <div className="h-full flex flex-col">
                 <div className="flex items-center gap-2 p-2 border-b bg-muted/40">
                     <div className="flex items-center flex-grow gap-2 px-2 py-1.5 bg-background rounded-md border shadow-sm">
@@ -117,10 +116,14 @@ export function PreviewPanel({
                 <div className="flex-grow relative">
                     {showCodeView ? (
                         <div className="h-full overflow-auto">
-                            <CodeView
-                                code={generatedCode}
-                                isGeneratingCode={isGeneratingCode}
-                            />
+                            {isGeneratingCode ? (
+                                <LoadingSandbox message="Generating code..." />
+                            ) : (
+                                <CodeView
+                                    code={generatedCode}
+                                    isGeneratingCode={isGeneratingCode}
+                                />
+                            )}
                         </div>
                     ) : (
                         <StreamlitPreview

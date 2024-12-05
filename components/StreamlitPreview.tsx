@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Globe, Loader2 } from 'lucide-react'
-import { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useEffect, useMemo } from 'react'
 
 interface StreamlitPreviewProps {
     url: string | null
@@ -17,6 +17,7 @@ export const StreamlitPreview = forwardRef<
 >(({ url, isGeneratingCode }, ref) => {
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const retryTimeoutRef = useRef<NodeJS.Timeout>()
+    const previousUrlRef = useRef<string | null>(null)
 
     // Function to refresh iframe
     const refreshIframe = () => {
@@ -32,69 +33,44 @@ export const StreamlitPreview = forwardRef<
 
     // Auto-refresh logic when URL changes
     useEffect(() => {
-        if (url) {
-            // Initial refresh after 2 seconds
+        // Only refresh if we're getting a new URL (not null) and it's different from the previous URL
+        if (url && url !== previousUrlRef.current) {
+            console.log('🔄 New URL detected, scheduling refresh...')
             retryTimeoutRef.current = setTimeout(() => {
+                console.log('🔄 Refreshing iframe after URL change')
                 refreshIframe()
             }, 2000)
 
-            // Cleanup timeout
-            return () => {
-                if (retryTimeoutRef.current) {
-                    clearTimeout(retryTimeoutRef.current)
-                }
+            // Update previous URL ref
+            previousUrlRef.current = url
+        }
+
+        // Cleanup timeout
+        return () => {
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current)
             }
         }
     }, [url])
 
-    // Handle iframe load error
-    const handleIframeError = () => {
-        if (iframeRef.current) {
-            // Retry after 2 seconds if there's an error
-            retryTimeoutRef.current = setTimeout(() => {
-                refreshIframe()
-            }, 2000)
+    const content = useMemo(() => {
+        if (!url) {
+            return (
+                <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">No preview available</p>
+                </div>
+            )
         }
-    }
 
-    const content = (
-        <div className="h-full relative">
-            {isGeneratingCode && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="relative">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            <div className="absolute -bottom-1 -right-1 h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-                            </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground font-medium">
-                            Refreshing app...
-                        </p>
-                    </div>
-                </div>
-            )}
-            {!url ? (
-                <div className="h-full flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-3">
-                        <Globe className="h-8 w-8 text-muted-foreground animate-pulse" />
-                        <p className="text-sm text-muted-foreground font-medium">
-                            Waiting for app to start...
-                        </p>
-                    </div>
-                </div>
-            ) : (
-                <iframe
-                    ref={iframeRef}
-                    src={url}
-                    className="w-full h-full border-0"
-                    allow="accelerometer; camera; gyroscope; microphone"
-                    onError={handleIframeError}
-                />
-            )}
-        </div>
-    )
+        return (
+            <iframe
+                ref={iframeRef}
+                src={url}
+                className="w-full h-full border-0"
+                allow="camera"
+            />
+        )
+    }, [url])
 
     return (
         <Card className="bg-background h-full">
