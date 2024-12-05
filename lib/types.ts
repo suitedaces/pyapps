@@ -2,6 +2,7 @@ import { Json } from '@/lib/database.types'
 import { App, ExecutionResult } from '@/lib/schema'
 import { Message } from 'ai'
 import { z } from 'zod'
+import { Tool } from './tools/types'
 
 // Model types
 export interface ModelProvider {
@@ -64,16 +65,7 @@ export interface DatabaseMessage {
 }
 
 // Tool definition aligned with Vercel AI SDK
-export interface Tool {
-    toolName: string
-    description: string
-    parameters: z.ZodObject<any>
-    execute?: (args: Record<string, any>) => Promise<any>
-    streamExecution?: (
-        args: Record<string, any>,
-        signal?: AbortSignal
-    ) => AsyncGenerator<ToolStreamResponse>
-}
+export type { Tool }
 
 // Add StreamingTool interface
 export interface StreamingTool extends Tool {

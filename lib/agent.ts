@@ -3,8 +3,8 @@ import { CoreMessage, LanguageModelV1, streamText } from 'ai'
 import { encode } from 'gpt-tokenizer'
 import { cookies } from 'next/headers'
 import { createVersion } from './supabase'
-import { toolManager } from './tools/registry'
-import { LLMModelConfig, ModelProvider, StreamingTool, Tool } from './types'
+import { getTools, getTool } from './tools/index'
+import { LLMModelConfig, ModelProvider, Tool } from './types'
 import { completeToolStream, updateToolDelta, generate } from './actions';
 
 interface FileContext {
@@ -40,7 +40,7 @@ export class GruntyAgent {
         chatId: string,
         userId: string,
         messages: CoreMessage[],
-        tools: (Tool | StreamingTool)[],
+        tools: Tool[],
         fileContext?: FileContext
     ) {
         this.fileContext = fileContext
@@ -90,30 +90,29 @@ export class GruntyAgent {
     private async handleStreamProcess(
         writer: WritableStreamDefaultWriter,
         encoder: TextEncoder,
-        tools: (Tool | StreamingTool)[],
+        tools: Tool[],
         chatId: string,
         userId: string
     ) {
         try {
             let collectedContent = ''
+            let toolCalls: any[] = []
+            let toolResults: any[] = []
             console.log('🚀 Starting stream process')
 
-            // Set up tools for the model
-            const formattedTools = tools.reduce(
-                (acc, tool) => {
-                    acc[tool.toolName] = {
-                        description: tool.description,
-                        parameters: tool.parameters,
-                        execute: null,
-                    }
-                    return acc
-                },
-                {} as Record<string, any>
-            )
+            // Fix: Convert tools array to record format
+            const formattedTools = tools.reduce((acc, tool) => {
+                acc[tool.toolName] = {
+                    name: tool.toolName,
+                    description: tool.description,
+                    parameters: tool.schema
+                }
+                return acc
+            }, {} as Record<string, { name: string; description: string; parameters: any }>)
 
             console.log('🛠️ Formatted tools:', {
                 toolCount: Object.keys(formattedTools).length,
-                tools: Object.keys(formattedTools),
+                tools: Object.keys(formattedTools)
             })
 
             // Start the stream
@@ -121,22 +120,16 @@ export class GruntyAgent {
                 model: this.model as unknown as LanguageModelV1,
                 messages: this.sanitizedMessages,
                 tools: formattedTools,
-                temperature: this.config.temperature || 0.7,
+                temperature: this.config.temperature || 0.5,
                 maxTokens: this.config.maxTokens || 4096,
                 experimental_toolCallStreaming: true,
             })
 
-            console.log('📡 Stream started')
-
-            // Handle text chunks - THIS IS THE KEY PART WE NEED TO FIX
+            // Process text stream
             for await (const chunk of textStream) {
                 console.log('📝 Received text chunk:', { chunk })
-
-                // Immediately stream the chunk to the client
                 const textPart = `0:${JSON.stringify(chunk)}\n\n`
                 await writer.write(encoder.encode(textPart))
-
-                // Also collect for storage
                 collectedContent += chunk
             }
 
@@ -145,280 +138,86 @@ export class GruntyAgent {
                 preview: collectedContent.substring(0, 100) + '...',
             })
 
-            // Process the full stream with tools
-            await this.processFullStream(
-                fullStream,
-                writer,
-                encoder,
-                collectedContent,
-                chatId,
-                userId
-            )
-        } catch (error) {
-            console.error('🔥 Stream process error:', error)
-            throw error
-        } finally {
-            writer.close()
-        }
-    }
-
-    private async processFullStream(
-        fullStream: any,
-        writer: WritableStreamDefaultWriter,
-        encoder: TextEncoder,
-        collectedContent: string,
-        chatId: string,
-        userId: string
-    ) {
-        let toolCalls: any[] = []
-        let toolResults: any[] = []
-        let appId: string | null = null
-        const versionCreatedForToolCall = new Set<string>()
-
-        try {
-            // First check if chat already has an associated app
-            const supabase = createRouteHandlerClient({ cookies })
-            const { data: existingChat } = await supabase
-                .from('chats')
-                .select('app_id')
-                .eq('id', chatId)
-                .single()
-
-            appId = existingChat?.app_id
-
-            // Extract CSV filename from messages or context
-            let csvFileName = this.fileContext?.fileName || 'data.csv'
-            if (!this.fileContext?.fileName) {
-                const csvFileNameMatch = this.sanitizedMessages
-                    .filter((msg) => msg.role === 'user')
-                    .map((msg) => {
-                        const content =
-                            typeof msg.content === 'string'
-                                ? msg.content
-                                : Array.isArray(msg.content)
-                                  ? msg.content
-                                        .map((part) =>
-                                            typeof part === 'string' ? part : ''
-                                        )
-                                        .join(' ')
-                                  : ''
-                        const match = content.match(/['"]([\w\s-]+\.csv)['"]/i)
-                        return match ? match[1] : null
-                    })
-                    .find((name) => name !== null)
-
-                if (csvFileNameMatch) {
-                    csvFileName = csvFileNameMatch
-                }
-            }
-
-            // Use the CSV filename (without extension) as the base for the app name
-            const baseAppName = csvFileName.replace('.csv', '')
-
+            // Process tool calls
             for await (const step of fullStream) {
-                console.log('🔄 Processing stream step:', { type: step.type })
-
                 if (step.type === 'tool-call') {
+                    const { toolCallId, toolName, args } = step
+                    console.log('🛠️ Tool call initiated:', { toolCallId, toolName })
+
+                    const tool = tools.find(t => t.toolName === toolName)
+                    if (!tool) {
+                        console.error(`❌ Tool ${toolName} not found`)
+                        await writer.write(encoder.encode(`e:${JSON.stringify({ toolCallId, error: `Tool ${toolName} not found` })}\n\n`))
+                        continue
+                    }
+
                     try {
-                        const toolCallId = step.toolCallId
-                        const toolName = step.toolName
-                        const args = step.args || {}
+                        console.log('🛠️ Starting tool execution:', { toolName, args })
 
-                        console.log('️ Tool call started:', {
+                        // 1. Send tool call start
+                        const startMessage = {
                             toolCallId,
-                            toolName,
-                            args,
-                        })
-
-                        const tool = toolManager.get(toolName)
-                        if (!tool) {
-                            throw new Error(`Tool ${toolName} not found`)
+                            toolName
                         }
+                        console.log('📤 Sending tool start:', startMessage)
+                        await writer.write(encoder.encode(`b:${JSON.stringify(startMessage)}\n\n`))
 
-                        // Send tool call start
-                        writer.write(
-                            encoder.encode(
-                                `b:${JSON.stringify({
-                                    toolCallId,
-                                    toolName,
-                                    args,
-                                })}\n\n`
+                        // 2. Send tool call delta - Make sure args is properly stringified
+                        const deltaMessage = {
+                            toolCallId,
+                            argsTextDelta: typeof args === 'string' ? args : JSON.stringify(args)
+                        }
+                        console.log('📤 Sending tool delta:', deltaMessage)
+                        await writer.write(encoder.encode(`c:${JSON.stringify(deltaMessage)}\n\n`))
+
+                        const result = await Promise.race([
+                            tool.execute(args, {
+                                toolCallId,
+                                messages: this.sanitizedMessages,
+                                fileContext: this.fileContext
+                            }),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Tool execution timeout')), 30000)
                             )
-                        )
+                        ])
 
-                        // Stream tool execution
-                        for await (const part of toolManager.streamToolExecution(
+                        // 3. Send tool result
+                        const resultMessage = {
+                            toolCallId,
+                            result: typeof result === 'string' ? result : JSON.stringify(result)
+                        }
+                        console.log('📤 Sending tool result:', resultMessage)
+                        await writer.write(encoder.encode(`a:${JSON.stringify(resultMessage)}\n\n`))
+
+                        // 4. Fix: Send complete tool call with required properties
+                        const toolCallMessage = {
                             toolCallId,
                             toolName,
-                            { ...args, fileContext: this.fileContext }
-                        )) {
-                            console.log('📦 Processing tool stream part:', {
-                                type: part.type,
-                                toolCallId: part.toolCallId,
-                                contentLength:
-                                    'argsTextDelta' in part
-                                        ? part.argsTextDelta.length
-                                        : undefined,
-                                content: 'argsTextDelta' in part
-                                    ? part
-                                    : undefined,
-                            })
-
-                            switch (part.type) {
-                                case 'tool-call-delta':
-                                    writer.write(
-                                        encoder.encode(
-                                            `c:${JSON.stringify({
-                                                toolCallId,
-                                                argsTextDelta:
-                                                    part.argsTextDelta,
-                                            })}\n\n`
-                                        )
-                                    )
-
-                                    try {
-                                        const success = await updateToolDelta(part.argsTextDelta)
-                                        if (!success) {
-                                            console.warn('⚠️ Failed to update tool delta')
-                                        }
-                                    } catch (error) {
-                                        console.error('❌ Error updating tool delta:', error)
-                                    }
-                                    break
-
-                                case 'tool-result':
-                                    // Handle app and version creation specifically for create_streamlit_app
-                                    if (
-                                        part.result &&
-                                        typeof part.result === 'string' &&
-                                        toolName === 'create_streamlit_app' &&
-                                        !versionCreatedForToolCall.has(
-                                            toolCallId
-                                        )
-                                    ) {
-                                        if (!appId) {
-                                            const {
-                                                data: newApp,
-                                                error: appError,
-                                            } = await supabase
-                                                .from('apps')
-                                                .insert({
-                                                    user_id: userId,
-                                                    name: baseAppName,
-                                                    description:
-                                                        args.query ||
-                                                        'Generated App',
-                                                    is_public: false,
-                                                    created_at:
-                                                        new Date().toISOString(),
-                                                    updated_at:
-                                                        new Date().toISOString(),
-                                                    created_by: userId,
-                                                })
-                                                .select()
-                                                .single()
-
-                                            if (appError) throw appError
-                                            appId = newApp.id
-
-                                            // Link chat to app
-                                            await supabase
-                                                .from('chats')
-                                                .update({ app_id: appId })
-                                                .eq('id', chatId)
-                                        }
-
-                                        if (!appId) {
-                                            throw new Error(
-                                                'Failed to create or retrieve app ID'
-                                            )
-                                        }
-
-                                        // Create new version
-                                        try {
-                                            const versionData =
-                                                await createVersion(
-                                                    appId,
-                                                    part.result
-                                                )
-                                            versionCreatedForToolCall.add(
-                                                toolCallId
-                                            )
-
-                                            console.log(
-                                                '✅ Version created successfully:',
-                                                {
-                                                    appId,
-                                                    versionNumber:
-                                                        versionData.version_number,
-                                                    toolName,
-                                                    toolCallId,
-                                                }
-                                            )
-                                        } catch (versionError) {
-                                            console.error(
-                                                '❌ Failed to create version:',
-                                                versionError
-                                            )
-                                            throw versionError
-                                        }
-                                    }
-
-                                    await completeToolStream()
-
-                                    // Send tool call completion first
-                                    writer.write(
-                                        encoder.encode(
-                                            `9:${JSON.stringify({
-                                                toolCallId,
-                                                toolName,
-                                                args,
-                                            })}\n\n`
-                                        )
-                                    )
-
-                                    // Then send tool result
-                                    writer.write(
-                                        encoder.encode(
-                                            `a:${JSON.stringify({
-                                                toolCallId,
-                                                result: part.result,
-                                            })}\n\n`
-                                        )
-                                    )
-
-                                    // Track result
-                                    toolResults.push({
-                                        id: toolCallId,
-                                        name: toolName,
-                                        result: part.result,
-                                    })
-                                    break
-                            }
+                            args: typeof args === 'object' ? args : JSON.parse(args) // Ensure args is an object
                         }
-
-                        // Track tool call
-                        toolCalls.push({
-                            id: toolCallId,
-                            name: toolName,
-                            args: args,
-                        })
+                        console.log('📤 Sending tool call:', toolCallMessage)
+                        await writer.write(encoder.encode(`9:${JSON.stringify(toolCallMessage)}\n\n`))
                     } catch (error) {
-                        console.error('❌ Error in tool execution:', error)
-                        writer.write(
-                            encoder.encode(
-                                `e:${JSON.stringify({
-                                    toolCallId: step.toolCallId,
-                                    error:
-                                        error instanceof Error
-                                            ? error.message
-                                            : 'Unknown error',
-                                })}\n\n`
-                            )
-                        )
+                        console.error('❌ Tool execution error:', error)
+                        await writer.write(encoder.encode(`e:${JSON.stringify({
+                            toolCallId,
+                            error: error instanceof Error ? error.message : 'Unknown error'
+                        })}\n\n`))
                     }
                 }
             }
+
+            // Fix: Send proper finish message with required properties
+            const finishMessage = {
+                finishReason: 'stop',
+                usage: {
+                    promptTokens: this.calculateTokenCount(this.sanitizedMessages.map(m => m.content).join('')),
+                    completionTokens: this.calculateTokenCount(collectedContent)
+                }
+            }
+            console.log('📤 Sending finish message:', finishMessage)
+            await writer.write(encoder.encode(`d:${JSON.stringify(finishMessage)}\n\n`))
+            await writer.close()
 
             // Store the complete message
             if (collectedContent) {
@@ -450,8 +249,7 @@ export class GruntyAgent {
                     return ''
                 }
 
-                const userMessageContent =
-                    getUserMessageContent(latestUserMessage)
+                const userMessageContent = getUserMessageContent(latestUserMessage)
 
                 console.log('📝 Processing user message:', {
                     originalContent: latestUserMessage?.content,
@@ -466,7 +264,8 @@ export class GruntyAgent {
                 })
             }
         } catch (error) {
-            console.error('Stream processing failed:', error)
+            console.error('❌ Stream processing failed:', error)
+            await writer.abort(error)
             throw error
         }
     }
@@ -562,9 +361,7 @@ export class GruntyAgent {
                 token_count: totalTokens,
             }
 
-            const { error } = await supabase
-                .from('messages')
-                .insert(messageData)
+            const { error } = await supabase.from('messages').insert(messageData)
 
             if (error) {
                 console.error('Failed to store message:', error)

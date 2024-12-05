@@ -1,14 +1,15 @@
 import { GruntyAgent } from '@/lib/agent'
 import { getModelClient } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
-import { tools } from '@/lib/tools'
-import { FileContext, Tool } from '@/lib/types'
+import { getTools } from '@/lib/tools/index'
+import { FileContext } from '@/lib/types'
 import { generateUUID } from '@/lib/utils'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { convertToCoreMessages } from 'ai'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
+import { Tool } from '@/lib/tools/types'
 
 // Validation schema for request body
 const RequestSchema = z.object({
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
             chatId,
             session.user.id,
             convertToCoreMessages(messages),
-            tools as Tool[],
+            getTools(),
             fileContext
         )
 
