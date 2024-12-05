@@ -1,8 +1,12 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { notFound } from 'next/navigation'
-import ChatPageClient from './ChatPageClient'
+import ChatContainer from '@/components/ChatContainer'
 
-export default async function ChatIdPage({
+export interface ChatPageProps {
+    initialChat: any
+}
+
+export default async function ChatPage({
     params: { id },
 }: {
     params: { id: string }
@@ -20,5 +24,5 @@ export default async function ChatIdPage({
         notFound()
     }
 
-    return <ChatPageClient initialChat={chat} />
+    return <ChatContainer initialChat={chat} />
 }
