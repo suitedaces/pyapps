@@ -410,35 +410,87 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
 
     // Modify fetchAppId
     const fetchAppId = useCallback(async () => {
-        if (!currentChatId) return
+        console.log('🔍 fetchAppId called with currentChatId:', currentChatId);
 
-        const { data: chat } = await supabase
-            .from('chats')
-            .select('app_id')
-            .eq('id', currentChatId)
-            .single()
+        if (!currentChatId) {
+            console.log('❌ No currentChatId available')
+            return
+        }
 
-        if (chat?.app_id) {
+        try {
+            // Log the query we're about to make
+            console.log('🔍 Querying chats table for id:', currentChatId);
+
+            const { data: chat, error: chatError } = await supabase
+                .from('chats')
+                .select('app_id, id')  // Also select id for debugging
+                .eq('id', currentChatId)
+                .single()
+
+            if (chatError) {
+                console.error('❌ Error fetching chat:', chatError)
+                return
+            }
+
+            console.log('📱 Fetched chat data:', chat)
+
+            if (!chat) {
+                console.log('❌ No chat found for id:', currentChatId);
+                return;
+            }
+
+            if (!chat.app_id) {
+                console.log('❌ No app_id found in chat:', chat);
+                return;
+            }
+
+            // Set current app before fetching versions
             setCurrentApp({ id: chat.app_id })
+            console.log('✅ Set current app:', chat.app_id)
 
-            const { data: versions } = await supabase
-                .from('versions')
+            // Verify the app exists
+            const { data: app, error: appError } = await supabase
+                .from('apps')
+                .select('*')
+                .eq('id', chat.app_id)
+                .single()
+
+            if (appError) {
+                console.error('❌ Error verifying app:', appError)
+                return
+            }
+
+            console.log('✅ Verified app exists:', app)
+
+            // Then fetch versions
+            const { data: versions, error: versionsError } = await supabase
+                .from('app_versions')
                 .select('*')
                 .eq('app_id', chat.app_id)
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single()
 
-            if (versions?.code) {
-                setGeneratedCode(versions.code)
-                await updateStreamlitApp(versions.code, true)
+            if (versionsError) {
+                console.error('❌ Error fetching versions:', versionsError)
+                return
             }
+
+            console.log('📱 Fetched versions:', versions)
+
+            if (versions?.[0]?.code) {
+                setGeneratedCode(versions[0].code)
+                await updateStreamlitApp(versions[0].code, true)
+            }
+        } catch (error) {
+            console.error('❌ Error in fetchAppId:', error)
         }
     }, [currentChatId, supabase, updateStreamlitApp])
 
     useEffect(() => {
-        fetchAppId()
-    }, [fetchAppId])
+        console.log('🔄 Dependencies changed - currentChatId:', currentChatId);
+        if (currentChatId) {
+            fetchAppId();
+        }
+    }, [currentChatId, fetchAppId]);
 
     const handleChatFinish = useCallback(() => {
         if (versionSelectorRef.current) {
@@ -609,14 +661,15 @@ export default function ChatPageClient({ initialChat }: ChatPageClientProps) {
                         )}
                     </ResizablePanelGroup>
                     <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
-                        {currentApp && (
-                            <VersionSelector
-                                appId={currentApp.id}
-                                onVersionChange={handleVersionChange}
-                                ref={versionSelectorRef}
-                            />
+                        {currentApp?.id && (
+                            <div className="bg-white p-2 rounded-lg shadow-md">
+                                <VersionSelector
+                                    appId={currentApp.id}
+                                    onVersionChange={handleVersionChange}
+                                    ref={versionSelectorRef}
+                                />
+                            </div>
                         )}
-
                         <Button
                             onClick={toggleRightContent}
                             className={cn(

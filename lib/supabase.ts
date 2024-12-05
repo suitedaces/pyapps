@@ -149,3 +149,42 @@ export async function getUserTotalTokens(userId: string) {
     if (error) throw error
     return data
 }
+
+// Add this function to create an app
+export async function createAppIfNotExists(
+    appId: string,
+    userId: string,
+    name: string = 'Streamlit App',
+    description: string = 'Generated Streamlit Application'
+): Promise<void> {
+    try {
+        // Check if app exists
+        const { data: existingApp } = await supabase
+            .from('apps')
+            .select('id')
+            .eq('id', appId)
+            .single()
+
+        if (!existingApp) {
+            // Create new app with correct schema
+            const { error: createError } = await supabase
+                .from('apps')
+                .insert({
+                    id: appId,
+                    user_id: userId,
+                    name: name,
+                    description: description,
+                    is_public: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    created_by: userId
+                })
+
+            if (createError) throw createError
+            console.log('✅ App created successfully:', appId)
+        }
+    } catch (error) {
+        console.error('Failed to create app:', error)
+        throw error
+    }
+}

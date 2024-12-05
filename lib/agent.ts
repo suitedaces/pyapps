@@ -2,7 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { CoreMessage, LanguageModelV1, streamText } from 'ai'
 import { encode } from 'gpt-tokenizer'
 import { cookies } from 'next/headers'
-import { createVersion } from './supabase'
+import { createVersion, createAppIfNotExists } from './supabase'
 import { getTools, getTool } from './tools/index'
 import { LLMModelConfig, ModelProvider, Tool } from './types'
 import { completeToolStream, updateToolDelta, generate } from './actions';
@@ -12,6 +12,15 @@ interface FileContext {
     fileType: string
     content?: string
     analysis?: any
+}
+
+// Add the StreamlitToolResult interface at the top of the file
+interface StreamlitToolResult {
+    content: string;
+    metadata?: {
+        requiredLibraries?: string[];
+        version?: any;
+    };
 }
 
 // Main agent class that handles chat streaming and tool execution
@@ -189,12 +198,59 @@ export class GruntyAgent {
                             )
                         ])
 
-                        // Track the tool result
+                        // Handle Streamlit app creation and versioning
+                        if (toolName === 'create_streamlit_app') {
+                            try {
+                                console.log('📱 Creating/updating Streamlit app')
+
+                                // First create the app if it doesn't exist
+                                await createAppIfNotExists(
+                                    chatId,
+                                    userId,
+                                    'Streamlit App',
+                                    'Generated Streamlit Application'
+                                )
+
+                                // Update chat with app_id
+                                const supabase = createRouteHandlerClient({ cookies })
+                                const { error: updateError } = await supabase
+                                    .from('chats')
+                                    .update({ app_id: chatId })
+                                    .eq('id', chatId)
+
+                                if (updateError) {
+                                    console.error('❌ Failed to update chat with app_id:', updateError)
+                                    return
+                                }
+
+                                console.log('✅ Updated chat with app_id:', chatId)
+
+                                // Now create the version
+                                const streamlitResult = result as StreamlitToolResult
+                                const versionMetadata = await createVersion(
+                                    chatId,
+                                    streamlitResult.content
+                                )
+
+                                // Add version metadata to the result
+                                streamlitResult.metadata = {
+                                    ...streamlitResult.metadata,
+                                    version: versionMetadata
+                                }
+
+                                console.log('✅ App and version created:', versionMetadata)
+                            } catch (error) {
+                                console.error('❌ Failed to create app/version:', error)
+                            }
+                        }
+
+                        // Track the tool result with any additional metadata
                         toolResults.push({
                             toolCallId,
                             toolName,
                             result,
-                            timestamp: new Date().toISOString()
+                            timestamp: new Date().toISOString(),
+                            metadata: (result as StreamlitToolResult).metadata
                         })
 
                         // 3. Send tool result

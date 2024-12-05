@@ -429,36 +429,71 @@ export default function Home() {
 
     // Add useEffect to fetch app ID when chat loads
     const fetchAppId = useCallback(async () => {
-        if (!currentChatId) return
+        if (!currentChatId) {
+            console.log('❌ No currentChatId available')
+            return
+        }
 
         try {
-            const { data: chat } = await supabase
+            // First check chats table
+            const { data: chat, error: chatError } = await supabase
                 .from('chats')
                 .select('app_id')
                 .eq('id', currentChatId)
                 .single()
 
-            if (chat?.app_id) {
-                setCurrentApp({ id: chat.app_id })
+            if (chatError) {
+                console.error('❌ Error fetching chat:', chatError)
+                return
+            }
 
-                // Fetch latest version code
-                const { data: versions } = await supabase
-                    .from('versions')
+            console.log('📱 Fetched chat data:', chat)
+
+            if (chat?.app_id) {
+                // Check apps table
+                const { data: app, error: appError } = await supabase
+                    .from('apps')
+                    .select('*')
+                    .eq('id', chat.app_id)
+                    .single()
+
+                if (appError) {
+                    console.error('❌ Error fetching app:', appError)
+                    return
+                }
+
+                console.log('📱 Fetched app data:', app)
+                setCurrentApp({ id: chat.app_id })
+                console.log('✅ Set current app:', chat.app_id)
+
+                // Check versions table
+                const { data: versions, error: versionsError } = await supabase
+                    .from('app_versions')
                     .select('*')
                     .eq('app_id', chat.app_id)
                     .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single()
 
-                if (versions?.code) {
-                    setGeneratedCode(versions.code)
-                    await updateStreamlitApp(versions.code, true)
+                if (versionsError) {
+                    console.error('❌ Error fetching versions:', versionsError)
+                    return
+                }
+
+                console.log('📱 Fetched versions:', versions)
+
+                if (versions?.[0]?.code) {
+                    setGeneratedCode(versions[0].code)
+                    await updateStreamlitApp(versions[0].code, true)
                 }
             }
         } catch (error) {
-            console.error('Error fetching app:', error)
+            console.error('❌ Error in fetchAppId:', error)
         }
     }, [currentChatId, supabase, updateStreamlitApp])
+
+    // Add this useEffect to track currentApp changes
+    useEffect(() => {
+        console.log('🔄 Current app state changed:', currentApp)
+    }, [currentApp])
 
     // Add this useEffect to trigger fetchAppId
     useEffect(() => {
