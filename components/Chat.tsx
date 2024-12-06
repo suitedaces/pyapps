@@ -31,6 +31,15 @@ interface ChatProps {
         visible: boolean | ((prev: boolean) => boolean)
     ) => void
     isChatCentered?: boolean
+    onCodeGeneration?: (
+        input: string,
+        fileContext?: {
+            fileName?: string
+            fileType?: string
+            content?: string
+        }
+    ) => Promise<void>
+    isGeneratingCode?: boolean
 }
 
 interface FileUploadState {
@@ -51,6 +60,8 @@ export function Chat({
     setActiveTab,
     setIsRightContentVisible,
     isChatCentered = false,
+    onCodeGeneration,
+    isGeneratingCode,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -200,81 +211,15 @@ export function Chat({
 
     const [isCreatingChat, setIsCreatingChat] = useState(false)
 
-    const handleChatSubmit = async (content: string, file?: File) => {
-        try {
-            onChatSubmit?.()
-            if (!chatId) {
-                setIsCreatingChat(true)
-            }
-
-            if (file) {
-                setFileUploadState(prev => ({ ...prev, isUploading: true }))
-                
-                try {
-                    const fileData = await uploadFile(file)
-                    const fileContent = await file.text()
-
-                    // Sanitize content
-                    const sanitizedContent = fileContent
-                        .split('\n')
-                        .map((row) => row.replace(/[\r\n]+/g, ''))
-                        .join('\n')
-
-                    const rows = sanitizedContent.split('\n')
-                    const columnNames = rows[0]
-                    const previewRows = rows.slice(1, 6).join('\n')
-                    const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
-
-                    const message =
-                        content.trim() ||
-                        `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
-
-                    await append(
-                        {
-                            content: message,
-                            role: 'user',
-                            createdAt: new Date(),
-                        },
-                        {
-                            body: {
-                                fileId: fileData.id,
-                                fileName: file.name,
-                                fileContent: sanitizedContent,
-                            },
-                        }
-                    )
-
-                    // Reset file state after successful upload
-                    setAttachedFile(null)
-                    resetFileUploadState()
-                    if (fileInputRef.current) {
-                        fileInputRef.current.value = ''
-                    }
-                } catch (error) {
-                    console.error('Error uploading file:', error)
-                    setFileUploadState(prev => ({
-                        ...prev,
-                        error: 'Failed to upload file. Please try again.',
-                        isUploading: false
-                    }))
-                    return
-                }
-            } else if (content.trim()) {
-                await append({
-                    content: content.trim(),
-                    role: 'user',
-                    createdAt: new Date(),
-                })
-            }
-        } catch (error) {
-            console.error('Error submitting message:', error)
-            setFileUploadState((prev) => ({
-                ...prev,
-                error: 'Failed to send message. Please try again.',
-            }))
-        } finally {
-            setFileUploadState((prev) => ({ ...prev, isUploading: false }))
+    const handleChatSubmission = async (content: string, file?: File) => {
+        if (file) {
+            await handleFileSubmit(file, content)
+        } else if (content.trim()) {
+            await onCodeGeneration?.(content.trim())
         }
+        
+        // Keep existing chat functionality
+        await handleSubmit({ preventDefault: () => {} } as React.FormEvent<HTMLFormElement>)
     }
 
     const messages = useMemo(() => {
@@ -398,6 +343,27 @@ export function Chat({
             setShowTypingText(false)
         }
     }, [messages])
+
+    const handleFileSubmit = async (file: File, content?: string) => {
+        try {
+            const fileContent = await file.text()
+            const sanitizedContent = fileContent
+                .split('\n')
+                .map(row => row.replace(/[\r\n]+/g, ''))
+                .join('\n')
+
+            await onCodeGeneration?.(
+                content || `Create a Streamlit app to visualize this data...`,
+                {
+                    fileName: file.name,
+                    fileType: file.type,
+                    content: sanitizedContent
+                }
+            )
+        } catch (error) {
+            console.error('Failed to process file:', error)
+        }
+    }
 
     return (
         <div className={cn(
@@ -534,8 +500,8 @@ export function Chat({
                 }}
             >
                 <Chatbar 
-                    onSubmit={handleChatSubmit} 
-                    isLoading={isLoading}
+                    onSubmit={handleChatSubmission} 
+                    isLoading={isLoading || !!isGeneratingCode}
                     className={cn(
                         "transition-all duration-500",
                         isChatCentered ? "p-6" : "p-4"

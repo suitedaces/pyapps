@@ -24,6 +24,8 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 import { VersionSelector } from '../components/VersionSelector'
+import { useStreamlitAgent } from '@/hooks/useStreamlitAgent'
+import { readStreamableValue } from 'ai/rsc'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -36,6 +38,7 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
     const { session, isLoading } = useAuth()
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { killSandbox, updateSandbox } = useSandboxStore()
+    const { generateCode, isGenerating } = useStreamlitAgent()
 
     // All state declarations first
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
@@ -430,6 +433,43 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
         }
     }, [generatedCode])
 
+    // Add handler for agent generation
+    const handleCodeGeneration = useCallback(async (
+        input: string,
+        fileContext?: {
+            fileName?: string
+            fileType?: string
+            content?: string
+        }
+    ) => {
+        if (!session?.user?.id) return
+
+        setIsGeneratingCode(true)
+        setGeneratedCode('')
+
+        try {
+            const stream = await generateCode(
+                input,
+                currentChatId || '',
+                session.user.id,
+                fileContext
+            )
+
+
+            // Handle streaming updates
+            for await (const chunk of readStreamableValue(stream)) {
+                setGeneratedCode(prev => prev + chunk)
+            }
+
+            // Update Streamlit preview after code generation
+            await updateStreamlitApp(generatedCode)
+        } catch (error) {
+            console.error('Failed to generate code:', error)
+        } finally {
+            setIsGeneratingCode(false)
+        }
+    }, [session?.user?.id, currentChatId, generateCode, updateStreamlitApp, ])
+
     // Loading states
     if (isLoading) {
         return <div>Loading...</div>
@@ -498,6 +538,8 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
                                             setActiveTab('code')
                                             setIsRightContentVisible(true)
                                         }}
+                                        onCodeGeneration={handleCodeGeneration}
+                                        isGeneratingCode={isGeneratingCode}
                                     />
                                 </div>
                             </div>

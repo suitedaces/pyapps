@@ -470,7 +470,7 @@ export class GruntyAgent {
         }
 
         if (messageHistory) {
-            messageHistory.forEach((msg) => {
+            messageHistory.forEach((msg: any) => {
                 if (msg.user_message) {
                     this.sanitizedMessages.push({
                         role: 'user',
