@@ -4,7 +4,7 @@ import { Chat } from '@/components/Chat'
 import { Logo } from '@/components/core/Logo'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
-import { Sidebar } from '@/components/Sidebar'
+import AppSidebar from './Sidebar'
 import { StreamlitPreviewRef } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
@@ -456,7 +456,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                     <div className="godrays-overlay z-10" />
                 </div>
             </div>
-            <Sidebar
+            <AppSidebar
                 onChatSelect={handleChatSelect}
                 currentChatId={currentChatId}
                 chats={sidebarChats || []}
@@ -472,9 +472,6 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                             right: 0,
                         }}
                     >
-                        <div className="px-4">
-                            <Logo inverted collapsed={false} />
-                        </div>
                     </div>
                 )}
                 <main
