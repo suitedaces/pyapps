@@ -162,17 +162,23 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
                             size="icon"
                             className={cn(
                                 "h-9 w-9",
+                                "bg-gradient-to-tr from-[#FFDE56] to-[#4989BB]",
+                                "disabled:bg-none disabled:bg-[#F5F5F5] disabled:border disabled:border-[#D4D4D4]",
                                 isCentered && "h-11 w-11"
                             )}
                             disabled={isLoading || (!message.trim() && !file)}
                         >
                             {isLoading ? (
                                 <Loader2 className={cn(
-                                    "h-5 w-5 animate-spin",
+                                    "h-5 w-5 animate-spin text-black",
                                     isCentered && "h-6 w-6"
                                 )} />
                             ) : (
-                                <ArrowUp className="h-5 w-5" />
+                                <ArrowUp className={cn(
+                                    "h-5 w-5",
+                                    "text-black",
+                                    "disabled:text-[#D4D4D4]"
+                                )} />
                             )}
                         </Button>
                     </motion.div>
