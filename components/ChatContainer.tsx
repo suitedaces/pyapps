@@ -450,7 +450,12 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
     )
 
     return (
-        <div className="relative flex h-screen overflow-hidden">
+        <div className="bg-white relative flex h-screen overflow-hidden">
+            <div className='bg-white absolute top-0 left-0 w-full h-full'>
+                <div className="godrays top-0 left-0 w-full min-h-[30vh] relative z-5">
+                    <div className="godrays-overlay z-10" />
+                </div>
+            </div>
             <Sidebar
                 onChatSelect={handleChatSelect}
                 currentChatId={currentChatId}

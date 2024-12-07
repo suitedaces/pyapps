@@ -333,7 +333,7 @@ export function Sidebar({
                         : 'var(--expanded-width)',
                 }}
                 className={cn(
-                    'hidden md:flex h-screen border-r bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60 relative',
+                    'hidden md:flex h-screen border-r z-10 bg-black relative',
                     className
                 )}
                 style={

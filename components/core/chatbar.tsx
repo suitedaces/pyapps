@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { PaperclipIcon, ArrowUp, Loader2 } from "lucide-react"
 import { FilePreview } from "@/components/FilePreview"
 import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea";
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface ChatbarProps {
     onSubmit: (content: string, file?: File) => Promise<void>
@@ -25,6 +25,7 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
     const [isSubmitted, setIsSubmitted] = React.useState(false)
+    const [isAnimating, setIsAnimating] = React.useState(false)
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
@@ -53,6 +54,7 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
         e.preventDefault()
         if (message.trim() || file) {
             setIsSubmitted(true)
+            setIsAnimating(true)
             const currentMessage = message
             const currentFile = file
 
@@ -110,15 +112,29 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
                         onKeyDown={handleKeyDown}
                         placeholder={file ? 'File attached. Add a message or press Send.' : 'Type your message...'}
                         className={cn(
-                            "min-h-[110px] w-full resize-none rounded-lg pr-24 py-4",
+                            "w-full resize-none rounded-lg pr-24 py-4",
                             "focus-visible:ring-1 focus-visible:ring-offset-0",
                             "scrollbar-thumb-rounded scrollbar-track-rounded",
                             "scrollbar-thin scrollbar-thumb-border"
                         )}
+                        style={{
+                            minHeight: isInChatPage ? '54px' : isAnimating ? '54px' : `${MIN_HEIGHT}px`,
+                            maxHeight: isInChatPage ? '54px' : isAnimating ? '54px' : `${MAX_HEIGHT}px`,
+                            transition: 'min-height 0.3s ease-in-out, max-height 0.3s ease-in-out'
+                        }}
                         disabled={isLoading}
                     />
 
-                    <div className="absolute w-full flex justify-between px-2 bottom-2 gap-2">
+                    <motion.div
+                        className="absolute flex justify-between pl-4 bottom-2 right-2 gap-2"
+                        animate={{
+                            width: isInChatPage ? '100px' : isAnimating ? '100px' : '100%'
+                        }}
+                        transition={{
+                            duration: 0.3,
+                            ease: "easeInOut"
+                        }}
+                    >
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -159,7 +175,7 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
                                 <ArrowUp className="h-5 w-5" />
                             )}
                         </Button>
-                    </div>
+                    </motion.div>
                 </div>
             </form>
         </motion.div>

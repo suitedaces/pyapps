@@ -403,7 +403,7 @@ export function Chat({
 
     return (
         <div className={cn(
-            "flex flex-col relative bg-background text-foreground",
+            "flex flex-col relative z-20 text-black",
             "h-[calc(100vh-7rem)]",
             "overflow-hidden"
         )}>
