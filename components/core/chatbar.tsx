@@ -1,11 +1,12 @@
 'use client'
 
-import { FilePreview } from '@/components/FilePreview'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
-import { Loader2, PaperclipIcon, SendIcon } from 'lucide-react'
-import * as React from 'react'
+import * as React from "react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+import { PaperclipIcon, ArrowUp, Loader2 } from "lucide-react"
+import { FilePreview } from "@/components/FilePreview"
+import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea";
 
 interface ChatbarProps {
     onSubmit: (content: string, file?: File) => Promise<void>
@@ -14,22 +15,18 @@ interface ChatbarProps {
     isCentered?: boolean
 }
 
-export default function Chatbar({ 
-    onSubmit, 
-    isLoading, 
-    className,
-    isCentered = false 
-}: ChatbarProps) {
-    const [message, setMessage] = React.useState('')
+const MIN_HEIGHT = 74;
+const MAX_HEIGHT = 110;
+
+export default function Chatbar({ onSubmit, isLoading, className, isCentered }: ChatbarProps) {
+    const [message, setMessage] = React.useState("")
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-    const handleFileChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = e.target.files?.[0]
-        if (selectedFile) {
-            setFile(selectedFile)
-        }
-    }, [])
+    const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+        minHeight: MIN_HEIGHT,
+        maxHeight: MAX_HEIGHT,
+    });
 
     const handleRemoveFile = React.useCallback(() => {
         setFile(null)
@@ -38,6 +35,13 @@ export default function Chatbar({
         }
     }, [])
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0]
+        if (selectedFile) {
+            setFile(selectedFile)
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (message.trim() || file) {
@@ -45,8 +49,9 @@ export default function Chatbar({
             const currentFile = file
 
             // Clear form
-            setMessage('')
-            setFile(null)
+            setMessage("")
+            handleRemoveFile()
+            adjustHeight(true);
 
             try {
                 await onSubmit(currentMessage, currentFile || undefined)
@@ -69,15 +74,8 @@ export default function Chatbar({
     }
 
     return (
-        <div className={className}>
-            <form
-                onSubmit={handleSubmit}
-                className={cn(
-                    "flex flex-col gap-2",
-                    "mx-auto",
-                    isCentered ? "max-w-[100%]" : "max-w-[800px]"
-                )}
-            >
+        <div className="p-4  bg-background">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 max-w-[800px] mx-auto">
                 {file && (
                     <div className="mb-2">
                         <FilePreview file={file} onRemove={handleRemoveFile} />
@@ -87,21 +85,20 @@ export default function Chatbar({
                 <div className="relative flex items-center">
                     <Textarea
                         value={message}
+                        ref={textareaRef}
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={file ? 'File attached. Add a message or press Send.' : 'Type your message...'}
                         className={cn(
-                            "min-h-[60px] w-full resize-none bg-background pr-24",
-                            "rounded-xl",
-                            isCentered && "min-h-[80px] text-lg"
+                            "min-h-[110px] w-full resize-none rounded-lg pr-24 py-4",
+                            "focus-visible:ring-1 focus-visible:ring-offset-0",
+                            "scrollbar-thumb-rounded scrollbar-track-rounded",
+                            "scrollbar-thin scrollbar-thumb-border"
                         )}
                         disabled={isLoading}
                     />
 
-                    <div className={cn(
-                        "absolute right-2 flex items-center gap-2",
-                        isCentered && "right-4 gap-3"
-                    )}>
+                    <div className="absolute w-full flex justify-between px-2 bottom-2 gap-2">
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -114,10 +111,7 @@ export default function Chatbar({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className={cn(
-                                "h-9 w-9",
-                                isCentered && "h-11 w-11"
-                            )}
+                            className="h-9 w-9 bg-secondary"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isLoading}
                         >
@@ -142,10 +136,7 @@ export default function Chatbar({
                                     isCentered && "h-6 w-6"
                                 )} />
                             ) : (
-                                <SendIcon className={cn(
-                                    "h-5 w-5",
-                                    isCentered && "h-6 w-6"
-                                )} />
+                                <ArrowUp className="h-5 w-5" />
                             )}
                         </Button>
                     </div>

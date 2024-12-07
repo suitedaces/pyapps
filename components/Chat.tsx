@@ -209,7 +209,7 @@ export function Chat({
 
             if (file) {
                 setFileUploadState(prev => ({ ...prev, isUploading: true }))
-                
+
                 try {
                     const fileData = await uploadFile(file)
                     const fileContent = await file.text()
@@ -419,19 +419,19 @@ export function Chat({
                 )}
                 show={showTypingText && isChatCentered}
             />
-            <motion.div 
+            <motion.div
                 className={cn(
                     "flex-1 overflow-hidden",
                     isChatCentered ? "opacity-0" : "opacity-100"
                 )}
                 initial={isCreatingChat ? false : { opacity: 0, height: 0 }}
-                animate={{ 
+                animate={{
                     opacity: isChatCentered ? 0 : 1,
                     height: isChatCentered ? 0 : "auto"
                 }}
                 transition={{ duration: 0.5 }}
             >
-                <ScrollArea 
+                <ScrollArea
                     ref={scrollAreaRef}
                     className={cn(
                         "h-full",
@@ -523,18 +523,18 @@ export function Chat({
             )}
 
             <motion.div
-                className="w-full border-t bg-background pb-2"
+                className="w-full bg-background pb-2"
                 initial={false}
                 animate={{
                     y: isChatCentered ? "-50vh" : 0
                 }}
-                transition={{ 
-                    duration: 0.5, 
+                transition={{
+                    duration: 0.5,
                     ease: [0.32, 0.72, 0, 1]
                 }}
             >
-                <Chatbar 
-                    onSubmit={handleChatSubmit} 
+                <Chatbar
+                    onSubmit={handleChatSubmit}
                     isLoading={isLoading}
                     className={cn(
                         "transition-all duration-500",
