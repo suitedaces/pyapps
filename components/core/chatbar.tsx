@@ -31,12 +31,16 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
         maxHeight: MAX_HEIGHT,
     });
 
-    const handleRemoveFile = React.useCallback(() => {
-        setFile(null)
+    const handleRemoveFile = React.useCallback((e?: React.MouseEvent) => {
+        // Prevent event bubbling
+        e?.preventDefault();
+        e?.stopPropagation();
+
+        setFile(null);
         if (fileInputRef.current) {
-            fileInputRef.current.value = ''
+            fileInputRef.current.value = '';
         }
-    }, [])
+    }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0]
@@ -79,18 +83,21 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
 
     return (
         <motion.div
-            className="p-4 w-full bg-background"
+            className="p-4 w-full absolute bg-background"
+            style={{
+                bottom: isInChatPage ? 0 : "40vh"
+            }}
             animate={{
-                paddingBottom: isInChatPage ? "0px" : (isSubmitted ? "0px" : "384px")
+                bottom: isInChatPage ? 0 : (isSubmitted ? 0 : "40vh")
             }}
             transition={{
                 duration: 0.3,
                 ease: "easeInOut"
             }}
         >
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4 max-w-[800px] mx-auto">
+            <form onSubmit={handleSubmit} className="flex relative flex-col gap-4 max-w-[800px] mx-auto">
                 {file && (
-                    <div className="mb-2">
+                    <div className="mb-2" onClick={(e) => e.stopPropagation()}>
                         <FilePreview file={file} onRemove={handleRemoveFile} />
                     </div>
                 )}

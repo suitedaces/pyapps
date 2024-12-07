@@ -125,9 +125,7 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
     const handleRemove = (e: React.MouseEvent) => {
         e.stopPropagation()
         setIsVisible(false)
-        setTimeout(() => {
-            onRemove()
-        }, 200)
+        onRemove()
     }
 
     return (
@@ -135,19 +133,16 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
             <AnimatePresence mode="wait">
                 {isVisible && (
                     <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
+                        initial={{ opacity: 0, y: 0 }}
+                        animate={{ opacity: 1, y: 10 }}
+                        exit={{ opacity: 0, y: 10 }}
                         transition={{ duration: 0.2 }}
-                        onAnimationComplete={() => {
-                            console.log('🟡 FilePreview: animation completed')
-                        }}
-                        className="bg-slate-50 dark:bg-slate-900 rounded-t-xl border-x border-t"
+                        className="absolute bottom-0 w-full -mb-[7.8rem] bg-slate-50 dark:bg-slate-900 rounded-b-xl border-x border-b"
                     >
                         <div className="p-2">
                             <motion.div
                                 className={`relative bg-white dark:bg-slate-800 rounded-lg border p-3 w-44 cursor-pointer
-                  ${error ? 'border-red-500' : 'hover:border-primary/50'} transition-colors`}
+                                    ${error ? 'border-red-500' : 'hover:border-primary/50'} transition-colors`}
                                 onClick={() =>
                                     isPreviewable(file) &&
                                     !error &&
@@ -196,7 +191,7 @@ export function FilePreview({ file, onRemove, onError }: FilePreviewProps) {
             </AnimatePresence>
 
             <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-                <DialogContent className="max-w-4xl h-[80vh] text-black">
+                <DialogContent className="max-w-4xl h-[80vh] absolute bottom-0 text-black">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <span>Preview:</span>

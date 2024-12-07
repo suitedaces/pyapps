@@ -483,7 +483,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                         ref={resizableGroupRef}
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
-                            <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
+                            <div className="w-full relative flex flex-col h-[calc(100vh-4rem)]">
                                 {!isInChatPage && showTypingText && <TypingText className='text-black font-bold text-3xl' text='From Data to Apps, in seconds' speed={30} show={true} />}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
