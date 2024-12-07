@@ -1,11 +1,11 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { streamText } from 'ai'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 
 export async function POST(req: Request) {
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createClient()
     const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) return new Response('Unauthorized', { status: 401 })
