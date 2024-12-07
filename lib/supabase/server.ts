@@ -25,3 +25,11 @@ export const createClient = async () => {
       }
     );
   };
+
+export const getSession = async () => {
+    const supabase = await createClient()
+    const {
+        data: { session },
+    } = await supabase.auth.getSession()
+    return session
+}

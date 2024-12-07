@@ -1,4 +1,4 @@
-import { createServerSupabaseClient, getSession } from '@/lib/supabase/server'
+import { createClient, getSession } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 // Fetch all conversations for the authenticated user
@@ -10,7 +10,7 @@ export async function GET() {
     }
 
     try {
-        const supabase = await createServerSupabaseClient()
+        const supabase = await createClient()
         const { data: chats, error } = await supabase
             .from('chats')
             .select('*')
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const supabase = await createServerSupabaseClient()
+        const supabase = await createClient()
         const body = await req.json()
 
         const { data: chat, error } = await supabase
