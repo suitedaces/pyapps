@@ -68,6 +68,7 @@ import {
 } from '@/components/ui/sidebar'
 
 import { Logo } from './core/Logo'
+import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
 
 interface Chat {
     id: string
@@ -440,9 +441,10 @@ export default function AppSidebar({
                                                     <CreditCard className="mr-2 h-4 w-4" />
                                                     <span>Billing</span>
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem>
-                                                    <Bell className="mr-2 h-4 w-4" />
-                                                    <span>Notifications</span>
+                                                <DropdownMenuItem className="cursor-default">
+                                                    <div className="flex w-full items-center justify-between">
+                                                        <ThemeSwitcherButton />
+                                                    </div>
                                                 </DropdownMenuItem>
                                             </DropdownMenuGroup>
                                             <DropdownMenuSeparator />
@@ -674,10 +676,9 @@ export default function AppSidebar({
                                                     <CreditCard />
                                                     Billing
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem>
-                                                    <Bell />
-                                                    Notifications
-                                                </DropdownMenuItem>
+                                                <div className="flex w-full items-center justify-between">
+                                                    <ThemeSwitcherButton />
+                                                </div>
                                             </DropdownMenuGroup>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={handleSignOut}>
