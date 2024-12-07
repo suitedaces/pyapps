@@ -3,8 +3,31 @@
 import Chatbar from '@/components/core/chatbar'
 import { Message as AIMessage } from '@/components/core/message'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ChatProps } from '@/lib/types'
 import { useEffect, useRef } from 'react'
+import { Message } from 'ai'
+
+interface FileUploadState {
+    isUploading: boolean
+    progress: number
+    error: string | null
+}
+
+
+interface ChatProps {
+    messages: Message[]
+    isLoading: boolean
+    input: string
+    onInputChange: (value: string) => void
+    onSubmit: (e: React.FormEvent, message: string, file?: File) => Promise<void>
+    fileUploadState: FileUploadState
+    onFileUpload: (file: File) => void
+    errorState: Error | null
+    onErrorDismiss: () => void
+    onChatFinish: () => void
+    onUpdateStreamlit: (code: string) => void
+    onCodeClick: (code: string) => void
+    isInChatPage: boolean
+}
 
 export function Chat({
     messages = [],
@@ -52,6 +75,7 @@ export function Chat({
                 isLoading={isLoading}
                 onFileUpload={onFileUpload}
                 fileUploadState={fileUploadState}
+                isInChatPage={isInChatPage}
             />
         </div>
     )

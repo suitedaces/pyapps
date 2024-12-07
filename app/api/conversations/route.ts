@@ -1,11 +1,11 @@
-import { createClient, getSession } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 // Fetch all conversations for the authenticated user
 export async function GET() {
-    const session = await getSession()
+    const user = await getUser()
 
-    if (!session) {
+    if (!user) {
         return new Response('Unauthorized', { status: 401 })
     }
 
@@ -14,7 +14,7 @@ export async function GET() {
         const { data: chats, error } = await supabase
             .from('chats')
             .select('*')
-            .eq('user_id', session.user.id)
+            .eq('user_id', user.id)
             .order('updated_at', { ascending: false })
 
         if (error) throw error
@@ -30,9 +30,9 @@ export async function GET() {
 
 // Create a new conversation
 export async function POST(req: Request) {
-    const session = await getSession()
+    const user = await getUser()
 
-    if (!session) {
+    if (!user) {
         return new Response('Unauthorized', { status: 401 })
     }
 
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
         const { data: chat, error } = await supabase
             .from('chats')
             .insert({
-                user_id: session.user.id,
+                user_id: user.id,
                 name: body.name || 'New Chat',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),

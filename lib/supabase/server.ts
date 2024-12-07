@@ -26,10 +26,9 @@ export const createClient = async () => {
     );
   };
 
-export const getSession = async () => {
+  export async function getUser() {
     const supabase = await createClient()
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
-    return session
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error || !user) return null
+    return user
 }

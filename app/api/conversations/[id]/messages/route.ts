@@ -1,4 +1,4 @@
-import { createClient, getSession } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { encode } from 'gpt-tokenizer'
 import { NextResponse } from 'next/server'
 
@@ -7,9 +7,9 @@ export async function GET(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const session = await getSession()
+    const user = await getUser()
 
-    if (!session) {
+    if (!user) {
         return new Response('Unauthorized', { status: 401 })
     }
 
@@ -37,9 +37,9 @@ export async function POST(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const session = await getSession()
+    const user = await getUser()
 
-    if (!session) {
+    if (!user) {
         return new Response('Unauthorized', { status: 401 })
     }
 
@@ -94,9 +94,9 @@ export async function PUT(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const session = await getSession()
+    const user = await getUser()
 
-    if (!session) {
+    if (!user) {
         return new Response('Unauthorized', { status: 401 })
     }
 
@@ -132,9 +132,9 @@ export async function DELETE(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const session = await getSession()
+    const user = await getUser()
 
-    if (!session) {
+    if (!user) {
         return new Response('Unauthorized', { status: 401 })
     }
 

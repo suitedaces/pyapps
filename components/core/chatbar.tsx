@@ -102,6 +102,7 @@ export default function Chatbar({
     return (
         <motion.div
             className="p-4 w-full absolute bg-background"
+            initial={{ bottom: isInChatPage ? 0 : "40vh" }}
             style={{
                 bottom: isInChatPage ? 0 : "40vh"
             }}
