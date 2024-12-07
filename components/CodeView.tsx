@@ -3,15 +3,20 @@ import { Loader2 } from 'lucide-react'
 import { highlight, languages } from 'prismjs'
 import { useEffect, useState } from 'react'
 import Editor from 'react-simple-code-editor'
+import dynamic from 'next/dynamic'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
-import { LoadingSandbox } from '@/components/LoadingSandbox'
 
 interface CodeViewProps {
     code: string | { code: string }
     isGeneratingCode: boolean
 }
+
+const LoadingSandbox = dynamic(
+    () => import('./LoadingSandbox'),
+    { ssr: false }
+)
 
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')

@@ -14,24 +14,34 @@ import { cn } from '@/lib/utils'
 import { Code, Globe, Layout, RefreshCcw, Loader2 } from 'lucide-react'
 import { useRef } from 'react'
 import { CodeView } from './CodeView'
-import { LoadingSandbox } from '@/components/LoadingSandbox'
+import dynamic from 'next/dynamic'
 import { AnimatePresence } from 'framer-motion'
+
+// Dynamically import LoadingSandbox with SSR disabled
+const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
+    ssr: false,
+    loading: () => (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="animate-pulse">Loading...</div>
+        </div>
+    )
+})
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
     generatedCode: string
     isGeneratingCode: boolean
-    isLoadingSandbox?: boolean
+    isLoadingSandbox: boolean
     showCodeView: boolean
-    onRefresh?: () => void
-    onCodeViewToggle?: () => void
+    onRefresh: () => void
+    onCodeViewToggle: () => void
 }
 
 export function PreviewPanel({
     streamlitUrl,
     generatedCode,
     isGeneratingCode,
-    isLoadingSandbox = false,
+    isLoadingSandbox,
     showCodeView,
     onRefresh,
     onCodeViewToggle,

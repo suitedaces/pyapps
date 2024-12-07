@@ -1,6 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createServerSupabaseClient, getSession } from '@/lib/supabase/server'
 import { encode } from 'gpt-tokenizer'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 // Fetch messages for a specific conversation
@@ -8,9 +7,14 @@ export async function GET(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const session = await getSession()
+
+    if (!session) {
+        return new Response('Unauthorized', { status: 401 })
+    }
 
     try {
+        const supabase = await createServerSupabaseClient()
         const { data: messages, error } = await supabase
             .from('messages')
             .select('*')
@@ -33,10 +37,16 @@ export async function POST(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
-    const body = await req.json()
+    const session = await getSession()
+
+    if (!session) {
+        return new Response('Unauthorized', { status: 401 })
+    }
 
     try {
+        const supabase = await createServerSupabaseClient()
+        const body = await req.json()
+
         // Calculate token counts for different message components
         const userTokens = encode(body.user_message || '').length
         const assistantTokens = encode(body.assistant_message || '').length
@@ -84,10 +94,16 @@ export async function PUT(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
-    const body = await req.json()
+    const session = await getSession()
+
+    if (!session) {
+        return new Response('Unauthorized', { status: 401 })
+    }
 
     try {
+        const supabase = await createServerSupabaseClient()
+        const body = await req.json()
+
         const { data, error } = await supabase
             .from('messages')
             .update({
@@ -116,9 +132,14 @@ export async function DELETE(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const session = await getSession()
+
+    if (!session) {
+        return new Response('Unauthorized', { status: 401 })
+    }
 
     try {
+        const supabase = await createServerSupabaseClient()
         const { error } = await supabase
             .from('messages')
             .delete()
