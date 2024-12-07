@@ -1,5 +1,7 @@
-import { createClient } from '@/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
     const requestUrl = new URL(request.url)
@@ -10,6 +12,6 @@ export async function GET(request: Request) {
         await supabase.auth.exchangeCodeForSession(code)
     }
 
-    // URL to redirect to after sign in process completes
-    return NextResponse.redirect(requestUrl.origin)
+    // Redirect to the home page after successful sign in
+    return NextResponse.redirect(new URL('/', requestUrl.origin))
 }

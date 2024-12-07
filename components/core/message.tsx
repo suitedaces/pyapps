@@ -1,7 +1,7 @@
 'use client'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useAuth } from '@/contexts/AuthContext'
+import { useSession } from '@/lib/hooks/use-session'
 import { App, ExecutionResult } from '@/lib/schema'
 import { cn } from '@/lib/utils'
 import { Message as AIMessage, ToolInvocation } from 'ai'
@@ -39,8 +39,8 @@ export function Message({
     isLoading,
     isCreatingChat = false,
 }: MessageProps) {
+    const { session } = useSession()
     const isUser = role === 'user'
-    const { session } = useAuth()
     const user = session?.user
 
     const renderPreviewButton = () => {

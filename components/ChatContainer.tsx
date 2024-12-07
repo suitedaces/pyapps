@@ -7,7 +7,7 @@ import { PreviewPanel } from '@/components/PreviewPanel'
 import { Sidebar } from '@/components/Sidebar'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
-import { useAuth } from '@/contexts/AuthContext'
+import { useSession } from '@/lib/hooks/use-session'
 import { useSidebar } from '@/contexts/SidebarContext'
 import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
@@ -37,7 +37,7 @@ interface FileUploadState {
 
 export default function ChatContainer({ initialChat, isNewChat = false, isInChatPage = false }: ChatContainerProps) {
     const router = useRouter()
-    const { session, isLoading } = useAuth()
+    const { session, isLoading: sessionLoading } = useSession()
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { killSandbox, updateSandbox } = useSandboxStore()
 
@@ -516,8 +516,12 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
     }, [messages])
 
     // Loading states
-    if (isLoading) {
-        return <div>Loading...</div>
+    if (sessionLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+            </div>
+        )
     }
 
     if (!session) {

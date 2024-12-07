@@ -9,7 +9,10 @@ export async function GET() {
     } = await supabase.auth.getSession()
 
     if (!session) {
-        return new Response('Unauthorized', { status: 401 })
+        return NextResponse.json(
+            { error: 'Not authenticated' },
+            { status: 401 }
+        )
     }
 
     try {
@@ -38,7 +41,10 @@ export async function POST(req: Request) {
     } = await supabase.auth.getSession()
 
     if (!session) {
-        return new Response('Unauthorized', { status: 401 })
+        return NextResponse.json(
+            { error: 'Not authenticated' },
+            { status: 401 }
+        )
     }
 
     try {

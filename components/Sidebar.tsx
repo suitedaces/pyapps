@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Session } from '@supabase/supabase-js'
-import { motion } from 'framer-motion'
+import { motion, HTMLMotionProps } from 'framer-motion'
 import {
     AppWindow,
     ChevronDown,
@@ -30,6 +30,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useSession } from '@/lib/hooks/use-session'
 
 interface SidebarProps {
     defaultCollapsed?: boolean
@@ -54,6 +55,20 @@ interface NavItemProps {
     onToggle?: () => void
 }
 
+// Add a type for the motion div props
+type MotionDivProps = HTMLMotionProps<"div">
+
+// Update the motion div props type
+type SidebarMotionProps = {
+    initial: boolean
+    animate: { width: string }
+    style: React.CSSProperties
+    className: string
+    children: React.ReactNode
+}
+
+const MotionDiv = motion.div as React.ComponentType<MotionDivProps & { className?: string }>
+
 export function Sidebar({
     defaultCollapsed = false,
     className,
@@ -64,16 +79,10 @@ export function Sidebar({
     onCollapsedChange,
 }: SidebarProps) {
     const [isChatsCollapsed, setIsChatsCollapsed] = useState(false)
-    const [session, setSession] = useState<Session | null>(null)
+    const { session } = useSession()
     const pathname = usePathname()
     const router = useRouter()
     const supabase = createClientComponentClient()
-
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-        })
-    }, [supabase.auth])
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
@@ -325,23 +334,19 @@ export function Sidebar({
     // Update DesktopSidebar component
     const DesktopSidebar = () => {
         return (
-            <motion.div
+            <MotionDiv
                 initial={false}
                 animate={{
-                    width: collapsed
-                        ? 'var(--collapsed-width)'
-                        : 'var(--expanded-width)',
+                    width: collapsed ? 'var(--collapsed-width)' : 'var(--expanded-width)',
                 }}
                 className={cn(
                     'hidden md:flex h-screen border-r z-10 bg-black relative',
                     className
                 )}
-                style={
-                    {
-                        '--collapsed-width': '4rem',
-                        '--expanded-width': '14rem',
-                    } as React.CSSProperties
-                }
+                style={{
+                    '--collapsed-width': '4rem',
+                    '--expanded-width': '14rem',
+                } as React.CSSProperties}
             >
                 <div className="flex h-full w-full flex-col gap-4">
                     <div className="flex h-14 items-center justify-between px-4">
@@ -546,7 +551,7 @@ export function Sidebar({
                         )}
                     </div>
                 </div>
-            </motion.div>
+            </MotionDiv>
         )
     }
 
@@ -557,7 +562,22 @@ export function Sidebar({
     return (
         <TooltipProvider>
             <MobileSidebar />
-            <DesktopSidebar />
+            <motion.div
+                initial={false}
+                animate={{
+                    width: collapsed ? 'var(--collapsed-width)' : 'var(--expanded-width)',
+                }}
+                style={{
+                    '--collapsed-width': '4rem',
+                    '--expanded-width': '14rem',
+                } as React.CSSProperties}
+                className={cn(
+                    'hidden md:flex h-screen border-r z-10 bg-black relative',
+                    className
+                )}
+            >
+                <DesktopSidebar />
+            </motion.div>
         </TooltipProvider>
     )
 }

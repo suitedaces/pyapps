@@ -1,4 +1,3 @@
-import { AuthProvider } from '@/contexts/AuthContext'
 import { SidebarProvider } from '@/contexts/SidebarContext'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
@@ -22,9 +21,7 @@ export default function RootLayout({
         <html lang="en">
             <body className={cn(inter.className, 'bg-white')}>
                 <Providers>
-                    <AuthProvider>
-                        <SidebarProvider>{children}</SidebarProvider>
-                    </AuthProvider>
+                    <SidebarProvider>{children}</SidebarProvider>
                 </Providers>
             </body>
         </html>
