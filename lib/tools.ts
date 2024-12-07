@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/supabase/server'
 import { toolManager } from './tools/registry'
 import { StreamlitTool } from './tools/streamlit'
 import { StreamingTool } from './tools/types'
@@ -106,7 +105,7 @@ async function handleStreamlitResult(
     toolInvocation: any,
     fileContext?: any
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     try {
         // Get chat and app information
@@ -157,7 +156,7 @@ async function handleStreamlitResult(
 
 // Helper function to create version (imported from supabase.ts)
 async function createVersion(appId: string, code: string) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     const { data, error } = await supabase
         .from('versions')

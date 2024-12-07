@@ -5,20 +5,16 @@ import { Logo } from '@/components/core/Logo'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { Sidebar } from '@/components/Sidebar'
-import { StreamlitPreviewRef } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSidebar } from '@/contexts/SidebarContext'
 import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
-import { createVersion } from '@/lib/supabase'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Message } from 'ai'
 import { useChat } from 'ai/react'
-import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -32,14 +28,20 @@ interface ChatContainerProps {
     isInChatPage?: boolean
 }
 
+interface FileUploadState {
+    isUploading: boolean
+    progress: number
+    error: string | null
+}
+
+
 export default function ChatContainer({ initialChat, isNewChat = false, isInChatPage = false }: ChatContainerProps) {
-    const supabase = createClientComponentClient()
     const router = useRouter()
     const { session, isLoading } = useAuth()
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { killSandbox, updateSandbox } = useSandboxStore()
 
-    // All state declarations first
+    // state declarations 
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat?.id || null)
     const [initialMessages, setInitialMessages] = useState<Message[]>([])
@@ -56,8 +58,9 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
     const [isLoadingSandbox, setIsLoadingSandbox] = useState(false)
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
+    const [errorState, setErrorState] = useState<Error | null>(null)
 
-    // All refs
+    // refs
     const hasNavigated = useRef(false)
     const isVersionSwitching = useRef(false)
     const versionSelectorRef = useRef<{ refreshVersions: () => void } | null>(null)
@@ -118,20 +121,33 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         messages,
         isLoading: chatLoading,
         setMessages,
+        input,
+        handleInputChange,
+        handleSubmit: originalHandleSubmit,
+        append,
     } = useChat({
-        api: currentChatId
-            ? `/api/conversations/${currentChatId}/stream`
-            : '/api/conversations/stream',
+        api: '/api/chat/stream',
         id: currentChatId ?? undefined,
         initialMessages,
         body: {
             model: currentModel,
             config: languageModel,
+            chatId: currentChatId,
             experimental_streamData: true,
         },
-        maxSteps: 10,
-        onResponse: (response) => {
-            if (!response.ok) return
+        onResponse: async (response) => {
+            if (!response.ok) {
+                handleResponseError(response)
+                return
+            }
+
+            // Handle chat creation
+            if (!currentChatId) {
+                const newChatId = response.headers.get('x-chat-id')
+                if (newChatId && isNewChat) {
+                    router.replace(`/chat/${newChatId}`)
+                }
+            }
         },
         onFinish: async (message) => {
             if (message.toolInvocations?.length) {
@@ -147,47 +163,11 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                             setIsCreatingVersion(true)
                             setGeneratedCode(code)
                             await updateStreamlitApp(code)
-
-                            const { data: chat } = await supabase
-                                .from('chats')
-                                .select('app_id')
-                                .eq('id', currentChatId)
-                                .single()
-
-                            let appId = chat?.app_id
-
-                            if (!appId) {
-                                const { data: app, error: appError } = await supabase
-                                    .from('apps')
-                                    .insert({
-                                        user_id: session.user.id,
-                                        name: messages[0].content.slice(0, 50) + '...',
-                                        description: 'Streamlit app created from chat',
-                                        is_public: false,
-                                        created_at: new Date().toISOString(),
-                                        updated_at: new Date().toISOString(),
-                                        created_by: session.user.id,
-                                    })
-                                    .select()
-                                    .single()
-
-                                if (appError) throw appError
-                                appId = app.id
-
-                                await supabase
-                                    .from('chats')
-                                    .update({ app_id: appId })
-                                    .eq('id', currentChatId)
-                            }
-
-                            await createVersion(appId, code)
-                            setCurrentApp({ id: appId })
-
                             if (versionSelectorRef.current) {
                                 await versionSelectorRef.current.refreshVersions()
                             }
                         } catch (error) {
-                            console.error('Failed to handle version creation:', error)
+                            console.error('Failed to handle streamlit update:', error)
                         } finally {
                             setIsCreatingVersion(false)
                         }
@@ -203,14 +183,41 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                     createdAt: new Date(),
                     toolInvocations: message.toolInvocations,
                 }
-
                 setMessages(prev => [...prev, assistantMessage])
             }
+            
+            handleChatFinish()
         },
-        onError: () => {
+        onError: (error) => {
             setIsGeneratingCode(false)
-        },
+            setErrorState(new Error(error.message))
+        }
     })
+
+    // Create a wrapped handleSubmit
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
+        e.preventDefault()
+        setShowTypingText(false)
+        await originalHandleSubmit(e)
+    }, [originalHandleSubmit])
+
+    // File handling logic moved from Chat.tsx
+    const [attachedFile, setAttachedFile] = useState<File | null>(null)
+    const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
+        isUploading: false,
+        progress: 0,
+        error: null,
+    })
+
+    // Error handling moved from Chat.tsx
+    const handleResponseError = (response: Response) => {
+        const errorMessage =
+            response.status === 429
+                ? 'Rate limit exceeded. Please wait a moment.'
+                : response.status === 413
+                    ? 'Message too long. Please try a shorter message.'
+                    : 'An error occurred. Please try again.'
+    }
 
     // Event handlers
     const handleRefresh = useCallback(async () => {
@@ -279,7 +286,8 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         setIsRightContentVisible(prev => !prev)
         if (resizableGroupRef.current) {
             setTimeout(() => {
-                resizableGroupRef.current.resetLayout()
+                // Trigger resize event to update panel layout
+                window.dispatchEvent(new Event('resize'))
             }, 0)
         }
     }, [])
@@ -409,6 +417,74 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         }
     }, [killSandbox])
 
+    const handleFileUpload = useCallback(async (file: File) => {
+        setFileUploadState({ isUploading: true, progress: 0, error: null })
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('chatId', currentChatId || '')
+            
+            // Read and process file content
+            const fileContent = await file.text()
+            const sanitizedContent = fileContent
+                .split('\n')
+                .map((row) => row.replace(/[\r\n]+/g, ''))
+                .join('\n')
+
+            const rows = sanitizedContent.split('\n')
+            const columnNames = rows[0]
+            const previewRows = rows.slice(1, 6).join('\n')
+            const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+            const message = `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+
+            // Upload file
+            const response = await fetch('/api/chat/stream/upload', {
+                method: 'POST',
+                body: formData,
+            })
+            
+            if (!response.ok) throw new Error('Upload failed')
+            const fileData = await response.json()
+
+            // Send message with file context
+            await append(
+                {
+                    content: message,
+                    role: 'user',
+                    createdAt: new Date(),
+                },
+                {
+                    body: {
+                        fileId: fileData.id,
+                        fileName: file.name,
+                        fileContent: sanitizedContent,
+                    },
+                }
+            )
+
+            setAttachedFile(null)
+            setFileUploadState({ isUploading: false, progress: 100, error: null })
+            
+        } catch (error) {
+            console.error('Error uploading file:', error)
+            setFileUploadState({
+                isUploading: false,
+                progress: 0,
+                error: 'Failed to upload file. Please try again.'
+            })
+        }
+    }, [append, currentChatId])
+
+    // Reset file upload state
+    const resetFileUploadState = useCallback(() => {
+        setFileUploadState({
+            isUploading: false,
+            progress: 0,
+            error: null,
+        })
+    }, [])
+
     // Update messages when last message contains tool invocations
     useEffect(() => {
         const lastMessage = messages[messages.length - 1]
@@ -431,6 +507,13 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             setIsRightContentVisible(true)
         }
     }, [generatedCode])
+
+    // Remove the messages effect since we handle visibility in submit
+    useEffect(() => {
+        if (messages.length > 0) {
+            setShowTypingText(false)
+        }
+    }, [messages])
 
     // Loading states
     if (isLoading) {
@@ -492,16 +575,20 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                                 {!isInChatPage && showTypingText && <TypingText className='text-black font-bold text-3xl' text='From Data to Apps, in seconds' speed={30} show={true} />}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
-                                        chatId={currentChatId}
-                                        initialMessages={initialMessages}
-                                        onChatCreated={handleChatCreated}
-                                        onChatSubmit={handleChatSubmit}
+                                        messages={messages || []}
+                                        isLoading={chatLoading}
+                                        input={input || ''}
+                                        onInputChange={handleInputChange}
+                                        onSubmit={handleSubmit}
+                                        fileUploadState={fileUploadState}
+                                        onFileUpload={(file) => {
+                                            setAttachedFile(file)
+                                            handleFileUpload(file)
+                                        }}
+                                        errorState={errorState}
+                                        onErrorDismiss={() => setErrorState(null)}
                                         onChatFinish={handleChatFinish}
                                         onUpdateStreamlit={updateStreamlitApp}
-                                        setActiveTab={setActiveTab}
-                                        setIsRightContentVisible={
-                                            setIsRightContentVisible
-                                        }
                                         onCodeClick={() => {
                                             setActiveTab('code')
                                             setIsRightContentVisible(true)

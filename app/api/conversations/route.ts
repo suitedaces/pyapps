@@ -1,10 +1,9 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/supabase/server'
 import { NextResponse } from 'next/server'
 
 // Fetch all conversations for the authenticated user
 export async function GET() {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const {
         data: { session },
     } = await supabase.auth.getSession()
@@ -33,7 +32,7 @@ export async function GET() {
 
 // Create a new conversation
 export async function POST(req: Request) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const {
         data: { session },
     } = await supabase.auth.getSession()

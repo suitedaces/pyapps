@@ -6,12 +6,17 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { PaperclipIcon, ArrowUp, Loader2 } from "lucide-react"
 import { FilePreview } from "@/components/FilePreview"
-import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea";
+import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea"
 import { motion, AnimatePresence } from "framer-motion"
+import { FileUploadState } from "@/lib/types"
 
 interface ChatbarProps {
-    onSubmit: (content: string, file?: File) => Promise<void>
-    isLoading: boolean
+    value?: string
+    onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+    onSubmit: (e: React.FormEvent) => void
+    isLoading?: boolean
+    onFileUpload?: (file: File) => void
+    fileUploadState?: FileUploadState
     className?: string
     isCentered?: boolean
     isInChatPage?: boolean
@@ -20,8 +25,18 @@ interface ChatbarProps {
 const MIN_HEIGHT = 74;
 const MAX_HEIGHT = 110;
 
-export default function Chatbar({ onSubmit, isLoading, className, isCentered, isInChatPage }: ChatbarProps) {
-    const [message, setMessage] = React.useState("")
+export default function Chatbar({ 
+    value = "",
+    onChange,
+    onSubmit,
+    isLoading = false,
+    onFileUpload,
+    fileUploadState,
+    className,
+    isCentered,
+    isInChatPage 
+}: ChatbarProps) {
+    const [message, setMessage] = React.useState(value)
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
     const [isSubmitted, setIsSubmitted] = React.useState(false)
@@ -61,10 +76,16 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
             // Clear form
             setMessage("")
             handleRemoveFile()
-            adjustHeight(true);
+            adjustHeight(true)
 
             try {
-                await onSubmit(currentMessage, currentFile || undefined)
+                if (onChange) {
+                    onChange({ target: { value: "" } } as React.ChangeEvent<HTMLTextAreaElement>)
+                }
+                onSubmit(e)
+                if (currentFile && onFileUpload) {
+                    onFileUpload(currentFile)
+                }
             } catch (error) {
                 console.error('Failed to send message:', error)
                 setIsSubmitted(false)
@@ -80,6 +101,18 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
             if (!isLoading && (message.trim() || file)) {
                 handleSubmit(e as any)
             }
+        }
+    }
+
+    // Update local message when value prop changes
+    React.useEffect(() => {
+        setMessage(value)
+    }, [value])
+
+    const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setMessage(e.target.value)
+        if (onChange) {
+            onChange(e)
         }
     }
 
@@ -108,7 +141,7 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
                     <Textarea
                         value={message}
                         ref={textareaRef}
-                        onChange={(e) => setMessage(e.target.value)}
+                        onChange={handleMessageChange}
                         onKeyDown={handleKeyDown}
                         placeholder={file ? 'File attached. Add a message or press Send.' : 'Type your message...'}
                         className={cn(

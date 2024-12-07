@@ -4,7 +4,7 @@ import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
 import { FileContext, Tool } from '@/lib/types'
 import { generateUUID } from '@/lib/utils'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/supabase/server'
 import { convertToCoreMessages } from 'ai'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
@@ -38,7 +38,7 @@ const RequestSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const {
         data: { session },
     } = await supabase.auth.getSession()

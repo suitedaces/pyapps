@@ -1,7 +1,6 @@
 import { analyzeFile } from '@/lib/fileAnalyzer'
 import { generateUUID } from '@/lib/utils'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { uploadToS3 } from '@/lib/s3'
@@ -15,7 +14,7 @@ const FileMetadataSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const {
         data: { user },
         error: userError,
@@ -46,7 +45,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createClient();
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {

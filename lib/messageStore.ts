@@ -1,6 +1,5 @@
 import { Anthropic } from '@anthropic-ai/sdk'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/supabase/server'
 import { CHAT_TITLE_PROMPT } from './prompts'
 import { DatabaseMessage } from './types'
 
@@ -51,7 +50,7 @@ class MessageStore {
 
     async fetchTitle(chatId: string) {
         try {
-            const supabase = createRouteHandlerClient({ cookies })
+            const supabase = await createClient()
             const {
                 data: { session },
             } = await supabase.auth.getSession()

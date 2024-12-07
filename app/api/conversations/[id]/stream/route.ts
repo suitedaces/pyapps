@@ -3,7 +3,7 @@ import { getModelClient } from '@/lib/modelProviders'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { tools } from '@/lib/tools'
 import { FileContext, Tool } from '@/lib/types'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/supabase/server'
 import { convertToCoreMessages } from 'ai'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
@@ -40,7 +40,7 @@ export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const {
         data: { session },
     } = await supabase.auth.getSession()

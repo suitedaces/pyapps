@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/supabase/server'
 import { encode } from 'gpt-tokenizer'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
@@ -8,7 +8,7 @@ export async function GET(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     try {
         const { data: messages, error } = await supabase
@@ -33,7 +33,7 @@ export async function POST(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const body = await req.json()
 
     try {
@@ -84,7 +84,7 @@ export async function PUT(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const body = await req.json()
 
     try {
@@ -116,7 +116,7 @@ export async function DELETE(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
 
     try {
         const { error } = await supabase

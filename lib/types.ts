@@ -6,6 +6,10 @@ import { z } from 'zod'
 // Model types
 export interface ModelProvider {
     id: string
+    provider: string
+    modelId: string
+    specificationVersion: '1.0'
+    defaultObjectGenerationMode: 'json'
     streamText: (params: StreamParams) => Promise<void>
 }
 
@@ -27,19 +31,39 @@ export interface StreamParams {
     onToolCall?: (toolInvocation: ToolInvocation) => Promise<void>
 }
 
-// Tool types aligned with Vercel AI SDK
-export interface ToolCallPayload {
+// Tool types from Vercel AI SDK
+export interface ToolCallBase<Name extends string = string, Args = unknown> {
     id: string
-    name: string
-    parameters: Record<string, any>
+    type: 'function'
+    function: {
+        name: Name
+        arguments: Args
+    }
 }
 
-export interface ToolResultPayload {
-    id: string
-    name: string
-    content: string
+export interface ToolInvocationBase<Name extends string = string, Result = unknown> {
+    toolCallId: string
+    state: 'partial-call' | 'call' | 'result'
+    toolName: Name
+    result?: Result
 }
 
+// Streamlit specific types
+export interface StreamlitToolArgs {
+    query: string
+    fileContext?: {
+        fileName: string
+        fileType: 'csv' | 'json'
+        analysis?: any
+    }
+    chatId: string
+}
+
+export interface StreamlitToolResult {
+    code: string
+    appId: string
+    success: boolean
+}
 // Message types aligned with Vercel AI SDK
 export interface ClientMessage {
     id: string
@@ -119,18 +143,24 @@ export type LLMModel = {
     providerId: string
 }
 
-export interface ToolInvocation {
-    state: 'call' | 'result'
+export interface ToolInvocation<Name extends string = string, Args = unknown> {
     toolCallId: string
-    toolName: string
-    args: Record<string, any>
-    result?: any
+    state: 'partial-call' | 'call' | 'result'
+    toolName: Name
+    result?: {
+        code: string
+        appId?: string
+        success: boolean
+    }
 }
 
-export interface ToolCall {
+export interface ToolCall<Name extends string = string, Args = unknown> {
     id: string
-    name: string
-    parameters: any
+    type: 'function'
+    function: {
+        name: Name
+        arguments: Args
+    }
 }
 
 export interface FileContext {
@@ -185,3 +215,47 @@ export interface CustomMessage extends Message {
         [key: string]: any
     }>
 }
+
+export interface ToolResult {
+    toolName: string
+    content: {
+        code: string
+        appId?: string
+    }
+}
+
+export interface ToolState {
+    isExecuting: boolean
+    toolName: string | null
+    progress: number
+}
+
+export interface ToolStateStore {
+    isExecuting: boolean
+    toolName: string | null
+    progress: number
+    setToolState: (state: Partial<ToolState>) => void
+}
+
+export interface FileUploadState {
+    isUploading: boolean
+    progress: number
+    error: string | null
+}
+
+export interface ChatProps {
+    messages: Message[]
+    isLoading: boolean
+    input: string
+    onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+    onSubmit: (e: React.FormEvent) => void
+    fileUploadState: FileUploadState
+    onFileUpload: (file: File) => void
+    errorState: Error | null
+    onErrorDismiss: () => void
+    onChatFinish?: () => void
+    onUpdateStreamlit?: (code: string) => void
+    onCodeClick?: () => void
+    isInChatPage?: boolean
+}
+

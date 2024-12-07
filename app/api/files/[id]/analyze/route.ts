@@ -1,6 +1,5 @@
 import { analyzeCSV } from '@/lib/csvAnalyzer'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -19,7 +18,7 @@ export async function POST(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const {
         data: { session },
     } = await supabase.auth.getSession()
