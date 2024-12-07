@@ -10,17 +10,33 @@ import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textar
 import { motion, AnimatePresence } from "framer-motion"
 
 interface ChatbarProps {
-    onSubmit: (content: string, file?: File) => Promise<void>
-    isLoading: boolean
-    className?: string
-    isCentered?: boolean
+    value: string
+    onChange: (value: string) => void
+    onSubmit: (e: React.FormEvent, message: string, file?: File) => Promise<void>
+    isLoading?: boolean
+    onFileUpload?: (file: File) => void
+    fileUploadState?: {
+        isUploading: boolean
+        progress: number
+        error: string | null
+    }
     isInChatPage?: boolean
+    isCentered?: boolean
 }
 
 const MIN_HEIGHT = 74;
 const MAX_HEIGHT = 110;
 
-export default function Chatbar({ onSubmit, isLoading, className, isCentered, isInChatPage }: ChatbarProps) {
+export default function Chatbar({ 
+    value,
+    onChange,
+    onSubmit,
+    isLoading,
+    onFileUpload,
+    fileUploadState,
+    isInChatPage,
+    isCentered
+}: ChatbarProps) {
     const [message, setMessage] = React.useState("")
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -64,7 +80,7 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered, is
             adjustHeight(true);
 
             try {
-                await onSubmit(currentMessage, currentFile || undefined)
+                await onSubmit(e, currentMessage, currentFile || undefined)
             } catch (error) {
                 console.error('Failed to send message:', error)
                 setIsSubmitted(false)

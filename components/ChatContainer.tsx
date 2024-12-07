@@ -122,7 +122,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         isLoading: chatLoading,
         setMessages,
         input,
-        handleInputChange,
+        handleInputChange: originalHandleInputChange,
         handleSubmit: originalHandleSubmit,
         append,
     } = useChat({
@@ -514,6 +514,16 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             setShowTypingText(false)
         }
     }, [messages])
+    
+    const handleInputChange = useCallback((value: string) => {
+        // Convert string value to synthetic event
+        originalHandleInputChange({ target: { value } } as React.ChangeEvent<HTMLTextAreaElement>)
+    }, [originalHandleInputChange])
+
+    // All useCallbacks here, including handleUpdateStreamlit
+    const handleUpdateStreamlit = useCallback(async (code: string): Promise<void> => {
+        await updateStreamlitApp(code)
+    }, [updateStreamlitApp])
 
     // Loading states
     if (isLoading) {
@@ -531,6 +541,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             </div>
         </ResizableHandle>
     )
+
 
     return (
         <div className="bg-white relative flex h-screen overflow-hidden">
@@ -575,20 +586,20 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                                 {!isInChatPage && showTypingText && <TypingText className='text-black font-bold text-3xl' text='From Data to Apps, in seconds' speed={30} show={true} />}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
-                                        messages={messages || []}
+                                        messages={messages}
                                         isLoading={chatLoading}
-                                        input={input || ''}
+                                        input={input}
                                         onInputChange={handleInputChange}
                                         onSubmit={handleSubmit}
                                         fileUploadState={fileUploadState}
-                                        onFileUpload={(file) => {
+                                        onFileUpload={(file: File) => {
                                             setAttachedFile(file)
                                             handleFileUpload(file)
                                         }}
                                         errorState={errorState}
                                         onErrorDismiss={() => setErrorState(null)}
                                         onChatFinish={handleChatFinish}
-                                        onUpdateStreamlit={updateStreamlitApp}
+                                        onUpdateStreamlit={handleUpdateStreamlit}
                                         onCodeClick={() => {
                                             setActiveTab('code')
                                             setIsRightContentVisible(true)
