@@ -195,7 +195,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
     })
 
     // Create a wrapped handleSubmit
-    const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent, message: string, file?: File) => {
         e.preventDefault()
         setShowTypingText(false)
         await originalHandleSubmit(e)
@@ -356,8 +356,8 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                 if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                 const data = await messagesResponse.json()
 
-                // Process messages and look for tool results
-                const messages: Message[] = data.messages.flatMap((msg: any) => {
+                // Transform messages to AI SDK format
+                const formattedMessages: Message[] = data.messages.flatMap((msg: any) => {
                     const messages: Message[] = []
                     if (msg.user_message) {
                         messages.push({
@@ -371,35 +371,39 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                             id: `${msg.id}-assistant`,
                             role: 'assistant',
                             content: msg.assistant_message,
+                            toolInvocations: msg.tool_results?.map((tool: any) => ({
+                                toolName: tool.name,
+                                toolCallId: tool.id,
+                                state: 'result',
+                                result: tool.result
+                            }))
                         })
                     }
                     return messages
                 })
 
-                setInitialMessages(messages)
-                setMessages(messages)
+                setInitialMessages(formattedMessages)
+                setMessages(formattedMessages)
 
-                // Find the latest Streamlit code from tool results
-                const streamlitCode = data.messages
-                    .filter((msg: any) => msg.tool_results && Array.isArray(msg.tool_results))
+                // Find and set latest Streamlit code
+                const lastStreamlitCode = data.messages
+                    .filter((msg: any) => msg.tool_results?.length)
                     .map((msg: any) => {
-                        const toolResult = msg.tool_results[0]
-                        if (toolResult && toolResult.name === 'create_streamlit_app') {
-                            return toolResult.result
-                        }
-                        return null
+                        const toolResult = msg.tool_results.find((t: any) => t.name === 'create_streamlit_app')
+                        return toolResult?.result
                     })
                     .filter(Boolean)
                     .pop()
 
-                if (streamlitCode) {
-                    setGeneratedCode(streamlitCode)
-                    await updateStreamlitApp(streamlitCode, true)
+                if (lastStreamlitCode) {
+                    setGeneratedCode(lastStreamlitCode)
+                    await updateStreamlitApp(lastStreamlitCode, true)
                     setIsRightContentVisible(true)
                 }
 
             } catch (error) {
                 console.error('Error initializing chat:', error)
+                setErrorState(error as Error)
             } finally {
                 setLoading(false)
                 setIsGeneratingCode(false)
@@ -407,7 +411,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         }
 
         initializeChat()
-    }, [currentChatId, updateStreamlitApp, setMessages])
+    }, [currentChatId, setMessages, updateStreamlitApp])
 
     // Cleanup effect
     useEffect(() => {

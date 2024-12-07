@@ -1,23 +1,25 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import ChatContainer from '@/components/ChatContainer'
 
-export interface ChatPageProps {
-    initialChat: any
+interface PageParams {
+    params: Promise<{ id: string }>
 }
 
-export default async function ChatPage({
-    params: { id },
-}: {
-    params: { id: string }
-}) {
-    const supabase = createClientComponentClient()
+export default async function ChatPage({ params }: PageParams) {
+    const { id } = await params
+    const user = await getUser()
+    
+    if (!user) {
+        notFound()
+    }
 
-    // We only need to fetch the chat data here
+    const supabase = await createClient()
     const { data: chat, error } = await supabase
         .from('chats')
         .select('*')
         .eq('id', id)
+        .eq('user_id', user.id)
         .single()
 
     if (error || !chat) {

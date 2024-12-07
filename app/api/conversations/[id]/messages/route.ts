@@ -1,12 +1,14 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { encode } from 'gpt-tokenizer'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+
+interface RouteContext {
+    params: Promise<{ id: string }>
+}
 
 // Fetch messages for a specific conversation
-export async function GET(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, context: RouteContext) {
+    const { id } = await context.params
     const user = await getUser()
 
     if (!user) {
@@ -18,7 +20,7 @@ export async function GET(
         const { data: messages, error } = await supabase
             .from('messages')
             .select('*')
-            .eq('chat_id', params.id)
+            .eq('chat_id', id)
             .order('created_at', { ascending: true })
 
         if (error) throw error
@@ -33,10 +35,8 @@ export async function GET(
 }
 
 // Store a new message in the conversation
-export async function POST(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
+export async function POST(req: NextRequest, context: RouteContext) {
+    const { id } = await context.params
     const user = await getUser()
 
     if (!user) {
@@ -62,7 +62,7 @@ export async function POST(
 
         // Prepare message data for storage
         const messageData = {
-            chat_id: params.id,
+            chat_id: id,
             user_id: body.user_id,
             role: body.role,
             user_message: body.user_message,
@@ -90,10 +90,8 @@ export async function POST(
 }
 
 // Update an existing message
-export async function PUT(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, context: RouteContext) {
+    const { id } = await context.params
     const user = await getUser()
 
     if (!user) {
@@ -113,7 +111,7 @@ export async function PUT(
                 tool_results: body.tool_results,
                 updated_at: new Date().toISOString(),
             })
-            .eq('id', params.id)
+            .eq('id', id)
             .select()
 
         if (error) throw error
@@ -128,10 +126,8 @@ export async function PUT(
 }
 
 // Delete a message
-export async function DELETE(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
+    const { id } = await context.params
     const user = await getUser()
 
     if (!user) {
@@ -143,7 +139,7 @@ export async function DELETE(
         const { error } = await supabase
             .from('messages')
             .delete()
-            .eq('id', params.id)
+            .eq('id', id)
 
         if (error) throw error
 
