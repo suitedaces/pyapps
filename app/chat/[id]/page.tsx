@@ -24,5 +24,5 @@ export default async function ChatPage({
         notFound()
     }
 
-    return <ChatContainer initialChat={chat} />
+    return <ChatContainer initialChat={chat} isInChatPage={true} />
 }

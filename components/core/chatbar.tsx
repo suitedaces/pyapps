@@ -7,21 +7,24 @@ import { cn } from "@/lib/utils"
 import { PaperclipIcon, ArrowUp, Loader2 } from "lucide-react"
 import { FilePreview } from "@/components/FilePreview"
 import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea";
+import { motion } from "framer-motion"
 
 interface ChatbarProps {
     onSubmit: (content: string, file?: File) => Promise<void>
     isLoading: boolean
     className?: string
     isCentered?: boolean
+    isInChatPage?: boolean
 }
 
 const MIN_HEIGHT = 74;
 const MAX_HEIGHT = 110;
 
-export default function Chatbar({ onSubmit, isLoading, className, isCentered }: ChatbarProps) {
+export default function Chatbar({ onSubmit, isLoading, className, isCentered, isInChatPage }: ChatbarProps) {
     const [message, setMessage] = React.useState("")
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
+    const [isSubmitted, setIsSubmitted] = React.useState(false)
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
@@ -45,6 +48,7 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered }: 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (message.trim() || file) {
+            setIsSubmitted(true)
             const currentMessage = message
             const currentFile = file
 
@@ -57,7 +61,7 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered }: 
                 await onSubmit(currentMessage, currentFile || undefined)
             } catch (error) {
                 console.error('Failed to send message:', error)
-                // Restore values on error
+                setIsSubmitted(false)
                 setMessage(currentMessage)
                 setFile(currentFile)
             }
@@ -74,7 +78,16 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered }: 
     }
 
     return (
-        <div className="p-4  bg-background">
+        <motion.div
+            className="p-4 w-full bg-background"
+            animate={{
+                paddingBottom: isInChatPage ? "0px" : (isSubmitted ? "0px" : "384px")
+            }}
+            transition={{
+                duration: 0.3,
+                ease: "easeInOut"
+            }}
+        >
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 max-w-[800px] mx-auto">
                 {file && (
                     <div className="mb-2">
@@ -142,6 +155,6 @@ export default function Chatbar({ onSubmit, isLoading, className, isCentered }: 
                     </div>
                 </div>
             </form>
-        </div>
+        </motion.div>
     )
 }

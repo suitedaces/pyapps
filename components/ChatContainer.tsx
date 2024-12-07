@@ -24,13 +24,15 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 import { VersionSelector } from '../components/VersionSelector'
+import { TypingText } from './core/typing-text'
 
 interface ChatContainerProps {
     initialChat?: any
     isNewChat?: boolean
+    isInChatPage?: boolean
 }
 
-export default function ChatContainer({ initialChat, isNewChat = false }: ChatContainerProps) {
+export default function ChatContainer({ initialChat, isNewChat = false, isInChatPage = false }: ChatContainerProps) {
     const supabase = createClientComponentClient()
     const router = useRouter()
     const { session, isLoading } = useAuth()
@@ -134,8 +136,8 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
         onFinish: async (message) => {
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
-                    .filter(invocation => invocation.toolName === 'create_streamlit_app' && 
-                                        invocation.state === 'result')
+                    .filter(invocation => invocation.toolName === 'create_streamlit_app' &&
+                        invocation.state === 'result')
                     .pop()
 
                 if (streamlitCall?.state === 'result') {
@@ -254,11 +256,11 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
             router.replace(`/chat/${chatId}`);
             return; // Let the chat/[id] page handle initialization
         }
-        
+
         // Only handle state updates if not navigating
         setShowTypingText(false);
         setCurrentChatId(chatId);
-        
+
         // Refresh the chat list
         const loadChats = async () => {
             try {
@@ -336,7 +338,7 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
     useEffect(() => {
         const initializeChat = async () => {
             if (!currentChatId) return
-            
+
             try {
                 setLoading(true)
                 setIsGeneratingCode(true)
@@ -412,8 +414,8 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
         const lastMessage = messages[messages.length - 1]
         if (lastMessage?.toolInvocations?.length) {
             const streamlitCall = lastMessage.toolInvocations.find(
-                invocation => invocation.toolName === 'create_streamlit_app' && 
-                             invocation.state === 'result'
+                invocation => invocation.toolName === 'create_streamlit_app' &&
+                    invocation.state === 'result'
             )
 
             if (streamlitCall?.state === 'result') {
@@ -482,6 +484,7 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
                             <div className="w-full flex flex-col h-[calc(100vh-4rem)]">
+                                {!isInChatPage && showTypingText && <TypingText className='text-black font-bold text-3xl' text='From Data to Apps, in seconds' speed={30} show={true} />}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
                                         chatId={currentChatId}
@@ -498,6 +501,7 @@ export default function ChatContainer({ initialChat, isNewChat = false }: ChatCo
                                             setActiveTab('code')
                                             setIsRightContentVisible(true)
                                         }}
+                                        isInChatPage={isInChatPage}
                                     />
                                 </div>
                             </div>

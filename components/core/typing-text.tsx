@@ -49,7 +49,7 @@ export function TypingText({
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    className="fixed inset-0 flex items-center justify-center pb-40 z-50 pointer-events-none"
+                    className="fixed inset-0 flex items-center justify-center pb-80 z-50 pointer-events-none"
                 >
                     <p className={`${className} flex items-center`}>
                         <span className="animate-fade-in">{displayText}</span>

@@ -31,6 +31,7 @@ interface ChatProps {
         visible: boolean | ((prev: boolean) => boolean)
     ) => void
     isChatCentered?: boolean
+    isInChatPage?: boolean
 }
 
 interface FileUploadState {
@@ -51,6 +52,7 @@ export function Chat({
     setActiveTab,
     setIsRightContentVisible,
     isChatCentered = false,
+    isInChatPage = false,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -405,20 +407,6 @@ export function Chat({
             "h-[calc(100vh-7rem)]",
             "overflow-hidden"
         )}>
-            <TypingText
-                text="from data to app, in seconds."
-                speed={50}
-                className={cn(
-                    "text-3xl font-medium tracking-tight",
-                    "absolute left-1/2 -translate-x-1/2",
-                    "top-32",
-                    "bg-gradient-to-r from-foreground to-foreground/70",
-                    "bg-clip-text text-transparent",
-                    isChatCentered ? "opacity-100" : "opacity-0",
-                    "transition-opacity duration-500"
-                )}
-                show={showTypingText && isChatCentered}
-            />
             <motion.div
                 className={cn(
                     "flex-1 overflow-hidden",
@@ -541,6 +529,7 @@ export function Chat({
                         isChatCentered ? "p-6" : "p-4"
                     )}
                     isCentered={isChatCentered}
+                    isInChatPage={isInChatPage}
                 />
             </motion.div>
         </div>
