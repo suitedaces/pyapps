@@ -64,6 +64,7 @@ import {
     SidebarProvider,
     SidebarRail,
     SidebarTrigger,
+    SidebarSeparator,
 } from '@/components/ui/sidebar'
 
 import { Logo } from './core/Logo'
@@ -326,6 +327,40 @@ export default function AppSidebar({
                                             />
                                         </CollapsibleContent>
                                     </Collapsible>
+
+                                    <SidebarSeparator className="my-2" />
+
+                                    <Collapsible>
+                                        <SidebarMenu>
+                                            <SidebarMenuItem className="flex justify-center">
+                                                <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                                    <File className="h-4 w-4" />
+                                                    {open && <span className="ml-2">Files</span>}
+                                                </SidebarMenuButton>
+                                                <CollapsibleTrigger asChild>
+                                                    <SidebarMenuAction>
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    </SidebarMenuAction>
+                                                </CollapsibleTrigger>
+                                            </SidebarMenuItem>
+                                        </SidebarMenu>
+                                    </Collapsible>
+
+                                    <Collapsible>
+                                        <SidebarMenu>
+                                            <SidebarMenuItem className="flex justify-center">
+                                                <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                                    <AppWindow className="h-4 w-4" />
+                                                    {open && <span className="ml-2">Apps</span>}
+                                                </SidebarMenuButton>
+                                                <CollapsibleTrigger asChild>
+                                                    <SidebarMenuAction>
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    </SidebarMenuAction>
+                                                </CollapsibleTrigger>
+                                            </SidebarMenuItem>
+                                        </SidebarMenu>
+                                    </Collapsible>
                                 </SidebarGroup>
                             </ScrollArea>
                         </SidebarContent>
@@ -451,10 +486,8 @@ export default function AppSidebar({
                                             onClick={onNewChat}
                                             className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
                                         >
-                                            <Link href="/" className="flex items-center gap-2">
-                                                {!open && <Plus className="h-4 w-4" />}
-                                                {open && <span>New Chat</span>}
-                                            </Link>
+                                            {!open && <Plus className="h-4 w-4" />}
+                                            {open && <span>New Chat</span>}
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                 </SidebarMenu>
@@ -492,6 +525,40 @@ export default function AppSidebar({
                                             isCreatingChat={isCreatingChat}
                                         />
                                     </CollapsibleContent>
+                                </Collapsible>
+
+                                <SidebarSeparator className="my-2" />
+
+                                <Collapsible>
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                                <File className="h-4 w-4" />
+                                                {open && <span className="ml-2">Files</span>}
+                                            </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                </Collapsible>
+
+                                <Collapsible>
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                                <AppWindow className="h-4 w-4" />
+                                                {open && <span className="ml-2">Apps</span>}
+                                            </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
                                 </Collapsible>
                             </SidebarGroup>
                         </ScrollArea>

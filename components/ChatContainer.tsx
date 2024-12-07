@@ -56,6 +56,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
     const [isLoadingSandbox, setIsLoadingSandbox] = useState(false)
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
+    const [isCreatingChat, setIsCreatingChat] = useState(false)
 
     // All refs
     const hasNavigated = useRef(false)
@@ -242,7 +243,8 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         setStreamlitUrl(null)
         setGeneratedCode('')
         setCurrentChatId(null)
-    }, [])
+        router.push('/')
+    }, [router])
 
     const handleChatFinish = useCallback(() => {
         if (versionSelectorRef.current) {
@@ -459,9 +461,9 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             <AppSidebar
                 onChatSelect={handleChatSelect}
                 currentChatId={currentChatId}
-                chats={sidebarChats || []}
-                collapsed={sidebarCollapsed}
-                onCollapsedChange={setSidebarCollapsed}
+                chats={sidebarChats}
+                onNewChat={handleNewChat}
+                isCreatingChat={isCreatingChat}
             />
             <div className="flex-1 flex flex-col bg-white min-w-0">
                 {sidebarCollapsed && (
