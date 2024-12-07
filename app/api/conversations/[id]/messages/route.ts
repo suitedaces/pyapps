@@ -1,4 +1,4 @@
-import { createServerSupabaseClient, getSession } from '@/lib/supabase/server'
+import { createClient, getSession } from '@/lib/supabase/server'
 import { encode } from 'gpt-tokenizer'
 import { NextResponse } from 'next/server'
 
@@ -14,7 +14,7 @@ export async function GET(
     }
 
     try {
-        const supabase = await createServerSupabaseClient()
+        const supabase = await createClient()
         const { data: messages, error } = await supabase
             .from('messages')
             .select('*')
@@ -44,7 +44,7 @@ export async function POST(
     }
 
     try {
-        const supabase = await createServerSupabaseClient()
+        const supabase = await createClient()
         const body = await req.json()
 
         // Calculate token counts for different message components
@@ -101,7 +101,7 @@ export async function PUT(
     }
 
     try {
-        const supabase = await createServerSupabaseClient()
+        const supabase = await createClient()
         const body = await req.json()
 
         const { data, error } = await supabase
@@ -139,7 +139,7 @@ export async function DELETE(
     }
 
     try {
-        const supabase = await createServerSupabaseClient()
+        const supabase = await createClient()
         const { error } = await supabase
             .from('messages')
             .delete()
