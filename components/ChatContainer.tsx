@@ -275,10 +275,22 @@ export default function ChatContainer({
     const handleFileUpload = useCallback(async (file: File) => {
         setFileUploadState({ isUploading: true, progress: 0, error: null })
         try {
+            // 1. Upload file first
             const formData = new FormData()
             formData.append('file', file)
-            formData.append('chatId', currentChatId || '')
+            if (currentChatId) {
+                formData.append('chatId', currentChatId)
+            }
+
+            const uploadResponse = await fetch('/api/files', {
+                method: 'POST',
+                body: formData,
+            })
             
+            if (!uploadResponse.ok) throw new Error('Upload failed')
+            const fileData = await uploadResponse.json()
+
+            // 2. Create file preview message
             const fileContent = await file.text()
             const sanitizedContent = fileContent
                 .split('\n')
@@ -292,14 +304,7 @@ export default function ChatContainer({
 
             const message = `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
 
-            const response = await fetch('/api/chat/stream/upload', {
-                method: 'POST',
-                body: formData,
-            })
-            
-            if (!response.ok) throw new Error('Upload failed')
-            const fileData = await response.json()
-
+            // 3. Send message with file context
             await append(
                 {
                     content: message,

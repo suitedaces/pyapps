@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StreamlitToolArgs, StreamlitToolResult } from '@/lib/types'
 import { generateText } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
+import { getUser } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 export const streamlitTool = {
@@ -16,6 +17,7 @@ export const streamlitTool = {
         chatId: z.string()
     }),
     execute: async ({ query, fileContext, chatId }: StreamlitToolArgs): Promise<StreamlitToolResult> => {
+        const user = await getUser()
         const supabase = await createClient()
 
         try {
@@ -43,10 +45,11 @@ export const streamlitTool = {
             let appId = chat?.app_id
 
             if (!appId) {
-                // Create new app
+                // Create new app with user_id
                 const { data: app, error: appError } = await supabase
                     .from('apps')
                     .insert({
+                        user_id: user.id,
                         name: query.slice(0, 50) + '...',
                         description: 'Streamlit app created from chat',
                         is_public: false,
@@ -60,11 +63,12 @@ export const streamlitTool = {
                 appId = app.id
 
                 // Link app to chat
-                await supabase
+                const { data: message, error: chatError } = await supabase
                     .from('chats')
                     .update({ app_id: appId })
                     .eq('id', chatId)
             }
+
 
             // Create new version
             const { data: version, error: versionError } = await supabase
