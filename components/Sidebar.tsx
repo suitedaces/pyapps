@@ -303,7 +303,10 @@ export default function AppSidebar({
                                     >
                                         <SidebarMenu>
                                             <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton className="w-full flex items-center justify-center">
+                                                <SidebarMenuButton
+                                                    className="w-full flex items-center jusitfy-between"
+                                                    tooltip="Your previous chats"
+                                                >
                                                     <MessageSquare className="h-4 w-4" />
                                                     {open && <span className="ml-2">Chats</span>}
                                                 </SidebarMenuButton>
@@ -334,7 +337,10 @@ export default function AppSidebar({
                                     <Collapsible>
                                         <SidebarMenu>
                                             <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                                <SidebarMenuButton
+                                                    className="w-full flex items-center jusitfy-between"
+                                                    tooltip="Manage your files"
+                                                >
                                                     <File className="h-4 w-4" />
                                                     {open && <span className="ml-2">Files</span>}
                                                 </SidebarMenuButton>
@@ -350,7 +356,10 @@ export default function AppSidebar({
                                     <Collapsible>
                                         <SidebarMenu>
                                             <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                                <SidebarMenuButton
+                                                    className="w-full flex items-center jusitfy-between"
+                                                    tooltip="Your applications"
+                                                >
                                                     <AppWindow className="h-4 w-4" />
                                                     {open && <span className="ml-2">Apps</span>}
                                                 </SidebarMenuButton>
@@ -503,7 +512,10 @@ export default function AppSidebar({
                                 >
                                     <SidebarMenu>
                                         <SidebarMenuItem className="flex justify-center">
-                                            <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Your previous chats"
+                                            >
                                                 <MessageSquare className="h-4 w-4" />
                                                 {open && <span className="ml-2">Chats</span>}
                                             </SidebarMenuButton>
@@ -534,7 +546,10 @@ export default function AppSidebar({
                                 <Collapsible>
                                     <SidebarMenu>
                                         <SidebarMenuItem className="flex justify-center">
-                                            <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Manage your files"
+                                            >
                                                 <File className="h-4 w-4" />
                                                 {open && <span className="ml-2">Files</span>}
                                             </SidebarMenuButton>
@@ -550,7 +565,10 @@ export default function AppSidebar({
                                 <Collapsible>
                                     <SidebarMenu>
                                         <SidebarMenuItem className="flex justify-center">
-                                            <SidebarMenuButton className="w-full flex items-center jusitfy-between">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Your applications"
+                                            >
                                                 <AppWindow className="h-4 w-4" />
                                                 {open && <span className="ml-2">Apps</span>}
                                             </SidebarMenuButton>
