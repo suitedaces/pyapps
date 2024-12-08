@@ -1,9 +1,10 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
 import { highlight, languages } from 'prismjs'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Editor from 'react-simple-code-editor'
 import dynamic from 'next/dynamic'
+import { motion, AnimatePresence } from 'framer-motion'
 
 import 'prismjs/components/prism-python'
 import 'prismjs/themes/prism-tomorrow.css'
@@ -20,49 +21,42 @@ const LoadingSandbox = dynamic(
 
 export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
+    const codeRef = useRef('')
+    const editorRef = useRef<HTMLDivElement>(null)
 
+    // Handle streaming code updates
     useEffect(() => {
-        if (code && !isGeneratingCode) {
-            try {
-                const codeStr = typeof code === 'object' && 'code' in code
-                    ? code.code
-                    : String(code)
+        if (code) {
+            const newCode = typeof code === 'object' && 'code' in code
+                ? code.code
+                : String(code)
 
-                const formattedCode = codeStr
-                    .split('\n')
-                    .map((line) => line.trim())
-                    .join('\n')
-                setDisplayCode(formattedCode)
-                console.log('Code type:', typeof code)
-                console.log('Formatted code:', formattedCode)
-            } catch (error) {
-                console.error('Error formatting code:', error)
-                setDisplayCode(typeof code === 'string' ? code : '')
+            // Update ref immediately for any comparisons
+            codeRef.current = newCode
+
+            // Smoothly update display code
+            setDisplayCode(newCode)
+
+            // Scroll to bottom of editor when new code arrives
+            if (editorRef.current) {
+                const editor = editorRef.current.querySelector('textarea')
+                if (editor) {
+                    editor.scrollTop = editor.scrollHeight
+                }
             }
-        } else if (!code) {
-            setDisplayCode('')
         }
-    }, [code, isGeneratingCode])
+    }, [code])
 
-    if (isGeneratingCode) {
+    // Loading overlay for initial generation
+    if (isGeneratingCode && !displayCode) {
         return <LoadingSandbox message="Generating code..." />
     }
 
-    if (!displayCode) {
-        return (
-            <Card className="bg-white border-border h-full">
-                <CardContent className="p-0 h-full flex items-center justify-center">
-                    <p className="text-sm text-text">No code generated yet</p>
-                </CardContent>
-            </Card>
-        )
-    }
-
     return (
-        <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow">
-            <CardContent className="p-0 h-full relative">
-                <div className="overflow-auto h-full code-container">
-                    <div className="min-w-max">
+        <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow relative">
+            <CardContent className="p-0 h-full">
+                <div className="overflow-auto h-full code-container" ref={editorRef}>
+                    <div className="min-w-max relative">
                         <Editor
                             value={displayCode}
                             onValueChange={() => {}}
@@ -80,8 +74,7 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                             }}
                             padding={16}
                             style={{
-                                fontFamily:
-                                    '"Fira code", "Fira Mono", monospace',
+                                fontFamily: '"Fira code", "Fira Mono", monospace',
                                 fontSize: 14,
                                 lineHeight: 1.5,
                                 minHeight: '100%',
@@ -91,6 +84,36 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                             className="w-full h-full custom-editor"
                             readOnly={true}
                         />
+
+                        {/* Streaming indicator */}
+                        <AnimatePresence>
+                            {isGeneratingCode && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="absolute bottom-4 right-4 flex items-center gap-2 bg-black/10 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg"
+                                >
+                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                    <span className="text-sm font-medium">
+                                        Generating code...
+                                    </span>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Cursor effect for streaming */}
+                        {isGeneratingCode && (
+                            <motion.div
+                                className="absolute bottom-0 right-0 w-2 h-4 bg-primary/50"
+                                animate={{ opacity: [0, 1, 0] }}
+                                transition={{
+                                    duration: 1,
+                                    repeat: Infinity,
+                                    ease: "linear"
+                                }}
+                            />
+                        )}
                     </div>
                 </div>
             </CardContent>
@@ -130,22 +153,6 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                 .custom-editor pre,
                 .custom-editor textarea {
                     color: #000 !important;
-                }
-                /* Token colors for syntax highlighting */
-                .token.comment {
-                    color: #6b7280;
-                }
-                .token.string {
-                    color: #059669;
-                }
-                .token.number {
-                    color: #7c3aed;
-                }
-                .token.keyword {
-                    color: #2563eb;
-                }
-                .token.function {
-                    color: #0284c7;
                 }
             `}</style>
         </Card>

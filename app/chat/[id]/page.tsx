@@ -26,5 +26,16 @@ export default async function ChatPage({ params }: PageParams) {
         notFound()
     }
 
-    return <ChatContainer initialChat={chat} isInChatPage={true} />
+    // Fetch messages for initial state
+    const { data: messages } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', id)
+        .order('created_at', { ascending: true })
+
+    return <ChatContainer 
+        initialChat={chat} 
+        initialMessages={messages} 
+        isInChatPage={true} 
+    />
 }

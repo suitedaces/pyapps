@@ -1,3 +1,4 @@
+// components/ChatContainer.tsx
 'use client'
 
 import { Chat } from '@/components/Chat'
@@ -11,10 +12,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useSidebar } from '@/contexts/SidebarContext'
 import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { useToolState } from '@/lib/stores/tool-state-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Message } from 'ai'
-import { useChat } from 'ai/react'
+import { useChat, useStreamData } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -24,6 +26,7 @@ import { TypingText } from './core/typing-text'
 
 interface ChatContainerProps {
     initialChat?: any
+    initialMessages?: any[]
     isNewChat?: boolean
     isInChatPage?: boolean
 }
@@ -34,18 +37,21 @@ interface FileUploadState {
     error: string | null
 }
 
-
-export default function ChatContainer({ initialChat, isNewChat = false, isInChatPage = false }: ChatContainerProps) {
+export default function ChatContainer({ 
+    initialChat, 
+    initialMessages = [], 
+    isNewChat = false, 
+    isInChatPage = false 
+}: ChatContainerProps) {
     const router = useRouter()
     const { session, isLoading } = useAuth()
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { killSandbox, updateSandbox } = useSandboxStore()
+    const { setToolState, currentToolCall } = useToolState()
 
-    // state declarations 
+    // State management
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat?.id || null)
-    const [initialMessages, setInitialMessages] = useState<Message[]>([])
-    const [loading, setLoading] = useState(false)
     const [showTypingText, setShowTypingText] = useState(true)
     const [activeTab, setActiveTab] = useState('preview')
     const [currentApp, setCurrentApp] = useState<{ id: string | null }>({ id: null })
@@ -59,8 +65,13 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
     const [errorState, setErrorState] = useState<Error | null>(null)
+    const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
+        isUploading: false,
+        progress: 0,
+        error: null,
+    })
 
-    // refs
+    // Refs
     const hasNavigated = useRef(false)
     const isVersionSwitching = useRef(false)
     const versionSelectorRef = useRef<{ refreshVersions: () => void } | null>(null)
@@ -72,6 +83,101 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         model: 'claude-3-5-sonnet-20241022',
     })
     const currentModel = modelsList.models.find(model => model.id === languageModel.model)
+
+    // Chat configuration with streaming
+    const {
+        messages,
+        isLoading: chatLoading,
+        input,
+        handleInputChange: originalHandleInputChange,
+        handleSubmit: originalHandleSubmit,
+        append,
+        setMessages,
+    } = useChat({
+        api: '/api/chat/stream',
+        id: currentChatId ?? undefined,
+        initialMessages: initialMessages?.map(msg => ({
+            id: msg.id,
+            role: msg.role as 'user' | 'assistant',
+            content: msg.role === 'user' ? msg.user_message : msg.assistant_message,
+            createdAt: new Date(msg.created_at),
+            toolInvocations: msg.tool_results?.map((tool: any) => ({
+                toolName: tool.name,
+                toolCallId: tool.id,
+                state: 'result',
+                result: tool.result
+            }))
+        })),
+        body: {
+            model: currentModel,
+            config: languageModel,
+            chatId: currentChatId,
+            experimental_streamData: true,
+        },
+        onToolCall: async ({ toolCall, toolCallId }) => {
+            if (toolCall.toolName === 'create_streamlit_app') {
+                setToolState({
+                    toolCallId,
+                    toolName: toolCall.toolName,
+                    state: 'streaming-start'
+                })
+
+                setIsRightContentVisible(true)
+                setShowCodeView(true)
+                setIsGeneratingCode(true)
+
+                if (toolCall.state === 'partial-call' && toolCall.args) {
+                    setGeneratedCode(prev => prev + toolCall.args)
+                    setToolState({
+                        toolCallId,
+                        toolName: toolCall.toolName,
+                        state: 'delta'
+                    })
+                } else if (toolCall.state === 'result') {
+                    setGeneratedCode(toolCall.result)
+                    await updateStreamlitApp(toolCall.result)
+                    setIsGeneratingCode(false)
+                    setToolState({
+                        toolCallId,
+                        toolName: toolCall.toolName,
+                        state: 'complete'
+                    })
+                }
+            }
+        },
+        onFinish: async (message) => {
+            if (isNewChat && currentChatId) {
+                router.replace(`/chat/${currentChatId}`)
+            }
+
+            handleChatFinish()
+            
+            if (message.toolInvocations?.length) {
+                const streamlitCall = message.toolInvocations
+                    .find(invocation => 
+                        invocation.toolName === 'create_streamlit_app' && 
+                        invocation.state === 'result'
+                    )
+
+                if (streamlitCall?.state === 'result') {
+                    try {
+                        setIsCreatingVersion(true)
+                        setGeneratedCode(streamlitCall.result)
+                        await updateStreamlitApp(streamlitCall.result)
+                        if (versionSelectorRef.current) {
+                            await versionSelectorRef.current.refreshVersions()
+                        }
+                    } finally {
+                        setIsCreatingVersion(false)
+                    }
+                }
+            }
+        },
+        onError: (error) => {
+            setIsGeneratingCode(false)
+            setErrorState(new Error(error.message))
+        }
+    })
 
     // Streamlit app management
     const updateStreamlitApp = useCallback(
@@ -116,110 +222,73 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         [updateSandbox]
     )
 
-    // Chat handling with AI SDK
-    const {
-        messages,
-        isLoading: chatLoading,
-        setMessages,
-        input,
-        handleInputChange: originalHandleInputChange,
-        handleSubmit: originalHandleSubmit,
-        append,
-    } = useChat({
-        api: '/api/chat/stream',
-        id: currentChatId ?? undefined,
-        initialMessages,
-        body: {
-            model: currentModel,
-            config: languageModel,
-            chatId: currentChatId,
-            experimental_streamData: true,
-        },
-        onResponse: async (response) => {
-            if (!response.ok) {
-                handleResponseError(response)
-                return
-            }
-
-            // Handle chat creation
-            if (!currentChatId) {
-                const newChatId = response.headers.get('x-chat-id')
-                if (newChatId && isNewChat) {
-                    router.replace(`/chat/${newChatId}`)
-                }
-            }
-        },
-        onFinish: async (message) => {
-            if (message.toolInvocations?.length) {
-                const streamlitCall = message.toolInvocations
-                    .filter(invocation => invocation.toolName === 'create_streamlit_app' &&
-                        invocation.state === 'result')
-                    .pop()
-
-                if (streamlitCall?.state === 'result') {
-                    const code = streamlitCall.result
-                    if (code && session?.user?.id) {
-                        try {
-                            setIsCreatingVersion(true)
-                            setGeneratedCode(code)
-                            await updateStreamlitApp(code)
-                            if (versionSelectorRef.current) {
-                                await versionSelectorRef.current.refreshVersions()
-                            }
-                        } catch (error) {
-                            console.error('Failed to handle streamlit update:', error)
-                        } finally {
-                            setIsCreatingVersion(false)
-                        }
-                    }
-                }
-            }
-
-            if (message.content.trim()) {
-                const assistantMessage = {
-                    id: Date.now().toString(),
-                    role: 'assistant' as const,
-                    content: message.content,
-                    createdAt: new Date(),
-                    toolInvocations: message.toolInvocations,
-                }
-                setMessages(prev => [...prev, assistantMessage])
-            }
+    // File handling
+    const handleFileUpload = useCallback(async (file: File) => {
+        setFileUploadState({ isUploading: true, progress: 0, error: null })
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('chatId', currentChatId || '')
             
-            handleChatFinish()
-        },
-        onError: (error) => {
-            setIsGeneratingCode(false)
-            setErrorState(new Error(error.message))
-        }
-    })
+            const fileContent = await file.text()
+            const sanitizedContent = fileContent
+                .split('\n')
+                .map((row) => row.replace(/[\r\n]+/g, ''))
+                .join('\n')
 
-    // Create a wrapped handleSubmit
+            const rows = sanitizedContent.split('\n')
+            const columnNames = rows[0]
+            const previewRows = rows.slice(1, 6).join('\n')
+            const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+
+            const message = `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+
+            const response = await fetch('/api/chat/stream/upload', {
+                method: 'POST',
+                body: formData,
+            })
+            
+            if (!response.ok) throw new Error('Upload failed')
+            const fileData = await response.json()
+
+            await append(
+                {
+                    content: message,
+                    role: 'user',
+                    createdAt: new Date(),
+                },
+                {
+                    body: {
+                        fileId: fileData.id,
+                        fileName: file.name,
+                        fileContent: sanitizedContent,
+                    },
+                }
+            )
+
+            setFileUploadState({ isUploading: false, progress: 100, error: null })
+            
+        } catch (error) {
+            console.error('Error uploading file:', error)
+            setFileUploadState({
+                isUploading: false,
+                progress: 0,
+                error: 'Failed to upload file. Please try again.'
+            })
+        }
+    }, [append, currentChatId])
+
+    // Event handlers
     const handleSubmit = useCallback(async (e: React.FormEvent, message: string, file?: File) => {
         e.preventDefault()
         setShowTypingText(false)
         await originalHandleSubmit(e)
     }, [originalHandleSubmit])
 
-    // File handling logic moved from Chat.tsx
-    const [attachedFile, setAttachedFile] = useState<File | null>(null)
-    const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
-        isUploading: false,
-        progress: 0,
-        error: null,
-    })
+    const handleInputChange = useCallback((value: string) => {
+        originalHandleInputChange({ target: { value } } as React.ChangeEvent<HTMLTextAreaElement>)
+    }, [originalHandleInputChange])
 
-    // Error handling moved from Chat.tsx
-    const handleResponseError = (response: Response) => {
-        const errorMessage =
-            response.status === 429
-                ? 'Rate limit exceeded. Please wait a moment.'
-                : response.status === 413
-                    ? 'Message too long. Please try a shorter message.'
-                    : 'An error occurred. Please try again.'
-    }
-
-    // Event handlers
     const handleRefresh = useCallback(async () => {
         if (sandboxId && session?.user?.id) {
             try {
@@ -241,57 +310,6 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         router.push(`/chat/${chatId}`)
     }, [router])
 
-    const handleChatSubmit = useCallback(() => {
-        setShowTypingText(false)
-    }, [])
-
-    const handleNewChat = useCallback(() => {
-        setStreamlitUrl(null)
-        setGeneratedCode('')
-        setCurrentChatId(null)
-    }, [])
-
-    const handleChatFinish = useCallback(() => {
-        if (versionSelectorRef.current) {
-            versionSelectorRef.current.refreshVersions()
-        }
-    }, [])
-
-    const handleChatCreated = useCallback((chatId: string) => {
-        if (isNewChat) {
-            // First navigate
-            router.replace(`/chat/${chatId}`);
-            return; // Let the chat/[id] page handle initialization
-        }
-
-        // Only handle state updates if not navigating
-        setShowTypingText(false);
-        setCurrentChatId(chatId);
-
-        // Refresh the chat list
-        const loadChats = async () => {
-            try {
-                const response = await fetch('/api/conversations')
-                if (!response.ok) throw new Error('Failed to fetch chats')
-                const data = await response.json()
-                setSidebarChats(data.chats)
-            } catch (error) {
-                console.error('Error fetching chats:', error)
-            }
-        }
-        loadChats()
-    }, [router, isNewChat])
-
-    const toggleRightContent = useCallback(() => {
-        setIsRightContentVisible(prev => !prev)
-        if (resizableGroupRef.current) {
-            setTimeout(() => {
-                // Trigger resize event to update panel layout
-                window.dispatchEvent(new Event('resize'))
-            }, 0)
-        }
-    }, [])
-
     const handleVersionChange = useCallback(async (version: AppVersion) => {
         if (!version.code) return
 
@@ -311,6 +329,21 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
         }
     }, [updateStreamlitApp])
 
+    const handleChatFinish = useCallback(() => {
+        if (versionSelectorRef.current) {
+            versionSelectorRef.current.refreshVersions()
+        }
+    }, [])
+
+    const toggleRightContent = useCallback(() => {
+        setIsRightContentVisible(prev => !prev)
+        if (resizableGroupRef.current) {
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'))
+            }, 0)
+        }
+    }, [])
+
     // Effects
     useEffect(() => {
         if (isNewChat && currentChatId && !hasNavigated.current) {
@@ -328,6 +361,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
 
     useEffect(() => {
         const loadChats = async () => {
+            if (!session?.user?.id) return
             try {
                 const response = await fetch('/api/conversations')
                 if (!response.ok) throw new Error('Failed to fetch chats')
@@ -338,9 +372,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             }
         }
 
-        if (session?.user?.id) {
-            loadChats()
-        }
+        loadChats()
     }, [session?.user?.id])
 
     useEffect(() => {
@@ -348,15 +380,16 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             if (!currentChatId) return
 
             try {
-                setLoading(true)
                 setIsGeneratingCode(true)
 
-                // Fetch messages
                 const messagesResponse = await fetch(`/api/conversations/${currentChatId}/messages`)
                 if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                 const data = await messagesResponse.json()
 
-                // Transform messages to AI SDK format
+                if (!data.messages?.length) {
+                    return // Don't try to set empty messages
+                }
+
                 const formattedMessages: Message[] = data.messages.flatMap((msg: any) => {
                     const messages: Message[] = []
                     if (msg.user_message) {
@@ -382,8 +415,9 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                     return messages
                 })
 
-                setInitialMessages(formattedMessages)
-                setMessages(formattedMessages)
+                if (formattedMessages.length > 0) {
+                    setMessages(formattedMessages)
+                }
 
                 // Find and set latest Streamlit code
                 const lastStreamlitCode = data.messages
@@ -405,7 +439,6 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                 console.error('Error initializing chat:', error)
                 setErrorState(error as Error)
             } finally {
-                setLoading(false)
                 setIsGeneratingCode(false)
             }
         }
@@ -420,114 +453,6 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             isExecutingRef.current = false
         }
     }, [killSandbox])
-
-    const handleFileUpload = useCallback(async (file: File) => {
-        setFileUploadState({ isUploading: true, progress: 0, error: null })
-        try {
-            const formData = new FormData()
-            formData.append('file', file)
-            formData.append('chatId', currentChatId || '')
-            
-            // Read and process file content
-            const fileContent = await file.text()
-            const sanitizedContent = fileContent
-                .split('\n')
-                .map((row) => row.replace(/[\r\n]+/g, ''))
-                .join('\n')
-
-            const rows = sanitizedContent.split('\n')
-            const columnNames = rows[0]
-            const previewRows = rows.slice(1, 6).join('\n')
-            const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
-
-            const message = `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
-
-            // Upload file
-            const response = await fetch('/api/chat/stream/upload', {
-                method: 'POST',
-                body: formData,
-            })
-            
-            if (!response.ok) throw new Error('Upload failed')
-            const fileData = await response.json()
-
-            // Send message with file context
-            await append(
-                {
-                    content: message,
-                    role: 'user',
-                    createdAt: new Date(),
-                },
-                {
-                    body: {
-                        fileId: fileData.id,
-                        fileName: file.name,
-                        fileContent: sanitizedContent,
-                    },
-                }
-            )
-
-            setAttachedFile(null)
-            setFileUploadState({ isUploading: false, progress: 100, error: null })
-            
-        } catch (error) {
-            console.error('Error uploading file:', error)
-            setFileUploadState({
-                isUploading: false,
-                progress: 0,
-                error: 'Failed to upload file. Please try again.'
-            })
-        }
-    }, [append, currentChatId])
-
-    // Reset file upload state
-    const resetFileUploadState = useCallback(() => {
-        setFileUploadState({
-            isUploading: false,
-            progress: 0,
-            error: null,
-        })
-    }, [])
-
-    // Update messages when last message contains tool invocations
-    useEffect(() => {
-        const lastMessage = messages[messages.length - 1]
-        if (lastMessage?.toolInvocations?.length) {
-            const streamlitCall = lastMessage.toolInvocations.find(
-                invocation => invocation.toolName === 'create_streamlit_app' &&
-                    invocation.state === 'result'
-            )
-
-            if (streamlitCall?.state === 'result') {
-                setGeneratedCode(streamlitCall.result)
-                setIsGeneratingCode(false)
-                updateStreamlitApp(streamlitCall.result)
-            }
-        }
-    }, [messages, updateStreamlitApp])
-
-    useEffect(() => {
-        if (generatedCode) {
-            setIsRightContentVisible(true)
-        }
-    }, [generatedCode])
-
-    // Remove the messages effect since we handle visibility in submit
-    useEffect(() => {
-        if (messages.length > 0) {
-            setShowTypingText(false)
-        }
-    }, [messages])
-    
-    const handleInputChange = useCallback((value: string) => {
-        // Convert string value to synthetic event
-        originalHandleInputChange({ target: { value } } as React.ChangeEvent<HTMLTextAreaElement>)
-    }, [originalHandleInputChange])
-
-    // All useCallbacks here, including handleUpdateStreamlit
-    const handleUpdateStreamlit = useCallback(async (code: string): Promise<void> => {
-        await updateStreamlitApp(code)
-    }, [updateStreamlitApp])
 
     // Loading states
     if (isLoading) {
@@ -545,7 +470,6 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
             </div>
         </ResizableHandle>
     )
-
 
     return (
         <div className="bg-white relative flex h-screen overflow-hidden">
@@ -587,7 +511,14 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
                             <div className="w-full relative flex flex-col h-[calc(100vh-4rem)]">
-                                {!isInChatPage && showTypingText && <TypingText className='text-black font-bold text-3xl' text='From Data to Apps, in seconds' speed={30} show={true} />}
+                                {!isInChatPage && showTypingText && (
+                                    <TypingText 
+                                        className='text-black font-bold text-3xl' 
+                                        text='From Data to Apps, in seconds' 
+                                        speed={30} 
+                                        show={true} 
+                                    />
+                                )}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
                                         messages={messages}
@@ -596,14 +527,11 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                                         onInputChange={handleInputChange}
                                         onSubmit={handleSubmit}
                                         fileUploadState={fileUploadState}
-                                        onFileUpload={(file: File) => {
-                                            setAttachedFile(file)
-                                            handleFileUpload(file)
-                                        }}
+                                        onFileUpload={handleFileUpload}
                                         errorState={errorState}
                                         onErrorDismiss={() => setErrorState(null)}
                                         onChatFinish={handleChatFinish}
-                                        onUpdateStreamlit={handleUpdateStreamlit}
+                                        onUpdateStreamlit={updateStreamlitApp}
                                         onCodeClick={() => {
                                             setActiveTab('code')
                                             setIsRightContentVisible(true)

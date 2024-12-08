@@ -30,7 +30,6 @@ export async function POST(req: Request) {
             currentChatId = newChat?.id || ''
         }
 
-        // Get file context if needed
         let fileContext = undefined
         if (fileId) {
             const { data: fileData } = await supabase
@@ -59,21 +58,16 @@ export async function POST(req: Request) {
                 ...messages
             ],
             tools: { streamlitTool },
-            onChunk: async (event: any) => {
-                const { chunk } = event
-                if (chunk.type === 'tool-call') {
-                    const toolResult = await streamlitTool.execute({
-                        query: chunk.args.query,
-                        fileContext: chunk.args.fileContext,
-                        chatId: currentChatId
-                    })
-                }
-            }
+            experimental_toolCallStreaming: true
         })
 
-        return result.toTextStreamResponse({
+        // Important: Use toDataStreamResponse for proper streaming
+        return result.toDataStreamResponse({
             headers: {
-                'x-chat-id': currentChatId
+                'x-chat-id': currentChatId,
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
             }
         })
 
@@ -85,5 +79,4 @@ export async function POST(req: Request) {
         )
     }
 }
-
 export const runtime = 'nodejs'
