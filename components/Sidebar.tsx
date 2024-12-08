@@ -450,8 +450,11 @@ export default function AppSidebar({
                                                     <CreditCard className="mr-2 h-4 w-4" />
                                                     <span>Billing</span>
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="cursor-default">
-                                                    <div className="flex w-full items-center justify-between">
+                                                <DropdownMenuItem
+                                                    className="cursor-default hover:!bg-transparent"
+                                                    onSelect={(e) => e.preventDefault()}
+                                                >
+                                                    <div className="w-full">
                                                         <ThemeSwitcherButton />
                                                     </div>
                                                 </DropdownMenuItem>
@@ -694,9 +697,14 @@ export default function AppSidebar({
                                                     <CreditCard />
                                                     Billing
                                                 </DropdownMenuItem>
-                                                <div className="flex w-full items-center justify-between">
-                                                    <ThemeSwitcherButton />
-                                                </div>
+                                                <DropdownMenuItem
+                                                    className="cursor-default hover:!bg-transparent"
+                                                    onSelect={(e) => e.preventDefault()}
+                                                >
+                                                    <div className="w-full">
+                                                        <ThemeSwitcherButton />
+                                                    </div>
+                                                </DropdownMenuItem>
                                             </DropdownMenuGroup>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={handleSignOut}>

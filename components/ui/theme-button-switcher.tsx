@@ -1,62 +1,61 @@
 "use client";
 
-import React from "react";
+import { useTheme } from "next-themes";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+const spring = {
+  type: "spring",
+  stiffness: 700,
+  damping: 30,
+  duration: 0.5
+};
+
 export const ThemeSwitcherButton = () => {
-  const [theme, setTheme] = React.useState<"light" | "dark">("light");
+  const { theme, setTheme } = useTheme();
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+  };
+
   return (
-    <button
-      className="group relative inline-flex items-center gap-2 overflow-hidden rounded-md px-2 py-1 font-medium text-neutral-600 tracking-tight hover:bg-neutral-100 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-      onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-      type="button"
-    >
-      <span
-        className={cn(
-          "relative size-6 scale-75 rounded-full bg-gradient-to-tr",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0 left-0 z-10 h-full w-full transform-gpu rounded-full bg-gradient-to-tr from-indigo-400 to-sky-200 transition-color duration-500",
-            theme === "dark" ? "scale-100" : "scale-90",
-          )}
-        />
-        <span
-          className={cn(
-            "absolute top-0 left-0 z-10 h-full w-full transform-gpu rounded-full bg-gradient-to-tr from-rose-400 to-amber-300 transition-color duration-500 dark:from-rose-600 dark:to-amber-600",
-            theme === "light" ? "opacity-100" : "opacity-0",
-          )}
-        />
-        <span
-          className={cn(
-            "absolute top-0 right-0 z-20 size-4 origin-top-right transform-gpu rounded-full bg-white transition-transform duration-500 group-hover:bg-neutral-100 dark:bg-neutral-800 group-hover:dark:bg-neutral-700",
-            theme === "dark" ? "scale-100" : "scale-0",
-          )}
-        />
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+        Theme
       </span>
-      <span className="relative h-6 w-12">
-        <span
-          className={cn(
-            "absolute top-0 left-0 transition-all duration-1000",
-            theme === "light"
-              ? "-translate-y-4 opacity-0 blur-lg"
-              : "translate-y-0 opacity-100 blur-0",
-          )}
-        >
-          Dark
-        </span>
-        <span
-          className={cn(
-            "absolute top-0 left-0 transition-all duration-1000",
-            theme === "dark"
-              ? "translate-y-4 opacity-0 blur-lg"
-              : "translate-y-0 opacity-100 blur-0",
-          )}
-        >
-          Light
-        </span>
-      </span>
-    </button>
+      <div className="relative flex h-8 items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-100 p-1 dark:bg-neutral-800">
+        <motion.div
+          className="absolute h-6 w-6 rounded bg-white dark:bg-neutral-700"
+          layout
+          transition={spring}
+          style={{
+            left: theme === "light" ? "4px" : theme === "dark" ? "calc(33.33% + 2px)" : "calc(66.66% + 0px)",
+          }}
+        />
+        {["light", "dark", "system"].map((t) => (
+          <motion.button
+            key={t}
+            layout
+            transition={spring}
+            onClick={() => handleThemeChange(t)}
+            className={cn(
+              "relative z-10 flex h-6 w-6 items-center justify-center rounded",
+            )}
+            aria-label={`Switch to ${t} theme`}
+          >
+            {t === "light" && (
+              <Sun className="h-4 w-4 text-neutral-900 dark:text-neutral-100" />
+            )}
+            {t === "dark" && (
+              <Moon className="h-4 w-4 text-neutral-900 dark:text-neutral-100" />
+            )}
+            {t === "system" && (
+              <Monitor className="h-4 w-4 text-neutral-900 dark:text-neutral-100" />
+            )}
+          </motion.button>
+        ))}
+      </div>
+    </div>
   );
 };

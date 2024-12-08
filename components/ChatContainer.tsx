@@ -444,18 +444,18 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
     }
 
     const CustomHandle = ({ ...props }) => (
-        <ResizableHandle {...props} withHandle className="relative">
+        <ResizableHandle {...props} withHandle className="relative bg-transparent">
             <div className="absolute inset-y-0 left-1/2 flex w-4 -translate-x-1/2 items-center justify-center">
-                <div className="h-8 w-1 rounded-full bg-black" />
+                <div className="h-8 w-1 rounded-full bg-black dark:bg-white" />
             </div>
         </ResizableHandle>
     )
 
     return (
-        <div className="bg-white relative flex h-screen overflow-hidden">
-            <div className='bg-white absolute top-0 left-0 w-full h-full'>
+        <div className="bg-white dark:bg-dark-app relative flex h-screen overflow-hidden">
+            <div className='absolute top-0 left-0 w-full h-full'>
                 <div className="godrays top-0 left-0 w-full min-h-[30vh] relative z-5">
-                    <div className="godrays-overlay z-10" />
+                    <div className="godrays-overlay dark:mix-blend-darken z-10" />
                 </div>
             </div>
             <AppSidebar
@@ -465,7 +465,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                 onNewChat={handleNewChat}
                 isCreatingChat={isCreatingChat}
             />
-            <div className="flex-1 flex flex-col bg-white min-w-0">
+            <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
                 {sidebarCollapsed && (
                     <div
                         className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
@@ -488,7 +488,14 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
                             <div className="w-full relative flex flex-col h-[calc(100vh-4rem)]">
-                                {!isInChatPage && showTypingText && <TypingText className='text-black font-bold text-3xl' text='From Data to Apps, in seconds' speed={30} show={true} />}
+                                {!isInChatPage && showTypingText && (
+                                    <TypingText
+                                        className='text-black dark:text-dark-text font-bold text-3xl'
+                                        text='From Data to Apps, in seconds'
+                                        speed={30}
+                                        show={true}
+                                    />
+                                )}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
                                         chatId={currentChatId}
@@ -498,9 +505,7 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                                         onChatFinish={handleChatFinish}
                                         onUpdateStreamlit={updateStreamlitApp}
                                         setActiveTab={setActiveTab}
-                                        setIsRightContentVisible={
-                                            setIsRightContentVisible
-                                        }
+                                        setIsRightContentVisible={setIsRightContentVisible}
                                         onCodeClick={() => {
                                             setActiveTab('code')
                                             setIsRightContentVisible(true)
@@ -513,11 +518,11 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
 
                         {isRightContentVisible && (
                             <>
-                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 transition-colors" />
+                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 dark:from-white/10 dark:to-white/5 dark:hover:from-white/20 dark:hover:to-white/10 transition-colors" />
                                 <ResizablePanel
                                     defaultSize={60}
                                     minSize={40}
-                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white h-[calc(100vh-4rem)] border border-gray-200"
+                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
                                 >
                                     <PreviewPanel
                                         streamlitUrl={streamlitUrl}
@@ -544,9 +549,9 @@ export default function ChatContainer({ initialChat, isNewChat = false, isInChat
                         <Button
                             onClick={toggleRightContent}
                             className={cn(
-                                'bg-black hover:bg-black/90',
+                                'bg-black dark:bg-dark-background dark:border-neutral-400 hover:bg-black/90',
                                 'text-white',
-                                'border border-transparent',
+                                'border border-transparent dark:border-dark-border',
                                 'transition-all duration-200 ease-in-out',
                                 'shadow-lg hover:shadow-xl',
                                 'rounded-lg'
