@@ -88,10 +88,7 @@ export async function POST(req: NextRequest) {
                 file_type: metadata.fileType,
                 file_size: metadata.fileSize,
                 s3_key: s3Key,
-                analysis,
-                created_at: new Date().toISOString(),
-                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
-                last_accessed: new Date().toISOString(),
+                analysis: analysis ? JSON.stringify(analysis) : undefined,
             })
             .select()
             .single();
