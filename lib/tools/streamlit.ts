@@ -1,98 +1,60 @@
-import { createClient } from '@/lib/supabase/server'
-import { StreamlitToolArgs, StreamlitToolResult } from '@/lib/types'
-import { generateText } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { getUser } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { generateObject } from 'ai'
+import { anthropic } from '@ai-sdk/anthropic'
 
 export const streamlitTool = {
     description: 'Generate a Streamlit app with data visualization',
     parameters: z.object({
-        query: z.string(),
-        fileContext: z.object({
-            fileName: z.string(),
-            fileType: z.enum(['csv', 'json']),
-            analysis: z.any().optional(),
-        }).optional(),
-        chatId: z.string()
+        dataDescription: z.string().optional().describe('If a file exists, description of the data, column names, and insights about the data that the user is interested in.'),
+        query: z.string().describe('Detailed requirmements of a complex Streamlit app.'),
+        fileDirectory: z
+            .string()
+            .regex(/^\/app\/s3\/data\/.+\/$/, 'Must be in the format "/app/s3/data/<fileNameWithExtension/>"')
+            .optional()
+            .describe('Should always be in the format "/app/s3/data/<fileNameWithExtension/>"'),
     }),
-    execute: async ({ query, fileContext, chatId }: StreamlitToolArgs): Promise<StreamlitToolResult> => {
-        const user = await getUser()
-        const supabase = await createClient()
+    execute: async ({ dataDescription, query, fileDirectory }: z.infer<typeof streamlitTool.parameters>): Promise<{ code: string, appName: string, appDescription: string }> => {
+        console.log('Starting streamlitTool execution:', { query, fileDirectory })
 
         try {
-            // Generate Streamlit code using Claude
-            const { text: code } = await generateText({
+            console.log('Generating Streamlit code with Claude...')
+            const { object: { code, appName, appDescription } } = await generateObject({
                 model: anthropic('claude-3-5-sonnet-20241022'),
+                schema: z.object({
+                    code: z.string().describe('ONLY the generated Streamlit code. Do not include any other text.'),
+                    appName: z.string().describe('Name of the app you created.'),
+                    appDescription: z.string().describe('Short description of the app you created.')
+                }),
                 messages: [
                     {
                         role: 'system',
                         content: `Generate a Streamlit app based on the query.
-                        ${fileContext ? `Use the file at path "/app/${fileContext.fileName}"` : ''}
+                        ${fileDirectory ? `ONLY use the file at path "${fileDirectory}"` : ''}
+                        ${dataDescription ? `Here's some information about the data: ${dataDescription}` : ''}
                         Include all necessary imports. Only respond with code.`
                     },
                     { role: 'user', content: query }
                 ]
             })
+            
+            console.log('Generated Streamlit code:', {
+                promptLength: query.length,
+                codeLength: code.length,
+                firstLines: code.split('\n').slice(0, 3).join('\n'),
+                appName,
+                appDescription
+            })
 
-            // Create or update app version in database
-            const { data: chat } = await supabase
-                .from('chats')
-                .select('app_id')
-                .eq('id', chatId)
-                .single()
-
-            let appId = chat?.app_id
-
-            if (!appId) {
-                // Create new app with user_id
-                const { data: app, error: appError } = await supabase
-                    .from('apps')
-                    .insert({
-                        user_id: user.id,
-                        name: query.slice(0, 50) + '...',
-                        description: 'Streamlit app created from chat',
-                        is_public: false,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                    })
-                    .select()
-                    .single()
-
-                if (appError) throw appError
-                appId = app.id
-
-                // Link app to chat
-                const { data: message, error: chatError } = await supabase
-                    .from('chats')
-                    .update({ app_id: appId })
-                    .eq('id', chatId)
-            }
-
-
-            // Create new version
-            const { data: version, error: versionError } = await supabase
-                .from('versions')
-                .insert({
-                    app_id: appId,
-                    code: code,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                })
-                .select()
-                .single()
-
-            if (versionError) throw versionError
-
-            return {
-                code,
-                appId: appId!,
-                success: true
-            }
+            return { code, appName, appDescription }
 
         } catch (error) {
-            console.error('Error in streamlit tool:', error)
+            console.error('Error in streamlit tool:', {
+                error,
+                query,
+                dataDescription,
+                fileDirectory
+            })
             throw error
         }
     }
-} 
+}
