@@ -35,7 +35,7 @@ export default async function ChatPage({ params }: PageParams) {
 
     return <ChatContainer 
         initialChat={chat} 
-        initialMessages={messages} 
+        initialMessages={messages ?? []} 
         isInChatPage={true} 
     />
 }

@@ -16,7 +16,7 @@ import { useToolState } from '@/lib/stores/tool-state-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Message } from 'ai'
-import { useChat, useStreamData } from 'ai/react'
+import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -37,6 +37,13 @@ interface FileUploadState {
     error: string | null
 }
 
+interface StreamlitToolCall {
+    toolName: string
+    args: string | {
+        code: string
+    }
+}
+
 export default function ChatContainer({ 
     initialChat, 
     initialMessages = [], 
@@ -47,7 +54,6 @@ export default function ChatContainer({
     const { session, isLoading } = useAuth()
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
     const { killSandbox, updateSandbox } = useSandboxStore()
-    const { setToolState, currentToolCall } = useToolState()
 
     // State management
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
@@ -84,7 +90,32 @@ export default function ChatContainer({
     })
     const currentModel = modelsList.models.find(model => model.id === languageModel.model)
 
-    // Chat configuration with streaming
+    // Add the chat creation handler
+    const handleChatCreated = useCallback((chatId: string) => {
+        if (isNewChat) {
+            // First navigate
+            router.replace(`/chat/${chatId}`)
+            return // Let the chat/[id] page handle initialization
+        }
+
+        // Only handle state updates if not navigating
+        setShowTypingText(false)
+        setCurrentChatId(chatId)
+
+        // Refresh the chat list
+        const loadChats = async () => {
+            try {
+                const response = await fetch('/api/conversations')
+                if (!response.ok) throw new Error('Failed to fetch chats')
+                const data = await response.json()
+                setSidebarChats(data.chats)
+            } catch (error) {
+                console.error('Error fetching chats:', error)
+            }
+        }
+        loadChats()
+    }, [router, isNewChat])
+
     const {
         messages,
         isLoading: chatLoading,
@@ -111,47 +142,69 @@ export default function ChatContainer({
         body: {
             model: currentModel,
             config: languageModel,
-            chatId: currentChatId,
             experimental_streamData: true,
         },
-        onToolCall: async ({ toolCall, toolCallId }) => {
-            if (toolCall.toolName === 'create_streamlit_app') {
-                setToolState({
-                    toolCallId,
-                    toolName: toolCall.toolName,
-                    state: 'streaming-start'
-                })
+        onToolCall: async ({ toolCall }) => {
+            const streamlitToolCall = toolCall as unknown as StreamlitToolCall
+            if (streamlitToolCall.toolName === 'create_streamlit_app') {
 
                 setIsRightContentVisible(true)
                 setShowCodeView(true)
                 setIsGeneratingCode(true)
 
-                if (toolCall.state === 'partial-call' && toolCall.args) {
-                    setGeneratedCode(prev => prev + toolCall.args)
-                    setToolState({
-                        toolCallId,
-                        toolName: toolCall.toolName,
-                        state: 'delta'
-                    })
-                } else if (toolCall.state === 'result') {
-                    setGeneratedCode(toolCall.result)
-                    await updateStreamlitApp(toolCall.result)
+                try {
+                    if (typeof streamlitToolCall.args === 'string') {
+                        setGeneratedCode(prev => prev + toolCall.args)
+                    } else {
+                        const code = streamlitToolCall.args.code
+                        if (code) {
+                            setGeneratedCode(code)
+                            await updateStreamlitApp(code)
+                        }
+                    }
+                } finally {
                     setIsGeneratingCode(false)
-                    setToolState({
-                        toolCallId,
-                        toolName: toolCall.toolName,
-                        state: 'complete'
-                    })
                 }
             }
         },
-        onFinish: async (message) => {
-            if (isNewChat && currentChatId) {
-                router.replace(`/chat/${currentChatId}`)
-            }
+        onFinish: async (message, { usage }) => {
+            if (message.content) {
+                
+                try {
+                    // Store complete message chain
+                    const response = await fetch('/api/chat/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            chatId: currentChatId, // undefined for new chats
+                            userMessage: input,
+                            assistantMessage: message.content,
+                            toolCalls: message.toolInvocations,
+                            toolResults: message.toolInvocations?.map(t => ({
+                                name: t.toolName,
+                                result: t.args.code
+                            })),
+                            tokenCount: usage.totalTokens
+                        })
+                    })
 
+                    if (!response.ok) throw new Error('Failed to store message')
+
+                    // If new chat, get chatId and route
+                    if (!currentChatId) {
+                        const { chatId } = await response.json()
+                        setCurrentChatId(chatId)
+                        router.replace(`/chat/${chatId}`)
+                    }
+                } catch (error) {
+                    console.error('Error storing message:', error)
+                }
+            }
             handleChatFinish()
             
+            // Existing tool invocations handling
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .find(invocation => 
@@ -172,10 +225,6 @@ export default function ChatContainer({
                     }
                 }
             }
-        },
-        onError: (error) => {
-            setIsGeneratingCode(false)
-            setErrorState(new Error(error.message))
         }
     })
 

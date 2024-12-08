@@ -183,7 +183,6 @@ export interface Database {
                     id: string
                     chat_id: string
                     user_id: string
-                    role: string
                     user_message: string
                     assistant_message: string
                     tool_calls: Json | null
@@ -195,7 +194,6 @@ export interface Database {
                     id?: string
                     chat_id: string
                     user_id: string
-                    role: string
                     user_message: string
                     assistant_message: string
                     tool_calls?: Json | null
@@ -207,7 +205,6 @@ export interface Database {
                     id?: string
                     chat_id?: string
                     user_id?: string
-                    role?: string
                     user_message?: string
                     assistant_message?: string
                     tool_calls?: Json | null
