@@ -2,6 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { Sandbox, Process, ProcessMessage } from 'e2b'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { getUser } from '@/lib/supabase/server'
+
+interface RouteContext {
+    params: Promise<{ id: string }>
+}
 
 async function listUserSandboxes(userId: string): Promise<Sandbox[]> {
     try {
@@ -58,17 +63,16 @@ async function killStreamlitProcess(sandbox: Sandbox) {
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    context: RouteContext,
 ) {
     const supabase = await createClient()
-    const {
-        data: { session },
-    } = await supabase.auth.getSession()
+    const user = await getUser()
 
-    if (!session) {
+    const { id } = await context.params
+    if (!user) {
         return NextResponse.json(
             { error: 'Not authenticated' },
-            { status: 401 }
+            { status: 401 } 
         )
     }
 
@@ -87,14 +91,14 @@ export async function POST(
         }
 
         // List existing sandboxes for the user
-        const existingSandboxes = await listUserSandboxes(session.user.id)
+        const existingSandboxes = await listUserSandboxes(user.id)
         let sandbox: Sandbox
 
-        if (params.id !== 'new' && existingSandboxes.some(s => s.id === params.id)) {
+        if (id !== 'new' && existingSandboxes.some(s => s.id === id)) {
             // Reconnect to specific sandbox if ID provided and exists
-            sandbox = await Sandbox.reconnect(params.id)
+            sandbox = await Sandbox.reconnect(id)
             await killStreamlitProcess(sandbox)  // Kill process and clean up
-            await cleanupOldSandboxes(existingSandboxes, params.id)
+            await cleanupOldSandboxes(existingSandboxes, id)
         } else if (existingSandboxes.length > 0) {
             // Reuse the first existing sandbox
             sandbox = existingSandboxes[0]
@@ -106,13 +110,13 @@ export async function POST(
                 apiKey: process.env.E2B_API_KEY!,
                 template: 'streamlit-sandbox-s3',
                 metadata: {
-                    userId: session.user.id
+                    userId: user.id
                 }
             })
         }
 
         // Setup S3 mount if new sandbox
-        if (params.id === 'new' || existingSandboxes.length === 0) {
+        if (id === 'new' || existingSandboxes.length === 0) {
             // Ensure directory exists
             await sandbox.process.start({
                 cmd: 'sudo mkdir -p /app/s3'
@@ -125,7 +129,7 @@ export async function POST(
 
             // Mount S3 with debug output
             await sandbox.process.start({
-                cmd: `sudo s3fs "pyapps:/${session.user.id}" /app/s3 \
+                cmd: `sudo s3fs "pyapps:/${user.id}" /app/s3 \
                     -o passwd_file=/etc/passwd-s3fs \
                     -o url="https://s3.amazonaws.com" \
                     -o endpoint=${process.env.AWS_REGION} \

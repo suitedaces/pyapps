@@ -1,9 +1,8 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient()
     const {
         data: { session },
     } = await supabase.auth.getSession()
@@ -32,7 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient()
     const {
         data: { session },
     } = await supabase.auth.getSession()
@@ -44,24 +43,42 @@ export async function POST(req: NextRequest) {
         )
     }
 
-    const { name, description } = await req.json()
+    try {
+        const { chatId, code, appName, appDescription } = await req.json()
 
-    const { data, error } = await supabase
-        .from('apps')
-        .insert({
-            user_id: session.user.id,
-            name,
-            description,
-        })
-        .select()
-        .single()
+        if (!chatId || !code || !appName) {
+            return NextResponse.json(
+                { error: 'Missing required fields' },
+                { status: 400 }
+            )
+        }
 
-    if (error) {
+        const { data, error } = await supabase.rpc(
+            'handle_streamlit_tool_response',
+            {
+                p_user_id: session.user.id,
+                p_chat_id: chatId,
+                p_code: code,
+                p_app_name: appName,
+                p_app_description: appDescription || null
+            }
+        )
+
+        if (error) {
+            console.error('RPC Error:', error)
+            return NextResponse.json(
+                { error: 'Failed to create app version' },
+                { status: 500 }
+            )
+        }
+
+        return NextResponse.json(data)
+
+    } catch (error) {
+        console.error('Error in POST /api/apps:', error)
         return NextResponse.json(
-            { error: 'Failed to create app' },
+            { error: 'Internal server error' },
             { status: 500 }
         )
     }
-
-    return NextResponse.json(data)
 }

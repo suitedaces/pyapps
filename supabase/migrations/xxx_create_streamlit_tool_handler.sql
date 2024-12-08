@@ -81,14 +81,18 @@ BEGIN
     WHERE id = p_chat_id;
 
     IF v_existing_app_id IS NULL THEN
-        -- Create new app (minimal, no name required)
+        -- Create new app with name from the tool response
         INSERT INTO apps (
             user_id,
+            name,                   -- Add name here
+            description,            -- Add description here
             is_public,
             created_at,
             updated_at
         ) VALUES (
             p_user_id,
+            p_name,                 -- Use the provided name
+            p_description,          -- Use the provided description
             false,
             now(),
             now()
@@ -100,6 +104,14 @@ BEGIN
         WHERE id = p_chat_id;
     ELSE
         v_app_id := v_existing_app_id;
+        
+        -- Update existing app's name and description
+        UPDATE apps
+        SET 
+            name = p_name,
+            description = p_description,
+            updated_at = now()
+        WHERE id = v_app_id;
     END IF;
 
     -- Create new version with name and description

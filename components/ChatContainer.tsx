@@ -12,7 +12,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useSidebar } from '@/contexts/SidebarContext'
 import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
-import { useToolState } from '@/lib/stores/tool-state-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Message } from 'ai'
@@ -39,8 +38,17 @@ interface FileUploadState {
 
 interface StreamlitToolCall {
     toolName: string
-    args: string | {
+    toolCallId: string
+    state: 'call' | 'partial-call' | 'result'
+    args?: {
+        dataDescription?: string
+        query: string
+        fileDirectory?: string
+    }
+    result?: {
         code: string
+        appName: string
+        appDescription: string
     }
 }
 
@@ -133,10 +141,14 @@ export default function ChatContainer({
             content: msg.role === 'user' ? msg.user_message : msg.assistant_message,
             createdAt: new Date(msg.created_at),
             toolInvocations: msg.tool_results?.map((tool: any) => ({
-                toolName: tool.name,
+                toolName: 'streamlitTool',
                 toolCallId: tool.id,
                 state: 'result',
-                result: tool.result
+                result: {
+                    code: tool.result,
+                    appName: tool.app_name || 'No name generated',
+                    appDescription: tool.app_description || 'No description generated'
+                }
             }))
         })),
         body: {
@@ -146,21 +158,15 @@ export default function ChatContainer({
         },
         onToolCall: async ({ toolCall }) => {
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
-            if (streamlitToolCall.toolName === 'create_streamlit_app') {
-
+            if (streamlitToolCall.toolName === 'streamlitTool') {
                 setIsRightContentVisible(true)
                 setShowCodeView(true)
                 setIsGeneratingCode(true)
 
                 try {
-                    if (typeof streamlitToolCall.args === 'string') {
-                        setGeneratedCode(prev => prev + toolCall.args)
-                    } else {
-                        const code = streamlitToolCall.args.code
-                        if (code) {
-                            setGeneratedCode(code)
-                            await updateStreamlitApp(code)
-                        }
+                    if (streamlitToolCall.state === 'result' && streamlitToolCall.result?.code) {
+                        setGeneratedCode(streamlitToolCall.result.code)
+                        await updateStreamlitApp(streamlitToolCall.result.code)
                     }
                 } finally {
                     setIsGeneratingCode(false)
@@ -169,22 +175,21 @@ export default function ChatContainer({
         },
         onFinish: async (message, { usage }) => {
             if (message.content) {
-                
                 try {
-                    // Store complete message chain
                     const response = await fetch('/api/chat/messages', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            chatId: currentChatId, // undefined for new chats
+                            chatId: currentChatId,
                             userMessage: input,
                             assistantMessage: message.content,
                             toolCalls: message.toolInvocations,
                             toolResults: message.toolInvocations?.map(t => ({
                                 name: t.toolName,
-                                result: t.args.code
+                                id: t.toolCallId,
+                                result: t.state === 'result' ? t.result?.code : undefined,
+                                app_name: t.state === 'result' ? t.result?.appName : undefined,
+                                app_description: t.state === 'result' ? t.result?.appDescription : undefined
                             })),
                             tokenCount: usage.totalTokens
                         })
@@ -192,31 +197,28 @@ export default function ChatContainer({
 
                     if (!response.ok) throw new Error('Failed to store message')
 
-                    // If new chat, get chatId and route
                     if (!currentChatId) {
                         const { chatId } = await response.json()
-                        setCurrentChatId(chatId)
-                        router.replace(`/chat/${chatId}`)
+                        handleChatCreated(chatId)
                     }
                 } catch (error) {
                     console.error('Error storing message:', error)
                 }
             }
-            handleChatFinish()
-            
-            // Existing tool invocations handling
+
+            // Handle tool results
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
                     .find(invocation => 
-                        invocation.toolName === 'create_streamlit_app' && 
+                        invocation.toolName === 'streamlitTool' && 
                         invocation.state === 'result'
                     )
 
-                if (streamlitCall?.state === 'result') {
+                if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
                     try {
                         setIsCreatingVersion(true)
-                        setGeneratedCode(streamlitCall.result)
-                        await updateStreamlitApp(streamlitCall.result)
+                        setGeneratedCode(streamlitCall.result.code)
+                        await updateStreamlitApp(streamlitCall.result.code)
                         if (versionSelectorRef.current) {
                             await versionSelectorRef.current.refreshVersions()
                         }
@@ -225,6 +227,8 @@ export default function ChatContainer({
                     }
                 }
             }
+            
+            handleChatFinish()
         }
     })
 
