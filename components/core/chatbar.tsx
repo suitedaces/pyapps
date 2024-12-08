@@ -6,8 +6,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { PaperclipIcon, ArrowUp, Loader2 } from "lucide-react"
 import { FilePreview } from "@/components/FilePreview"
-import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea";
-import { motion, AnimatePresence } from "framer-motion"
+import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea"
+import { motion } from "framer-motion"
 
 interface ChatbarProps {
     value: string
@@ -24,20 +24,20 @@ interface ChatbarProps {
     isCentered?: boolean
 }
 
-const MIN_HEIGHT = 74;
-const MAX_HEIGHT = 110;
+const MIN_HEIGHT = 74
+const MAX_HEIGHT = 110
 
-export default function Chatbar({ 
+export default function Chatbar({
     value,
     onChange,
     onSubmit,
-    isLoading,
+    isLoading = false,
     onFileUpload,
     fileUploadState,
-    isInChatPage,
-    isCentered
+    isInChatPage = false,
+    isCentered = false
 }: ChatbarProps) {
-    const [message, setMessage] = React.useState("")
+    // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
     const [isSubmitted, setIsSubmitted] = React.useState(false)
@@ -46,46 +46,44 @@ export default function Chatbar({
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
         maxHeight: MAX_HEIGHT,
-    });
+    })
 
     const handleRemoveFile = React.useCallback((e?: React.MouseEvent) => {
-        // Prevent event bubbling
-        e?.preventDefault();
-        e?.stopPropagation();
-
-        setFile(null);
+        e?.preventDefault()
+        e?.stopPropagation()
+        setFile(null)
         if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+            fileInputRef.current.value = ''
         }
-    }, []);
+    }, [])
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0]
         if (selectedFile) {
             setFile(selectedFile)
+            if (onFileUpload) {
+                onFileUpload(selectedFile)
+            }
         }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (message.trim() || file) {
+        
+        if (!isLoading && (value.trim() || file)) {
             setIsSubmitted(true)
             setIsAnimating(true)
-            const currentMessage = message
-            const currentFile = file
-
-            // Clear form
-            setMessage("")
-            handleRemoveFile()
-            adjustHeight(true);
-
+            
             try {
-                await onSubmit(e, currentMessage, currentFile || undefined)
+                await onSubmit(e, value, file || undefined)
+                // Clear the file after successful submission
+                handleRemoveFile()
+                // Let parent component handle clearing the message
+                adjustHeight(true)
             } catch (error) {
                 console.error('Failed to send message:', error)
+            } finally {
                 setIsSubmitted(false)
-                setMessage(currentMessage)
-                setFile(currentFile)
             }
         }
     }
@@ -93,26 +91,24 @@ export default function Chatbar({
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            if (!isLoading && (message.trim() || file)) {
+            if (!isLoading && (value.trim() || file)) {
                 handleSubmit(e as any)
             }
         }
+    }
+
+    const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        onChange(e.target.value)
+        adjustHeight()
     }
 
     return (
         <motion.div
             className="p-4 w-full absolute bg-background"
             initial={{ bottom: isInChatPage ? 0 : "40vh" }}
-            style={{
-                bottom: isInChatPage ? 0 : "40vh"
-            }}
-            animate={{
-                bottom: isInChatPage ? 0 : (isSubmitted ? 0 : "40vh")
-            }}
-            transition={{
-                duration: 0.3,
-                ease: "easeInOut"
-            }}
+            style={{ bottom: isInChatPage ? 0 : "40vh" }}
+            animate={{ bottom: isInChatPage ? 0 : (isSubmitted ? 0 : "40vh") }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
         >
             <form onSubmit={handleSubmit} className="flex relative flex-col gap-4 max-w-[800px] mx-auto">
                 {file && (
@@ -123,9 +119,9 @@ export default function Chatbar({
 
                 <div className="relative flex items-center">
                     <Textarea
-                        value={message}
+                        value={value}
                         ref={textareaRef}
-                        onChange={(e) => setMessage(e.target.value)}
+                        onChange={handleMessageChange}
                         onKeyDown={handleKeyDown}
                         placeholder={file ? 'File attached. Add a message or press Send.' : 'Type your message...'}
                         className={cn(
@@ -183,7 +179,7 @@ export default function Chatbar({
                                 "disabled:bg-none disabled:bg-[#F5F5F5] disabled:border disabled:border-[#D4D4D4]",
                                 isCentered && "h-11 w-11"
                             )}
-                            disabled={isLoading || (!message.trim() && !file)}
+                            disabled={isLoading || (!value.trim() && !file)}
                         >
                             {isLoading ? (
                                 <Loader2 className={cn(

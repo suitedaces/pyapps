@@ -3,12 +3,13 @@ import { streamText } from 'ai'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
+import { getUser } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
     const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const user = await getUser()
 
-    if (!session) return new Response('Unauthorized', { status: 401 })
+    if (!user) return new Response('Unauthorized', { status: 401 })
 
     try {
         const { messages, chatId, fileId, fileName, fileContent } = await req.json()
@@ -19,14 +20,14 @@ export async function POST(req: Request) {
             const { data: newChat } = await supabase
                 .from('chats')
                 .insert({
-                    user_id: session.user.id,
+                    user_id: user.id,
                     name: messages[0]?.content?.slice(0, 50) || 'New Chat',
                     created_at: new Date().toISOString(),
                 })
                 .select()
                 .single()
 
-            currentChatId = newChat.id
+            currentChatId = newChat?.id || ''
         }
 
         // Get file context if needed
@@ -36,13 +37,13 @@ export async function POST(req: Request) {
                 .from('files')
                 .select('*')
                 .eq('id', fileId)
-                .eq('user_id', session.user.id)
+                .eq('user_id', user.id)
                 .single()
 
             fileContext = {
-                fileName: fileData.file_name,
-                fileType: fileData.file_type,
-                analysis: fileData.analysis
+                fileName: fileData?.file_name,
+                fileType: fileData?.file_type,
+                analysis: fileData?.analysis
             }
         }
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
                 {
                     role: 'system',
                     content: fileContext 
-                        ? `${CHAT_SYSTEM_PROMPT}\n\nYou are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}".`
+                        ? `${CHAT_SYSTEM_PROMPT}\n\nYou are working with a ${fileContext?.fileType?.toUpperCase()} file named "${fileContext?.fileName}".`
                         : CHAT_SYSTEM_PROMPT
                 },
                 ...messages
