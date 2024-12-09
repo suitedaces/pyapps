@@ -408,7 +408,7 @@ export default function ChatContainer({
 
     useEffect(() => {
         const loadChats = async () => {
-            if (!session?.user?.id) return
+            if (!session?.user?.id) returnmod
             try {
                 const response = await fetch('/api/conversations')
                 if (!response.ok) throw new Error('Failed to fetch chats')
