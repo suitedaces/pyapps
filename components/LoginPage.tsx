@@ -7,7 +7,7 @@ import {
     CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -16,7 +16,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('')
     const [error, setError] = useState<string | null>(null)
     const router = useRouter()
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
