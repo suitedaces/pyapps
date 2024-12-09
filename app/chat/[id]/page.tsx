@@ -17,7 +17,6 @@ export default async function ChatPage({ params }: PageParams) {
 
     const supabase = await createClient()
 
-
     console.log('User id:', user.id)
     // Parallel fetch of chat, messages, and current version
     const [chatResponse, messagesResponse, versionResponse] = await Promise.all([

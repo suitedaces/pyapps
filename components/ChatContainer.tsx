@@ -123,7 +123,7 @@ export default function ChatContainer({
         // Refresh chat list
         const loadChats = async () => {
             try {
-                const response = await fetch('/api/conversations')
+                const response = await fetch('/api/chats')
                 if (!response.ok) throw new Error('Failed to fetch chats')
                 const data = await response.json()
                 setSidebarChats(data.chats)
@@ -143,7 +143,7 @@ export default function ChatContainer({
         append,
         setMessages,
     } = useChat({
-        api: '/api/chat/stream',
+        api: '/api/chats/stream',
         id: currentChatId ?? undefined,
         initialMessages: formatDatabaseMessages(initialMessages || []),
         body: {
@@ -171,11 +171,10 @@ export default function ChatContainer({
         onFinish: async (message, { usage }) => {
             if (message.content) {
                 try {
-                    const response = await fetch('/api/chat/messages', {
+                    const response = await fetch('/api/chats/messages?chatId=' + currentChatId, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            chatId: currentChatId,
                             userMessage: input,
                             assistantMessage: message.content,
                             toolCalls: message.toolInvocations,
@@ -408,9 +407,9 @@ export default function ChatContainer({
 
     useEffect(() => {
         const loadChats = async () => {
-            if (!session?.user?.id) returnmod
+            if (!session?.user?.id) return
             try {
-                const response = await fetch('/api/conversations')
+                const response = await fetch('/api/chats')
                 if (!response.ok) throw new Error('Failed to fetch chats')
                 const data = await response.json()
                 setSidebarChats(data.chats)
@@ -427,7 +426,7 @@ export default function ChatContainer({
             if (!currentChatId) return
 
             try {
-                const messagesResponse = await fetch(`/api/conversations/${currentChatId}/messages`)
+                const messagesResponse = await fetch(`/api/chats/messages?chatId=${currentChatId}`)
                 if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                 const data = await messagesResponse.json()
 
