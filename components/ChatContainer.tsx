@@ -98,6 +98,8 @@ export default function ChatContainer({
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
 
+    const newChatIdRef = useRef<string | null>(null)
+
     // Refs
     const hasNavigated = useRef(false)
     const isVersionSwitching = useRef(false)
@@ -153,6 +155,13 @@ export default function ChatContainer({
             config: languageModel,
             experimental_streamData: true,
         },
+        onResponse: async (response) => {
+            const newChatId = response.headers.get('x-chat-id')
+            if (newChatId && !currentChatId) {
+                newChatIdRef.current = newChatId
+                console.log('🚀 New chat created:', newChatId)
+            }
+        },
         onToolCall: async ({ toolCall }) => {
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
             if (streamlitToolCall.toolName === 'streamlitTool') {
@@ -173,29 +182,30 @@ export default function ChatContainer({
         onFinish: async (message, { usage }) => {
             if (message.content) {
                 try {
-                    const response = await fetch('/api/chats/messages?chatId=' + currentChatId, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userMessage: input,
-                            assistantMessage: message.content,
-                            toolCalls: message.toolInvocations,
-                            toolResults: message.toolInvocations?.map(t => ({
-                                name: t.toolName,
-                                id: t.toolCallId,
-                                result: t.state === 'result' ? t.result?.code : undefined,
-                                app_name: t.state === 'result' ? t.result?.appName : undefined,
-                                app_description: t.state === 'result' ? t.result?.appDescription : undefined
-                            })),
-                            tokenCount: usage.totalTokens
-                        })
-                    })
+                    // const response = await fetch('/api/chats/messages?chatId=' + currentChatId, {
+                    //     method: 'POST',
+                    //     headers: { 'Content-Type': 'application/json' },
+                    //     body: JSON.stringify({
+                    //         userMessage: input,
+                    //         assistantMessage: message.content,
+                    //         toolCalls: message.toolInvocations,
+                    //         toolResults: message.toolInvocations?.map(t => ({
+                    //             name: t.toolName,
+                    //             id: t.toolCallId,
+                    //             result: t.state === 'result' ? t.result?.code : undefined,
+                    //             app_name: t.state === 'result' ? t.result?.appName : undefined,
+                    //             app_description: t.state === 'result' ? t.result?.appDescription : undefined
+                    //         })),
+                    //         tokenCount: usage.totalTokens
+                    //     })
+                    // })
 
-                    if (!response.ok) throw new Error('Failed to store message')
+                    // if (!response.ok) throw new Error('Failed to store message')
 
-                    if (!currentChatId) {
-                        const { chatId } = await response.json()
-                        handleChatCreated(chatId)
+                    if (!currentChatId && newChatIdRef.current) {
+                        console.log('🚀 New chat created:', newChatIdRef.current);
+
+                        handleChatCreated(newChatIdRef.current)
                     }
                 } catch (error) {
                     console.error('Error storing message:', error)
@@ -337,7 +347,7 @@ export default function ChatContainer({
         e.preventDefault()
         setShowTypingText(false)
         setHasFirstMessage(true)
-        await originalHandleSubmit(e)
+        originalHandleSubmit(e)
     }, [originalHandleSubmit])
 
     const handleInputChange = useCallback((value: string) => {
