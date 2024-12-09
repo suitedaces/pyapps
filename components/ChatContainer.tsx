@@ -193,35 +193,6 @@ export default function ChatContainer({
                 return
             }
 
-            if (message.content) {
-                try {
-                    const response = await fetch('/api/chats/messages?chatId=' + chatIdToUse, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userMessage: input,
-                            assistantMessage: message.content,
-                            toolCalls: message.toolInvocations,
-                            toolResults: message.toolInvocations?.map(t => ({
-                                name: t.toolName,
-                                id: t.toolCallId,
-                                result: t.state === 'result' ? t.result?.code : undefined,
-                                app_name: t.state === 'result' ? t.result?.appName : undefined,
-                                app_description: t.state === 'result' ? t.result?.appDescription : undefined
-                            })),
-                            tokenCount: usage.totalTokens
-                        })
-                    })
-
-                    if (!response.ok) {
-                        throw new Error('Failed to store message')
-                    }
-                } catch (error) {
-                    console.error('Error storing message:', error)
-                    setErrorState(new Error('Failed to save message. Please try again.'))
-                }
-            }
-
             // Handle tool results
             if (message.toolInvocations?.length) {
                 const streamlitCall = message.toolInvocations
