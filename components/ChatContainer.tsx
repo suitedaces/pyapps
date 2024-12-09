@@ -136,6 +136,9 @@ export default function ChatContainer({
         loadChats()
     }, [router, isNewChat])
 
+    // Store chat ID from response headers
+    const [pendingChatId, setPendingChatId] = useState<string | null>(null)
+
     const {
         messages,
         isLoading: chatLoading,
@@ -154,10 +157,10 @@ export default function ChatContainer({
             experimental_streamData: true,
         },
         onResponse: async (response) => {
-            // Extract chat ID from response headers
-            const chatId = response.headers.get('x-chat-id')
-            if (chatId && !currentChatId) {
-                handleChatCreated(chatId)
+            // Store chat ID from response headers to be used in onFinish
+            const newChatId = response.headers.get('x-chat-id')
+            if (newChatId) {
+                setPendingChatId(newChatId)
             }
         },
         onToolCall: async ({ toolCall }) => {
@@ -178,14 +181,21 @@ export default function ChatContainer({
             }
         },
         onFinish: async (message, { usage }) => {
-            if (!currentChatId) {
+            // Use the stored pending chat ID
+            if (pendingChatId && !currentChatId) {
+                handleChatCreated(pendingChatId)
+            }
+
+            const chatIdToUse = currentChatId || pendingChatId
+
+            if (!chatIdToUse) {
                 console.error('No chat ID available for message storage')
                 return
             }
 
             if (message.content) {
                 try {
-                    const response = await fetch('/api/chats/messages?chatId=' + currentChatId, {
+                    const response = await fetch('/api/chats/messages?chatId=' + chatIdToUse, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -234,6 +244,8 @@ export default function ChatContainer({
                 }
             }
 
+            // Clear the pending chat ID after we're done
+            setPendingChatId(null)
             handleChatFinish()
         }
     })
