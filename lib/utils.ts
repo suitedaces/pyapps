@@ -8,6 +8,7 @@ import {
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { v4 as uuidv4 } from 'uuid'
+import { Database } from './database.types'
 
 export interface User {
     id: string
@@ -160,4 +161,46 @@ export const truncate = (str: string) => {
         maxLength - 3 - extension.length
     )
     return `${truncatedName}...${extension}`
+}
+
+type DatabaseMessage = Database['public']['Tables']['messages']['Row']
+
+export function formatDatabaseMessages(dbMessages: DatabaseMessage[]): Message[] {
+    return dbMessages.map(msg => {
+        const messages: Message[] = []
+        
+        // Add user message
+        if (msg.user_message) {
+            messages.push({
+                id: `${msg.id}-user`,
+                role: 'user' as const,
+                content: msg.user_message,
+                createdAt: new Date(msg.created_at)
+            })
+        }
+        
+        // Add assistant message with tool results
+        if (msg.assistant_message) {
+            messages.push({
+                id: `${msg.id}-assistant`,
+                role: 'assistant' as const,
+                content: msg.assistant_message,
+                createdAt: new Date(msg.created_at),
+                toolInvocations: msg.tool_results 
+                    ? (msg.tool_results as any[]).map(tool => ({
+                        toolName: 'streamlitTool',
+                        toolCallId: tool.id,
+                        state: 'result' as const,
+                        result: {
+                            code: tool.result,
+                            appName: tool.app_name || 'No name generated',
+                            appDescription: tool.app_description || 'No description generated'
+                        }
+                    }))
+                    : []
+            })
+        }
+        
+        return messages
+    }).flat()
 }

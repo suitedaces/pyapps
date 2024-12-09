@@ -1,6 +1,7 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import ChatContainer from '@/components/ChatContainer'
+import { Database } from '@/lib/database.types'
 
 interface PageParams {
     params: Promise<{ id: string }>
@@ -15,27 +16,43 @@ export default async function ChatPage({ params }: PageParams) {
     }
 
     const supabase = await createClient()
-    const { data: chat, error } = await supabase
-        .from('chats')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .single()
 
-    if (error || !chat) {
+
+    console.log('User id:', user.id)
+    // Parallel fetch of chat, messages, and current version
+    const [chatResponse, messagesResponse, versionResponse] = await Promise.all([
+        supabase
+            .from('chats')
+            .select('*')
+            .eq('id', id)
+            .single(),
+        supabase
+            .from('messages')
+            .select('*')
+            .eq('chat_id', id)
+            .order('created_at', { ascending: true }),
+        supabase
+            .rpc('get_chat_current_app_version', { p_chat_id: id })
+    ])
+
+    console.log('chatResponse', chatResponse)
+    console.log('messagesResponse', messagesResponse)
+    console.log('versionResponse', versionResponse)
+
+    if (chatResponse.error || !chatResponse.data) {
+        console.error('Error fetching chat:', chatResponse.error)
         notFound()
     }
 
-    // Fetch messages for initial state
-    const { data: messages } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('chat_id', id)
-        .order('created_at', { ascending: true })
+    if (messagesResponse.error) {
+        console.error('Error fetching messages:', messagesResponse.error)
+        notFound()
+    }
 
     return <ChatContainer 
-        initialChat={chat} 
-        initialMessages={messages ?? []} 
+        initialChat={chatResponse.data} 
+        initialMessages={messagesResponse.data ?? []} 
+        initialVersion={versionResponse.data ?? null}
         isInChatPage={true} 
     />
 }

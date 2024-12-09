@@ -22,10 +22,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
+import { formatDatabaseMessages } from '@/lib/utils'
 
 interface ChatContainerProps {
     initialChat?: any
     initialMessages?: any[]
+    initialVersion?: AppVersion
     isNewChat?: boolean
     isInChatPage?: boolean
 }
@@ -55,6 +57,7 @@ interface StreamlitToolCall {
 export default function ChatContainer({ 
     initialChat, 
     initialMessages = [], 
+    initialVersion = null, 
     isNewChat = false, 
     isInChatPage = false 
 }: ChatContainerProps) {
@@ -135,22 +138,7 @@ export default function ChatContainer({
     } = useChat({
         api: '/api/chat/stream',
         id: currentChatId ?? undefined,
-        initialMessages: initialMessages?.map(msg => ({
-            id: msg.id,
-            role: msg.role as 'user' | 'assistant',
-            content: msg.role === 'user' ? msg.user_message : msg.assistant_message,
-            createdAt: new Date(msg.created_at),
-            toolInvocations: msg.tool_results?.map((tool: any) => ({
-                toolName: 'streamlitTool',
-                toolCallId: tool.id,
-                state: 'result',
-                result: {
-                    code: tool.result,
-                    appName: tool.app_name || 'No name generated',
-                    appDescription: tool.app_description || 'No description generated'
-                }
-            }))
-        })),
+        initialMessages: formatDatabaseMessages(initialMessages || []),
         body: {
             model: currentModel,
             config: languageModel,
@@ -435,7 +423,7 @@ export default function ChatContainer({
 
     useEffect(() => {
         const initializeChat = async () => {
-            if (!currentChatId) return
+            if (!currentChatId || initialVersion) return // Skip if we have initial version
 
             try {
                 setIsGeneratingCode(true)
@@ -444,53 +432,24 @@ export default function ChatContainer({
                 if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                 const data = await messagesResponse.json()
 
-                if (!data.messages?.length) {
-                    return // Don't try to set empty messages
-                }
+                if (data.messages?.length) {
+                    setMessages(formatDatabaseMessages(data.messages))
 
-                const formattedMessages: Message[] = data.messages.flatMap((msg: any) => {
-                    const messages: Message[] = []
-                    if (msg.user_message) {
-                        messages.push({
-                            id: `${msg.id}-user`,
-                            role: 'user',
-                            content: msg.user_message,
+                    // Find and set latest Streamlit code
+                    const lastStreamlitCode = data.messages
+                        .filter((msg: any) => msg.tool_results?.length)
+                        .map((msg: any) => {
+                            const toolResult = msg.tool_results.find((t: any) => t.name === 'streamlitTool')
+                            return toolResult?.result
                         })
+                        .filter(Boolean)
+                        .pop()
+
+                    if (lastStreamlitCode) {
+                        setGeneratedCode(lastStreamlitCode)
+                        await updateStreamlitApp(lastStreamlitCode, true)
+                        setIsRightContentVisible(true)
                     }
-                    if (msg.assistant_message) {
-                        messages.push({
-                            id: `${msg.id}-assistant`,
-                            role: 'assistant',
-                            content: msg.assistant_message,
-                            toolInvocations: msg.tool_results?.map((tool: any) => ({
-                                toolName: tool.name,
-                                toolCallId: tool.id,
-                                state: 'result',
-                                result: tool.result
-                            }))
-                        })
-                    }
-                    return messages
-                })
-
-                if (formattedMessages.length > 0) {
-                    setMessages(formattedMessages)
-                }
-
-                // Find and set latest Streamlit code
-                const lastStreamlitCode = data.messages
-                    .filter((msg: any) => msg.tool_results?.length)
-                    .map((msg: any) => {
-                        const toolResult = msg.tool_results.find((t: any) => t.name === 'create_streamlit_app')
-                        return toolResult?.result
-                    })
-                    .filter(Boolean)
-                    .pop()
-
-                if (lastStreamlitCode) {
-                    setGeneratedCode(lastStreamlitCode)
-                    await updateStreamlitApp(lastStreamlitCode, true)
-                    setIsRightContentVisible(true)
                 }
 
             } catch (error) {
@@ -502,7 +461,7 @@ export default function ChatContainer({
         }
 
         initializeChat()
-    }, [currentChatId, setMessages, updateStreamlitApp])
+    }, [currentChatId, initialVersion, setMessages, updateStreamlitApp])
 
     // Cleanup effect
     useEffect(() => {
