@@ -27,7 +27,7 @@ import { formatDatabaseMessages } from '@/lib/utils'
 interface ChatContainerProps {
     initialChat?: any
     initialMessages?: any[]
-    initialVersion?: AppVersion
+    initialVersion?: AppVersion | null
     isNewChat?: boolean
     isInChatPage?: boolean
 }
@@ -64,22 +64,29 @@ export default function ChatContainer({
     const router = useRouter()
     const { session, isLoading } = useAuth()
     const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
-    const { killSandbox, updateSandbox } = useSandboxStore()
+    const { 
+        streamlitUrl,
+        isGeneratingCode,
+        isLoadingSandbox,
+        generatedCode,
+        updateSandbox,
+        killSandbox,
+        setGeneratingCode,
+        setStreamlitUrl,
+        setIsLoadingSandbox,
+        setGeneratedCode
+    } = useSandboxStore()
 
     // State management
+    const [sidebarChats, setSidebarChats] = useState<any[]>([])
     const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat?.id || null)
     const [showTypingText, setShowTypingText] = useState(true)
     const [activeTab, setActiveTab] = useState('preview')
     const [currentApp, setCurrentApp] = useState<{ id: string | null }>({ id: null })
-    const [generatedCode, setGeneratedCode] = useState<string>('')
-    const [isGeneratingCode, setIsGeneratingCode] = useState(false)
-    const [streamlitUrl, setStreamlitUrl] = useState<string | null>(null)
     const [showCodeView, setShowCodeView] = useState(false)
     const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
-    const [isLoadingSandbox, setIsLoadingSandbox] = useState(false)
-    const [sidebarChats, setSidebarChats] = useState<any[]>([])
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
     const [errorState, setErrorState] = useState<Error | null>(null)
     const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
@@ -149,15 +156,15 @@ export default function ChatContainer({
             if (streamlitToolCall.toolName === 'streamlitTool') {
                 setIsRightContentVisible(true)
                 setShowCodeView(true)
-                setIsGeneratingCode(true)
+                setGeneratingCode(true)
 
                 try {
                     if (streamlitToolCall.state === 'result' && streamlitToolCall.result?.code) {
                         setGeneratedCode(streamlitToolCall.result.code)
-                        await updateStreamlitApp(streamlitToolCall.result.code)
+                        await updateSandbox(streamlitToolCall.result.code)
                     }
                 } finally {
-                    setIsGeneratingCode(false)
+                    setGeneratingCode(false)
                 }
             }
         },
@@ -225,7 +232,7 @@ export default function ChatContainer({
         async (code: string, forceExecute = false) => {
             if (!code) {
                 setStreamlitUrl(null)
-                setIsGeneratingCode(false)
+                setGeneratingCode(false)
                 return null
             }
 
@@ -257,10 +264,10 @@ export default function ChatContainer({
             } finally {
                 isExecutingRef.current = false
                 setIsLoadingSandbox(false)
-                setIsGeneratingCode(false)
+                setGeneratingCode(false)
             }
         },
-        [updateSandbox]
+        [updateSandbox, setGeneratingCode, setStreamlitUrl, setIsLoadingSandbox]
     )
 
     // File handling
@@ -339,15 +346,15 @@ export default function ChatContainer({
     const handleRefresh = useCallback(async () => {
         if (sandboxId && session?.user?.id) {
             try {
-                setIsGeneratingCode(true)
+                setGeneratingCode(true)
                 await updateStreamlitApp(generatedCode, true)
             } catch (error) {
                 console.error('Error refreshing app:', error)
             } finally {
-                setIsGeneratingCode(false)
+                setGeneratingCode(false)
             }
         }
-    }, [sandboxId, session?.user?.id, generatedCode, updateStreamlitApp])
+    }, [sandboxId, session?.user?.id, generatedCode, updateStreamlitApp, setGeneratingCode])
 
     const handleCodeViewToggle = useCallback(() => {
         setShowCodeView(prev => !prev)
@@ -361,7 +368,7 @@ export default function ChatContainer({
         if (!version.code) return
 
         isVersionSwitching.current = true
-        setIsGeneratingCode(true)
+        setGeneratingCode(true)
 
         try {
             setGeneratedCode(version.code)
@@ -371,10 +378,10 @@ export default function ChatContainer({
                 message: error instanceof Error ? error.message : 'Error updating version'
             }])
         } finally {
-            setIsGeneratingCode(false)
+            setGeneratingCode(false)
             isVersionSwitching.current = false
         }
-    }, [updateStreamlitApp])
+    }, [updateStreamlitApp, setGeneratingCode, setGeneratedCode])
 
     const handleChatFinish = useCallback(() => {
         if (versionSelectorRef.current) {
@@ -394,10 +401,10 @@ export default function ChatContainer({
     // Effects
     useEffect(() => {
         if (chatLoading) {
-            setIsGeneratingCode(true)
+            setGeneratingCode(true)
             setGeneratedCode('')
         }
-    }, [chatLoading])
+    }, [chatLoading, setGeneratingCode, setGeneratedCode])
 
     useEffect(() => {
         const loadChats = async () => {
@@ -417,10 +424,12 @@ export default function ChatContainer({
 
     useEffect(() => {
         const initializeChat = async () => {
-            if (!currentChatId || initialVersion) return // Skip if we have initial version
+            if (!currentChatId) return
 
             try {
-                setIsGeneratingCode(true)
+                setGeneratingCode(true)
+                setIsLoadingSandbox(true)
+                setIsRightContentVisible(true)
 
                 const messagesResponse = await fetch(`/api/conversations/${currentChatId}/messages`)
                 if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
@@ -450,12 +459,12 @@ export default function ChatContainer({
                 console.error('Error initializing chat:', error)
                 setErrorState(error as Error)
             } finally {
-                setIsGeneratingCode(false)
+                setGeneratingCode(false)
             }
         }
 
         initializeChat()
-    }, [currentChatId, initialVersion, setMessages, updateStreamlitApp])
+    }, [currentChatId, initialVersion, setMessages, updateStreamlitApp, setGeneratingCode, setGeneratedCode])
 
     // Cleanup effect
     useEffect(() => {
