@@ -87,6 +87,7 @@ export default function ChatContainer({
         progress: 0,
         error: null,
     })
+    const [hasFirstMessage, setHasFirstMessage] = useState(false)
 
     // Refs
     const hasNavigated = useRef(false)
@@ -101,19 +102,18 @@ export default function ChatContainer({
     })
     const currentModel = modelsList.models.find(model => model.id === languageModel.model)
 
-    // Add the chat creation handler
+    // Simplified chat creation handler
     const handleChatCreated = useCallback((chatId: string) => {
-        if (isNewChat) {
-            // First navigate
+        if (!hasNavigated.current && isNewChat) {
+            hasNavigated.current = true
             router.replace(`/chat/${chatId}`)
-            return // Let the chat/[id] page handle initialization
+            return
         }
 
-        // Only handle state updates if not navigating
         setShowTypingText(false)
         setCurrentChatId(chatId)
-
-        // Refresh the chat list
+        
+        // Refresh chat list
         const loadChats = async () => {
             try {
                 const response = await fetch('/api/conversations')
@@ -328,6 +328,7 @@ export default function ChatContainer({
     const handleSubmit = useCallback(async (e: React.FormEvent, message: string, file?: File) => {
         e.preventDefault()
         setShowTypingText(false)
+        setHasFirstMessage(true)
         await originalHandleSubmit(e)
     }, [originalHandleSubmit])
 
@@ -391,13 +392,6 @@ export default function ChatContainer({
     }, [])
 
     // Effects
-    useEffect(() => {
-        if (isNewChat && currentChatId && !hasNavigated.current) {
-            hasNavigated.current = true
-            router.replace(`/chat/${currentChatId}`)
-        }
-    }, [isNewChat, currentChatId, router])
-
     useEffect(() => {
         if (chatLoading) {
             setIsGeneratingCode(true)
@@ -527,7 +521,10 @@ export default function ChatContainer({
                         ref={resizableGroupRef}
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
-                            <div className="w-full relative flex flex-col h-[calc(100vh-4rem)]">
+                            <div className={cn(
+                                "w-full relative flex flex-col",
+                                hasFirstMessage || isInChatPage ? "h-[calc(100vh-4rem)]" : "h-screen"
+                            )}>
                                 {!isInChatPage && showTypingText && (
                                     <TypingText 
                                         className='text-black font-bold text-3xl' 
@@ -553,7 +550,7 @@ export default function ChatContainer({
                                             setActiveTab('code')
                                             setIsRightContentVisible(true)
                                         }}
-                                        isInChatPage={isInChatPage}
+                                        isInChatPage={isInChatPage || hasFirstMessage}
                                     />
                                 </div>
                             </div>

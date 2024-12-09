@@ -104,10 +104,15 @@ export default function Chatbar({
 
     return (
         <motion.div
-            className="p-4 w-full absolute bg-background"
+            className={cn(
+                "p-4 w-full bg-background",
+                isInChatPage || isSubmitted ? "fixed bottom-0 left-0" : "absolute"
+            )}
             initial={{ bottom: isInChatPage ? 0 : "40vh" }}
-            style={{ bottom: isInChatPage ? 0 : "40vh" }}
-            animate={{ bottom: isInChatPage ? 0 : (isSubmitted ? 0 : "40vh") }}
+            animate={{ 
+                bottom: isInChatPage || isSubmitted ? 0 : "40vh",
+                position: isInChatPage || isSubmitted ? "fixed" : "absolute",
+            }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
         >
             <form onSubmit={handleSubmit} className="flex relative flex-col gap-4 max-w-[800px] mx-auto">
