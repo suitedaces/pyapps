@@ -153,6 +153,13 @@ export default function ChatContainer({
             config: languageModel,
             experimental_streamData: true,
         },
+        onResponse: async (response) => {
+            // Extract chat ID from response headers
+            const chatId = response.headers.get('x-chat-id')
+            if (chatId && !currentChatId) {
+                handleChatCreated(chatId)
+            }
+        },
         onToolCall: async ({ toolCall }) => {
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
             if (streamlitToolCall.toolName === 'streamlitTool') {
@@ -171,6 +178,11 @@ export default function ChatContainer({
             }
         },
         onFinish: async (message, { usage }) => {
+            if (!currentChatId) {
+                console.error('No chat ID available for message storage')
+                return
+            }
+
             if (message.content) {
                 try {
                     const response = await fetch('/api/chats/messages?chatId=' + currentChatId, {
@@ -191,14 +203,12 @@ export default function ChatContainer({
                         })
                     })
 
-                    if (!response.ok) throw new Error('Failed to store message')
-
-                    if (!currentChatId) {
-                        const { chatId } = await response.json()
-                        handleChatCreated(chatId)
+                    if (!response.ok) {
+                        throw new Error('Failed to store message')
                     }
                 } catch (error) {
                     console.error('Error storing message:', error)
+                    setErrorState(new Error('Failed to save message. Please try again.'))
                 }
             }
 

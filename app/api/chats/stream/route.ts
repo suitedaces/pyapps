@@ -14,6 +14,31 @@ export async function POST(req: Request) {
     try {
         const { messages, chatId, fileId, fileName, fileContent } = await req.json()
 
+        // Create a new chat if chatId is not provided
+        let currentChatId = chatId
+        if (!currentChatId) {
+            const { data: newChat, error: chatError } = await supabase
+                .from('chats')
+                .insert([{ user_id: user.id }])
+                .select()
+                .single()
+
+            if (chatError) throw chatError
+            currentChatId = newChat.id
+        }
+
+        // Associate file with chat using the chat_files junction table
+        if (fileId) {
+            const { error: chatFileError } = await supabase
+                .from('chat_files')
+                .insert([{
+                    chat_id: currentChatId,
+                    file_id: fileId
+                }])
+
+            if (chatFileError) console.error('Error associating file with chat:', chatFileError)
+        }
+
         let fileContext = undefined
         if (fileId) {
             const { data: fileData } = await supabase
@@ -48,10 +73,25 @@ export async function POST(req: Request) {
             experimental_toolCallStreaming: true
         })
 
+        // Store the initial user message
+        const userMessage = messages[messages.length - 1]
+        if (userMessage.role === 'user') {
+            await supabase
+                .from('messages')
+                .insert([{
+                    chat_id: currentChatId,
+                    user_id: user.id,
+                    user_message: userMessage.content,
+                    assistant_message: '',
+                    token_count: 0,
+                    created_at: new Date().toISOString()
+                }])
+        }
+
         // Important: Use toDataStreamResponse for proper streaming
         return result.toDataStreamResponse({
             headers: {
-                'x-chat-id': chatId,
+                'x-chat-id': currentChatId,
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
