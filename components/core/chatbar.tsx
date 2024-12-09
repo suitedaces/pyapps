@@ -61,9 +61,6 @@ export default function Chatbar({
         const selectedFile = e.target.files?.[0]
         if (selectedFile) {
             setFile(selectedFile)
-            if (onFileUpload) {
-                onFileUpload(selectedFile)
-            }
         }
     }
 
@@ -73,6 +70,10 @@ export default function Chatbar({
         if (!isLoading && (value.trim() || file)) {
             setIsSubmitted(true)
             setIsAnimating(true)
+
+            if (onFileUpload && file) {
+                onFileUpload(file)
+            }
 
             try {
                 await onSubmit(e, value, file || undefined)

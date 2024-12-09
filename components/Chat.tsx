@@ -74,12 +74,22 @@ export function Chat({
         }
     }, [messages])
 
+    const handleFileUpload = (file: File) => {
+        // Just update the UI state to show file is selected
+        fileUploadState = {
+            isUploading: false,
+            progress: 0,
+            error: null
+        }
+        onFileUpload(file)  // Ye direct parent component ko file bhej raha hai
+    }
+
     return (
         <div className="flex flex-col relative z-20 text-black h-[calc(100vh-7rem)] overflow-hidden">
             {/* Error displays */}
             {errorState && (
-                <Alert 
-                    variant="destructive" 
+                <Alert
+                    variant="destructive"
                     className="mb-4 absolute top-0 left-0 right-0 z-50"
                     onClick={onErrorDismiss}
                 >
@@ -89,8 +99,8 @@ export function Chat({
             )}
 
             {fileUploadState.error && (
-                <Alert 
-                    variant="destructive" 
+                <Alert
+                    variant="destructive"
                     className="mb-4 absolute top-0 left-0 right-0 z-50"
                 >
                     <XCircle className="h-4 w-4" />
@@ -118,7 +128,7 @@ export function Chat({
                 onChange={onInputChange}
                 onSubmit={handleSubmit}
                 isLoading={isLoading || fileUploadState.isUploading}
-                onFileUpload={onFileUpload}
+                onFileUpload={handleFileUpload}
                 fileUploadState={fileUploadState}
                 isInChatPage={isInChatPage}
             />

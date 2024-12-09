@@ -54,7 +54,7 @@ export function Message({
     }, [isLastMessage, content])
 
     // Memoize content lines for better streaming performance
-    const contentLines = useMemo(() => 
+    const contentLines = useMemo(() =>
         content.split('\n').filter(Boolean)
     , [content])
 
@@ -96,7 +96,7 @@ export function Message({
                         <Avatar className="w-8 h-8 bg-[#FFD700] border-2 mt-5 border-border flex-shrink-0">
                             <AvatarFallback>A</AvatarFallback>
                         </Avatar>
-                        <div className="mx-2 p-4 break-words w-full">
+                        <div className="mx-2 p-4 break-words w-full dark:text-dark-text">
                             {/* Streamed content */}
                             <AnimatePresence mode="popLayout">
                                 {contentLines.map((line, i) => (
@@ -120,7 +120,7 @@ export function Message({
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className="flex items-center gap-2 text-sm text-gray-500 mt-2"
+                                    className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300 mt-2"
                                 >
                                     <Terminal className="w-4 h-4 animate-pulse" />
                                     <span>Generating Streamlit app...</span>
@@ -133,7 +133,7 @@ export function Message({
                             {/* Typing indicator for streaming */}
                             {isLastMessage && isLoading && (
                                 <motion.div
-                                    className="w-2 h-4 bg-black/40 mt-1"
+                                    className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
                                     animate={{ opacity: [0, 1, 0] }}
                                     transition={{
                                         duration: 1,
