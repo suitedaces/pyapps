@@ -28,8 +28,8 @@ export async function POST(req: Request) {
 
         let currentChatId = chatId
 
-        // Create new chat if needed
-        if (!currentChatId) {
+        // Only create a new chat if we don't have one AND we have a message to store
+        if (!currentChatId && userMessage && assistantMessage) {
             const { data: chat } = await supabase
                 .from('chats')
                 .insert({
@@ -44,30 +44,26 @@ export async function POST(req: Request) {
             currentChatId = chat?.id
         }
 
-        // Store message chain with token count
-        const { data: message, error: messageError } = await supabase
-            .from('messages')
-            .insert({
-                chat_id: currentChatId,
-                user_id: user.id,
-                user_message: userMessage,
-                assistant_message: assistantMessage,
-                tool_calls: toolCalls,
-                tool_results: toolResults,
-                token_count: tokenCount,
-                created_at: new Date().toISOString(),
-            })
-        
-        if (messageError) {
-            console.error('Error storing message:', messageError)
-            return new Response('Error storing message', { status: 500 })
+        // Only store message if we have both user and assistant messages
+        if (currentChatId && userMessage && assistantMessage) {
+            const { data: message, error: messageError } = await supabase
+                .from('messages')
+                .insert({
+                    chat_id: currentChatId,
+                    user_id: user.id,
+                    user_message: userMessage,
+                    assistant_message: assistantMessage,
+                    tool_calls: toolCalls,
+                    tool_results: toolResults,
+                    token_count: tokenCount,
+                    created_at: new Date().toISOString(),
+                })
+            
+            if (messageError) {
+                console.error('Error storing message:', messageError)
+                return new Response('Error storing message', { status: 500 })
+            }
         }
-
-        // Update user's token usage
-        // await supabase.rpc('update_user_token_usage', {
-        //     p_user_id: user.id,
-        //     p_tokens: tokenCount.totalTokens
-        // })
 
         return Response.json({ 
             chatId: currentChatId 

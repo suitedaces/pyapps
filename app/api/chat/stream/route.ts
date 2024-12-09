@@ -14,22 +14,6 @@ export async function POST(req: Request) {
     try {
         const { messages, chatId, fileId, fileName, fileContent } = await req.json()
 
-        // Handle chat creation/retrieval
-        let currentChatId = chatId
-        if (!currentChatId) {
-            const { data: newChat } = await supabase
-                .from('chats')
-                .insert({
-                    user_id: user.id,
-                    name: messages[0]?.content?.slice(0, 50) || 'New Chat',
-                    created_at: new Date().toISOString(),
-                })
-                .select()
-                .single()
-
-            currentChatId = newChat?.id || ''
-        }
-
         let fileContext = undefined
         if (fileId) {
             const { data: fileData } = await supabase
@@ -67,7 +51,7 @@ export async function POST(req: Request) {
         // Important: Use toDataStreamResponse for proper streaming
         return result.toDataStreamResponse({
             headers: {
-                'x-chat-id': currentChatId,
+                'x-chat-id': chatId,
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
