@@ -427,10 +427,6 @@ export default function ChatContainer({
             if (!currentChatId) return
 
             try {
-                setGeneratingCode(true)
-                setIsLoadingSandbox(true)
-                setIsRightContentVisible(true)
-
                 const messagesResponse = await fetch(`/api/conversations/${currentChatId}/messages`)
                 if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                 const data = await messagesResponse.json()
@@ -449,9 +445,10 @@ export default function ChatContainer({
                         .pop()
 
                     if (lastStreamlitCode) {
+                        setIsRightContentVisible(true)
+                        setIsLoadingSandbox(true)
                         setGeneratedCode(lastStreamlitCode)
                         await updateStreamlitApp(lastStreamlitCode, true)
-                        setIsRightContentVisible(true)
                     }
                 }
 
@@ -464,7 +461,7 @@ export default function ChatContainer({
         }
 
         initializeChat()
-    }, [currentChatId, initialVersion, setMessages, updateStreamlitApp, setGeneratingCode, setGeneratedCode])
+    }, [currentChatId, initialVersion, setMessages, updateStreamlitApp, setGeneratingCode, setGeneratedCode, setIsLoadingSandbox, setIsRightContentVisible])
 
     // Cleanup effect
     useEffect(() => {
