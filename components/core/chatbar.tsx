@@ -106,12 +106,12 @@ export default function Chatbar({
         <motion.div
             className={cn(
                 "p-4 w-full bg-background",
-                isInChatPage || isSubmitted ? "fixed bottom-0 left-0" : "absolute"
+                isInChatPage || isSubmitted ? "absolute bottom-0 left-0" : "absolute",
+                "z-10"
             )}
             initial={{ bottom: isInChatPage ? 0 : "40vh" }}
             animate={{ 
                 bottom: isInChatPage || isSubmitted ? 0 : "40vh",
-                position: isInChatPage || isSubmitted ? "fixed" : "absolute",
             }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
         >
