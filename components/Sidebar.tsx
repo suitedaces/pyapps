@@ -79,7 +79,6 @@ interface Chat {
 
 interface SidebarProps {
     onChatSelect: (chatId: string) => void
-    onNewChat: () => void
     currentChatId: string | null
     chats?: Chat[]
     isCreatingChat: boolean
@@ -238,29 +237,31 @@ const ChatsList = ({
 
 export default function AppSidebar({
     onChatSelect,
-    onNewChat,
     currentChatId,
     chats = [],
     isCreatingChat,
 }: SidebarProps) {
     const [open, setOpen] = useState(false)
     const [isChatsOpen, setIsChatsOpen] = useState(true)
-    const [session, setSession] = useState<Session | null>(null)
-    const supabase = createClientComponentClient()
     const router = useRouter()
+    const [session, setSession] = useState<Session | null>(null)
+    const supabase = createClient()
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        const getSession = async () => {
+            const { data: { session: currentSession } } = await supabase.auth.getSession()
+            setSession(currentSession)
+        }
+
+        getSession()
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session)
         })
 
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session)
-        })
-
-        return () => subscription.unsubscribe()
+        return () => {
+            subscription.unsubscribe()
+        }
     }, [supabase.auth])
 
     const handleSignOut = async () => {
@@ -285,7 +286,7 @@ export default function AppSidebar({
                                     <SidebarMenu>
                                         <SidebarMenuItem className="flex justify-center">
                                             <SidebarMenuButton
-                                                onClick={onNewChat}
+                                                onClick={() => router.push('/')}
                                                 className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
                                             >
                                                 {!open && <Plus className="h-4 w-4" />}
@@ -497,7 +498,7 @@ export default function AppSidebar({
                                 <SidebarMenu>
                                     <SidebarMenuItem className="flex justify-center">
                                         <SidebarMenuButton
-                                            onClick={onNewChat}
+                                            onClick={() => router.push('/')}
                                             className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
                                         >
                                             {!open && <Plus className="h-4 w-4" />}

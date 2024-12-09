@@ -500,7 +500,6 @@ export default function ChatContainer({
                 onChatSelect={handleChatSelect}
                 currentChatId={currentChatId}
                 chats={sidebarChats}
-                onNewChat={handleNewChat}
                 isCreatingChat={isCreatingChat}
             />
             <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
