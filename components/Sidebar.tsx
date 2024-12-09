@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { Session } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import {
@@ -67,7 +67,7 @@ export function Sidebar({
     const [session, setSession] = useState<Session | null>(null)
     const pathname = usePathname()
     const router = useRouter()
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {

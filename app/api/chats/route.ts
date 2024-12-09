@@ -45,13 +45,14 @@ export async function POST(req: Request) {
             .insert({
                 user_id: user.id,
                 name: body.name || 'New Chat',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
             })
             .select()
             .single()
 
-        if (error) throw error
+        if (error) {
+            console.log('ERROR:', error)
+            throw error
+        }
 
         return NextResponse.json(chat)
     } catch (error) {

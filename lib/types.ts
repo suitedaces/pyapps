@@ -12,8 +12,10 @@ export interface ModelProvider {
 export interface AppVersion {
     id: string
     app_id: string
-    version_number: number
     code: string
+    version_number: number
+    name: string | null
+    description: string | null
     created_at: string
     updated_at: string
     is_current: boolean
