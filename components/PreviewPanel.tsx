@@ -58,10 +58,10 @@ export function PreviewPanel({
     }
 
     return (
-        <div className="relative h-full">
+        <div className="relative h-full z-40">
             <AnimatePresence>
                 {showOverlay && (
-                    <LoadingSandbox 
+                    <LoadingSandbox
                         message={isLoadingSandbox ? 'Preparing your sandbox...' : 'Generating your code...'}
                     />
                 )}

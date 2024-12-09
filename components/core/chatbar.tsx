@@ -69,11 +69,11 @@ export default function Chatbar({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        
+
         if (!isLoading && (value.trim() || file)) {
             setIsSubmitted(true)
             setIsAnimating(true)
-            
+
             try {
                 await onSubmit(e, value, file || undefined)
                 // Clear the file after successful submission
@@ -104,14 +104,12 @@ export default function Chatbar({
 
     return (
         <motion.div
-            className={cn(
-                "p-4 w-full bg-background",
-                isInChatPage || isSubmitted ? "absolute bottom-0 left-0" : "absolute",
-                "z-10"
-            )}
-            initial={{ bottom: isInChatPage ? 0 : "40vh" }}
-            animate={{ 
-                bottom: isInChatPage || isSubmitted ? 0 : "40vh",
+            className="p-4 w-full absolute bg-background dark:bg-dark-app"
+            style={{
+                bottom: isInChatPage ? 0 : "40vh"
+            }}
+            animate={{
+                bottom: isInChatPage ? 0 : (isSubmitted ? 0 : "40vh")
             }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
         >
@@ -133,7 +131,8 @@ export default function Chatbar({
                             "w-full resize-none rounded-lg pr-24 py-4",
                             "focus-visible:ring-1 focus-visible:ring-offset-0",
                             "scrollbar-thumb-rounded scrollbar-track-rounded",
-                            "scrollbar-thin scrollbar-thumb-border"
+                            "scrollbar-thin scrollbar-thumb-border",
+                            "dark:bg-dark-app dark:text-dark-text dark:border-dark-border"
                         )}
                         style={{
                             minHeight: isInChatPage ? '54px' : isAnimating ? '54px' : `${MIN_HEIGHT}px`,
@@ -165,7 +164,7 @@ export default function Chatbar({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 bg-secondary"
+                            className="h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isLoading}
                         >
@@ -181,21 +180,23 @@ export default function Chatbar({
                             className={cn(
                                 "h-9 w-9",
                                 "bg-gradient-to-tr from-[#FFDE56] to-[#4989BB]",
+                                "dark:from-[#03f241] dark:via-[#d549dd] dark:to-[#03e5f2]",
                                 "disabled:bg-none disabled:bg-[#F5F5F5] disabled:border disabled:border-[#D4D4D4]",
+                                "dark:disabled:bg-dark-app dark:disabled:border-dark-border",
                                 isCentered && "h-11 w-11"
                             )}
                             disabled={isLoading || (!value.trim() && !file)}
                         >
                             {isLoading ? (
                                 <Loader2 className={cn(
-                                    "h-5 w-5 animate-spin text-black",
+                                    "h-5 w-5 animate-spin text-black dark:text-dark-text",
                                     isCentered && "h-6 w-6"
                                 )} />
                             ) : (
                                 <ArrowUp className={cn(
                                     "h-5 w-5",
-                                    "text-black",
-                                    "disabled:text-[#D4D4D4]"
+                                    "text-black dark:text-dark-text",
+                                    "disabled:text-[#D4D4D4] dark:disabled:text-dark-border"
                                 )} />
                             )}
                         </Button>

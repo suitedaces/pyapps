@@ -36,43 +36,27 @@ export function Logo({
                 }
                 .app {
                     margin-left: 0.3em;
+                    transition: opacity 0.2s ease;
                 }
             `}</style>
-            {collapsed ? (
-                <span
-                    className={cn(
-                        'text-2xl',
-                        inverted ? 'text-black' : 'text-white'
-                    )}
-                >
-                    py
-                </span>
-            ) : (
-                <>
-                    <span
-                        className={cn(
-                            'text-2xl',
-                            inverted ? 'text-black' : 'text-white'
-                        )}
-                    >
-                        py_
-                    </span>
-                    <span
-                        className={cn(
-                            'cursor absolute text-2xl',
-                            inverted ? 'text-black' : 'text-white'
-                        )}
-                    >
-                        |
-                    </span>
-                    <span className="app text-gray-500 text-2xl">apps</span>
-                    <div
-                        className={cn(
-                            'absolute bottom-0 left-0 w-full h-px',
-                            inverted ? 'bg-gray-200' : 'bg-gray-700'
-                        )}
-                    />
-                </>
+            <span
+                className={cn(
+                    'text-2xl',
+                    inverted ? 'text-black dark:text-white' : 'text-white dark:text-black'
+                )}
+            >
+                py_
+            </span>
+            <span
+                className={cn(
+                    'cursor absolute text-2xl',
+                    inverted ? 'text-black dark:text-white' : 'text-white dark:text-black'
+                )}
+            >
+                |
+            </span>
+            {!collapsed && (
+                <span className="app text-gray-500 text-2xl">apps</span>
             )}
         </div>
     )
