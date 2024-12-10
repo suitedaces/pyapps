@@ -1,10 +1,8 @@
 'use client'
 
-import {
-    createClientComponentClient,
-    Session,
-} from '@supabase/auth-helpers-nextjs'
+import { Session } from '@supabase/supabase-js'
 import { createContext, useContext, useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 interface AuthContextType {
     session: Session | null
@@ -19,13 +17,10 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [isLoading, setIsLoading] = useState(true)
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     useEffect(() => {
-        console.log('Auth Provider: Checking session...')
-
         supabase.auth.getSession().then(({ data: { session } }) => {
-            console.log('Auth Provider: Session status:', !!session)
             setSession(session)
             setIsLoading(false)
         })
@@ -33,7 +28,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
-            console.log('Auth Provider: Auth state changed:', !!session)
             setSession(session)
             setIsLoading(false)
         })

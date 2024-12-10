@@ -8,7 +8,7 @@ interface LoadingSandboxProps {
     message: string
 }
 
-export function LoadingSandbox({ message }: LoadingSandboxProps) {
+export default function LoadingSandbox({ message }: LoadingSandboxProps) {
     return (
         <motion.div
             initial={{ opacity: 0 }}

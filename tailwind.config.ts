@@ -54,7 +54,30 @@ module.exports = {
                         'hsl(var(--sidebar-accent-foreground))',
                     border: 'hsl(var(--sidebar-border))',
                     ring: 'hsl(var(--sidebar-ring))',
+                    dark: {
+                        background: '#0F0F10',
+                        foreground: '#f5f5f5',
+                        accent: '#262626',
+                        'accent-foreground': '#f5f5f5',
+                        border: '#262626',
+                        ring: '#404040'
+                    }
                 },
+                dark: {
+                    background: '#0F0F10',
+                    text: '#f5f5f5',
+                    border: 'rgb(115 115 115)',
+                    textAreaBorder: '#262626',
+                },
+            },
+            backgroundColor: {
+                'dark-app': '#0F0F10',
+            },
+            textColor: {
+                'dark-text': '#f5f5f5',
+            },
+            borderColor: {
+                'dark-border': 'rgb(115 115 115)',
             },
             borderRadius: {
                 base: '15px',

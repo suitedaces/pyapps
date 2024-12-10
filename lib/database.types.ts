@@ -113,6 +113,8 @@ export interface Database {
                     app_id: string
                     version_number: number
                     code: string
+                    name: string | null
+                    description: string | null
                     created_at: string
                 }
                 Insert: {
@@ -120,6 +122,8 @@ export interface Database {
                     app_id: string
                     version_number: number
                     code: string
+                    name?: string | null
+                    description?: string | null
                     created_at?: string
                 }
                 Update: {
@@ -127,6 +131,8 @@ export interface Database {
                     app_id?: string
                     version_number?: number
                     code?: string
+                    name?: string | null
+                    description?: string | null
                     created_at?: string
                 }
                 Relationships: [
@@ -183,7 +189,6 @@ export interface Database {
                     id: string
                     chat_id: string
                     user_id: string
-                    role: string
                     user_message: string
                     assistant_message: string
                     tool_calls: Json | null
@@ -195,7 +200,6 @@ export interface Database {
                     id?: string
                     chat_id: string
                     user_id: string
-                    role: string
                     user_message: string
                     assistant_message: string
                     tool_calls?: Json | null
@@ -207,7 +211,6 @@ export interface Database {
                     id?: string
                     chat_id?: string
                     user_id?: string
-                    role?: string
                     user_message?: string
                     assistant_message?: string
                     tool_calls?: Json | null
@@ -444,11 +447,15 @@ export interface Database {
                 Args: {
                     p_app_id: string
                     p_code: string
+                    p_name?: string | null
+                    p_description?: string | null
                 }
                 Returns: {
                     version_id: string
                     version_number: number
                     app_id: string
+                    name: string | null
+                    description: string | null
                     created_at: string
                 }
             }
@@ -475,6 +482,38 @@ export interface Database {
                     created_at: string
                     is_current: boolean
                 }[]
+            }
+            handle_streamlit_tool_response: {
+                Args: {
+                    p_user_id: string
+                    p_chat_id: string
+                    p_code: string
+                    p_app_name: string
+                    p_app_description: string
+                }
+                Returns: {
+                    app_id: string
+                    version_id: string
+                    version_number: number
+                    created_at: string
+                    is_update: boolean
+                    name: string
+                    description: string | null
+                }
+            }
+            get_chat_current_app_version: {
+                Args: {
+                    p_chat_id: string
+                }
+                Returns: {
+                    version_id: string
+                    app_id: string
+                    code: string
+                    version_number: number
+                    name: string | null
+                    description: string | null
+                    created_at: string
+                } | null
             }
         }
         Enums: {
