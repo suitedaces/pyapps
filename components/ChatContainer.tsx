@@ -2,11 +2,9 @@
 'use client'
 
 import { Chat } from '@/components/Chat'
-import { Logo } from '@/components/core/Logo'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import AppSidebar from './Sidebar'
-import { StreamlitPreviewRef } from '@/components/StreamlitPreview'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useAuth } from '@/contexts/AuthContext'
@@ -15,7 +13,6 @@ import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { Message } from 'ai'
 import { useChat } from 'ai/react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -214,47 +211,44 @@ export default function ChatContainer({
     })
 
     // Streamlit app management
-    const updateStreamlitApp = useCallback(
-        async (code: string, forceExecute = false) => {
-            if (!code) {
-                setStreamlitUrl(null)
-                setGeneratingCode(false)
-                return null
-            }
+    const updateStreamlitApp = useCallback(async (code: string, forceExecute = false) => {
+        if (!code) {
+            setStreamlitUrl(null)
+            setGeneratingCode(false)
+            return null
+        }
 
-            if (isExecutingRef.current) {
-                console.log('⚠️ Already executing, skipping...')
-                return null
-            }
+        if (isExecutingRef.current) {
+            console.log('⚠️ Already executing, skipping...')
+            return null
+        }
 
-            isExecutingRef.current = true
-            setIsLoadingSandbox(true)
+        isExecutingRef.current = true
+        setIsLoadingSandbox(true)
 
-            try {
-                for (let attempt = 1; attempt <= 3; attempt++) {
-                    try {
-                        const url = await updateSandbox(code, forceExecute)
-                        if (url) {
-                            setStreamlitUrl(url)
-                            return url
-                        }
-                    } catch (error) {
-                        if (attempt === 3) throw error
-                        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+        try {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const url = await updateSandbox(code, forceExecute)
+                    if (url) {
+                        setStreamlitUrl(url)
+                        return url
                     }
+                } catch (error) {
+                    if (attempt === 3) throw error
+                    await new Promise(resolve => setTimeout(resolve, attempt * 1000))
                 }
-                return null
-            } catch (error) {
-                console.error('❌ All attempts to update sandbox failed:', error)
-                return null
-            } finally {
-                isExecutingRef.current = false
-                setIsLoadingSandbox(false)
-                setGeneratingCode(false)
             }
-        },
-        [updateSandbox, setGeneratingCode, setStreamlitUrl, setIsLoadingSandbox]
-    )
+            return null
+        } catch (error) {
+            console.error('❌ All attempts to update sandbox failed:', error)
+            return null
+        } finally {
+            isExecutingRef.current = false
+            setIsLoadingSandbox(false)
+            setGeneratingCode(false)
+        }
+    }, [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox])
 
     // File handling with chat ID context
     const handleFileUpload = useCallback(async (file: File) => {
@@ -415,31 +409,50 @@ export default function ChatContainer({
             if (!currentChatId) return
 
             try {
-                const messagesResponse = await fetch(`/api/chats/messages?chatId=${currentChatId}`)
-                if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
-                const data = await messagesResponse.json()
-
-                if (data.messages?.length) {
-                    setMessages(formatDatabaseMessages(data.messages))
-
-                    // Find and set latest Streamlit code
-                    const lastStreamlitCode = data.messages
-                        .filter((msg: any) => msg.tool_results?.length)
-                        .map((msg: any) => {
-                            const toolResult = msg.tool_results.find((t: any) => t.name === 'streamlitTool')
-                            return toolResult?.result
-                        })
-                        .filter(Boolean)
-                        .pop()
-
-                    if (lastStreamlitCode) {
-                        setIsRightContentVisible(true)
-                        setIsLoadingSandbox(true)
-                        setGeneratedCode(lastStreamlitCode)
-                        await updateStreamlitApp(lastStreamlitCode, true)
-                    }
+                // Set initial messages first if they exist
+                if (initialMessages?.length) {
+                    console.log('Setting initial messages:', initialMessages.length)
+                    setMessages(initialMessages)
                 }
 
+                // Handle version initialization
+                const versionData = Array.isArray(initialVersion) ? initialVersion[0] : initialVersion
+
+                if (versionData?.code) {
+                    console.log('Initializing with version:', versionData.version_id)
+                    setIsRightContentVisible(true)
+                    setIsLoadingSandbox(true)
+                    setGeneratedCode(versionData.code)
+                    await updateStreamlitApp(versionData.code, true)
+                    return
+                }
+
+                // Only fetch messages if we don't have initial messages
+                if (!initialMessages?.length) {
+                    const messagesResponse = await fetch(`/api/chats/messages?chatId=${currentChatId}`)
+                    if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
+                    const data = await messagesResponse.json()
+
+                    if (data.messages?.length) {
+                        setMessages(formatDatabaseMessages(data.messages))
+
+                        const lastStreamlitCode = data.messages
+                            .filter((msg: any) => msg.tool_results?.length)
+                            .map((msg: any) => {
+                                const toolResult = msg.tool_results.find((t: any) => t.name === 'streamlitTool')
+                                return toolResult?.result
+                            })
+                            .filter(Boolean)
+                            .pop()
+
+                        if (lastStreamlitCode) {
+                            setIsRightContentVisible(true)
+                            setIsLoadingSandbox(true)
+                            setGeneratedCode(lastStreamlitCode)
+                            await updateStreamlitApp(lastStreamlitCode, true)
+                        }
+                    }
+                }
             } catch (error) {
                 console.error('Error initializing chat:', error)
                 setErrorState(error as Error)
@@ -449,15 +462,33 @@ export default function ChatContainer({
         }
 
         initializeChat()
-    }, [currentChatId, initialVersion, setMessages, updateStreamlitApp, setGeneratingCode, setGeneratedCode, setIsLoadingSandbox, setIsRightContentVisible])
+    }, [
+        currentChatId,
+        initialVersion,
+        initialMessages,
+        updateStreamlitApp,
+        setMessages,
+        setGeneratedCode,
+        setGeneratingCode,
+        setIsLoadingSandbox,
+        setIsRightContentVisible,
+        setErrorState
+    ])
 
     // Cleanup effect
     useEffect(() => {
         return () => {
-            killSandbox()
+            if (sandboxId) {
+                fetch(`/api/sandbox/${sandboxId}/kill`, {
+                    method: 'POST',
+                }).catch(console.error)
+            }
             isExecutingRef.current = false
+            setStreamlitUrl(null)
+            setGeneratedCode('')
+            setIsLoadingSandbox(false)
         }
-    }, [killSandbox])
+    }, [sandboxId, setStreamlitUrl, setGeneratedCode, setIsLoadingSandbox])
 
     // Loading states
     if (isLoading) {
