@@ -4,6 +4,7 @@ import {
     generateId,
     Message,
     ToolInvocation,
+    ToolCallState
 } from 'ai'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -181,24 +182,46 @@ export function formatDatabaseMessages(dbMessages: DatabaseMessage[]): Message[]
         
         // Add assistant message with tool results
         if (msg.assistant_message) {
+            const toolInvocations: ToolInvocation[] = []
+            
+            // Process tool calls and results together
+            if (msg.tool_calls) {
+                const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [msg.tool_calls]
+                const results = msg.tool_results ? (Array.isArray(msg.tool_results) ? msg.tool_results : [msg.tool_results]) : []
+                
+                for (const call of calls) {
+                    const result = results.find(r => r.tool_call_id === call.id)
+                    
+                    // Base tool invocation
+                    const toolInvocation: ToolInvocation = {
+                        toolCallId: call.toolCallId,
+                        toolName: call.toolName,
+                        state: result ? 'result' : 'call',
+                        args: call.args
+                    }
+                    
+                    // Add result if available
+                    if (result) {
+                        toolInvocation.state = 'result'
+                        toolInvocation.result = {
+                            code: result.code,
+                            appName: result.appName || 'No name generated',
+                            appDescription: result.appDescription || 'No description generated'
+                        }
+                    }
+                    
+                    toolInvocations.push(toolInvocation)
+                }
+            }
+        
             messages.push({
                 id: `${msg.id}-assistant`,
                 role: 'assistant' as const,
                 content: msg.assistant_message,
                 createdAt: new Date(msg.created_at),
-                toolInvocations: msg.tool_results 
-                    ? (msg.tool_results as any[]).map(tool => ({
-                        toolName: 'streamlitTool',
-                        toolCallId: tool.id,
-                        state: 'result' as const,
-                        result: {
-                            code: tool.result,
-                            appName: tool.app_name || 'No name generated',
-                            appDescription: tool.app_description || 'No description generated'
-                        }
-                    }))
-                    : []
+                toolInvocations: toolInvocations
             })
+        console.log("Formatted messages: ", messages)
         }
         
         return messages

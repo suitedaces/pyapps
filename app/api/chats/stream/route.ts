@@ -12,21 +12,19 @@ export async function POST(req: Request) {
     if (!user) return new Response('Unauthorized', { status: 401 })
 
     try {
-        const { messages, chatId, fileId, fileName, fileContent } =
-            await req.json()
+        const { messages, chatId, fileId, fileName, fileContent } = await req.json()
 
+        // Use existing chat ID if provided
         let newChatId = chatId
+        
+        // Only create new chat if no chat ID exists
         if (!chatId) {
             const { data: newChat, error } = await supabase
                 .from('chats')
                 .insert([
                     {
                         user_id: user.id,
-                        name:
-                            messages[messages.length - 1]?.content?.slice(
-                                0,
-                                100
-                            ) || 'New Chat',
+                        name: messages[messages.length - 1]?.content?.slice(0, 100) || 'New Chat',
                     },
                 ])
                 .select()
@@ -36,7 +34,8 @@ export async function POST(req: Request) {
             newChatId = newChat.id
         }
 
-        if (fileId) {
+        // Associate file with chat if provided
+        if (fileId && newChatId) {
             const { error: chatFileError } = await supabase
                 .from('chat_files')
                 .insert([
@@ -47,10 +46,7 @@ export async function POST(req: Request) {
                 ])
 
             if (chatFileError) {
-                console.error(
-                    'Error associating file with chat:',
-                    chatFileError
-                )
+                console.error('Error associating file with chat:', chatFileError)
             }
         }
 

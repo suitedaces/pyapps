@@ -553,7 +553,7 @@ const sidebarMenuButtonVariants = cva(
 )
 
 const SidebarMenuButton = React.forwardRef<
-    HTMLButtonElement,
+    HTMLButtonElement | HTMLDivElement,
     React.ComponentProps<'button'> & {
         asChild?: boolean
         isActive?: boolean
@@ -568,12 +568,20 @@ const SidebarMenuButton = React.forwardRef<
             size = 'default',
             tooltip,
             className,
+            children,
             ...props
         },
         ref
     ) => {
-        const Comp = asChild ? Slot : 'button'
         const { isMobile, state } = useSidebar()
+        
+        // Check if children contains SidebarTrigger
+        const hasTrigger = React.Children.toArray(children).some(
+            child => React.isValidElement(child) && child.type === SidebarTrigger
+        )
+        
+        // If we have a SidebarTrigger child, render a div instead of a button
+        const Comp = hasTrigger ? 'div' : (asChild ? Slot : 'button')
 
         const button = (
             <Comp
@@ -585,8 +593,10 @@ const SidebarMenuButton = React.forwardRef<
                     sidebarMenuButtonVariants({ variant, size }),
                     className
                 )}
-                {...props}
-            />
+                {...(hasTrigger ? {} : props)} // Only spread props if not a div wrapper
+            >
+                {children}
+            </Comp>
         )
 
         if (!tooltip) {

@@ -2,6 +2,7 @@ import { createClient, getUser } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import ChatContainer from '@/components/ChatContainer'
 import { Database } from '@/lib/database.types'
+import { formatDatabaseMessages } from '@/lib/utils'
 
 interface PageParams {
     params: Promise<{ id: string }>
@@ -48,9 +49,11 @@ export default async function ChatPage({ params }: PageParams) {
         notFound()
     }
 
+    const messages = formatDatabaseMessages(messagesResponse.data ?? [])
+
     return <ChatContainer 
         initialChat={chatResponse.data} 
-        initialMessages={messagesResponse.data ?? []} 
+        initialMessages={messages} 
         initialVersion={versionResponse.data ?? null}
         isInChatPage={true} 
     />

@@ -151,6 +151,7 @@ export default function ChatContainer({
         id: currentChatId ?? undefined,
         initialMessages: formatDatabaseMessages(initialMessages || []),
         body: {
+            chatId: currentChatId, // Add this to ensure chat ID is passed
             model: currentModel,
             config: languageModel,
             experimental_streamData: true,
@@ -180,36 +181,10 @@ export default function ChatContainer({
             }
         },
         onFinish: async (message, { usage }) => {
-            if (message.content) {
-                try {
-                    // const response = await fetch('/api/chats/messages?chatId=' + currentChatId, {
-                    //     method: 'POST',
-                    //     headers: { 'Content-Type': 'application/json' },
-                    //     body: JSON.stringify({
-                    //         userMessage: input,
-                    //         assistantMessage: message.content,
-                    //         toolCalls: message.toolInvocations,
-                    //         toolResults: message.toolInvocations?.map(t => ({
-                    //             name: t.toolName,
-                    //             id: t.toolCallId,
-                    //             result: t.state === 'result' ? t.result?.code : undefined,
-                    //             app_name: t.state === 'result' ? t.result?.appName : undefined,
-                    //             app_description: t.state === 'result' ? t.result?.appDescription : undefined
-                    //         })),
-                    //         tokenCount: usage.totalTokens
-                    //     })
-                    // })
-
-                    // if (!response.ok) throw new Error('Failed to store message')
-
-                    if (!currentChatId && newChatIdRef.current) {
-                        console.log('🚀 New chat created:', newChatIdRef.current);
-
-                        handleChatCreated(newChatIdRef.current)
-                    }
-                } catch (error) {
-                    console.error('Error storing message:', error)
-                }
+            if (message.content && newChatIdRef.current) {
+                // Only handle chat creation for new chats
+                handleChatCreated(newChatIdRef.current)
+                newChatIdRef.current = null // Reset after handling
             }
 
             // Handle tool results
@@ -281,13 +256,14 @@ export default function ChatContainer({
         [updateSandbox, setGeneratingCode, setStreamlitUrl, setIsLoadingSandbox]
     )
 
-    // File handling
+    // File handling with chat ID context
     const handleFileUpload = useCallback(async (file: File) => {
         setFileUploadState({ isUploading: true, progress: 0, error: null })
         try {
-            // 1. Upload file first
             const formData = new FormData()
             formData.append('file', file)
+            
+            // Always include current chat ID if it exists
             if (currentChatId) {
                 formData.append('chatId', currentChatId)
             }
@@ -300,7 +276,7 @@ export default function ChatContainer({
             if (!uploadResponse.ok) throw new Error('Upload failed')
             const fileData = await uploadResponse.json()
 
-            // 2. Create file preview message
+            // Create file preview message with chat context
             const fileContent = await file.text()
             const sanitizedContent = fileContent
                 .split('\n')
@@ -314,7 +290,7 @@ export default function ChatContainer({
 
             const message = `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
 
-            // 3. Send message with file context
+            // Send message with file and chat context
             await append(
                 {
                     content: message,
@@ -323,6 +299,7 @@ export default function ChatContainer({
                 },
                 {
                     body: {
+                        chatId: currentChatId, // Always include current chat ID
                         fileId: fileData.id,
                         fileName: file.name,
                         fileContent: sanitizedContent,
