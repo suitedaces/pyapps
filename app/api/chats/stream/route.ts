@@ -67,7 +67,7 @@ export async function POST(req: Request) {
         }
 
         const SYSTEM_PROMPT = fileContext
-            ? `${CHAT_SYSTEM_PROMPT}\n\nYou are working with a ${fileContext?.fileType?.toUpperCase()} file named "${fileContext?.fileName}. Here's some information about the file: ${fileContext?.analysis}`
+            ? `${CHAT_SYSTEM_PROMPT}\n\nYou are working with a ${fileContext?.fileType?.toUpperCase()} file named "${fileContext?.fileName}" in the directory "/app/s3/data/${fileContext?.fileName}". Here's some information about the file: ${fileContext?.analysis}`
             : CHAT_SYSTEM_PROMPT
 
         console.log('🔍 Streaming with fileContext:', fileContext)
