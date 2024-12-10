@@ -13,7 +13,7 @@
         "dev:debug": "DEBUG=tools:* next dev"
     },
     "dependencies": {
-        "@ai-sdk/anthropic": "^0.0.51",
+        "@ai-sdk/anthropic": "^1.0.5",
         "@anthropic-ai/sdk": "^0.27.1",
         "@aws-sdk/client-s3": "^3.705.0",
         "@aws-sdk/s3-request-presigner": "^3.515.0",

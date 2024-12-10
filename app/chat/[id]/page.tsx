@@ -1,7 +1,6 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import ChatContainer from '@/components/ChatContainer'
-import { Database } from '@/lib/database.types'
 import { formatDatabaseMessages } from '@/lib/utils'
 import { AppVersion } from '@/lib/types'
 
@@ -72,7 +71,13 @@ export default async function ChatPage({ params }: PageParams) {
     }
 
     // Extract files from the response
-    const files = filesResponse.data?.map(row => row.files) ?? []
+    const files = filesResponse.data
+        ?.map(row => row.files)
+        .filter((file): file is NonNullable<typeof file> => file !== null)
+        .map(file => ({
+            ...file,
+            analysis: file.analysis as string | null
+        })) ?? []
 
     const messages = formatDatabaseMessages(messagesResponse.data ?? [])
 
