@@ -1,11 +1,17 @@
 import { z } from 'zod'
-import { generateObject, tool } from 'ai'
+import { generateObject, tool, CoreTool } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
-import { Tool } from 'ai'
 
-export const streamlitTool = tool({
-    name: 'streamlitTool',
-    description: 'Generate a Streamlit app with data visualization',
+
+export const streamlitTool: CoreTool<z.ZodObject<{
+    dataDescription: z.ZodOptional<z.ZodString>,
+    query: z.ZodString,
+    fileDirectory: z.ZodOptional<z.ZodString>
+}>, {
+    code: string,
+    appName: string,
+    appDescription: string
+}> = tool({
     parameters: z.object({
         dataDescription: z.string().max(1000, 'Please be concise, less words, more details.').optional().describe('If a file exists, description of the data, column names, and insights about the data that the user is interested in.'),
         query: z.string().max(1000, 'Please be concise and to the point, yet detailed.').describe('Detailed instructions on what the user may want to see in the Streamlit app. NOT the actual code.'),
@@ -15,7 +21,7 @@ export const streamlitTool = tool({
             .optional()
             .describe('Should always be in the format "/app/s3/data/<fileNameWithExtension/>"'),
     }),
-    execute: async ({ dataDescription, query, fileDirectory }) => {
+    execute: async ({ dataDescription, query, fileDirectory }: { dataDescription?: string, query: string, fileDirectory?: string }) => {
         console.log('Starting streamlitTool execution:', { query, fileDirectory })
 
         try {

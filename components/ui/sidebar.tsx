@@ -585,6 +585,7 @@ const SidebarMenuButton = React.forwardRef<
 
         const button = (
             <Comp
+                // @ts-expect-error
                 ref={ref}
                 data-sidebar="menu-button"
                 data-size={size}

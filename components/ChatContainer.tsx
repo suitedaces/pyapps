@@ -25,11 +25,17 @@ import { formatDatabaseMessages } from '@/lib/utils'
 interface ChatContainerProps {
     initialChat?: any
     initialMessages?: any[]
-    initialVersion?: AppVersion | null
+    initialVersion?: AppVersion | AppVersion[] | null
+    initialFiles?: Array<{
+        id: string
+        file_name: string
+        file_type: string
+        analysis: string | null
+        created_at: string
+    }>
     isNewChat?: boolean
     isInChatPage?: boolean
 }
-
 interface FileUploadState {
     isUploading: boolean
     progress: number
@@ -57,7 +63,8 @@ export default function ChatContainer({
     initialMessages = [],
     initialVersion = null,
     isNewChat = false,
-    isInChatPage = false
+    isInChatPage = false,
+    initialFiles = []
 }: ChatContainerProps) {
     const router = useRouter()
     const { session, isLoading } = useAuth()

@@ -11,14 +11,16 @@ export interface ModelProvider {
 
 export interface AppVersion {
     id: string
+    version_id?: string
     app_id: string
     code: string
     version_number: number
     name: string | null
     description: string | null
     created_at: string
-    updated_at: string
-    is_current: boolean
+    // Optional fields to maintain compatibility
+    updated_at?: string
+    is_current?: boolean
 }
 
 export interface StreamParams {

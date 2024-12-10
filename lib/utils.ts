@@ -4,7 +4,6 @@ import {
     generateId,
     Message,
     ToolInvocation,
-    ToolCallState
 } from 'ai'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -186,29 +185,26 @@ export function formatDatabaseMessages(dbMessages: DatabaseMessage[]): Message[]
             
             // Process tool calls and results together
             if (msg.tool_calls) {
-                const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [msg.tool_calls]
-                const results = msg.tool_results ? (Array.isArray(msg.tool_results) ? msg.tool_results : [msg.tool_results]) : []
+                const calls = (Array.isArray(msg.tool_calls) ? msg.tool_calls : [msg.tool_calls]) as any[];
+                const results = msg.tool_results ? 
+                    (Array.isArray(msg.tool_results) ? msg.tool_results : [msg.tool_results]) as any[] : []
                 
                 for (const call of calls) {
-                    const result = results.find(r => r.tool_call_id === call.id)
+                    const result = results.find((r: { tool_call_id: any }) => r?.tool_call_id === call?.id)
                     
-                    // Base tool invocation
                     const toolInvocation: ToolInvocation = {
-                        toolCallId: call.toolCallId,
-                        toolName: call.toolName,
-                        state: result ? 'result' : 'call',
-                        args: call.args
-                    }
-                    
-                    // Add result if available
-                    if (result) {
-                        toolInvocation.state = 'result'
-                        toolInvocation.result = {
-                            code: result.code,
-                            appName: result.appName || 'No name generated',
-                            appDescription: result.appDescription || 'No description generated'
-                        }
-                    }
+                        toolCallId: call?.toolCallId,
+                        toolName: call?.toolName,
+                        state: result ? 'result' as const : 'call' as const,
+                        args: call?.args,
+                        ...(result && {
+                            result: {
+                                code: result?.code,
+                                appName: result?.appName || 'No name generated',
+                                appDescription: result?.appDescription || 'No description generated'
+                            }
+                        })
+                    } as ToolInvocation
                     
                     toolInvocations.push(toolInvocation)
                 }
