@@ -289,7 +289,7 @@ export default function ChatContainer({
             const previewRows = rows.slice(1, 6).join('\n')
             const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
 
-            const message = `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+            const message = `Create a Streamlit app to visualize this data.`
 
             // Send message with file and chat context
             await append(
