@@ -82,6 +82,8 @@ interface SidebarProps {
     currentChatId: string | null
     chats?: Chat[]
     isCreatingChat: boolean
+    chatTitles: Record<string, string>
+    onGenerateTitle: (chatId: string) => Promise<string | null>
 }
 
 const TypewriterText = ({ text }: { text: string }) => {
@@ -127,20 +129,43 @@ const CustomSidebarMenuSubItem = ({
     </div>
 )
 
+interface ChatsListProps {
+    chats: Chat[]
+    onChatSelect: (chatId: string) => void
+    currentChatId: string | null
+    isCreatingChat: boolean
+    chatTitles: Record<string, string>
+    onGenerateTitle: (chatId: string) => Promise<string | null>
+}
+
 const ChatsList = ({
     chats = [],
     onChatSelect,
     currentChatId,
     isCreatingChat,
-}: {
-    chats: Chat[]
-    onChatSelect: (chatId: string) => void
-    currentChatId: string | null
-    isCreatingChat: boolean
-}) => {
+    chatTitles,
+    onGenerateTitle
+}: ChatsListProps) => {
     const router = useRouter()
     const visibleChats = chats.slice(0, 10)
-    const mostRecentChat = chats[0]?.name || 'New Chat'
+
+    useEffect(() => {
+        const generateMissingTitles = async () => {
+            console.log('🔍 Checking for chats without titles...')
+            for (const chat of chats) {
+                if (!chat.name && !chatTitles[chat.id]) {
+                    console.log('📝 Requesting title for chat:', chat.id)
+                    await onGenerateTitle(chat.id)
+                }
+            }
+        }
+
+        generateMissingTitles()
+    }, [chats, chatTitles, onGenerateTitle])
+
+    const getChatTitle = (chat: Chat) => {
+        return chat.name || chatTitles[chat.id] || 'New Chat'
+    }
 
     return (
         <SidebarMenuSub>
@@ -154,7 +179,7 @@ const ChatsList = ({
                         <CustomSidebarMenuSubItem className="group/item relative bg-sidebar-accent">
                             <SidebarMenuSubButton className="w-full text-left flex items-center gap-2">
                                 <MessageSquare className="h-4 w-4 animate-pulse" />
-                                <TypewriterText text={mostRecentChat} />
+                                <TypewriterText text={getChatTitle(chats[0])} />
                                 <span className="ml-2 h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                             </SidebarMenuSubButton>
                         </CustomSidebarMenuSubItem>
@@ -240,6 +265,8 @@ export default function AppSidebar({
     currentChatId,
     chats = [],
     isCreatingChat,
+    chatTitles,
+    onGenerateTitle
 }: SidebarProps) {
     const [open, setOpen] = useState(false)
     const [isChatsOpen, setIsChatsOpen] = useState(true)
@@ -329,6 +356,8 @@ export default function AppSidebar({
                                                 onChatSelect={onChatSelect}
                                                 currentChatId={currentChatId}
                                                 isCreatingChat={isCreatingChat}
+                                                chatTitles={chatTitles}
+                                                onGenerateTitle={onGenerateTitle}
                                             />
                                         </CollapsibleContent>
                                     </Collapsible>
@@ -541,6 +570,8 @@ export default function AppSidebar({
                                             onChatSelect={onChatSelect}
                                             currentChatId={currentChatId}
                                             isCreatingChat={isCreatingChat}
+                                            chatTitles={chatTitles}
+                                            onGenerateTitle={onGenerateTitle}
                                         />
                                     </CollapsibleContent>
                                 </Collapsible>

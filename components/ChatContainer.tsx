@@ -101,6 +101,7 @@ export default function ChatContainer({
     })
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
+    const [chatTitles, setChatTitles] = useState<Record<string, string>>({})
 
     const newChatIdRef = useRef<string | null>(null)
 
@@ -263,7 +264,7 @@ export default function ChatContainer({
         try {
             const formData = new FormData()
             formData.append('file', file)
-            
+
             // Always include current chat ID if it exists
             if (currentChatId) {
                 formData.append('chatId', currentChatId)
@@ -497,6 +498,50 @@ export default function ChatContainer({
         }
     }, [sandboxId, setStreamlitUrl, setGeneratedCode, setIsLoadingSandbox])
 
+    // Title generation
+    const generateTitle = useCallback(async (chatId: string) => {
+        console.log('🎯 Starting title generation for chat:', chatId)
+        try {
+            const response = await fetch('/api/chats/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chatId,
+                    isTitleGeneration: true,
+                    messages: []
+                })
+            })
+
+            if (!response.ok) throw new Error('Failed to generate title')
+
+            const title = await response.text()
+            console.log('✨ Generated title:', title)
+
+            // Update local state
+            setChatTitles(prev => ({ ...prev, [chatId]: title }))
+
+            // Refresh chats list immediately
+            const chatsResponse = await fetch('/api/chats')
+            if (chatsResponse.ok) {
+                const data = await chatsResponse.json()
+                setSidebarChats(data.chats)
+            }
+
+            return title
+        } catch (error) {
+            console.error('❌ Error in generateTitle:', error)
+            return null
+        }
+    }, [setSidebarChats])
+
+    // Add this useEffect to trigger title generation for new chats
+    useEffect(() => {
+        if (currentChatId && !chatTitles[currentChatId]) {
+            console.log('🔄 Triggering title generation for new chat:', currentChatId)
+            generateTitle(currentChatId)
+        }
+    }, [currentChatId])
+
     // Loading states
     if (isLoading) {
         return <div>Loading...</div>
@@ -526,6 +571,8 @@ export default function ChatContainer({
                 currentChatId={currentChatId}
                 chats={sidebarChats}
                 isCreatingChat={isCreatingChat}
+                chatTitles={chatTitles}
+                onGenerateTitle={generateTitle}
             />
             <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
                 {sidebarCollapsed && (
