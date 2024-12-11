@@ -502,14 +502,10 @@ export default function ChatContainer({
     const generateTitle = useCallback(async (chatId: string) => {
         console.log('🎯 Starting title generation for chat:', chatId)
         try {
-            const response = await fetch('/api/chats/stream', {
+            const response = await fetch('/api/title', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chatId,
-                    isTitleGeneration: true,
-                    messages: []
-                })
+                body: JSON.stringify({ chatId })
             })
 
             if (!response.ok) throw new Error('Failed to generate title')
