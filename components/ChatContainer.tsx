@@ -101,6 +101,7 @@ export default function ChatContainer({
     })
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
+    const pendingFileLinkId = useRef<string | null>(null);
 
     const newChatIdRef = useRef<string | null>(null)
 
@@ -166,6 +167,16 @@ export default function ChatContainer({
                 newChatIdRef.current = newChatId
                 console.log('🚀 New chat created:', newChatId)
             }
+
+            if (pendingFileLinkId.current && newChatId) {
+                await fetch('/api/chats/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatId: newChatId, fileId: pendingFileLinkId.current }),
+                })
+                console.log('🚀 File linked to chat:', pendingFileLinkId.current)
+                pendingFileLinkId.current = null
+            }
         },
         onToolCall: async ({ toolCall }) => {
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
@@ -184,7 +195,7 @@ export default function ChatContainer({
                 }
             }
         },
-        onFinish: async (message, { usage }) => {
+        onFinish: async (message) => {
             if (message.content && newChatIdRef.current) {
                 // Only handle chat creation for new chats
                 handleChatCreated(newChatIdRef.current)
@@ -276,6 +287,10 @@ export default function ChatContainer({
 
             if (!uploadResponse.ok) throw new Error('Upload failed')
             const fileData = await uploadResponse.json()
+
+            if (isNewChat) {
+                pendingFileLinkId.current = fileData.id
+            }
 
             // Create file preview message with chat context
             const fileContent = await file.text()
