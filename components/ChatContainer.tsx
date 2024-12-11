@@ -102,6 +102,7 @@ export default function ChatContainer({
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [chatTitles, setChatTitles] = useState<Record<string, string>>({})
+    const pendingFileLinkId = useRef<string | null>(null);
 
     const newChatIdRef = useRef<string | null>(null)
 
@@ -167,6 +168,16 @@ export default function ChatContainer({
                 newChatIdRef.current = newChatId
                 console.log('🚀 New chat created:', newChatId)
             }
+
+            if (pendingFileLinkId.current && newChatId) {
+                await fetch('/api/chats/files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatId: newChatId, fileId: pendingFileLinkId.current }),
+                })
+                console.log('🚀 File linked to chat:', pendingFileLinkId.current)
+                pendingFileLinkId.current = null
+            }
         },
         onToolCall: async ({ toolCall }) => {
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
@@ -185,7 +196,7 @@ export default function ChatContainer({
                 }
             }
         },
-        onFinish: async (message, { usage }) => {
+        onFinish: async (message) => {
             if (message.content && newChatIdRef.current) {
                 // Only handle chat creation for new chats
                 handleChatCreated(newChatIdRef.current)
@@ -278,6 +289,10 @@ export default function ChatContainer({
             if (!uploadResponse.ok) throw new Error('Upload failed')
             const fileData = await uploadResponse.json()
 
+            if (isNewChat) {
+                pendingFileLinkId.current = fileData.id
+            }
+
             // Create file preview message with chat context
             const fileContent = await file.text()
             const sanitizedContent = fileContent
@@ -290,7 +305,7 @@ export default function ChatContainer({
             const previewRows = rows.slice(1, 6).join('\n')
             const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
 
-            const message = `Create a Streamlit app to visualize this data. The file is stored in the directory '/app/' and is named "${file.name}". Ensure all references to the file use the full path '/app/${file.name}'.\n${dataPreview}\nCreate a complex, aesthetic visualization using these exact column names.`
+            const message = `Create a Streamlit app to visualize this data.`
 
             // Send message with file and chat context
             await append(
