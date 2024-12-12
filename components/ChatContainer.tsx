@@ -209,6 +209,11 @@ export default function ChatContainer({
                         invocation.toolName === 'streamlitTool' &&
                         invocation.state === 'result'
                     )
+                const suggestionsCall = message.toolInvocations
+                    .find(invocation =>
+                        invocation.toolName === 'suggestionsTool' &&
+                        invocation.state === 'result'
+                    )
 
                 if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
                     try {

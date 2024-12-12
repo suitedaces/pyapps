@@ -2,6 +2,7 @@ import { Json } from '@/lib/database.types'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
+import { suggestionsTool } from '@/lib/tools/suggestions'
 import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
 
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
                 },
                 ...messages,
             ],
-            tools: { streamlitTool },
+            tools: { streamlitTool, suggestionsTool },
             experimental_toolCallStreaming: true,
             onFinish: async (event) => {
                 const { text, toolCalls, toolResults, usage } = event

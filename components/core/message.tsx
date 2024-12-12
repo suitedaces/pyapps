@@ -11,6 +11,7 @@ import { useRef, useEffect, useMemo } from 'react'
 import { Markdown } from './markdown'
 import { MessageButton } from './message-button'
 import { useToolState } from '@/lib/stores/tool-state-store'
+import { SuggestionsChecklist } from './SuggestionsChecklist'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
@@ -58,22 +59,45 @@ export function Message({
         content.split('\n').filter(Boolean)
     , [content])
 
-    // Handle tool invocations display
+    // Add this function inside the Message component
+    const handleMetricToggle = (metric: string, checked: boolean) => {
+        // Here you can handle what happens when a metric is toggled
+        console.log(`Metric ${metric} ${checked ? 'checked' : 'unchecked'}`)
+        if (checked && onToolResultClick) {
+            onToolResultClick(metric)
+        }
+    }
+
+    // Update the renderToolInvocations function to include suggestions handling
     const renderToolInvocations = () => {
         if (!toolInvocations?.length) return null
 
         return (
-            <MessageButton
-                toolInvocations={toolInvocations}
-                object={object}
-                result={result}
-                onObjectClick={onObjectClick}
-                onToolResultClick={onToolResultClick}
-                onCodeClick={onCodeClick}
-                messageId={id}
-                isLastMessage={isLastMessage}
-                isLoading={isLoading}
-            />
+            <>
+                {toolInvocations.map((invocation: ToolInvocation) => {
+                    if (invocation.toolName === 'suggestionsTool' && invocation.state === 'result') {
+                        return (
+                            <SuggestionsChecklist
+                                key={invocation.toolCallId}
+                                metrics={invocation.result.metrics}
+                                onMetricToggle={handleMetricToggle}
+                            />
+                        )
+                    }
+                    return null
+                })}
+                <MessageButton
+                    toolInvocations={toolInvocations}
+                    object={object}
+                    result={result}
+                    onObjectClick={onObjectClick}
+                    onToolResultClick={onToolResultClick}
+                    onCodeClick={onCodeClick}
+                    messageId={id}
+                    isLastMessage={isLastMessage}
+                    isLoading={isLoading}
+                />
+            </>
         )
     }
 
