@@ -37,9 +37,10 @@ interface FilePreviewProps {
     onRemove: () => void
     onError?: (error: string) => void
     isMinHeight: boolean
+    textareaHeight: number
 }
 
-export function FilePreview({ file, onRemove, onError, isMinHeight }: FilePreviewProps) {
+export function FilePreview({ file, onRemove, onError, isMinHeight, textareaHeight }: FilePreviewProps) {
     const [isVisible, setIsVisible] = useState(true)
     const [preview, setPreview] = useState<string>('')
     const [isPreviewOpen, setIsPreviewOpen] = useState(false)
@@ -137,7 +138,7 @@ export function FilePreview({ file, onRemove, onError, isMinHeight }: FilePrevie
         return {
             initial: {
                 opacity: 0,
-                y: isBottom ? 20 : -20
+                y: isBottom ? -20 : 20
             },
             animate: {
                 opacity: 1,
@@ -151,7 +152,7 @@ export function FilePreview({ file, onRemove, onError, isMinHeight }: FilePrevie
             },
             exit: {
                 opacity: 0,
-                y: isBottom ? 20 : -20,
+                y: isBottom ? -20 : 20,
                 transition: { duration: 0.2 }
             }
         }
@@ -178,10 +179,10 @@ export function FilePreview({ file, onRemove, onError, isMinHeight }: FilePrevie
                         {...getPosition}
                         className={cn(
                             "absolute w-full bg-slate-50 dark:bg-slate-900 border-x",
-                            isMinHeight
-                                ? "top-0 -translate-y-full border-t rounded-t-xl"  // Top position
-                                : "bottom-0 translate-y-full border-b rounded-b-xl", // Bottom position
-                            "transform transition-transform duration-200"  // Smooth transform
+                            !isMinHeight
+                                ? "top-[130px] translate-y-full border-b rounded-b-xl" // Top position
+                                : "bottom-0 -mb-5 -translate-y-full border-t rounded-t-xl", // Bottom position
+                            "transform transition-transform duration-200"
                         )}
                     >
                         <div className="p-2">
@@ -207,7 +208,7 @@ export function FilePreview({ file, onRemove, onError, isMinHeight }: FilePrevie
 
                                 <div className="flex flex-col items-center gap-1.5">
                                     <div className="text-center">
-                                        <span className="text-sm font-medium line-clamp-2 text-center">
+                                        <span className="text-sm dark:text-white font-medium line-clamp-2 text-center">
                                             {file.name}
                                         </span>
                                     </div>

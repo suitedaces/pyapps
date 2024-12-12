@@ -25,9 +25,9 @@ interface ChatbarProps {
     isCentered?: boolean
 }
 
-const MIN_HEIGHT = 75
+const MIN_HEIGHT = 54
 const MAX_HEIGHT = 111
-const HEIGHT_THRESHOLD = 100
+const HEIGHT_THRESHOLD = 75
 
 export default function Chatbar({
     value,
@@ -72,30 +72,26 @@ export default function Chatbar({
         heightCheckTimeoutRef.current = setTimeout(() => {
             if (textareaRef.current) {
                 const currentHeight = textareaRef.current.offsetHeight
-                const finalHeight = file ? MAX_HEIGHT : currentHeight
-                const isAboveThreshold = finalHeight > HEIGHT_THRESHOLD
+                // Check if height is at MIN_HEIGHT
+                const isMinHeight = currentHeight === MIN_HEIGHT
 
-                debugLog('Height Check', {
+                debugLog('Height Values', {
                     currentHeight,
-                    finalHeight,
-                    previousHeight: previousHeightRef.current,
-                    threshold: HEIGHT_THRESHOLD,
-                    isAboveThreshold,
-                    hasFile: !!file,
-                    timestamp: new Date().toISOString()
+                    MIN_HEIGHT,
+                    MAX_HEIGHT,
+                    isMinHeight,
+                    hasFile: !!file
                 })
 
-                // Force MAX_HEIGHT when file is present
                 if (file) {
                     setTextareaHeight(MAX_HEIGHT)
-                    setIsTextareaMinHeight(false)  // Always show at bottom with file
+                    setIsTextareaMinHeight(isMinHeight)  // Use the actual calculation
                     previousHeightRef.current = MAX_HEIGHT
                     return
                 }
 
-                // Normal height handling
                 setTextareaHeight(currentHeight)
-                setIsTextareaMinHeight(!isAboveThreshold)
+                setIsTextareaMinHeight(isMinHeight)
                 previousHeightRef.current = currentHeight
             }
         }, 100)
@@ -158,11 +154,11 @@ export default function Chatbar({
         if (selectedFile) {
             setFile(selectedFile)
 
-            // Force MAX_HEIGHT immediately when file is added
             if (textareaRef.current) {
+                const currentHeight = textareaRef.current.offsetHeight
                 textareaRef.current.style.height = `${MAX_HEIGHT}px`
                 setTextareaHeight(MAX_HEIGHT)
-                setIsTextareaMinHeight(false)  // Force bottom position
+                setIsTextareaMinHeight(currentHeight === MIN_HEIGHT)  // Use actual height check
                 previousHeightRef.current = MAX_HEIGHT
             }
         }
@@ -259,6 +255,7 @@ export default function Chatbar({
                             onRemove={handleRemoveFile}
                             isMinHeight={isTextareaMinHeight}
                             onError={handleFileError}
+                            textareaHeight={textareaHeight}
                         />
                     </div>
                 )}
