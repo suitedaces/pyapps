@@ -17,6 +17,17 @@ const LoadingSandbox = dynamic(
     { ssr: false }
 )
 
+const CODE_THEMES = {
+    dark: {
+        primary: 'github-dark-high-contrast',
+        alternate: 'github-dark-default',
+        extra: 'ayu-dark'
+    },
+    light: {
+        primary: 'github-light'
+    }
+} as const
+
 export function CodeView({
     code,
     isGeneratingCode,
@@ -24,24 +35,30 @@ export function CodeView({
 }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
     const [highlightedHtml, setHighlightedHtml] = useState('')
+
     const codeRef = useRef('')
     const containerRef = useRef<HTMLDivElement>(null)
 
     // Initialize Shiki highlighter with dual themes
     useEffect(() => {
         const initHighlighter = async () => {
+            // Saare themes ko flat array me convert karte hai
+            const allThemes = [
+                ...Object.values(CODE_THEMES.dark),
+                ...Object.values(CODE_THEMES.light)
+            ]
 
             const highlighter = await createHighlighter({
                 langs: [language],
-                themes: ['ayu-dark', 'github-dark-default', 'github-dark-high-contrast', 'github-light']
+                themes: allThemes
             })
 
             if (displayCode) {
                 const html = highlighter.codeToHtml(displayCode, {
                     lang: language,
                     themes: {
-                        light: 'github-light',
-                        dark: 'github-dark-high-contrast'
+                        light: CODE_THEMES.light.primary,
+                        dark: CODE_THEMES.dark.primary
                     },
                 })
                 setHighlightedHtml(html)
