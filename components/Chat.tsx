@@ -117,6 +117,7 @@ export function Chat({
                         isLastMessage={index === messages.length - 1}
                         isLoading={isLoading && index === messages.length - 1}
                         onCodeClick={handleCodeClick}
+                        toolInvocations={message.toolInvocations}
                     />
                 ))}
                 <div ref={messagesEndRef} />
