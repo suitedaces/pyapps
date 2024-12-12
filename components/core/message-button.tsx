@@ -36,7 +36,7 @@ export function MessageButton({
         if (!toolInvocations?.length) return null
 
         const toolCall = toolInvocations.find(
-            (inv) => inv.toolName === 'create_streamlit_app'
+            (inv) => inv.toolName === 'streamlitTool'
         )
 
         if (!toolCall) return null
@@ -59,7 +59,7 @@ export function MessageButton({
             onCodeClick?.(messageId)
         } else if (toolInvocations?.length) {
             const streamlitCall = toolInvocations.find(
-                (inv) => inv.toolName === 'create_streamlit_app' && inv.state === 'result'
+                (inv) => inv.toolName === 'streamlitTool' && inv.state === 'result'
             )
             if (streamlitCall?.result) {
                 onToolResultClick?.(streamlitCall.result)

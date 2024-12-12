@@ -661,6 +661,7 @@ export default function ChatContainer({
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
                                 >
                                     <PreviewPanel
+                                        messages={messages}
                                         streamlitUrl={streamlitUrl}
                                         generatedCode={generatedCode}
                                         isGeneratingCode={isGeneratingCode}

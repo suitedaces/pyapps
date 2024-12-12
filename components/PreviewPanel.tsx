@@ -16,6 +16,7 @@ import { useRef } from 'react'
 import { CodeView } from './CodeView'
 import dynamic from 'next/dynamic'
 import { AnimatePresence } from 'framer-motion'
+import { Message, ToolInvocation } from 'ai'
 
 // Dynamically import LoadingSandbox with SSR disabled
 const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
@@ -28,6 +29,7 @@ const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
 })
 
 interface PreviewPanelProps {
+    messages: Message[],
     streamlitUrl: string | null
     generatedCode: string
     isGeneratingCode: boolean
@@ -38,6 +40,7 @@ interface PreviewPanelProps {
 }
 
 export function PreviewPanel({
+    messages,
     streamlitUrl,
     generatedCode,
     isGeneratingCode,
@@ -125,16 +128,36 @@ export function PreviewPanel({
                 </div>
                 <div className="flex-grow relative">
                     {showCodeView ? (
-                        <div className="h-full overflow-auto">
-                            {isGeneratingCode ? (
-                                <LoadingSandbox message="Generating code..." />
-                            ) : (
-                                <CodeView
-                                    code={generatedCode}
-                                    isGeneratingCode={isGeneratingCode}
-                                />
-                            )}
-                        </div>
+                        <>
+                            {
+                                messages.map((m: Message) => (
+                                    <div className="h-full overflow-auto">
+                                        {m.toolInvocations?.map((toolInvocations: ToolInvocation) => {
+                                            switch (toolInvocations.state) {
+                                                case 'partial-call':
+                                                    console.log(toolInvocations.args.code);
+                                                    return <CodeView
+                                                        key={toolInvocations.toolCallId}
+                                                        code={toolInvocations.args.code}
+                                                    />
+                                                case 'call':
+                                                    console.log(toolInvocations.args.code);
+                                                    return <CodeView
+                                                        key={toolInvocations.toolCallId}
+                                                        code={toolInvocations.args.code}
+                                                    />
+                                                case 'result':
+                                                    console.log(toolInvocations.result.code);
+                                                    return <CodeView
+                                                        key={toolInvocations.toolCallId}
+                                                        code={toolInvocations.result.code}
+                                                    />
+                                            }
+                                        })}
+                                    </div>
+                                ))
+                            }
+                        </>
                     ) : (
                         <StreamlitPreview
                             ref={streamlitPreviewRef}

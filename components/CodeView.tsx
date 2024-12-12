@@ -8,7 +8,6 @@ import { enableDeprecationWarnings, BundledLanguage, createHighlighter } from 's
 enableDeprecationWarnings()
 interface CodeViewProps {
     code: string | { code: string }
-    isGeneratingCode: boolean
     language?: BundledLanguage
 }
 
@@ -30,7 +29,6 @@ const CODE_THEMES = {
 
 export function CodeView({
     code,
-    isGeneratingCode,
     language = 'python'
 }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
@@ -85,10 +83,6 @@ export function CodeView({
         }
     }, [code])
 
-    if (isGeneratingCode && !displayCode) {
-        return <LoadingSandbox message="Generating code..." />
-    }
-
     return (
         <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow relative">
             <CardContent className="p-0 h-full">
@@ -100,34 +94,6 @@ export function CodeView({
                         className="min-w-max relative shiki-container"
                         dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                     />
-
-                    <AnimatePresence>
-                        {isGeneratingCode && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                className="absolute bottom-4 right-4 flex items-center gap-2 bg-black/10 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg"
-                            >
-                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                <span className="text-sm font-medium">
-                                    Generating code...
-                                </span>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {isGeneratingCode && (
-                        <motion.div
-                            className="absolute bottom-0 right-0 w-2 h-4 bg-primary/50"
-                            animate={{ opacity: [0, 1, 0] }}
-                            transition={{
-                                duration: 1,
-                                repeat: Infinity,
-                                ease: "linear"
-                            }}
-                        />
-                    )}
                 </div>
             </CardContent>
         </Card>

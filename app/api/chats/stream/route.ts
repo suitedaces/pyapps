@@ -131,15 +131,6 @@ export async function POST(req: Request) {
             },
         })
 
-        for await (const step of result.fullStream) {
-            if (step.type === 'tool-call-streaming-start') {  // Changed from 'tool-call-streaming-start'
-                const stream = createDataStream({ execute: (dataStream) => {
-                    dataStream.writeData({ toolCall: step });
-                } });
-                stream.getReader().read(); // Send tool call data to client
-            }
-        }
-
         // Important: Use toDataStreamResponse for proper streaming
         return result.toDataStreamResponse({
             headers: {
