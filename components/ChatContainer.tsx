@@ -180,20 +180,30 @@ export default function ChatContainer({
             }
         },
         onToolCall: async ({ toolCall }) => {
+            console.log('🔧 Tool Call Received:', toolCall) // Debug log
+
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
             if (streamlitToolCall.toolName === 'streamlitTool') {
+                console.log('🎯 Streamlit Tool Call Detected:', streamlitToolCall) // Debug log
+
                 setIsRightContentVisible(true)
                 setShowCodeView(true)
                 setGeneratingCode(true)
 
                 try {
                     if (streamlitToolCall.state === 'result' && streamlitToolCall.result?.code) {
+                        console.log('✨ Received Code Result') // Debug log
                         setGeneratedCode(streamlitToolCall.result.code)
                         await updateSandbox(streamlitToolCall.result.code)
                     }
                 } finally {
-                    setGeneratingCode(false)
+                    if (streamlitToolCall.state === 'result') {
+                        console.log('✅ Finished Processing Tool Call') // Debug log
+                        setGeneratingCode(false)
+                    }
                 }
+            } else {
+                console.log('⚠️ Unknown Tool Call:', streamlitToolCall.toolName) // Debug log
             }
         },
         onFinish: async (message) => {
@@ -217,7 +227,7 @@ export default function ChatContainer({
                         setGeneratedCode(streamlitCall.result.code)
                         await updateStreamlitApp(streamlitCall.result.code)
                         if (versionSelectorRef.current) {
-                            await versionSelectorRef.current.refreshVersions()
+                            versionSelectorRef.current.refreshVersions()
                         }
                     } finally {
                         setIsCreatingVersion(false)
@@ -303,7 +313,7 @@ export default function ChatContainer({
             const rows = sanitizedContent.split('\n')
             const columnNames = rows[0]
             const previewRows = rows.slice(1, 6).join('\n')
-            const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
+            const dataPreview = `���️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
 
             const message = `Create a Streamlit app to visualize this data.`
 
@@ -404,12 +414,12 @@ export default function ChatContainer({
     }, [])
 
     // Effects
-    useEffect(() => {
-        if (chatLoading) {
-            setGeneratingCode(true)
-            setGeneratedCode('')
-        }
-    }, [chatLoading, setGeneratingCode, setGeneratedCode])
+    // useEffect(() => {
+    //     if (chatLoading) {
+    //         setGeneratingCode(true)
+    //         setGeneratedCode('')
+    //     }
+    // }, [chatLoading, setGeneratingCode, setGeneratedCode])
 
     useEffect(() => {
         const loadChats = async () => {

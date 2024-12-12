@@ -3,7 +3,7 @@ import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
-import { generateText, streamText } from 'ai'
+import { createDataStream, streamText } from 'ai'
 
 export async function POST(req: Request) {
     const supabase = await createClient()
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
             : CHAT_SYSTEM_PROMPT
 
         console.log('🔍 Streaming with fileContext:', fileContext)
-        const result = await streamText({
+        const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [
                 {
@@ -130,6 +130,15 @@ export async function POST(req: Request) {
                 }
             },
         })
+
+        for await (const step of result.fullStream) {
+            if (step.type === 'tool-call-streaming-start') {  // Changed from 'tool-call-streaming-start'
+                const stream = createDataStream({ execute: (dataStream) => {
+                    dataStream.writeData({ toolCall: step });
+                } });
+                stream.getReader().read(); // Send tool call data to client
+            }
+        }
 
         // Important: Use toDataStreamResponse for proper streaming
         return result.toDataStreamResponse({
