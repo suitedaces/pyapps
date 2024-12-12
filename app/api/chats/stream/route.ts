@@ -4,6 +4,8 @@ import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 import { createDataStream, streamText } from 'ai'
+import { completeToolStream, updateToolDelta, generate } from '@/lib/actions';
+
 
 export async function POST(req: Request) {
     const supabase = await createClient()
@@ -78,6 +80,7 @@ export async function POST(req: Request) {
             : CHAT_SYSTEM_PROMPT
 
         console.log('🔍 Streaming with fileContext:', fileContext)
+
         const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [
@@ -89,9 +92,17 @@ export async function POST(req: Request) {
             ],
             tools: { streamlitTool },
             experimental_toolCallStreaming: true,
+            onChunk: async (event) => {
+                if (event.chunk.type === 'tool-call-delta' && event.chunk.toolName === 'streamlitTool') {
+                    console.log('TOOL CALL DELTA', event.chunk.argsTextDelta);
+                    await updateToolDelta(event.chunk.argsTextDelta)
+                }
+            },
             onFinish: async (event) => {
                 const { text, toolCalls, toolResults, usage } = event
                 if (!text) return
+
+                completeToolStream()
 
                 try {
                     const userMessage = messages[messages.length - 1].content
@@ -130,6 +141,7 @@ export async function POST(req: Request) {
                 }
             },
         })
+
 
         // Important: Use toDataStreamResponse for proper streaming
         return result.toDataStreamResponse({

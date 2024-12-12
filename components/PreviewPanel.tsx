@@ -29,7 +29,6 @@ const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
 })
 
 interface PreviewPanelProps {
-    messages: Message[],
     streamlitUrl: string | null
     generatedCode: string
     isGeneratingCode: boolean
@@ -40,7 +39,6 @@ interface PreviewPanelProps {
 }
 
 export function PreviewPanel({
-    messages,
     streamlitUrl,
     generatedCode,
     isGeneratingCode,
@@ -128,36 +126,9 @@ export function PreviewPanel({
                 </div>
                 <div className="flex-grow relative">
                     {showCodeView ? (
-                        <>
-                            {
-                                messages.map((m: Message) => (
-                                    <div className="h-full overflow-auto">
-                                        {m.toolInvocations?.map((toolInvocations: ToolInvocation) => {
-                                            switch (toolInvocations.state) {
-                                                case 'partial-call':
-                                                    console.log(toolInvocations.args.code);
-                                                    return <CodeView
-                                                        key={toolInvocations.toolCallId}
-                                                        code={toolInvocations.args.code}
-                                                    />
-                                                case 'call':
-                                                    console.log(toolInvocations.args.code);
-                                                    return <CodeView
-                                                        key={toolInvocations.toolCallId}
-                                                        code={toolInvocations.args.code}
-                                                    />
-                                                case 'result':
-                                                    console.log(toolInvocations.result.code);
-                                                    return <CodeView
-                                                        key={toolInvocations.toolCallId}
-                                                        code={toolInvocations.result.code}
-                                                    />
-                                            }
-                                        })}
-                                    </div>
-                                ))
-                            }
-                        </>
+                        <div className="h-full overflow-auto">
+                            <CodeView code={generatedCode} />
+                        </div>
                     ) : (
                         <StreamlitPreview
                             ref={streamlitPreviewRef}

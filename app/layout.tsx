@@ -6,6 +6,7 @@ import './globals.css'
 import { Providers } from './providers'
 import { cn } from '@/lib/utils'
 import { ThemeProvider } from '@/contexts/ThemeProvider'
+import { AI } from '@/lib/ai-config'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,7 +27,9 @@ export default function RootLayout({
                     <Providers>
                         <AuthProvider>
                             <SidebarProvider>
-                                {children}
+                                <AI>
+                                    {children}
+                                </AI>
                             </SidebarProvider>
                         </AuthProvider>
                     </Providers>

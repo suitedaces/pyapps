@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import { enableDeprecationWarnings, BundledLanguage, createHighlighter } from 'shiki'
+// import { generate } from '@/lib/actions'
+import { readStreamableValue } from 'ai/rsc'
+import { generate } from '@/lib/actions'
+
+// import { type AI } from '@/lib/ai-config'
 
 enableDeprecationWarnings()
 interface CodeViewProps {
@@ -27,12 +32,106 @@ const CODE_THEMES = {
     }
 } as const
 
+interface CodeViewState {
+    displayCode: string
+    isStreaming: boolean
+    error: string | null
+}
+
 export function CodeView({
     code,
     language = 'python'
 }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
     const [highlightedHtml, setHighlightedHtml] = useState('')
+
+    const [state, setState] = useState<CodeViewState>({
+        displayCode: '',
+        isStreaming: false,
+        error: null
+    })
+
+    // const handleCodeStreaming = async () => {
+    //     try {
+    //         const { delta } = await generate()
+
+    //         for await (const chunk of readStreamableValue(delta)) {
+    //             console.log('📥 Stream Update:', {
+    //                 chunk,
+    //                 timestamp: new Date().toISOString()
+    //             })
+
+    //             setDisplayCode(prev => prev + chunk);
+
+    //         }
+    //     } catch (error) {
+    //         console.error('Error in streaming:', error)
+    //         setState(prev => ({
+    //             ...prev,
+    //             error: 'Error streaming code',
+    //             isStreaming: false
+    //         }))
+    //     }
+    // }
+
+    useEffect(() => {
+        handleCodeStreaming()
+    },)
+
+    useEffect(() => {
+        if (!state.isStreaming && code) {
+            const finalCode = typeof code === 'object' && 'code' in code
+                ? code.code
+                : String(code)
+
+            setState(prev => ({
+                ...prev,
+                displayCode: finalCode
+            }))
+        }
+    }, [code, state.isStreaming])
+
+    const handleCodeStreaming = async () => {
+        try {
+            setState(prev => ({
+                ...prev,
+                displayCode: ''
+            }))
+
+            const streamable = await generate()
+            let accumulatedCode = ''
+
+            // Read and process the stream
+            for await (const chunk of readStreamableValue(streamable)) {
+                console.log('📥 Stream Update:', {
+                    chunk,
+                    timestamp: new Date().toISOString()
+                })
+
+                const cleanChunk = String(chunk).replace(/\[object Object\]/g, '')
+                accumulatedCode += cleanChunk
+
+                setState(prev => ({
+                    ...prev,
+                    displayCode: accumulatedCode,
+                    isStreaming: true,
+                }))
+            }
+
+            setState(prev => ({
+                ...prev,
+                displayCode: accumulatedCode,
+                isStreaming: false
+            }))
+        } catch (error) {
+            console.error('Error in streaming:', error)
+            setState(prev => ({
+                ...prev,
+                error: 'Error streaming code',
+                isStreaming: false
+            }))
+        }
+    }
 
     const codeRef = useRef('')
     const containerRef = useRef<HTMLDivElement>(null)
@@ -74,7 +173,12 @@ export function CodeView({
                 : String(code)
 
             codeRef.current = newCode
-            setDisplayCode(newCode)
+
+            // Update state with new code
+            setState(prev => ({
+                ...prev,
+                displayCode: newCode
+            }))
 
             // Auto-scroll to bottom
             if (containerRef.current) {
