@@ -139,7 +139,7 @@ export function Message({
                             </AnimatePresence>
 
                             {/* Tool streaming indicator */}
-                            {isLastMessage && isLoading && currentToolCall.state === 'streaming-start' && (
+                            {isLastMessage && isLoading && currentToolCall.toolName === 'streamlitTool' && currentToolCall.state === 'streaming-start' && (
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
