@@ -35,6 +35,7 @@ interface ChatContainerProps {
     }>
     isNewChat?: boolean
     isInChatPage?: boolean
+    initialAppId?: string | null
 }
 
 interface FileUploadState {
