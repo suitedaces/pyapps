@@ -85,7 +85,7 @@ export function Chat({
     }
 
     return (
-        <div className="flex flex-col relative z-20 text-black h-[calc(100vh-7rem)] overflow-hidden">
+        <div className="flex flex-col relative z-20 text-black h-full overflow-hidden">
             {/* Error displays */}
             {errorState && (
                 <Alert
@@ -117,6 +117,7 @@ export function Chat({
                         isLastMessage={index === messages.length - 1}
                         isLoading={isLoading && index === messages.length - 1}
                         onCodeClick={handleCodeClick}
+                        toolInvocations={message.toolInvocations}
                     />
                 ))}
                 <div ref={messagesEndRef} />

@@ -8,6 +8,7 @@ import { PaperclipIcon, ArrowUp, Loader2 } from "lucide-react"
 import { FilePreview } from "@/components/FilePreview"
 import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea"
 import { motion } from "framer-motion"
+import { useEffect } from "react"
 
 interface ChatbarProps {
     value: string
@@ -24,8 +25,9 @@ interface ChatbarProps {
     isCentered?: boolean
 }
 
-const MIN_HEIGHT = 74
-const MAX_HEIGHT = 110
+const MIN_HEIGHT = 54
+const MAX_HEIGHT = 111
+const HEIGHT_THRESHOLD = 75
 
 export default function Chatbar({
     value,
@@ -48,6 +50,96 @@ export default function Chatbar({
         maxHeight: MAX_HEIGHT,
     })
 
+    // Add debug wrapper function
+    const debugLog = (message: string, data: any) => {
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`[Chatbar] ${message}:`, data)
+        }
+    }
+
+    // Initialize with MAX_HEIGHT and track previous height
+    const [textareaHeight, setTextareaHeight] = React.useState(MAX_HEIGHT)
+    const [isTextareaMinHeight, setIsTextareaMinHeight] = React.useState(false)
+    const previousHeightRef = React.useRef(MAX_HEIGHT)
+    const heightCheckTimeoutRef = React.useRef<NodeJS.Timeout>()
+
+    // Debounced height check
+    const checkAndUpdateHeight = React.useCallback(() => {
+        if (heightCheckTimeoutRef.current) {
+            clearTimeout(heightCheckTimeoutRef.current)
+        }
+
+        heightCheckTimeoutRef.current = setTimeout(() => {
+            if (textareaRef.current) {
+                const currentHeight = textareaRef.current.offsetHeight
+                // Check if height is at MIN_HEIGHT
+                const isMinHeight = currentHeight === MIN_HEIGHT
+
+                debugLog('Height Values', {
+                    currentHeight,
+                    MIN_HEIGHT,
+                    MAX_HEIGHT,
+                    isMinHeight,
+                    hasFile: !!file
+                })
+
+                if (file) {
+                    setTextareaHeight(MAX_HEIGHT)
+                    setIsTextareaMinHeight(isMinHeight)  // Use the actual calculation
+                    previousHeightRef.current = MAX_HEIGHT
+                    return
+                }
+
+                setTextareaHeight(currentHeight)
+                setIsTextareaMinHeight(isMinHeight)
+                previousHeightRef.current = currentHeight
+            }
+        }, 100)
+    }, [file])
+
+    // Cleanup
+    React.useEffect(() => {
+        return () => {
+            if (heightCheckTimeoutRef.current) {
+                clearTimeout(heightCheckTimeoutRef.current)
+            }
+        }
+    }, [])
+
+    // Monitor height changes with ResizeObserver
+    useEffect(() => {
+        if (textareaRef.current) {
+            debugLog('Initial Mount', {
+                height: textareaRef.current.offsetHeight,
+                ref: textareaRef.current
+            })
+
+            // Initial height check
+            checkAndUpdateHeight()
+
+            const resizeObserver = new ResizeObserver(() => {
+                requestAnimationFrame(checkAndUpdateHeight)
+            })
+
+            resizeObserver.observe(textareaRef.current)
+
+            return () => {
+                if (textareaRef.current) {
+                    resizeObserver.unobserve(textareaRef.current)
+                }
+            }
+        }
+    }, [checkAndUpdateHeight])
+
+    // Track file changes
+    useEffect(() => {
+        if (file) {
+            debugLog('File Changed', { file })
+            // Force a single height check after file change
+            setTimeout(checkAndUpdateHeight, 0)
+        }
+    }, [file, checkAndUpdateHeight])
+
     const handleRemoveFile = React.useCallback((e?: React.MouseEvent) => {
         e?.preventDefault()
         e?.stopPropagation()
@@ -61,6 +153,14 @@ export default function Chatbar({
         const selectedFile = e.target.files?.[0]
         if (selectedFile) {
             setFile(selectedFile)
+
+            if (textareaRef.current) {
+                const currentHeight = textareaRef.current.offsetHeight
+                textareaRef.current.style.height = `${MAX_HEIGHT}px`
+                setTextareaHeight(MAX_HEIGHT)
+                setIsTextareaMinHeight(currentHeight === MIN_HEIGHT)  // Use actual height check
+                previousHeightRef.current = MAX_HEIGHT
+            }
         }
     }
 
@@ -101,7 +201,36 @@ export default function Chatbar({
     const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         onChange(e.target.value)
         adjustHeight()
+
+        // Defer height check to next frame to ensure DOM updates
+        requestAnimationFrame(() => {
+            checkAndUpdateHeight()
+            debugLog('Message Changed', {
+                value: e.target.value,
+                height: textareaRef.current?.offsetHeight
+            })
+        })
     }
+
+    // Debug logging
+    useEffect(() => {
+        if (process.env.NODE_ENV === 'development') {
+            console.log('[Chatbar] State Update:', {
+                height: textareaRef.current?.offsetHeight,
+                isMinHeight: isTextareaMinHeight,
+                timestamp: new Date().toISOString()
+            })
+        }
+    }, [isTextareaMinHeight])
+
+    // Add handleFileError function
+    const handleFileError = React.useCallback((error: string) => {
+        if (process.env.NODE_ENV === 'development') {
+            console.error('[Chatbar] File Error:', error)
+        }
+        // You can add additional error handling here if needed
+        // For example, showing a toast notification
+    }, [])
 
     return (
         <motion.div
@@ -116,8 +245,18 @@ export default function Chatbar({
         >
             <form onSubmit={handleSubmit} className="flex relative flex-col gap-4 max-w-[800px] mx-auto">
                 {file && (
-                    <div className="mb-2" onClick={(e) => e.stopPropagation()}>
-                        <FilePreview file={file} onRemove={handleRemoveFile} />
+                    <div
+                        className="relative"
+                        style={{ height: 0 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <FilePreview
+                            file={file}
+                            onRemove={handleRemoveFile}
+                            isMinHeight={isTextareaMinHeight}
+                            onError={handleFileError}
+                            textareaHeight={textareaHeight}
+                        />
                     </div>
                 )}
 
@@ -138,9 +277,12 @@ export default function Chatbar({
                         style={{
                             minHeight: isInChatPage ? '54px' : isAnimating ? '54px' : `${MIN_HEIGHT}px`,
                             maxHeight: isInChatPage ? '54px' : isAnimating ? '54px' : `${MAX_HEIGHT}px`,
-                            transition: 'min-height 0.3s ease-in-out, max-height 0.3s ease-in-out'
+                            height: `${textareaHeight}px`, // Explicitly set height
+                            transition: 'all 0.3s ease-in-out'
                         }}
                         disabled={isLoading}
+                        onFocus={() => checkAndUpdateHeight()} // Check height on focus
+                        onBlur={() => checkAndUpdateHeight()}  // Check height on blur
                     />
 
                     <motion.div

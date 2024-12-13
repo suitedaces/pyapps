@@ -3,7 +3,7 @@ import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
-import { streamText } from 'ai'
+import { createDataStream, streamText } from 'ai'
 
 // Types
 interface StreamlitToolResult {
@@ -253,7 +253,10 @@ export async function POST(req: Request) {
     const supabase = await createClient()
     const user = await getUser()
 
-    if (!user) return new Response('Unauthorized', { status: 401 })
+    if (!user) {
+        console.log('❌ Unauthorized user')
+        return new Response('Unauthorized', { status: 401 })
+    }
 
     try {
         const { messages, chatId, fileId, fileName, fileContent } = await req.json()
@@ -280,7 +283,7 @@ export async function POST(req: Request) {
         const systemPrompt = buildSystemPrompt(fileContext)
 
         console.log('🔍 Streaming with fileContext:', fileContext)
-        const result = await streamText({
+        const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [
                 { role: 'system', content: systemPrompt },
@@ -339,10 +342,18 @@ export async function POST(req: Request) {
             },
         })
     } catch (error) {
-        console.error('Error in chat stream:', error)
+        console.error('❌ Error in stream route:', error)
         return new Response(
-            JSON.stringify({ error: 'Internal server error' }),
-            { status: 500 }
+            JSON.stringify({
+                error: 'Internal server error',
+                details: error instanceof Error ? error.message : 'Unknown error'
+            }),
+            {
+                status: 500,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
         )
     }
 }

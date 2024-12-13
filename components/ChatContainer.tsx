@@ -136,6 +136,7 @@ export default function ChatContainer({
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [currentAppId, setCurrentAppId] = useState<string | null>(initialAppId || null)
+    const [chatTitles, setChatTitles] = useState<Record<string, string>>({})
 
     // Model configuration
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -229,6 +230,8 @@ export default function ChatContainer({
             }
         },
         onToolCall: async ({ toolCall }) => {
+            console.log('🔧 Tool Call Received:', toolCall) // Debug log
+
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
             if (streamlitToolCall.toolName === 'streamlitTool') {
                 try {
@@ -243,8 +246,13 @@ export default function ChatContainer({
                     console.error('Failed to update sandbox:', error)
                     setErrorState(error as Error)
                 } finally {
-                    setGeneratingCode(false)
+                    if (streamlitToolCall.state === 'result') {
+                        console.log('✅ Finished Processing Tool Call') // Debug log
+                        setGeneratingCode(false)
+                    }
                 }
+            } else {
+                console.log('⚠️ Unknown Tool Call:', streamlitToolCall.toolName) // Debug log
             }
         },
         onFinish: async (message) => {
@@ -267,7 +275,7 @@ export default function ChatContainer({
                         await updateStreamlitApp(streamlitCall.result.code)
                         
                         if (versionSelectorRef.current) {
-                            await versionSelectorRef.current.refreshVersions()
+                            versionSelectorRef.current.refreshVersions()
                         }
                     }
                 }
@@ -338,7 +346,8 @@ export default function ChatContainer({
         try {
             const formData = new FormData()
             formData.append('file', file)
-            
+
+            // Always include current chat ID if it exists
             if (currentChatId) {
                 formData.append('chatId', currentChatId)
             }
@@ -464,12 +473,12 @@ export default function ChatContainer({
     }, [])
 
     // Effects
-    useEffect(() => {
-        if (chatLoading) {
-            setGeneratingCode(true)
-            setGeneratedCode('')
-        }
-    }, [chatLoading, setGeneratingCode, setGeneratedCode])
+    // useEffect(() => {
+    //     if (chatLoading) {
+    //         setGeneratingCode(true)
+    //         setGeneratedCode('')
+    //     }
+    // }, [chatLoading, setGeneratingCode, setGeneratedCode])
 
     useEffect(() => {
         const loadChats = async () => {
@@ -569,6 +578,46 @@ export default function ChatContainer({
         }
     }, [sandboxId, killSandbox, setStreamlitUrl, setGeneratedCode])
 
+    // Title generation
+    const generateTitle = useCallback(async (chatId: string) => {
+        console.log('🎯 Starting title generation for chat:', chatId)
+        try {
+            const response = await fetch('/api/title', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatId })
+            })
+
+            if (!response.ok) throw new Error('Failed to generate title')
+
+            const title = await response.text()
+            console.log('✨ Generated title:', title)
+
+            // Update local state
+            setChatTitles(prev => ({ ...prev, [chatId]: title }))
+
+            // Refresh chats list immediately
+            const chatsResponse = await fetch('/api/chats')
+            if (chatsResponse.ok) {
+                const data = await chatsResponse.json()
+                setSidebarChats(data.chats)
+            }
+
+            return title
+        } catch (error) {
+            console.error('❌ Error in generateTitle:', error)
+            return null
+        }
+    }, [setSidebarChats])
+
+    // Add this useEffect to trigger title generation for new chats
+    useEffect(() => {
+        if (currentChatId && !chatTitles[currentChatId]) {
+            console.log('🔄 Triggering title generation for new chat:', currentChatId)
+            generateTitle(currentChatId)
+        }
+    }, [currentChatId])
+
     // Loading states
     if (isLoading) {
         return <div>Loading...</div>
@@ -598,6 +647,8 @@ export default function ChatContainer({
                 currentChatId={currentChatId}
                 chats={sidebarChats}
                 isCreatingChat={isCreatingChat}
+                chatTitles={chatTitles}
+                onGenerateTitle={generateTitle}
             />
             <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
                 {sidebarCollapsed && (

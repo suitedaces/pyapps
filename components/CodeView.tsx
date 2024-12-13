@@ -1,17 +1,15 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
-import { highlight, languages } from 'prismjs'
 import { useEffect, useRef, useState } from 'react'
-import Editor from 'react-simple-code-editor'
 import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
+import { enableDeprecationWarnings, BundledLanguage, createHighlighter } from 'shiki'
 
-import 'prismjs/components/prism-python'
-import 'prismjs/themes/prism-tomorrow.css'
-
+enableDeprecationWarnings()
 interface CodeViewProps {
     code: string | { code: string }
     isGeneratingCode: boolean
+    language?: BundledLanguage
 }
 
 const LoadingSandbox = dynamic(
@@ -19,10 +17,56 @@ const LoadingSandbox = dynamic(
     { ssr: false }
 )
 
-export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
+const CODE_THEMES = {
+    dark: {
+        primary: 'github-dark-high-contrast',
+        alternate: 'github-dark-default',
+        extra: 'ayu-dark'
+    },
+    light: {
+        primary: 'github-light'
+    }
+} as const
+
+export function CodeView({
+    code,
+    isGeneratingCode,
+    language = 'python'
+}: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
+    const [highlightedHtml, setHighlightedHtml] = useState('')
+
     const codeRef = useRef('')
-    const editorRef = useRef<HTMLDivElement>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    // Initialize Shiki highlighter with dual themes
+    useEffect(() => {
+        const initHighlighter = async () => {
+            // Saare themes ko flat array me convert karte hai
+            const allThemes = [
+                ...Object.values(CODE_THEMES.dark),
+                ...Object.values(CODE_THEMES.light)
+            ]
+
+            const highlighter = await createHighlighter({
+                langs: [language],
+                themes: allThemes
+            })
+
+            if (displayCode) {
+                const html = highlighter.codeToHtml(displayCode, {
+                    lang: language,
+                    themes: {
+                        light: CODE_THEMES.light.primary,
+                        dark: CODE_THEMES.dark.primary
+                    },
+                })
+                setHighlightedHtml(html)
+            }
+        }
+
+        initHighlighter()
+    }, [displayCode, language])
 
     // Handle streaming code updates
     useEffect(() => {
@@ -31,23 +75,16 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
                 ? code.code
                 : String(code)
 
-            // Update ref immediately for any comparisons
             codeRef.current = newCode
-
-            // Smoothly update display code
             setDisplayCode(newCode)
 
-            // Scroll to bottom of editor when new code arrives
-            if (editorRef.current) {
-                const editor = editorRef.current.querySelector('textarea')
-                if (editor) {
-                    editor.scrollTop = editor.scrollHeight
-                }
+            // Auto-scroll to bottom
+            if (containerRef.current) {
+                containerRef.current.scrollTop = containerRef.current.scrollHeight
             }
         }
     }, [code])
 
-    // Loading overlay for initial generation
     if (isGeneratingCode && !displayCode) {
         return <LoadingSandbox message="Generating code..." />
     }
@@ -55,106 +92,44 @@ export function CodeView({ code, isGeneratingCode }: CodeViewProps) {
     return (
         <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow relative">
             <CardContent className="p-0 h-full">
-                <div className="overflow-auto h-full code-container" ref={editorRef}>
-                    <div className="min-w-max relative">
-                        <Editor
-                            value={displayCode}
-                            onValueChange={() => {}}
-                            highlight={(codeToHighlight) => {
-                                try {
-                                    return highlight(
-                                        String(codeToHighlight),
-                                        languages.python,
-                                        'python'
-                                    )
-                                } catch (error) {
-                                    console.error('Highlighting error:', error)
-                                    return String(codeToHighlight)
-                                }
-                            }}
-                            padding={16}
-                            style={{
-                                fontFamily: '"Fira code", "Fira Mono", monospace',
-                                fontSize: 14,
-                                lineHeight: 1.5,
-                                minHeight: '100%',
-                                backgroundColor: 'transparent',
-                                color: '#000',
-                            }}
-                            className="w-full h-full custom-editor"
-                            readOnly={true}
-                        />
+                <div
+                    ref={containerRef}
+                    className="overflow-auto h-full p-4 font-mono text-sm"
+                >
+                    <div
+                        className="min-w-max relative shiki-container"
+                        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+                    />
 
-                        {/* Streaming indicator */}
-                        <AnimatePresence>
-                            {isGeneratingCode && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 10 }}
-                                    className="absolute bottom-4 right-4 flex items-center gap-2 bg-black/10 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg"
-                                >
-                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                    <span className="text-sm font-medium">
-                                        Generating code...
-                                    </span>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Cursor effect for streaming */}
+                    <AnimatePresence>
                         {isGeneratingCode && (
                             <motion.div
-                                className="absolute bottom-0 right-0 w-2 h-4 bg-primary/50"
-                                animate={{ opacity: [0, 1, 0] }}
-                                transition={{
-                                    duration: 1,
-                                    repeat: Infinity,
-                                    ease: "linear"
-                                }}
-                            />
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="absolute bottom-4 right-4 flex items-center gap-2 bg-black/10 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg"
+                            >
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                <span className="text-sm font-medium">
+                                    Generating code...
+                                </span>
+                            </motion.div>
                         )}
-                    </div>
+                    </AnimatePresence>
+
+                    {isGeneratingCode && (
+                        <motion.div
+                            className="absolute bottom-0 right-0 w-2 h-4 bg-primary/50"
+                            animate={{ opacity: [0, 1, 0] }}
+                            transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                ease: "linear"
+                            }}
+                        />
+                    )}
                 </div>
             </CardContent>
-            <style jsx global>{`
-                .code-container {
-                    height: 100%;
-                }
-                .custom-editor {
-                    height: 100%;
-                }
-                .custom-editor textarea,
-                .custom-editor pre {
-                    white-space: pre !important;
-                    min-height: 100% !important;
-                }
-                .code-container::-webkit-scrollbar {
-                    width: 8px;
-                    height: 8px;
-                }
-                .code-container::-webkit-scrollbar-track {
-                    background: #e5e6e9;
-                }
-                .code-container::-webkit-scrollbar-thumb {
-                    background: #212121;
-                    border-radius: 4px;
-                }
-                .code-container::-webkit-scrollbar-thumb:hover {
-                    background: #1b1b1b;
-                }
-                .code-container {
-                    scrollbar-width: thin;
-                    scrollbar-color: #212121 #e5e6e9;
-                }
-                .custom-editor {
-                    padding: 1rem !important;
-                }
-                .custom-editor pre,
-                .custom-editor textarea {
-                    color: #000 !important;
-                }
-            `}</style>
         </Card>
     )
 }
