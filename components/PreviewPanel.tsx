@@ -16,6 +16,7 @@ import { useRef } from 'react'
 import { CodeView } from './CodeView'
 import dynamic from 'next/dynamic'
 import { AnimatePresence } from 'framer-motion'
+import React from 'react'
 
 // Dynamically import LoadingSandbox with SSR disabled
 const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
@@ -38,7 +39,10 @@ interface PreviewPanelProps {
     onCodeViewToggle: () => void
 }
 
-export function PreviewPanel({
+export const PreviewPanel = React.forwardRef<
+    { refreshIframe: () => void }, 
+    PreviewPanelProps
+>(({
     streamlitUrl,
     appId,
     generatedCode,
@@ -47,9 +51,16 @@ export function PreviewPanel({
     showCodeView,
     onRefresh,
     onCodeViewToggle,
-}: PreviewPanelProps) {
+}, ref) => {
     const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
 
+    React.useImperativeHandle(ref, () => ({
+        refreshIframe: () => {
+            if (streamlitPreviewRef.current) {
+                streamlitPreviewRef.current.refreshIframe()
+            }
+        }
+    }))
     const showOverlay = isGeneratingCode || isLoadingSandbox
 
     const displayUrl = appId 
@@ -152,4 +163,6 @@ export function PreviewPanel({
             </div>
         </div>
     )
-}
+})
+
+PreviewPanel.displayName = 'PreviewPanel'

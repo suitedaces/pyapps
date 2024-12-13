@@ -111,6 +111,7 @@ export default function ChatContainer({
     const resizableGroupRef = useRef<any>(null)
     const isExecutingRef = useRef(false)
     const hasInitialized = useRef(false)
+    const streamlitPreviewRef = useRef<{ refreshIframe: () => void } | null>(null)
 
     // State management
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
@@ -432,8 +433,14 @@ export default function ChatContainer({
 
         try {
             setGeneratedCode(version.code)
-            // Force sandbox refresh when switching versions
+            // Wait for sandbox update to complete
             await updateStreamlitApp(version.code, true)
+            // Add this line to refresh the iframe
+            if (streamlitPreviewRef.current?.refreshIframe) {
+                setTimeout(() => {
+                    streamlitPreviewRef.current?.refreshIframe()
+                }, 1200)
+            }
         } catch (error) {
             setErrorState(error as Error)
         } finally {
@@ -659,6 +666,7 @@ export default function ChatContainer({
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
                                 >
                                     <PreviewPanel
+                                        ref={streamlitPreviewRef}
                                         appId={currentAppId || undefined}
                                         streamlitUrl={streamlitUrl}
                                         generatedCode={generatedCode}
