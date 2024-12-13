@@ -7,25 +7,49 @@ import { RefreshCcw } from 'lucide-react'
 import { VersionSelector } from './VersionSelector'
 import { AppVersion } from '@/lib/types'
 import { useCallback, useRef } from 'react'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { StreamlitFrameRef } from './StreamlitFrame'
 
 interface AppHeaderProps {
     appId: string
     appName: string
     initialVersions: AppVersion[]
+    initialUrl: string
+    streamlitRef?: React.RefObject<StreamlitFrameRef>
 }
 
-export function AppHeader({ appId, appName, initialVersions }: AppHeaderProps) {
-    const iframeRef = useRef<HTMLIFrameElement>(null)
+export function AppHeader({ appId, appName, initialVersions, initialUrl, streamlitRef }: AppHeaderProps) {
+    const { updateSandbox, setGeneratingCode, setGeneratedCode } = useSandboxStore()
+    const isUpdatingRef = useRef(false)
 
     const handleVersionChange = useCallback(async (version: AppVersion) => {
-        console.log('Version changed:', version)
-    }, [])
+        if (!version.code || isUpdatingRef.current) return
+
+        isUpdatingRef.current = true
+        setGeneratingCode(true)
+        
+        try {
+            setGeneratedCode(version.code)
+            await updateSandbox(version.code, true)
+            
+            if (streamlitRef?.current) {
+                requestAnimationFrame(() => {
+                    streamlitRef.current?.refreshIframe()
+                })
+            }
+        } catch (error) {
+            console.error('Error updating version:', error)
+        } finally {
+            setGeneratingCode(false)
+            isUpdatingRef.current = false
+        }
+    }, [updateSandbox, setGeneratingCode, setGeneratedCode, streamlitRef])
 
     const handleRefresh = useCallback(() => {
-        if (iframeRef.current) {
-            iframeRef.current.src = iframeRef.current.src
+        if (streamlitRef?.current) {
+            streamlitRef.current.refreshIframe()
         }
-    }, [])
+    }, [streamlitRef])
 
     return (
         <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-dark-app z-50">
@@ -41,7 +65,7 @@ export function AppHeader({ appId, appName, initialVersions }: AppHeaderProps) {
                 <div className="flex items-center gap-4">
                     <VersionSelector
                         appId={appId}
-                        initialVersions={initialVersions}
+                        initialVersions={initialVersions as AppVersion[]}
                         onVersionChange={handleVersionChange}
                     />
                     <Button

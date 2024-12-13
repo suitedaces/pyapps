@@ -1,23 +1,15 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { ThemeProvider } from '@/contexts/ThemeProvider'
-import { Logo } from '@/components/core/Logo'
-import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
-import { Button } from '@/components/ui/button'
-import { RefreshCcw } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { VersionSelector } from '@/components/VersionSelector'
-import { AppHeader } from '@/components/AppHeader'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
-import { StreamlitFrame } from '@/components/StreamlitFrame'
+import { AppClient } from './AppClient'
+import { AppVersion } from '@/lib/types'
 
 interface PageParams {
-    params: Promise<{ id: string }>
+    params: { id: string }
 }
 
 export default async function AppPage({ params }: PageParams) {
-    const { id } = await params
+    const { id } = params
     const user = await getUser()
     
     if (!user) {
@@ -61,18 +53,5 @@ export default async function AppPage({ params }: PageParams) {
 
     const { url: sandboxUrl } = await sandboxResponse.json()
 
-    return (
-        <ThemeProvider>
-            <div className="min-h-screen flex flex-col bg-white dark:bg-dark-app">
-                <AppHeader
-                    appId={id}
-                    appName={app[0].name ?? ''}
-                    initialVersions={app}
-                />
-                <main className="flex-1">
-                    <StreamlitFrame url={sandboxUrl} />
-                </main>
-            </div>
-        </ThemeProvider>
-    )
+    return <AppClient app={app[0] as AppVersion} sandboxUrl={sandboxUrl} id={id} />
 }
