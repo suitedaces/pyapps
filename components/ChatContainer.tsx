@@ -1,4 +1,3 @@
-// components/ChatContainer.tsx
 'use client'
 
 import { Chat } from '@/components/Chat'
@@ -21,6 +20,7 @@ import { useLocalStorage } from 'usehooks-ts'
 import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
 import { formatDatabaseMessages } from '@/lib/utils'
+import React from 'react'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -36,6 +36,7 @@ interface ChatContainerProps {
     isNewChat?: boolean
     isInChatPage?: boolean
 }
+
 interface FileUploadState {
     isUploading: boolean
     progress: number
@@ -58,40 +59,70 @@ interface StreamlitToolCall {
     }
 }
 
+interface SandboxState {
+    id: string | null
+    status: 'idle' | 'generating' | 'loading' | 'error'
+    errors: Array<{ message: string }>
+    isCreatingVersion: boolean
+}
+
+interface RightPanelState {
+    isVisible: boolean
+    view: 'code' | 'preview'
+}
+
+interface ChatState {
+    status: 'initial' | 'typing' | 'creating' | 'active'
+    hasMessages: boolean
+}
+
 export default function ChatContainer({
     initialChat,
     initialMessages = [],
     initialVersion = null,
     isNewChat = false,
     isInChatPage = false,
-    initialFiles = []
+    initialFiles = [],
+    initialAppId = null
 }: ChatContainerProps) {
     const router = useRouter()
     const { session, isLoading } = useAuth()
-    const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebar()
+    const { collapsed: sidebarCollapsed } = useSidebar()
     const {
         streamlitUrl,
-        isGeneratingCode,
-        isLoadingSandbox,
         generatedCode,
         updateSandbox,
         killSandbox,
         setGeneratingCode,
+        isGeneratingCode,
+        isLoadingSandbox,
         setStreamlitUrl,
-        setIsLoadingSandbox,
         setGeneratedCode
     } = useSandboxStore()
 
+    // Refs for preventing race conditions
+    const abortControllerRef = useRef<AbortController | null>(null)
+    const pendingFileLinkId = useRef<string | null>(null)
+    const newChatIdRef = useRef<string | null>(null)
+    const hasNavigated = useRef(false)
+    const isVersionSwitching = useRef(false)
+    const versionSelectorRef = useRef<{ refreshVersions: () => void } | null>(null)
+    const resizableGroupRef = useRef<any>(null)
+    const isExecutingRef = useRef(false)
+    const hasInitialized = useRef(false)
+
     // State management
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
-    const [isRightContentVisible, setIsRightContentVisible] = useState(false)
     const [currentChatId, setCurrentChatId] = useState<string | null>(initialChat?.id || null)
-    const [showTypingText, setShowTypingText] = useState(true)
-    const [activeTab, setActiveTab] = useState('preview')
-    const [currentApp, setCurrentApp] = useState<{ id: string | null }>({ id: null })
-    const [showCodeView, setShowCodeView] = useState(false)
+    const [rightPanel, setRightPanel] = useState<RightPanelState>({
+        isVisible: false,
+        view: 'preview'
+    })
+    const [chatState, setChatState] = useState<ChatState>({
+        status: 'initial',
+        hasMessages: initialMessages?.length > 0
+    })
     const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [sandboxErrors, setSandboxErrors] = useState<Array<{ message: string }>>([])
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
     const [errorState, setErrorState] = useState<Error | null>(null)
     const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
@@ -101,16 +132,7 @@ export default function ChatContainer({
     })
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
-    const pendingFileLinkId = useRef<string | null>(null);
-
-    const newChatIdRef = useRef<string | null>(null)
-
-    // Refs
-    const hasNavigated = useRef(false)
-    const isVersionSwitching = useRef(false)
-    const versionSelectorRef = useRef<{ refreshVersions: () => void } | null>(null)
-    const resizableGroupRef = useRef<any>(null)
-    const isExecutingRef = useRef(false)
+    const [currentAppId, setCurrentAppId] = useState<string | null>(initialAppId || null)
 
     // Model configuration
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -118,31 +140,46 @@ export default function ChatContainer({
     })
     const currentModel = modelsList.models.find(model => model.id === languageModel.model)
 
-    // Simplified chat creation handler
+    // Move updateChatState before handleChatCreated
+    const updateChatState = useCallback((updates: Partial<ChatState>) => {
+        setChatState(prev => ({ ...prev, ...updates }))
+    }, [])
+
+    // Improved chat creation handler with race condition prevention
     const handleChatCreated = useCallback((chatId: string) => {
+        setCurrentChatId(chatId)
+        updateChatState({ 
+            status: 'active',
+            hasMessages: true 
+        })
+        
         if (!hasNavigated.current && isNewChat) {
             hasNavigated.current = true
             router.replace(`/chat/${chatId}`)
-            return
         }
 
-        setShowTypingText(false)
-        setCurrentChatId(chatId)
-
-        // Refresh chat list
+        // Refresh chat list with cleanup
+        const controller = new AbortController()
         const loadChats = async () => {
             try {
-                const response = await fetch('/api/chats')
+                const response = await fetch('/api/chats', {
+                    signal: controller.signal
+                })
                 if (!response.ok) throw new Error('Failed to fetch chats')
                 const data = await response.json()
                 setSidebarChats(data.chats)
             } catch (error) {
-                console.error('Error fetching chats:', error)
+                if (error instanceof Error && error.name !== 'AbortError') {
+                    console.error('Error fetching chats:', error)
+                }
             }
         }
         loadChats()
-    }, [router, isNewChat])
 
+        return () => controller.abort()
+    }, [router, isNewChat, updateChatState])
+
+    // Chat hook with improved error handling
     const {
         messages,
         isLoading: chatLoading,
@@ -156,79 +193,93 @@ export default function ChatContainer({
         id: currentChatId ?? undefined,
         initialMessages: formatDatabaseMessages(initialMessages || []),
         body: {
-            chatId: currentChatId, // Add this to ensure chat ID is passed
+            chatId: currentChatId,
             model: currentModel,
             config: languageModel,
             experimental_streamData: true,
         },
         onResponse: async (response) => {
             const newChatId = response.headers.get('x-chat-id')
+            const newAppId = response.headers.get('x-app-id')
             if (newChatId && !currentChatId) {
                 newChatIdRef.current = newChatId
-                console.log('🚀 New chat created:', newChatId)
+            }
+            if (newAppId && !currentAppId) {
+                setCurrentAppId(newAppId)
             }
 
             if (pendingFileLinkId.current && newChatId) {
-                await fetch('/api/chats/files', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chatId: newChatId, fileId: pendingFileLinkId.current }),
-                })
-                console.log('🚀 File linked to chat:', pendingFileLinkId.current)
-                pendingFileLinkId.current = null
+                try {
+                    await fetch('/api/chats/files', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            chatId: newChatId, 
+                            fileId: pendingFileLinkId.current 
+                        }),
+                    })
+                    pendingFileLinkId.current = null
+                } catch (error) {
+                    console.error('Failed to link file:', error)
+                    setErrorState(error as Error)
+                }
             }
         },
         onToolCall: async ({ toolCall }) => {
             const streamlitToolCall = toolCall as unknown as StreamlitToolCall
             if (streamlitToolCall.toolName === 'streamlitTool') {
-                setIsRightContentVisible(true)
-                setShowCodeView(true)
-                setGeneratingCode(true)
-
                 try {
-                    if (streamlitToolCall.state === 'result' && streamlitToolCall.result?.code) {
-                        setGeneratedCode(streamlitToolCall.result.code)
-                        await updateSandbox(streamlitToolCall.result.code)
-                    }
+                    React.startTransition(() => {
+                        setRightPanel(prev => ({
+                            ...prev,
+                            isVisible: true
+                        }))
+                        setGeneratingCode(true)
+                    })
+                } catch (error) {
+                    console.error('Failed to update sandbox:', error)
+                    setErrorState(error as Error)
                 } finally {
                     setGeneratingCode(false)
                 }
             }
         },
         onFinish: async (message) => {
-            if (message.content && newChatIdRef.current) {
-                // Only handle chat creation for new chats
-                handleChatCreated(newChatIdRef.current)
-                newChatIdRef.current = null // Reset after handling
-            }
+            try {
+                if (message.content && newChatIdRef.current) {
+                    handleChatCreated(newChatIdRef.current)
+                    newChatIdRef.current = null
+                }
 
-            // Handle tool results
-            if (message.toolInvocations?.length) {
-                const streamlitCall = message.toolInvocations
-                    .find(invocation =>
-                        invocation.toolName === 'streamlitTool' &&
-                        invocation.state === 'result'
-                    )
+                if (message.toolInvocations?.length) {
+                    const streamlitCall = message.toolInvocations
+                        .find(invocation =>
+                            invocation.toolName === 'streamlitTool' &&
+                            invocation.state === 'result'
+                        )
 
-                if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
-                    try {
+                    if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
                         setIsCreatingVersion(true)
                         setGeneratedCode(streamlitCall.result.code)
                         await updateStreamlitApp(streamlitCall.result.code)
+                        
                         if (versionSelectorRef.current) {
                             await versionSelectorRef.current.refreshVersions()
                         }
-                    } finally {
-                        setIsCreatingVersion(false)
                     }
                 }
-            }
 
-            handleChatFinish()
+                handleChatFinish()
+            } catch (error) {
+                console.error('Failed in onFinish:', error)
+                setErrorState(error as Error)
+            } finally {
+                setIsCreatingVersion(false)
+            }
         }
     })
 
-    // Streamlit app management
+    // Improved Streamlit app management with retry logic
     const updateStreamlitApp = useCallback(async (code: string, forceExecute = false) => {
         if (!code) {
             setStreamlitUrl(null)
@@ -237,12 +288,10 @@ export default function ChatContainer({
         }
 
         if (isExecutingRef.current) {
-            console.log('⚠️ Already executing, skipping...')
             return null
         }
 
         isExecutingRef.current = true
-        setIsLoadingSandbox(true)
 
         try {
             for (let attempt = 1; attempt <= 3; attempt++) {
@@ -259,23 +308,29 @@ export default function ChatContainer({
             }
             return null
         } catch (error) {
-            console.error('❌ All attempts to update sandbox failed:', error)
+            console.error('Failed to update sandbox after retries:', error)
+            setErrorState(error as Error)
             return null
         } finally {
             isExecutingRef.current = false
-            setIsLoadingSandbox(false)
             setGeneratingCode(false)
         }
-    }, [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox])
+    }, [updateSandbox, setStreamlitUrl, setGeneratingCode])
 
-    // File handling with chat ID context
+    // Improved file upload with abort controller
     const handleFileUpload = useCallback(async (file: File) => {
+        // Abort any existing upload
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+        }
+        
+        abortControllerRef.current = new AbortController()
         setFileUploadState({ isUploading: true, progress: 0, error: null })
+        
         try {
             const formData = new FormData()
             formData.append('file', file)
             
-            // Always include current chat ID if it exists
             if (currentChatId) {
                 formData.append('chatId', currentChatId)
             }
@@ -283,6 +338,7 @@ export default function ChatContainer({
             const uploadResponse = await fetch('/api/files', {
                 method: 'POST',
                 body: formData,
+                signal: abortControllerRef.current.signal
             })
 
             if (!uploadResponse.ok) throw new Error('Upload failed')
@@ -292,7 +348,6 @@ export default function ChatContainer({
                 pendingFileLinkId.current = fileData.id
             }
 
-            // Create file preview message with chat context
             const fileContent = await file.text()
             const sanitizedContent = fileContent
                 .split('\n')
@@ -302,20 +357,16 @@ export default function ChatContainer({
             const rows = sanitizedContent.split('\n')
             const columnNames = rows[0]
             const previewRows = rows.slice(1, 6).join('\n')
-            const dataPreview = `⚠️ EXACT column names:\n${columnNames}\n\nFirst 5 rows:\n${previewRows}`
 
-            const message = `Create a Streamlit app to visualize this data.`
-
-            // Send message with file and chat context
             await append(
                 {
-                    content: message,
+                    content: `Create a Streamlit app to visualize this data.`,
                     role: 'user',
                     createdAt: new Date(),
                 },
                 {
                     body: {
-                        chatId: currentChatId, // Always include current chat ID
+                        chatId: currentChatId,
                         fileId: fileData.id,
                         fileName: file.name,
                         fileContent: sanitizedContent,
@@ -326,19 +377,20 @@ export default function ChatContainer({
             setFileUploadState({ isUploading: false, progress: 100, error: null })
 
         } catch (error) {
-            console.error('Error uploading file:', error)
-            setFileUploadState({
-                isUploading: false,
-                progress: 0,
-                error: 'Failed to upload file. Please try again.'
-            })
+            if (error instanceof Error && error.name !== 'AbortError') {
+                console.error('Error uploading file:', error)
+                setFileUploadState({
+                    isUploading: false,
+                    progress: 0,
+                    error: 'Failed to upload file. Please try again.'
+                })
+            }
         }
     }, [append, currentChatId])
 
     // Event handlers
     const handleSubmit = useCallback(async (e: React.FormEvent, message: string, file?: File) => {
         e.preventDefault()
-        setShowTypingText(false)
         setHasFirstMessage(true)
         originalHandleSubmit(e)
     }, [originalHandleSubmit])
@@ -361,7 +413,10 @@ export default function ChatContainer({
     }, [sandboxId, session?.user?.id, generatedCode, updateStreamlitApp, setGeneratingCode])
 
     const handleCodeViewToggle = useCallback(() => {
-        setShowCodeView(prev => !prev)
+        setRightPanel(prev => ({
+            ...prev,
+            view: prev.view === 'code' ? 'preview' : 'code'
+        }))
     }, [])
 
     const handleChatSelect = useCallback((chatId: string) => {
@@ -378,9 +433,7 @@ export default function ChatContainer({
             setGeneratedCode(version.code)
             await updateStreamlitApp(version.code, true)
         } catch (error) {
-            setSandboxErrors(prev => [...prev, {
-                message: error instanceof Error ? error.message : 'Error updating version'
-            }])
+            setErrorState(error as Error)
         } finally {
             setGeneratingCode(false)
             isVersionSwitching.current = false
@@ -394,12 +447,10 @@ export default function ChatContainer({
     }, [])
 
     const toggleRightContent = useCallback(() => {
-        setIsRightContentVisible(prev => !prev)
-        if (resizableGroupRef.current) {
-            setTimeout(() => {
-                window.dispatchEvent(new Event('resize'))
-            }, 0)
-        }
+        setRightPanel(prev => ({
+            ...prev,
+            isVisible: !prev.isVisible
+        }))
     }, [])
 
     // Effects
@@ -428,28 +479,32 @@ export default function ChatContainer({
 
     useEffect(() => {
         const initializeChat = async () => {
-            if (!currentChatId) return
-
+            if (!currentChatId || isVersionSwitching.current || hasInitialized.current) return;
+            
+            hasInitialized.current = true;
+            
             try {
-                // Set initial messages first if they exist
                 if (initialMessages?.length) {
-                    console.log('Setting initial messages:', initialMessages.length)
-                    setMessages(initialMessages)
+                    setMessages(initialMessages);
                 }
 
-                // Handle version initialization
-                const versionData = Array.isArray(initialVersion) ? initialVersion[0] : initialVersion
+                if (!initialAppId && !currentAppId) {
+                    const chatResponse = await fetch(`/api/chats/${currentChatId}`);
+                    const chatData = await chatResponse.json();
+                    setCurrentAppId(chatData.app_id);
+                }
+
+                const versionData = Array.isArray(initialVersion) ? initialVersion[0] : initialVersion;
 
                 if (versionData?.code) {
-                    console.log('Initializing with version:', versionData.version_id)
-                    setIsRightContentVisible(true)
-                    setIsLoadingSandbox(true)
-                    setGeneratedCode(versionData.code)
-                    await updateStreamlitApp(versionData.code, true)
-                    return
+                    setRightPanel(prev => ({
+                        ...prev,
+                        isVisible: true
+                    }));
+                    setGeneratedCode(versionData.code);
+                    await updateStreamlitApp(versionData.code, true);
                 }
 
-                // Only fetch messages if we don't have initial messages
                 if (!initialMessages?.length) {
                     const messagesResponse = await fetch(`/api/chats/messages?chatId=${currentChatId}`)
                     if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
@@ -468,8 +523,11 @@ export default function ChatContainer({
                             .pop()
 
                         if (lastStreamlitCode) {
-                            setIsRightContentVisible(true)
-                            setIsLoadingSandbox(true)
+                            setRightPanel(prev => ({
+                                ...prev,
+                                isVisible: true
+                            }))
+                            setGeneratingCode(true)
                             setGeneratedCode(lastStreamlitCode)
                             await updateStreamlitApp(lastStreamlitCode, true)
                         }
@@ -481,36 +539,25 @@ export default function ChatContainer({
             } finally {
                 setGeneratingCode(false)
             }
-        }
+        };
 
-        initializeChat()
-    }, [
-        currentChatId,
-        initialVersion,
-        initialMessages,
-        updateStreamlitApp,
-        setMessages,
-        setGeneratedCode,
-        setGeneratingCode,
-        setIsLoadingSandbox,
-        setIsRightContentVisible,
-        setErrorState
-    ])
+        initializeChat();
+    }, [currentChatId]);
 
     // Cleanup effect
     useEffect(() => {
         return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+            }
             if (sandboxId) {
-                fetch(`/api/sandbox/${sandboxId}/kill`, {
-                    method: 'POST',
-                }).catch(console.error)
+                killSandbox().catch(console.error)
             }
             isExecutingRef.current = false
             setStreamlitUrl(null)
             setGeneratedCode('')
-            setIsLoadingSandbox(false)
         }
-    }, [sandboxId, setStreamlitUrl, setGeneratedCode, setIsLoadingSandbox])
+    }, [sandboxId, killSandbox, setStreamlitUrl, setGeneratedCode])
 
     // Loading states
     if (isLoading) {
@@ -568,7 +615,7 @@ export default function ChatContainer({
                                 "w-full relative flex flex-col",
                                 hasFirstMessage || isInChatPage ? "h-[calc(100vh-4rem)]" : "h-screen"
                             )}>
-                                {!isInChatPage && showTypingText && (
+                                {!isInChatPage && chatState.status === 'initial' && (
                                     <TypingText
                                         className='text-black dark:text-dark-text font-bold text-3xl'
                                         text='From Data to Apps, in seconds'
@@ -590,8 +637,10 @@ export default function ChatContainer({
                                         onChatFinish={handleChatFinish}
                                         onUpdateStreamlit={updateStreamlitApp}
                                         onCodeClick={() => {
-                                            setActiveTab('code')
-                                            setIsRightContentVisible(true)
+                                            setRightPanel(prev => ({
+                                                ...prev,
+                                                view: 'code'
+                                            }))
                                         }}
                                         isInChatPage={isInChatPage || hasFirstMessage}
                                     />
@@ -599,7 +648,7 @@ export default function ChatContainer({
                             </div>
                         </ResizablePanel>
 
-                        {isRightContentVisible && (
+                        {rightPanel.isVisible && (
                             <>
                                 <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 dark:from-white/10 dark:to-white/5 dark:hover:from-white/20 dark:hover:to-white/10 transition-colors" />
                                 <ResizablePanel
@@ -608,22 +657,23 @@ export default function ChatContainer({
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
                                 >
                                     <PreviewPanel
+                                        appId={currentAppId || undefined}
                                         streamlitUrl={streamlitUrl}
                                         generatedCode={generatedCode}
-                                        isGeneratingCode={isGeneratingCode}
                                         isLoadingSandbox={isLoadingSandbox}
-                                        showCodeView={showCodeView}
-                                        onRefresh={handleRefresh}
+                                        isGeneratingCode={isGeneratingCode}
+                                        showCodeView={rightPanel.view === 'code'}
                                         onCodeViewToggle={handleCodeViewToggle}
+                                        onRefresh={handleRefresh}
                                     />
                                 </ResizablePanel>
                             </>
                         )}
                     </ResizablePanelGroup>
                     <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
-                        {currentApp?.id && (
+                        {currentAppId && (
                             <VersionSelector
-                                appId={currentApp.id}
+                                appId={currentAppId}
                                 onVersionChange={handleVersionChange}
                                 ref={versionSelectorRef}
                             />
@@ -641,7 +691,7 @@ export default function ChatContainer({
                             )}
                             size="icon"
                         >
-                            {isRightContentVisible ? (
+                            {rightPanel.isVisible ? (
                                 <ChevronRight className="h-4 w-4" />
                             ) : (
                                 <ChevronLeft className="h-4 w-4" />
@@ -653,3 +703,4 @@ export default function ChatContainer({
         </div>
     )
 }
+

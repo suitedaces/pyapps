@@ -85,7 +85,8 @@ export default async function ChatPage({ params }: PageParams) {
         initialChat={chatResponse.data} 
         initialMessages={messages} 
         initialVersion={versionResponse.data}
-        initialFiles={files} 
+        initialFiles={files}
+        initialAppId={chatResponse.data.app_id}
         isInChatPage={true} 
     />
 }

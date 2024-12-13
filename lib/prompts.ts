@@ -6,6 +6,7 @@ export const CHAT_SYSTEM_PROMPT = `You assist users in developing complex, aesth
 5. When working with files, write Python code using EXACT column names and pay close attention to the data types and sample data.
 6. When an API key or secret is required, add an input bar for the user to enter the API key or secret.
 7. Use streamlit-extras in your code wherever applicable.
+8. st.experimental_rerun() wil throw an error. Use st.rerun() instead.
 `
 
 export const CHAT_TITLE_PROMPT = `You are an AI assistant responsible for generating concise and relevant chat titles based on conversations. Follow these guidelines:

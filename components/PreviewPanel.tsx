@@ -29,6 +29,7 @@ const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
+    appId?: string
     generatedCode: string
     isGeneratingCode: boolean
     isLoadingSandbox: boolean
@@ -39,6 +40,7 @@ interface PreviewPanelProps {
 
 export function PreviewPanel({
     streamlitUrl,
+    appId,
     generatedCode,
     isGeneratingCode,
     isLoadingSandbox,
@@ -49,6 +51,10 @@ export function PreviewPanel({
     const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
 
     const showOverlay = isGeneratingCode || isLoadingSandbox
+
+    const displayUrl = appId 
+        ? `${process.env.NEXT_PUBLIC_BASE_URL || ''}/apps/${appId}`
+        : null
 
     const handleRefresh = () => {
         if (streamlitPreviewRef.current) {
@@ -71,7 +77,7 @@ export function PreviewPanel({
                     <div className="flex items-center flex-grow gap-2 px-2 py-1.5 bg-background rounded-md border shadow-sm">
                         <Globe className="h-4 w-4 text-foreground/90" />
                         <Input
-                            value={streamlitUrl || ''}
+                            value={ displayUrl || ''}
                             readOnly
                             className="flex-grow font-mono text-sm border-0 focus-visible:ring-0 px-0 py-0 h-auto bg-transparent text-foreground selection:bg-blue-200"
                         />

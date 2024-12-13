@@ -26,7 +26,7 @@ export const streamlitTool: CoreTool<z.ZodObject<{
     appDescription: string
 }> = tool({
     parameters: streamlitToolSchema,
-    execute: async ({ code, requiredLibraries, appName, appDescription }) => {
+    execute: async ({ code, requiredLibraries, appName, appDescription }: { code: string, requiredLibraries: string[], appName: string, appDescription: string }) => {
         console.log('Generated Streamlit code:', {
             codeLength: code.length,
             firstLines: code.split('\n').slice(0, 3).join('\n'),

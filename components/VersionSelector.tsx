@@ -10,6 +10,7 @@ import {
     useEffect,
     useImperativeHandle,
     useState,
+    useRef,
 } from 'react'
 import { Button } from './ui/button'
 
@@ -29,7 +30,7 @@ export const VersionSelector = forwardRef<
     const [versions, setVersions] = useState<AppVersion[]>([])
     const [currentIndex, setCurrentIndex] = useState<number>(0)
     const [isLoading, setIsLoading] = useState(false)
-    const [hasInitialized, setHasInitialized] = useState(false)
+    const hasInitializedRef = useRef(false)
 
     const loadVersions = useCallback(async () => {
         if (!appId || isLoading) return
@@ -42,9 +43,9 @@ export const VersionSelector = forwardRef<
             if (versionsData.length > 0) {
                 setCurrentIndex(0)
 
-                if (!hasInitialized) {
+                if (!hasInitializedRef.current) {
                     onVersionChange(versionsData[0])
-                    setHasInitialized(true)
+                    hasInitializedRef.current = true
                 }
             }
         } catch (error) {
@@ -52,13 +53,13 @@ export const VersionSelector = forwardRef<
         } finally {
             setIsLoading(false)
         }
-    }, [appId, onVersionChange, hasInitialized, isLoading])
+    }, [appId, onVersionChange, isLoading])
 
     useImperativeHandle(
         ref,
         () => ({
             refreshVersions: () => {
-                setHasInitialized(false)
+                hasInitializedRef.current = false
                 return loadVersions()
             },
         }),
@@ -66,8 +67,7 @@ export const VersionSelector = forwardRef<
     )
 
     useEffect(() => {
-        if (appId) {
-            setHasInitialized(false)
+        if (appId && !hasInitializedRef.current) {
             loadVersions()
         }
     }, [appId, loadVersions])
@@ -109,9 +109,9 @@ export const VersionSelector = forwardRef<
             versionsCount: versions.length,
             currentIndex,
             isLoading,
-            hasInitialized,
+            hasInitialized: hasInitializedRef.current,
         })
-    }, [appId, versions.length, currentIndex, isLoading, hasInitialized])
+    }, [appId, versions.length, currentIndex, isLoading, hasInitializedRef.current])
 
     if (versions.length === 0 && !isLoading) return null
 

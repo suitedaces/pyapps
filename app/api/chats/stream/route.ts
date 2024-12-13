@@ -5,6 +5,250 @@ import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
 
+// Types
+interface StreamlitToolResult {
+    toolName: string
+    result?: {
+        code: string
+        appName: string
+        appDescription: string
+    }
+}
+
+interface FileContext {
+    fileName: string
+    fileType: string
+    analysis: string
+}
+
+// Chat Management
+async function createNewChat(supabase: any, userId: string, chatName: string) {
+    const { data: chat, error } = await supabase
+        .from('chats')
+        .insert([{ user_id: userId, name: chatName }])
+        .select()
+        .single()
+
+    if (error) throw error
+    return chat
+}
+
+async function linkFileToChat(supabase: any, chatId: string, fileId: string) {
+    const { error } = await supabase
+        .from('chat_files')
+        .insert([{ chat_id: chatId, file_id: fileId }])
+
+    if (error) {
+        console.error('Error associating file with chat:', error)
+        return false
+    }
+    return true
+}
+
+// File Management
+async function getFileContext(supabase: any, fileId: string, userId: string): Promise<FileContext | undefined> {
+    if (!fileId) return undefined
+
+    const { data: fileData } = await supabase
+        .from('files')
+        .select('*')
+        .eq('id', fileId)
+        .eq('user_id', userId)
+        .single()
+
+    if (!fileData) return undefined
+
+    return {
+        fileName: fileData.file_name,
+        fileType: fileData.file_type,
+        analysis: fileData.analysis,
+    }
+}
+
+// Message Management
+async function storeMessage(
+    supabase: any,
+    chatId: string,
+    userId: string,
+    userMessage: string,
+    assistantMessage: string,
+    toolCalls: any,
+    toolResults: any,
+    tokenCount: number
+) {
+    await supabase.from('messages').insert({
+        chat_id: chatId,
+        user_id: userId,
+        user_message: userMessage,
+        assistant_message: assistantMessage,
+        tool_calls: toolCalls as Json,
+        tool_results: toolResults as Json,
+        token_count: tokenCount,
+        created_at: new Date().toISOString(),
+    })
+}
+
+// App Version Management
+async function getNextVersionNumber(supabase: any, appId: string): Promise<number> {
+    const { data } = await supabase
+        .from('app_versions')
+        .select('version_number')
+        .eq('app_id', appId)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .single()
+
+    return (data?.version_number || 0) + 1
+}
+
+async function getCurrentAppVersion(supabase: any, appId: string) {
+    const { data: app } = await supabase
+        .from('apps')
+        .select('current_version_id')
+        .eq('id', appId)
+        .single()
+
+    if (!app?.current_version_id) return null
+
+    const { data: version } = await supabase
+        .from('app_versions')
+        .select('code')
+        .eq('id', app.current_version_id)
+        .single()
+
+    return version
+}
+
+async function createNewApp(supabase: any, userId: string, name: string, description: string) {
+    const { data: app } = await supabase
+        .from('apps')
+        .insert({
+            user_id: userId,
+            name,
+            description,
+            is_public: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            created_by: userId
+        })
+        .select()
+        .single()
+
+    return app
+}
+
+async function createAppVersion(
+    supabase: any,
+    appId: string,
+    versionNumber: number,
+    code: string,
+    name: string,
+    description: string
+) {
+    const { data: version } = await supabase
+        .from('app_versions')
+        .insert({
+            app_id: appId,
+            version_number: versionNumber,
+            code,
+            created_at: new Date().toISOString(),
+            name,
+            description
+        })
+        .select()
+        .single()
+
+    return version
+}
+
+async function updateAppCurrentVersion(supabase: any, appId: string, versionId: string) {
+    await supabase
+        .from('apps')
+        .update({ 
+            current_version_id: versionId,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', appId)
+}
+
+async function handleStreamlitAppVersioning(
+    supabase: any,
+    userId: string,
+    chatId: string,
+    toolResult: StreamlitToolResult
+): Promise<string | null> {
+    if (!toolResult.result) return null
+
+    const { code, appName, appDescription } = toolResult.result
+    
+    // Check for existing app
+    const { data: chat } = await supabase
+        .from('chats')
+        .select('app_id')
+        .eq('id', chatId)
+        .single()
+
+    let appId = chat?.app_id
+
+    if (!appId) {
+        // Create new app flow
+        const app = await createNewApp(
+            supabase,
+            userId,
+            appName || 'Untitled App',
+            appDescription || ''
+        )
+        appId = app.id
+
+        const version = await createAppVersion(
+            supabase,
+            appId,
+            1,
+            code,
+            appName || 'Version 1',
+            appDescription || ''
+        )
+
+        await Promise.all([
+            updateAppCurrentVersion(supabase, appId, version.id),
+            linkChatToApp(supabase, chatId, appId)
+        ])
+    } else {
+        // Update existing app flow
+        const currentVersion = await getCurrentAppVersion(supabase, appId)
+        
+        if (currentVersion?.code !== code) {
+            const nextVersion = await getNextVersionNumber(supabase, appId)
+            
+            const version = await createAppVersion(
+                supabase,
+                appId,
+                nextVersion,
+                code,
+                appName || `Version ${nextVersion}`,
+                appDescription || ''
+            )
+
+            await updateAppCurrentVersion(supabase, appId, version.id)
+        }
+    }
+
+    return appId
+}
+
+async function linkChatToApp(supabase: any, chatId: string, appId: string) {
+    await supabase
+        .from('chats')
+        .update({ app_id: appId })
+        .eq('id', chatId)
+}
+
+function buildSystemPrompt(fileContext: FileContext | undefined): string {
+    if (!fileContext) return CHAT_SYSTEM_PROMPT
+
+    return `${CHAT_SYSTEM_PROMPT}\n\nYou are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}" in the directory "/app/s3/data/${fileContext.fileName}". Here's some information about the file: ${fileContext.analysis}`
+}
+
 export async function POST(req: Request) {
     const supabase = await createClient()
     const user = await getUser()
@@ -13,71 +257,33 @@ export async function POST(req: Request) {
 
     try {
         const { messages, chatId, fileId, fileName, fileContent } = await req.json()
-
-        // Use existing chat ID if provided
         let newChatId = chatId
-        
-        // Only create new chat if no chat ID exists
+        let appId: string | null = null
+
+        // Initialize chat if needed
         if (!chatId) {
-            const { data: newChat, error } = await supabase
-                .from('chats')
-                .insert([
-                    {
-                        user_id: user.id,
-                        name: messages[messages.length - 1]?.content?.slice(0, 100) || 'New Chat',
-                    },
-                ])
-                .select()
-                .single()
-
-            if (error) throw error
-            newChatId = newChat.id
+            const chat = await createNewChat(
+                supabase,
+                user.id,
+                messages[messages.length - 1]?.content?.slice(0, 100) || 'New Chat'
+            )
+            newChatId = chat.id
         }
 
-        // Associate file with chat if provided
+        // Handle file association
         if (fileId && newChatId) {
-            const { error: chatFileError } = await supabase
-                .from('chat_files')
-                .insert([
-                    {
-                        chat_id: newChatId,
-                        file_id: fileId,
-                    },
-                ])
-
-            if (chatFileError) {
-                console.error('Error associating file with chat:', chatFileError)
-            }
+            await linkFileToChat(supabase, newChatId, fileId)
         }
 
-        let fileContext = undefined
-        if (fileId) {
-            const { data: fileData } = await supabase
-                .from('files')
-                .select('*')
-                .eq('id', fileId)
-                .eq('user_id', user.id)
-                .single()
-
-            fileContext = {
-                fileName: fileData?.file_name,
-                fileType: fileData?.file_type,
-                analysis: fileData?.analysis,
-            }
-        }
-
-        const SYSTEM_PROMPT = fileContext
-            ? `${CHAT_SYSTEM_PROMPT}\n\nYou are working with a ${fileContext?.fileType?.toUpperCase()} file named "${fileContext?.fileName}" in the directory "/app/s3/data/${fileContext?.fileName}". Here's some information about the file: ${fileContext?.analysis}`
-            : CHAT_SYSTEM_PROMPT
+        // Get file context if needed
+        const fileContext = await getFileContext(supabase, fileId, user.id)
+        const systemPrompt = buildSystemPrompt(fileContext)
 
         console.log('🔍 Streaming with fileContext:', fileContext)
         const result = await streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [
-                {
-                    role: 'system',
-                    content: SYSTEM_PROMPT,
-                },
+                { role: 'system', content: systemPrompt },
                 ...messages,
             ],
             tools: { streamlitTool },
@@ -89,45 +295,44 @@ export async function POST(req: Request) {
                 try {
                     const userMessage = messages[messages.length - 1].content
 
-                    // Create new chat if needed
-                    if (!newChatId) {
-                        const { data: chat } = await supabase
-                            .from('chats')
-                            .insert({
-                                user_id: user.id,
-                                name: userMessage.slice(0, 50) + '...',
-                                created_at: new Date().toISOString(),
-                                updated_at: new Date().toISOString(),
-                            })
-                            .select()
-                            .single()
+                    // Handle Streamlit versioning if tool results exist
+                    if (toolResults?.length) {
+                        const streamlitResult = toolResults.find((result: any) => 
+                            result.toolName === 'streamlitTool' && 
+                            result.result?.code
+                        )
 
-                        newChatId = chat?.id
+                        if (streamlitResult) {
+                            appId = await handleStreamlitAppVersioning(
+                                supabase,
+                                user.id,
+                                newChatId,
+                                streamlitResult
+                            )
+                        }
                     }
-                    // Store message with all relevant data
-                    await supabase.from('messages').insert({
-                        chat_id: newChatId as string,
-                        user_id: user.id,
-                        user_message: userMessage,
-                        assistant_message: text,
-                        tool_calls: toolCalls as Json,
-                        tool_results: toolResults as Json,
-                        token_count: usage.totalTokens,
-                        created_at: new Date().toISOString(),
-                    })
 
-                    return newChatId
+                    await storeMessage(
+                        supabase,
+                        newChatId,
+                        user.id,
+                        userMessage,
+                        text,
+                        toolCalls,
+                        toolResults,
+                        usage.totalTokens
+                    )
                 } catch (error) {
-                    console.error('Error storing message:', error)
+                    console.error('Error in message handling:', error)
                     throw error
                 }
             },
         })
 
-        // Important: Use toDataStreamResponse for proper streaming
         return result.toDataStreamResponse({
             headers: {
                 'x-chat-id': newChatId,
+                'x-app-id': appId || '',
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 Connection: 'keep-alive',
@@ -141,4 +346,5 @@ export async function POST(req: Request) {
         )
     }
 }
+
 export const runtime = 'nodejs'

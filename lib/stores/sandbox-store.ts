@@ -85,8 +85,8 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
         }
     },
 
-    killSandbox: async () => {
-        const { sandboxId } = get()
+    killSandbox: async (sandboxId: string) => {
+
         if (sandboxId) {
             try {
                 set({ error: null })
