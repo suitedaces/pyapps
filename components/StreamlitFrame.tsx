@@ -33,7 +33,7 @@ const StreamlitFrame = forwardRef<StreamlitFrameRef, StreamlitFrameProps>(
             const timer = setTimeout(() => {
                 refreshIframe()
                 setIsInitialLoad(false)
-            }, 3500)
+            }, 3000)
 
             return () => clearTimeout(timer)
         }, [url])
