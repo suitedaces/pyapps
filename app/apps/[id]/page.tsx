@@ -6,6 +6,11 @@ import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
 import { Button } from '@/components/ui/button'
 import { RefreshCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { VersionSelector } from '@/components/VersionSelector'
+import { AppHeader } from '@/components/AppHeader'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
+import { StreamlitFrame } from '@/components/StreamlitFrame'
 
 interface PageParams {
     params: Promise<{ id: string }>
@@ -15,54 +20,43 @@ export default async function AppPage({ params }: PageParams) {
     const { id } = await params
     const user = await getUser()
     
-    const supabase = await createClient()
-
-    // Fetch app and its current version
-    const { data: app, error } = await supabase
-        .from('apps')
-        .select(`
-            *,
-            app_versions!inner (
-                code,
-                version_number,
-                created_at
-            )
-        `)
-        .eq('id', id)
-        .eq('app_versions.id', 'apps.current_version_id')
-        .single()
-
-    if (error || !app) {
-        console.error('Error fetching app:', error)
+    if (!user) {
         notFound()
     }
 
-    // Initialize sandbox
-    const sandboxResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sandbox/${id}/execute`, {
+    const supabase = await createClient()
+
+    const { data: app, error } = await supabase
+        .rpc('get_app_versions', { p_app_id: id })
+        .select()
+
+    if (error || !app || app.length === 0) {
+        console.error('Error fetching app:', error?.message)
+        notFound()
+    }
+
+    // Get auth token for sandbox request
+    const cookieStore = await cookies()
+    const supabaseToken = cookieStore.get('sb-token')?.value
+
+    // Initialize sandbox with auth
+    const sandboxResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sandbox/new/execute`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseToken}`,
+            'Cookie': cookieStore.getAll()
+                .map((cookie: { name: string; value: string }) => `${cookie.name}=${cookie.value}`)
+                .join('; ')
         },
         body: JSON.stringify({
-            code: app.app_versions[0].code
+            code: app[0].code
         })
     })
 
     if (!sandboxResponse.ok) {
-        console.error('Failed to initialize sandbox')
-        notFound()
-    }
-
-    const chatResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/chats/${id}`, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-
-    if (!chatResponse.ok) {
-        console.error('Failed to fetch chat')
-        notFound()
+        console.error('Failed to initialize sandbox:', await sandboxResponse.text())
+        return <div>Failed to load app. Please try again later.</div>
     }
 
     const { url: sandboxUrl } = await sandboxResponse.json()
@@ -70,37 +64,13 @@ export default async function AppPage({ params }: PageParams) {
     return (
         <ThemeProvider>
             <div className="min-h-screen flex flex-col bg-white dark:bg-dark-app">
-                {/* Header with branding and theme toggle */}
-                <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-dark-app z-50">
-                    <div className="h-full px-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <Logo inverted={false} />
-                            <div className="hidden sm:block">
-                                <h1 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                                    {app.name}
-                                </h1>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                            >
-                                <RefreshCcw className="h-4 w-4" />
-                            </Button>
-                            <ThemeSwitcherButton />
-                        </div>
-                    </div>
-                </header>
-
-                {/* Full screen iframe */}
+                <AppHeader
+                    appId={id}
+                    appName={app[0].name ?? ''}
+                    initialVersions={app}
+                />
                 <main className="flex-1">
-                    <iframe
-                        src={sandboxUrl}
-                        className="w-full h-full border-0"
-                        allow="camera"
-                    />
+                    <StreamlitFrame url={sandboxUrl} />
                 </main>
             </div>
         </ThemeProvider>

@@ -432,6 +432,7 @@ export default function ChatContainer({
 
         try {
             setGeneratedCode(version.code)
+            // Force sandbox refresh when switching versions
             await updateStreamlitApp(version.code, true)
         } catch (error) {
             setErrorState(error as Error)
