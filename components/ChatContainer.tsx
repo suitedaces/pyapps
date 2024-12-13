@@ -98,7 +98,8 @@ export default function ChatContainer({
         isGeneratingCode,
         isLoadingSandbox,
         setStreamlitUrl,
-        setGeneratedCode
+        setGeneratedCode,
+        setIsLoadingSandbox
     } = useSandboxStore()
 
     // Refs for preventing race conditions
@@ -301,6 +302,11 @@ export default function ChatContainer({
                     const url = await updateSandbox(code, forceExecute)
                     if (url) {
                         setStreamlitUrl(url)
+                        if (streamlitPreviewRef.current?.refreshIframe) {
+                            streamlitPreviewRef.current.refreshIframe()
+                            await new Promise(resolve => setTimeout(resolve, 2000))
+                            setIsLoadingSandbox(false)
+                        }
                         return url
                     }
                 } catch (error) {
@@ -317,7 +323,7 @@ export default function ChatContainer({
             isExecutingRef.current = false
             setGeneratingCode(false)
         }
-    }, [updateSandbox, setStreamlitUrl, setGeneratingCode])
+    }, [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox])
 
     // Improved file upload with abort controller
     const handleFileUpload = useCallback(async (file: File) => {
@@ -395,7 +401,8 @@ export default function ChatContainer({
         e.preventDefault()
         setHasFirstMessage(true)
         originalHandleSubmit(e)
-    }, [originalHandleSubmit])
+        updateChatState({ status: 'active' })
+    }, [originalHandleSubmit, updateChatState])
 
     const handleInputChange = useCallback((value: string) => {
         originalHandleInputChange({ target: { value } } as React.ChangeEvent<HTMLTextAreaElement>)
@@ -435,12 +442,6 @@ export default function ChatContainer({
             setGeneratedCode(version.code)
             // Wait for sandbox update to complete
             await updateStreamlitApp(version.code, true)
-            // Add this line to refresh the iframe
-            if (streamlitPreviewRef.current?.refreshIframe) {
-                setTimeout(() => {
-                    streamlitPreviewRef.current?.refreshIframe()
-                }, 1200)
-            }
         } catch (error) {
             setErrorState(error as Error)
         } finally {
