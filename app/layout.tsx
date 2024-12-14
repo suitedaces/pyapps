@@ -1,6 +1,6 @@
 import { AuthProvider } from '@/contexts/AuthContext'
 import { SidebarProvider } from '@/contexts/SidebarContext'
-import { ThemeProvider } from '@/contexts/ThemeProvider'
+import { ThemeProvider } from '@/providers/theme-provider'
 import { cn } from '@/lib/utils'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
@@ -21,13 +21,18 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" suppressHydrationWarning>
+            <head />
             <body
                 className={cn(
                     inter.className,
                     'antialiased bg-white dark:bg-dark-app'
                 )}
             >
-                <ThemeProvider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                >
                     <Providers>
                         <AuthProvider>
                             <SidebarProvider>{children}</SidebarProvider>
