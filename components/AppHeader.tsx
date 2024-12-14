@@ -19,7 +19,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ appId, appName, initialVersions, initialUrl, streamlitRef }: AppHeaderProps) {
-    const { updateSandbox, setGeneratingCode, setGeneratedCode } = useSandboxStore()
+    const { updateSandbox, setGeneratingCode, setGeneratedCode, setIsLoadingSandbox } = useSandboxStore()
     const isUpdatingRef = useRef(false)
 
     const handleVersionChange = useCallback(async (version: AppVersion) => {
@@ -29,18 +29,20 @@ export function AppHeader({ appId, appName, initialVersions, initialUrl, streaml
         setGeneratingCode(true)
         
         try {
+            setIsLoadingSandbox(true)
             setGeneratedCode(version.code)
             await updateSandbox(version.code, true)
             
             if (streamlitRef?.current) {
-                requestAnimationFrame(() => {
-                    streamlitRef.current?.refreshIframe()
-                })
+                await new Promise(resolve => requestAnimationFrame(resolve))
+                await new Promise(resolve => setTimeout(resolve, 2000))
+                streamlitRef.current.refreshIframe()
             }
         } catch (error) {
             console.error('Error updating version:', error)
         } finally {
             setGeneratingCode(false)
+            setIsLoadingSandbox(false)
             isUpdatingRef.current = false
         }
     }, [updateSandbox, setGeneratingCode, setGeneratedCode, streamlitRef])
@@ -65,7 +67,6 @@ export function AppHeader({ appId, appName, initialVersions, initialUrl, streaml
                 <div className="flex items-center gap-4">
                     <VersionSelector
                         appId={appId}
-                        initialVersions={initialVersions as AppVersion[]}
                         onVersionChange={handleVersionChange}
                     />
                     <Button
@@ -76,7 +77,7 @@ export function AppHeader({ appId, appName, initialVersions, initialUrl, streaml
                     >
                         <RefreshCcw className="h-4 w-4" />
                     </Button>
-                    <ThemeSwitcherButton />
+                    <ThemeSwitcherButton showLabel={false} />
                 </div>
             </div>
         </header>

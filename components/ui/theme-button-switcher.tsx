@@ -13,7 +13,11 @@ const spring = {
   duration: 0.5
 };
 
-export const ThemeSwitcherButton = () => {
+interface ThemeSwitcherButtonProps {
+  showLabel?: boolean;
+}
+
+export const ThemeSwitcherButton = ({ showLabel = true }: ThemeSwitcherButtonProps) => {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -29,9 +33,11 @@ export const ThemeSwitcherButton = () => {
   if (!mounted) {
     return (
       <div className="flex items-center justify-between gap-4">
-        <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-          Theme
-        </span>
+        {showLabel && (
+          <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+            Theme
+          </span>
+        )}
         <div className="relative flex h-8 items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-100 p-1 dark:bg-neutral-800">
           <div className="h-6 w-[72px]" />
         </div>
@@ -41,9 +47,11 @@ export const ThemeSwitcherButton = () => {
 
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-        Theme
-      </span>
+      {showLabel && (
+        <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+          Theme
+        </span>
+      )}
       <div className="relative flex h-8 items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-100 p-1 dark:bg-neutral-800">
         <motion.div
           className="absolute h-6 w-6 rounded bg-white dark:bg-neutral-700"
