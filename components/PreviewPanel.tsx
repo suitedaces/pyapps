@@ -16,6 +16,7 @@ import { useRef } from 'react'
 import { CodeView } from './CodeView'
 import dynamic from 'next/dynamic'
 import { AnimatePresence } from 'framer-motion'
+import React from 'react'
 
 // Dynamically import LoadingSandbox with SSR disabled
 const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
@@ -29,6 +30,7 @@ const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
 
 interface PreviewPanelProps {
     streamlitUrl: string | null
+    appId?: string
     generatedCode: string
     isGeneratingCode: boolean
     isLoadingSandbox: boolean
@@ -37,18 +39,33 @@ interface PreviewPanelProps {
     onCodeViewToggle: () => void
 }
 
-export function PreviewPanel({
+export const PreviewPanel = React.forwardRef<
+    { refreshIframe: () => void }, 
+    PreviewPanelProps
+>(({
     streamlitUrl,
+    appId,
     generatedCode,
     isGeneratingCode,
     isLoadingSandbox,
     showCodeView,
     onRefresh,
     onCodeViewToggle,
-}: PreviewPanelProps) {
+}, ref) => {
     const streamlitPreviewRef = useRef<StreamlitPreviewRef>(null)
 
+    React.useImperativeHandle(ref, () => ({
+        refreshIframe: () => {
+            if (streamlitPreviewRef.current) {
+                streamlitPreviewRef.current.refreshIframe()
+            }
+        }
+    }))
     const showOverlay = isGeneratingCode || isLoadingSandbox
+
+    const displayUrl = appId 
+        ? `${process.env.NEXT_PUBLIC_BASE_URL || ''}/apps/${appId}`
+        : null
 
     const handleRefresh = () => {
         if (streamlitPreviewRef.current) {
@@ -71,7 +88,7 @@ export function PreviewPanel({
                     <div className="flex items-center flex-grow gap-2 px-2 py-1.5 bg-background rounded-md border shadow-sm">
                         <Globe className="h-4 w-4 text-foreground/90" />
                         <Input
-                            value={streamlitUrl || ''}
+                            value={ displayUrl || ''}
                             readOnly
                             className="flex-grow font-mono text-sm border-0 focus-visible:ring-0 px-0 py-0 h-auto bg-transparent text-foreground selection:bg-blue-200"
                         />
@@ -146,4 +163,6 @@ export function PreviewPanel({
             </div>
         </div>
     )
-}
+})
+
+PreviewPanel.displayName = 'PreviewPanel'

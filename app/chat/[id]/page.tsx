@@ -8,14 +8,6 @@ interface PageParams {
     params: Promise<{ id: string }>
 }
 
-interface VersionResponse {
-    data: AppVersion[] | null
-    error: any
-    count: number | null
-    status: number
-    statusText: string
-}
-
 export default async function ChatPage({ params }: PageParams) {
     const { id } = await params
     const user = await getUser()
@@ -85,7 +77,8 @@ export default async function ChatPage({ params }: PageParams) {
         initialChat={chatResponse.data} 
         initialMessages={messages} 
         initialVersion={versionResponse.data}
-        initialFiles={files} 
+        initialFiles={files}
+        initialAppId={chatResponse.data.app_id}
         isInChatPage={true} 
     />
 }

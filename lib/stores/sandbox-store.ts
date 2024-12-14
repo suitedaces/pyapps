@@ -70,7 +70,6 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 sandboxId: data.sandboxId,
                 streamlitUrl: data.url,
                 isInitializing: false,
-                isLoadingSandbox: false
             })
             return data.url
         } catch (error) {
@@ -87,6 +86,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
 
     killSandbox: async () => {
         const { sandboxId } = get()
+        
         if (sandboxId) {
             try {
                 set({ error: null })

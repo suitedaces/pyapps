@@ -479,6 +479,8 @@ export interface Database {
                     id: string
                     version_number: number
                     code: string
+                    name: string | null
+                    description: string | null
                     created_at: string
                     is_current: boolean
                 }[]

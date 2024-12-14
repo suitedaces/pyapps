@@ -7,7 +7,7 @@ const Textarea = React.forwardRef<
     React.ComponentProps<'textarea'>
 >(({ className, ...props }, ref) => {
   return (
-    <div className="relative w-full rounded-md border border-neutral-200 dark:border-dark-textAreaBorder">
+    <div className="relative w-full rounded-md border-2 border-neutral-200 dark:border-dark-textAreaBorder">
       <textarea
         className={cn(
             "flex min-h-[80px] w-full bg-white px-3 py-2 text-base ring-offset-white",
