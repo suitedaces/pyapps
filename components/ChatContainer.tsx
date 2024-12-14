@@ -709,147 +709,143 @@ export default function ChatContainer({
 
     return (
         <div className="bg-white dark:bg-dark-app relative flex h-screen overflow-hidden">
-            {shouldShowAuthPrompt ? (
-                <AuthPrompt />
-            ) : (
-                <>
-                    <div className="absolute top-0 left-0 w-full h-full">
-                        <div className="godrays top-0 left-0 w-full min-h-[30vh] relative z-5">
-                            <div className="godrays-overlay dark:mix-blend-darken z-10" />
-                        </div>
-                    </div>
-                    <AppSidebar
-                        onChatSelect={handleChatSelect}
-                        currentChatId={currentChatId}
-                        chats={sidebarChats}
-                        isCreatingChat={isCreatingChat}
-                        chatTitles={chatTitles}
-                        onGenerateTitle={generateTitle}
-                    />
-                    <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
-                        {sidebarCollapsed && (
+            <div className="absolute top-0 left-0 w-full h-full">
+                <div className="godrays top-0 left-0 w-full min-h-[30vh] relative z-5">
+                    <div className="godrays-overlay dark:mix-blend-darken z-10" />
+                </div>
+            </div>
+            <AppSidebar
+                onChatSelect={handleChatSelect}
+                currentChatId={currentChatId}
+                chats={sidebarChats}
+                isCreatingChat={isCreatingChat}
+                chatTitles={chatTitles}
+                onGenerateTitle={generateTitle}
+            />
+            <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
+                {sidebarCollapsed && (
+                    <div
+                        className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
+                        style={{
+                            left: '4rem',
+                            right: 0,
+                        }}
+                    ></div>
+                )}
+                <main
+                    className={cn(
+                        'flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative',
+                        'h-screen pt-14'
+                    )}
+                >
+                    <ResizablePanelGroup
+                        direction="horizontal"
+                        ref={resizableGroupRef}
+                    >
+                        <ResizablePanel defaultSize={40} minSize={30}>
                             <div
-                                className="fixed top-0 h-14 flex items-center z-20 transition-all duration-200"
-                                style={{
-                                    left: '4rem',
-                                    right: 0,
-                                }}
-                            ></div>
-                        )}
-                        <main
-                            className={cn(
-                                'flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative',
-                                'h-screen pt-14'
-                            )}
-                        >
-                            <ResizablePanelGroup
-                                direction="horizontal"
-                                ref={resizableGroupRef}
+                                className={cn(
+                                    'w-full relative flex flex-col',
+                                    hasFirstMessage || isInChatPage
+                                        ? 'h-[calc(100vh-4rem)]'
+                                        : 'h-screen'
+                                )}
                             >
-                                <ResizablePanel defaultSize={40} minSize={30}>
-                                    <div
-                                        className={cn(
-                                            'w-full relative flex flex-col',
-                                            hasFirstMessage || isInChatPage
-                                                ? 'h-[calc(100vh-4rem)]'
-                                                : 'h-screen'
-                                        )}
-                                    >
-                                        {!isInChatPage &&
-                                            chatState.status === 'initial' && (
-                                                <TypingText
-                                                    className="text-black dark:text-dark-text font-bold text-3xl"
-                                                    text="From Data to Apps, in seconds"
-                                                    speed={30}
-                                                    show={true}
-                                                />
-                                            )}
-                                        <div className="max-w-[800px] mx-auto w-full h-full">
-                                            <Chat
-                                                messages={messages}
-                                                isLoading={chatLoading}
-                                                input={input}
-                                                onInputChange={handleInputChange}
-                                                onSubmit={handleSubmit}
-                                                fileUploadState={fileUploadState}
-                                                onFileUpload={handleFileUpload}
-                                                errorState={errorState}
-                                                onErrorDismiss={() =>
-                                                    setErrorState(null)
-                                                }
-                                                onChatFinish={handleChatFinish}
-                                                onUpdateStreamlit={updateStreamlitApp}
-                                                onCodeClick={() => {
-                                                    setRightPanel((prev) => ({
-                                                        ...prev,
-                                                        view: 'code',
-                                                    }))
-                                                }}
-                                                isInChatPage={
-                                                    isInChatPage || hasFirstMessage
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                </ResizablePanel>
-
-                                {rightPanel.isVisible && (
-                                    <>
-                                        <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 dark:from-white/10 dark:to-white/5 dark:hover:from-white/20 dark:hover:to-white/10 transition-colors" />
-                                        <ResizablePanel
-                                            defaultSize={60}
-                                            minSize={40}
-                                            className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
-                                        >
-                                            <PreviewPanel
-                                                ref={streamlitPreviewRef}
-                                                appId={currentAppId || undefined}
-                                                streamlitUrl={streamlitUrl}
-                                                generatedCode={generatedCode}
-                                                isLoadingSandbox={isLoadingSandbox}
-                                                isGeneratingCode={isGeneratingCode}
-                                                showCodeView={
-                                                    rightPanel.view === 'code'
-                                                }
-                                                onCodeViewToggle={handleCodeViewToggle}
-                                                onRefresh={handleRefresh}
-                                            />
-                                        </ResizablePanel>
-                                    </>
-                                )}
-                            </ResizablePanelGroup>
-                            <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
-                                {currentAppId && (
-                                    <VersionSelector
-                                        appId={currentAppId}
-                                        onVersionChange={handleVersionChange}
-                                        ref={versionSelectorRef}
+                                {!isInChatPage &&
+                                    chatState.status === 'initial' && (
+                                        <TypingText
+                                            className="text-black dark:text-dark-text font-bold text-3xl"
+                                            text="From Data to Apps, in seconds"
+                                            speed={30}
+                                            show={true}
+                                        />
+                                    )}
+                                <div className="max-w-[800px] mx-auto w-full h-full">
+                                    <Chat
+                                        messages={messages}
+                                        isLoading={chatLoading}
+                                        input={input}
+                                        onInputChange={handleInputChange}
+                                        onSubmit={handleSubmit}
+                                        fileUploadState={fileUploadState}
+                                        onFileUpload={handleFileUpload}
+                                        errorState={errorState}
+                                        onErrorDismiss={() =>
+                                            setErrorState(null)
+                                        }
+                                        onChatFinish={handleChatFinish}
+                                        onUpdateStreamlit={updateStreamlitApp}
+                                        onCodeClick={() => {
+                                            setRightPanel((prev) => ({
+                                                ...prev,
+                                                view: 'code',
+                                            }))
+                                        }}
+                                        isInChatPage={
+                                            isInChatPage || hasFirstMessage
+                                        }
                                     />
-                                )}
-
-                                <Button
-                                    onClick={toggleRightContent}
-                                    className={cn(
-                                        'bg-black dark:bg-dark-background dark:border-neutral-400 hover:bg-black/90',
-                                        'text-white',
-                                        'border border-transparent dark:border-dark-border',
-                                        'transition-all duration-200 ease-in-out',
-                                        'shadow-lg hover:shadow-xl',
-                                        'rounded-lg'
-                                    )}
-                                    size="icon"
-                                >
-                                    {rightPanel.isVisible ? (
-                                        <ChevronRight className="h-4 w-4" />
-                                    ) : (
-                                        <ChevronLeft className="h-4 w-4" />
-                                    )}
-                                </Button>
+                                </div>
                             </div>
-                        </main>
+                        </ResizablePanel>
+
+                        {rightPanel.isVisible && (
+                            <>
+                                <CustomHandle className="bg-gradient-to-r from-black/10 to-black/5 hover:from-black/20 hover:to-black/10 dark:from-white/10 dark:to-white/5 dark:hover:from-white/20 dark:hover:to-white/10 transition-colors" />
+                                <ResizablePanel
+                                    defaultSize={60}
+                                    minSize={40}
+                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
+                                >
+                                    <PreviewPanel
+                                        ref={streamlitPreviewRef}
+                                        appId={currentAppId || undefined}
+                                        streamlitUrl={streamlitUrl}
+                                        generatedCode={generatedCode}
+                                        isLoadingSandbox={isLoadingSandbox}
+                                        isGeneratingCode={isGeneratingCode}
+                                        showCodeView={
+                                            rightPanel.view === 'code'
+                                        }
+                                        onCodeViewToggle={handleCodeViewToggle}
+                                        onRefresh={handleRefresh}
+                                    />
+                                </ResizablePanel>
+                            </>
+                        )}
+                    </ResizablePanelGroup>
+                    <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
+                        {currentAppId && (
+                            <VersionSelector
+                                appId={currentAppId}
+                                onVersionChange={handleVersionChange}
+                                ref={versionSelectorRef}
+                            />
+                        )}
+
+                        <Button
+                            onClick={toggleRightContent}
+                            className={cn(
+                                'bg-black dark:bg-dark-background dark:border-neutral-400 hover:bg-black/90',
+                                'text-white',
+                                'border border-transparent dark:border-dark-border',
+                                'transition-all duration-200 ease-in-out',
+                                'shadow-lg hover:shadow-xl',
+                                'rounded-lg'
+                            )}
+                            size="icon"
+                        >
+                            {rightPanel.isVisible ? (
+                                <ChevronRight className="h-4 w-4" />
+                            ) : (
+                                <ChevronLeft className="h-4 w-4" />
+                            )}
+                        </Button>
                     </div>
-                </>
-            )}
+                </main>
+            </div>
+
+            {shouldShowAuthPrompt && <AuthPrompt />}
         </div>
     )
 }
