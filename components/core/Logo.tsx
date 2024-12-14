@@ -42,7 +42,9 @@ export function Logo({
             <span
                 className={cn(
                     'text-2xl',
-                    inverted ? 'text-black dark:text-white' : 'text-white dark:text-black'
+                    inverted
+                        ? 'text-black dark:text-white'
+                        : 'text-white dark:text-black'
                 )}
             >
                 py_
@@ -50,7 +52,9 @@ export function Logo({
             <span
                 className={cn(
                     'cursor absolute text-2xl',
-                    inverted ? 'text-black dark:text-white' : 'text-white dark:text-black'
+                    inverted
+                        ? 'text-black dark:text-white'
+                        : 'text-white dark:text-black'
                 )}
             >
                 |

@@ -1,8 +1,14 @@
 'use client'
 
-import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Loader2 } from 'lucide-react'
+import {
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useRef,
+    useState,
+} from 'react'
 
 export interface StreamlitFrameRef {
     refreshIframe: () => void
@@ -25,9 +31,13 @@ const StreamlitFrame = forwardRef<StreamlitFrameRef, StreamlitFrameProps>(
             }
         }
 
-        useImperativeHandle(ref, () => ({
-            refreshIframe
-        }), [url])
+        useImperativeHandle(
+            ref,
+            () => ({
+                refreshIframe,
+            }),
+            [url]
+        )
 
         useEffect(() => {
             const timer = setTimeout(() => {
@@ -51,8 +61,9 @@ const StreamlitFrame = forwardRef<StreamlitFrameRef, StreamlitFrameProps>(
                     id="streamlit-iframe"
                     src={url}
                     className={cn(
-                        "w-full h-full border-0",
-                        (isLoading || isInitialLoad) && "blur-sm transition-all duration-200"
+                        'w-full h-full border-0',
+                        (isLoading || isInitialLoad) &&
+                            'blur-sm transition-all duration-200'
                     )}
                     allow="camera"
                     onLoad={handleIframeLoad}

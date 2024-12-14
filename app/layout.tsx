@@ -1,11 +1,11 @@
 import { AuthProvider } from '@/contexts/AuthContext'
 import { SidebarProvider } from '@/contexts/SidebarContext'
+import { ThemeProvider } from '@/contexts/ThemeProvider'
+import { cn } from '@/lib/utils'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
-import { cn } from '@/lib/utils'
-import { ThemeProvider } from '@/contexts/ThemeProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -21,13 +21,16 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={cn(inter.className, 'antialiased bg-white dark:bg-dark-app')}>
+            <body
+                className={cn(
+                    inter.className,
+                    'antialiased bg-white dark:bg-dark-app'
+                )}
+            >
                 <ThemeProvider>
                     <Providers>
                         <AuthProvider>
-                            <SidebarProvider>
-                                {children}
-                            </SidebarProvider>
+                            <SidebarProvider>{children}</SidebarProvider>
                         </AuthProvider>
                     </Providers>
                 </ThemeProvider>

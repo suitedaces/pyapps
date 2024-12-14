@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Message } from 'ai'
 import Chatbar from '@/components/core/chatbar'
 import { Message as AIMessage } from '@/components/core/message'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Message } from 'ai'
 import { XCircle } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 
 interface FileUploadState {
     isUploading: boolean
@@ -19,7 +19,11 @@ interface ChatProps {
     isLoading: boolean
     input: string
     onInputChange: (value: string) => void
-    onSubmit: (e: React.FormEvent, message: string, file?: File) => Promise<void>
+    onSubmit: (
+        e: React.FormEvent,
+        message: string,
+        file?: File
+    ) => Promise<void>
     fileUploadState: FileUploadState
     onFileUpload: (file: File) => void
     errorState: Error | null
@@ -48,7 +52,11 @@ export function Chat({
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     // Handle submission
-    const handleSubmit = async (e: React.FormEvent, message: string, file?: File) => {
+    const handleSubmit = async (
+        e: React.FormEvent,
+        message: string,
+        file?: File
+    ) => {
         e.preventDefault()
         if (!message.trim() && !file) return
 
@@ -79,9 +87,9 @@ export function Chat({
         fileUploadState = {
             isUploading: false,
             progress: 0,
-            error: null
+            error: null,
         }
-        onFileUpload(file)  // Ye direct parent component ko file bhej raha hai
+        onFileUpload(file) // Ye direct parent component ko file bhej raha hai
     }
 
     return (
@@ -110,16 +118,19 @@ export function Chat({
 
             {/* Messages */}
             <ScrollArea className="h-full p-4 space-y-4 w-full max-w-[800px] m-auto pb-6">
-                {Array.isArray(messages) && messages.map((message, index) => (
-                    <AIMessage
-                        key={message.id}
-                        {...message}
-                        isLastMessage={index === messages.length - 1}
-                        isLoading={isLoading && index === messages.length - 1}
-                        onCodeClick={handleCodeClick}
-                        toolInvocations={message.toolInvocations}
-                    />
-                ))}
+                {Array.isArray(messages) &&
+                    messages.map((message, index) => (
+                        <AIMessage
+                            key={message.id}
+                            {...message}
+                            isLastMessage={index === messages.length - 1}
+                            isLoading={
+                                isLoading && index === messages.length - 1
+                            }
+                            onCodeClick={handleCodeClick}
+                            toolInvocations={message.toolInvocations}
+                        />
+                    ))}
                 <div ref={messagesEndRef} />
             </ScrollArea>
 

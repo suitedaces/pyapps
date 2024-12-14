@@ -4,8 +4,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
     let response = NextResponse.next({
         request: {
-            headers: request.headers
-        }
+            headers: request.headers,
+        },
     })
 
     const supabase = createServerClient(
@@ -20,35 +20,35 @@ export async function middleware(request: NextRequest) {
                     request.cookies.set({
                         name,
                         value,
-                        ...options
+                        ...options,
                     })
                     response = NextResponse.next({
                         request: {
-                            headers: request.headers
-                        }
+                            headers: request.headers,
+                        },
                     })
                     response.cookies.set({
                         name,
                         value,
-                        ...options
+                        ...options,
                     })
                 },
                 remove(name: string, options: any) {
                     request.cookies.delete({
                         name,
-                        ...options
+                        ...options,
                     })
                     response = NextResponse.next({
                         request: {
-                            headers: request.headers
-                        }
+                            headers: request.headers,
+                        },
                     })
                     response.cookies.delete({
                         name,
-                        ...options
+                        ...options,
                     })
-                }
-            }
+                },
+            },
         }
     )
 
@@ -57,5 +57,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
+    matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }

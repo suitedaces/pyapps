@@ -1,9 +1,13 @@
 import { Card, CardContent } from '@/components/ui/card'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { motion, AnimatePresence } from 'framer-motion'
-import { enableDeprecationWarnings, BundledLanguage, createHighlighter } from 'shiki'
+import { useEffect, useRef, useState } from 'react'
+import {
+    BundledLanguage,
+    createHighlighter,
+    enableDeprecationWarnings,
+} from 'shiki'
 
 enableDeprecationWarnings()
 
@@ -15,20 +19,17 @@ interface CodeViewProps {
     containerClassName?: string
 }
 
-const LoadingSandbox = dynamic(
-    () => import('./LoadingSandbox'),
-    { ssr: false }
-)
+const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), { ssr: false })
 
 const CODE_THEMES = {
     dark: {
         primary: 'github-dark-high-contrast',
         alternate: 'github-dark-default',
-        extra: 'ayu-dark'
+        extra: 'ayu-dark',
     },
     light: {
-        primary: 'github-light'
-    }
+        primary: 'github-light',
+    },
 } as const
 
 export function CodeView({
@@ -36,7 +37,7 @@ export function CodeView({
     isGeneratingCode,
     language = 'python',
     className = '',
-    containerClassName = ''
+    containerClassName = '',
 }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
     const [highlightedHtml, setHighlightedHtml] = useState('')
@@ -48,12 +49,12 @@ export function CodeView({
         const initHighlighter = async () => {
             const allThemes = [
                 ...Object.values(CODE_THEMES.dark),
-                ...Object.values(CODE_THEMES.light)
+                ...Object.values(CODE_THEMES.light),
             ]
 
             const highlighter = await createHighlighter({
                 langs: [language],
-                themes: allThemes
+                themes: allThemes,
             })
 
             if (displayCode) {
@@ -61,7 +62,7 @@ export function CodeView({
                     lang: language,
                     themes: {
                         light: CODE_THEMES.light.primary,
-                        dark: CODE_THEMES.dark.primary
+                        dark: CODE_THEMES.dark.primary,
                     },
                 })
                 setHighlightedHtml(html)
@@ -74,16 +75,18 @@ export function CodeView({
     // Handle streaming code updates
     useEffect(() => {
         if (code) {
-            const newCode = typeof code === 'object' && 'code' in code
-                ? code.code
-                : String(code)
+            const newCode =
+                typeof code === 'object' && 'code' in code
+                    ? code.code
+                    : String(code)
 
             codeRef.current = newCode
             setDisplayCode(newCode)
 
             // Auto-scroll to bottom
             if (containerRef.current) {
-                containerRef.current.scrollTop = containerRef.current.scrollHeight
+                containerRef.current.scrollTop =
+                    containerRef.current.scrollHeight
             }
         }
     }, [code])
@@ -127,7 +130,7 @@ export function CodeView({
                             transition={{
                                 duration: 1,
                                 repeat: Infinity,
-                                ease: "linear"
+                                ease: 'linear',
                             }}
                         />
                     )}

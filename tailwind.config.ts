@@ -60,8 +60,8 @@ module.exports = {
                         accent: '#262626',
                         'accent-foreground': '#f5f5f5',
                         border: '#262626',
-                        ring: '#404040'
-                    }
+                        ring: '#404040',
+                    },
                 },
                 dark: {
                     background: '#0F0F10',

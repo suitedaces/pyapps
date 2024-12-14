@@ -5,21 +5,20 @@ interface RouteContext {
     params: Promise<{ id: string }>
 }
 
-export async function GET(
-    request: Request,
-    context: RouteContext
-) {
+export async function GET(request: Request, context: RouteContext) {
     const supabase = await createClient()
     const { id } = await context.params
 
     const { data: chat, error } = await supabase
         .from('chats')
-        .select(`
+        .select(
+            `
             *,
             app:app_id (
                 id
             )
-        `)
+        `
+        )
         .eq('id', id)
         .single()
 

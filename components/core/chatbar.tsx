@@ -1,19 +1,23 @@
 'use client'
 
-import * as React from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { cn } from "@/lib/utils"
-import { PaperclipIcon, ArrowUp, Loader2 } from "lucide-react"
-import { FilePreview } from "@/components/FilePreview"
-import { useAutoResizeTextarea } from "@/components/hooks/use-auto-resize-textarea"
-import { motion } from "framer-motion"
-import { useEffect } from "react"
+import { FilePreview } from '@/components/FilePreview'
+import { useAutoResizeTextarea } from '@/components/hooks/use-auto-resize-textarea'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
+import { ArrowUp, Loader2, PaperclipIcon } from 'lucide-react'
+import * as React from 'react'
+import { useEffect } from 'react'
 
 interface ChatbarProps {
     value: string
     onChange: (value: string) => void
-    onSubmit: (e: React.FormEvent, message: string, file?: File) => Promise<void>
+    onSubmit: (
+        e: React.FormEvent,
+        message: string,
+        file?: File
+    ) => Promise<void>
     isLoading?: boolean
     onFileUpload?: (file: File) => void
     fileUploadState?: {
@@ -37,7 +41,7 @@ export default function Chatbar({
     onFileUpload,
     fileUploadState,
     isInChatPage = false,
-    isCentered = false
+    isCentered = false,
 }: ChatbarProps) {
     // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
@@ -80,12 +84,12 @@ export default function Chatbar({
                     MIN_HEIGHT,
                     MAX_HEIGHT,
                     isMinHeight,
-                    hasFile: !!file
+                    hasFile: !!file,
                 })
 
                 if (file) {
                     setTextareaHeight(MAX_HEIGHT)
-                    setIsTextareaMinHeight(isMinHeight)  // Use the actual calculation
+                    setIsTextareaMinHeight(isMinHeight) // Use the actual calculation
                     previousHeightRef.current = MAX_HEIGHT
                     return
                 }
@@ -111,7 +115,7 @@ export default function Chatbar({
         if (textareaRef.current) {
             debugLog('Initial Mount', {
                 height: textareaRef.current.offsetHeight,
-                ref: textareaRef.current
+                ref: textareaRef.current,
             })
 
             // Initial height check
@@ -158,7 +162,7 @@ export default function Chatbar({
                 const currentHeight = textareaRef.current.offsetHeight
                 textareaRef.current.style.height = `${MAX_HEIGHT}px`
                 setTextareaHeight(MAX_HEIGHT)
-                setIsTextareaMinHeight(currentHeight === MIN_HEIGHT)  // Use actual height check
+                setIsTextareaMinHeight(currentHeight === MIN_HEIGHT) // Use actual height check
                 previousHeightRef.current = MAX_HEIGHT
             }
         }
@@ -207,7 +211,7 @@ export default function Chatbar({
             checkAndUpdateHeight()
             debugLog('Message Changed', {
                 value: e.target.value,
-                height: textareaRef.current?.offsetHeight
+                height: textareaRef.current?.offsetHeight,
             })
         })
     }
@@ -218,7 +222,7 @@ export default function Chatbar({
             console.log('[Chatbar] State Update:', {
                 height: textareaRef.current?.offsetHeight,
                 isMinHeight: isTextareaMinHeight,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             })
         }
     }, [isTextareaMinHeight])
@@ -236,14 +240,17 @@ export default function Chatbar({
         <motion.div
             className="p-4 w-full absolute bg-background dark:bg-dark-app"
             style={{
-                bottom: isInChatPage ? 0 : "40vh"
+                bottom: isInChatPage ? 0 : '40vh',
             }}
             animate={{
-                bottom: isInChatPage ? 0 : (isSubmitted ? 0 : "40vh")
+                bottom: isInChatPage ? 0 : isSubmitted ? 0 : '40vh',
             }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
         >
-            <form onSubmit={handleSubmit} className="flex relative flex-col gap-4 max-w-[800px] mx-auto">
+            <form
+                onSubmit={handleSubmit}
+                className="flex relative flex-col gap-4 max-w-[800px] mx-auto"
+            >
                 {file && (
                     <div
                         className="relative"
@@ -266,33 +273,49 @@ export default function Chatbar({
                         ref={textareaRef}
                         onChange={handleMessageChange}
                         onKeyDown={handleKeyDown}
-                        placeholder={file ? 'File attached. Add a message or press Send.' : 'Type your message...'}
+                        placeholder={
+                            file
+                                ? 'File attached. Add a message or press Send.'
+                                : 'Type your message...'
+                        }
                         className={cn(
-                            "w-full resize-none rounded-lg pr-24 py-4",
-                            "focus-visible:ring-1 focus-visible:ring-offset-0",
-                            "scrollbar-thumb-rounded scrollbar-track-rounded",
-                            "scrollbar-thin scrollbar-thumb-border",
-                            "dark:bg-dark-app dark:text-dark-text dark:border-dark-border"
+                            'w-full resize-none rounded-lg pr-24 py-4',
+                            'focus-visible:ring-1 focus-visible:ring-offset-0',
+                            'scrollbar-thumb-rounded scrollbar-track-rounded',
+                            'scrollbar-thin scrollbar-thumb-border',
+                            'dark:bg-dark-app dark:text-dark-text dark:border-dark-border'
                         )}
                         style={{
-                            minHeight: isInChatPage ? '54px' : isAnimating ? '54px' : `${MIN_HEIGHT}px`,
-                            maxHeight: isInChatPage ? '54px' : isAnimating ? '54px' : `${MAX_HEIGHT}px`,
+                            minHeight: isInChatPage
+                                ? '54px'
+                                : isAnimating
+                                  ? '54px'
+                                  : `${MIN_HEIGHT}px`,
+                            maxHeight: isInChatPage
+                                ? '54px'
+                                : isAnimating
+                                  ? '54px'
+                                  : `${MAX_HEIGHT}px`,
                             height: `${textareaHeight}px`, // Explicitly set height
-                            transition: 'all 0.3s ease-in-out'
+                            transition: 'all 0.3s ease-in-out',
                         }}
                         disabled={isLoading}
                         onFocus={() => checkAndUpdateHeight()} // Check height on focus
-                        onBlur={() => checkAndUpdateHeight()}  // Check height on blur
+                        onBlur={() => checkAndUpdateHeight()} // Check height on blur
                     />
 
                     <motion.div
                         className="absolute flex justify-between pl-4 bottom-2 right-2 gap-2"
                         animate={{
-                            width: isInChatPage ? '100px' : isAnimating ? '100px' : '100%'
+                            width: isInChatPage
+                                ? '100px'
+                                : isAnimating
+                                  ? '100px'
+                                  : '100%',
                         }}
                         transition={{
                             duration: 0.3,
-                            ease: "easeInOut"
+                            ease: 'easeInOut',
                         }}
                     >
                         <input
@@ -311,36 +334,42 @@ export default function Chatbar({
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isLoading}
                         >
-                            <PaperclipIcon className={cn(
-                                "h-5 w-5",
-                                isCentered && "h-6 w-6"
-                            )} />
+                            <PaperclipIcon
+                                className={cn(
+                                    'h-5 w-5',
+                                    isCentered && 'h-6 w-6'
+                                )}
+                            />
                         </Button>
 
                         <Button
                             type="submit"
                             size="icon"
                             className={cn(
-                                "h-9 w-9",
-                                "bg-gradient-to-tr from-[#FFDE56] to-[#4989BB]",
-                                "dark:from-[#03f241] dark:via-[#d549dd] dark:to-[#03e5f2]",
-                                "disabled:bg-none disabled:bg-[#F5F5F5] disabled:border disabled:border-[#D4D4D4]",
-                                "dark:disabled:bg-dark-app dark:disabled:border-dark-border",
-                                isCentered && "h-11 w-11"
+                                'h-9 w-9',
+                                'bg-gradient-to-tr from-[#FFDE56] to-[#4989BB]',
+                                'dark:from-[#03f241] dark:via-[#d549dd] dark:to-[#03e5f2]',
+                                'disabled:bg-none disabled:bg-[#F5F5F5] disabled:border disabled:border-[#D4D4D4]',
+                                'dark:disabled:bg-dark-app dark:disabled:border-dark-border',
+                                isCentered && 'h-11 w-11'
                             )}
                             disabled={isLoading || (!value.trim() && !file)}
                         >
                             {isLoading ? (
-                                <Loader2 className={cn(
-                                    "h-5 w-5 animate-spin text-black dark:text-dark-text",
-                                    isCentered && "h-6 w-6"
-                                )} />
+                                <Loader2
+                                    className={cn(
+                                        'h-5 w-5 animate-spin text-black dark:text-dark-text',
+                                        isCentered && 'h-6 w-6'
+                                    )}
+                                />
                             ) : (
-                                <ArrowUp className={cn(
-                                    "h-5 w-5",
-                                    "text-black dark:text-dark-text",
-                                    "disabled:text-[#D4D4D4] dark:disabled:text-dark-border"
-                                )} />
+                                <ArrowUp
+                                    className={cn(
+                                        'h-5 w-5',
+                                        'text-black dark:text-dark-text',
+                                        'disabled:text-[#D4D4D4] dark:disabled:text-dark-border'
+                                    )}
+                                />
                             )}
                         </Button>
                     </motion.div>

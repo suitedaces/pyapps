@@ -3,7 +3,7 @@ import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
-import { createDataStream, streamText } from 'ai'
+import { streamText } from 'ai'
 
 // Types
 interface StreamlitToolResult {
@@ -46,7 +46,11 @@ async function linkFileToChat(supabase: any, chatId: string, fileId: string) {
 }
 
 // File Management
-async function getFileContext(supabase: any, fileId: string, userId: string): Promise<FileContext | undefined> {
+async function getFileContext(
+    supabase: any,
+    fileId: string,
+    userId: string
+): Promise<FileContext | undefined> {
     if (!fileId) return undefined
 
     const { data: fileData } = await supabase
@@ -89,7 +93,10 @@ async function storeMessage(
 }
 
 // App Version Management
-async function getNextVersionNumber(supabase: any, appId: string): Promise<number> {
+async function getNextVersionNumber(
+    supabase: any,
+    appId: string
+): Promise<number> {
     const { data } = await supabase
         .from('app_versions')
         .select('version_number')
@@ -119,7 +126,12 @@ async function getCurrentAppVersion(supabase: any, appId: string) {
     return version
 }
 
-async function createNewApp(supabase: any, userId: string, name: string, description: string) {
+async function createNewApp(
+    supabase: any,
+    userId: string,
+    name: string,
+    description: string
+) {
     const { data: app } = await supabase
         .from('apps')
         .insert({
@@ -129,7 +141,7 @@ async function createNewApp(supabase: any, userId: string, name: string, descrip
             is_public: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            created_by: userId
+            created_by: userId,
         })
         .select()
         .single()
@@ -153,7 +165,7 @@ async function createAppVersion(
             code,
             created_at: new Date().toISOString(),
             name,
-            description
+            description,
         })
         .select()
         .single()
@@ -161,12 +173,16 @@ async function createAppVersion(
     return version
 }
 
-async function updateAppCurrentVersion(supabase: any, appId: string, versionId: string) {
+async function updateAppCurrentVersion(
+    supabase: any,
+    appId: string,
+    versionId: string
+) {
     await supabase
         .from('apps')
-        .update({ 
+        .update({
             current_version_id: versionId,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         })
         .eq('id', appId)
 }
@@ -180,7 +196,7 @@ async function handleStreamlitAppVersioning(
     if (!toolResult.result) return null
 
     const { code, appName, appDescription } = toolResult.result
-    
+
     // Check for existing app
     const { data: chat } = await supabase
         .from('chats')
@@ -211,15 +227,15 @@ async function handleStreamlitAppVersioning(
 
         await Promise.all([
             updateAppCurrentVersion(supabase, appId, version.id),
-            linkChatToApp(supabase, chatId, appId)
+            linkChatToApp(supabase, chatId, appId),
         ])
     } else {
         // Update existing app flow
         const currentVersion = await getCurrentAppVersion(supabase, appId)
-        
+
         if (currentVersion?.code !== code) {
             const nextVersion = await getNextVersionNumber(supabase, appId)
-            
+
             const version = await createAppVersion(
                 supabase,
                 appId,
@@ -237,10 +253,7 @@ async function handleStreamlitAppVersioning(
 }
 
 async function linkChatToApp(supabase: any, chatId: string, appId: string) {
-    await supabase
-        .from('chats')
-        .update({ app_id: appId })
-        .eq('id', chatId)
+    await supabase.from('chats').update({ app_id: appId }).eq('id', chatId)
 }
 
 function buildSystemPrompt(fileContext: FileContext | undefined): string {
@@ -259,7 +272,8 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { messages, chatId, fileId, fileName, fileContent } = await req.json()
+        const { messages, chatId, fileId, fileName, fileContent } =
+            await req.json()
         let newChatId = chatId
         let appId: string | null = null
 
@@ -268,7 +282,8 @@ export async function POST(req: Request) {
             const chat = await createNewChat(
                 supabase,
                 user.id,
-                messages[messages.length - 1]?.content?.slice(0, 100) || 'New Chat'
+                messages[messages.length - 1]?.content?.slice(0, 100) ||
+                    'New Chat'
             )
             newChatId = chat.id
         }
@@ -285,10 +300,7 @@ export async function POST(req: Request) {
         console.log('🔍 Streaming with fileContext:', fileContext)
         const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
-            messages: [
-                { role: 'system', content: systemPrompt },
-                ...messages,
-            ],
+            messages: [{ role: 'system', content: systemPrompt }, ...messages],
             tools: { streamlitTool },
             experimental_toolCallStreaming: true,
             onFinish: async (event) => {
@@ -300,9 +312,10 @@ export async function POST(req: Request) {
 
                     // Handle Streamlit versioning if tool results exist
                     if (toolResults?.length) {
-                        const streamlitResult = toolResults.find((result: any) => 
-                            result.toolName === 'streamlitTool' && 
-                            result.result?.code
+                        const streamlitResult = toolResults.find(
+                            (result: any) =>
+                                result.toolName === 'streamlitTool' &&
+                                result.result?.code
                         )
 
                         if (streamlitResult) {
@@ -346,13 +359,14 @@ export async function POST(req: Request) {
         return new Response(
             JSON.stringify({
                 error: 'Internal server error',
-                details: error instanceof Error ? error.message : 'Unknown error'
+                details:
+                    error instanceof Error ? error.message : 'Unknown error',
             }),
             {
                 status: 500,
                 headers: {
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                },
             }
         )
     }

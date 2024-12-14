@@ -1,14 +1,17 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { ThemeProvider } from '@/contexts/ThemeProvider'
 import { AppHeader } from '@/components/AppHeader'
-import { StreamlitFrame, StreamlitFrameRef } from '@/components/StreamlitFrame'
-import { AppVersion } from '@/lib/types'
 import { CodeView } from '@/components/CodeView'
+import { StreamlitFrame, StreamlitFrameRef } from '@/components/StreamlitFrame'
+import {
+    ResizableHandle,
+    ResizablePanel,
+    ResizablePanelGroup,
+} from '@/components/ui/resizable'
+import { ThemeProvider } from '@/contexts/ThemeProvider'
+import { AppVersion } from '@/lib/types'
 import { Circle } from 'lucide-react'
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
-import { cn } from '@/lib/utils'
+import { useRef, useState } from 'react'
 
 interface AppClientProps {
     app: AppVersion
@@ -21,9 +24,9 @@ export function AppClient({ app, sandboxUrl, id }: AppClientProps) {
     const [showCode, setShowCode] = useState(false)
 
     const CustomHandle = ({ ...props }) => (
-        <ResizableHandle 
-            {...props} 
-            withHandle 
+        <ResizableHandle
+            {...props}
+            withHandle
             className="relative bg-transparent w-[6px] transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-800"
         >
             <div className="absolute inset-0 flex items-center justify-center">
@@ -48,16 +51,20 @@ export function AppClient({ app, sandboxUrl, id }: AppClientProps) {
                     <ResizablePanelGroup direction="horizontal">
                         <ResizablePanel defaultSize={showCode ? 60 : 100}>
                             <div className="h-[calc(100vh-3.5rem)]">
-                                <StreamlitFrame 
+                                <StreamlitFrame
                                     ref={streamlitRef}
-                                    url={sandboxUrl} 
+                                    url={sandboxUrl}
                                 />
                             </div>
                         </ResizablePanel>
                         {showCode && (
                             <>
                                 <CustomHandle />
-                                <ResizablePanel defaultSize={40} minSize={30} maxSize={70}>
+                                <ResizablePanel
+                                    defaultSize={40}
+                                    minSize={30}
+                                    maxSize={70}
+                                >
                                     <div className="h-[calc(100vh-3.5rem)]">
                                         <div className="h-full flex flex-col bg-neutral-50 dark:bg-neutral-900">
                                             {/* Terminal Header */}
@@ -73,7 +80,7 @@ export function AppClient({ app, sandboxUrl, id }: AppClientProps) {
                                             </div>
                                             {/* Terminal Content */}
                                             <div className="flex-1 overflow-y-auto">
-                                                <CodeView 
+                                                <CodeView
                                                     code={app.code || ''}
                                                     isGeneratingCode={false}
                                                     language="python"

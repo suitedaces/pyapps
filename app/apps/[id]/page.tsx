@@ -1,8 +1,8 @@
 import { createClient, getUser } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { AppClient } from './AppClient'
 import { AppVersion } from '@/lib/types'
+import { cookies } from 'next/headers'
+import { notFound } from 'next/navigation'
+import { AppClient } from './AppClient'
 
 interface PageParams {
     params: Promise<{ id: string }>
@@ -11,7 +11,7 @@ interface PageParams {
 export default async function AppPage({ params }: PageParams) {
     const { id } = await params
     const user = await getUser()
-    
+
     if (!user) {
         notFound()
     }
@@ -32,26 +32,38 @@ export default async function AppPage({ params }: PageParams) {
     const supabaseToken = cookieStore.get('sb-token')?.value
 
     // Initialize sandbox with auth
-    const sandboxResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sandbox/new/execute`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseToken}`,
-            'Cookie': cookieStore.getAll()
-                .map((cookie: { name: string; value: string }) => `${cookie.name}=${cookie.value}`)
-                .join('; ')
-        },
-        body: JSON.stringify({
-            code: app[0].code
-        })
-    })
+    const sandboxResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL}/api/sandbox/new/execute`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${supabaseToken}`,
+                Cookie: cookieStore
+                    .getAll()
+                    .map(
+                        (cookie: { name: string; value: string }) =>
+                            `${cookie.name}=${cookie.value}`
+                    )
+                    .join('; '),
+            },
+            body: JSON.stringify({
+                code: app[0].code,
+            }),
+        }
+    )
 
     if (!sandboxResponse.ok) {
-        console.error('Failed to initialize sandbox:', await sandboxResponse.text())
+        console.error(
+            'Failed to initialize sandbox:',
+            await sandboxResponse.text()
+        )
         return <div>Failed to load app. Please try again later.</div>
     }
 
     const { url: sandboxUrl } = await sandboxResponse.json()
 
-    return <AppClient app={app[0] as AppVersion} sandboxUrl={sandboxUrl} id={id} />
+    return (
+        <AppClient app={app[0] as AppVersion} sandboxUrl={sandboxUrl} id={id} />
+    )
 }

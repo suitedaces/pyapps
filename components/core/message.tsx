@@ -3,14 +3,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
 import { App, ExecutionResult } from '@/lib/schema'
+import { useToolState } from '@/lib/stores/tool-state-store'
 import { cn } from '@/lib/utils'
-import { Message as AIMessage, ToolInvocation } from 'ai'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Message as AIMessage } from 'ai'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Terminal } from 'lucide-react'
-import { useRef, useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Markdown } from './markdown'
 import { MessageButton } from './message-button'
-import { useToolState } from '@/lib/stores/tool-state-store'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
@@ -54,9 +54,10 @@ export function Message({
     }, [isLastMessage, content])
 
     // Memoize content lines for better streaming performance
-    const contentLines = useMemo(() =>
-        content.split('\n').filter(Boolean)
-    , [content])
+    const contentLines = useMemo(
+        () => content.split('\n').filter(Boolean),
+        [content]
+    )
 
     // Handle tool invocations display
     const renderToolInvocations = () => {
@@ -106,7 +107,7 @@ export function Message({
                                         animate={{ opacity: 1, height: 'auto' }}
                                         transition={{
                                             duration: 0.2,
-                                            delay: i * 0.1
+                                            delay: i * 0.1,
                                         }}
                                     >
                                         <Markdown>{line}</Markdown>
@@ -115,17 +116,20 @@ export function Message({
                             </AnimatePresence>
 
                             {/* Tool streaming indicator */}
-                            {isLastMessage && isLoading && currentToolCall.toolName === 'streamlitTool' && currentToolCall.state === 'streaming-start' && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300 mt-2"
-                                >
-                                    <Terminal className="w-4 h-4 animate-pulse" />
-                                    <span>Generating Streamlit app...</span>
-                                </motion.div>
-                            )}
+                            {isLastMessage &&
+                                isLoading &&
+                                currentToolCall.toolName === 'streamlitTool' &&
+                                currentToolCall.state === 'streaming-start' && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300 mt-2"
+                                    >
+                                        <Terminal className="w-4 h-4 animate-pulse" />
+                                        <span>Generating Streamlit app...</span>
+                                    </motion.div>
+                                )}
 
                             {/* Tool invocations */}
                             {renderToolInvocations()}
@@ -138,7 +142,7 @@ export function Message({
                                     transition={{
                                         duration: 1,
                                         repeat: Infinity,
-                                        ease: "linear"
+                                        ease: 'linear',
                                     }}
                                 />
                             )}

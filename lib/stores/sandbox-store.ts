@@ -6,7 +6,7 @@ interface SandboxState {
     isInitializing: boolean
     lastExecutedCode: string | null
     error: string | null
-    
+
     // UI state
     streamlitUrl: string | null
     isLoadingSandbox: boolean
@@ -14,7 +14,10 @@ interface SandboxState {
     generatedCode: string
 
     // Methods
-    updateSandbox: (code: string, forceExecute?: boolean) => Promise<string | null>
+    updateSandbox: (
+        code: string,
+        forceExecute?: boolean
+    ) => Promise<string | null>
     killSandbox: () => Promise<void>
     clearError: () => void
     setGeneratingCode: (isGenerating: boolean) => void
@@ -37,7 +40,8 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
     generatedCode: '',
 
     // Methods
-    setGeneratingCode: (isGenerating) => set({ isGeneratingCode: isGenerating }),
+    setGeneratingCode: (isGenerating) =>
+        set({ isGeneratingCode: isGenerating }),
 
     updateSandbox: async (code: string, forceExecute: boolean = false) => {
         const { sandboxId, lastExecutedCode } = get()
@@ -47,17 +51,20 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
         }
 
         try {
-            set({ 
-                isInitializing: true, 
+            set({
+                isInitializing: true,
                 error: null,
-                isLoadingSandbox: true 
+                isLoadingSandbox: true,
             })
 
-            const response = await fetch(`/api/sandbox/${sandboxId || 'new'}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
+            const response = await fetch(
+                `/api/sandbox/${sandboxId || 'new'}/execute`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code }),
+                }
+            )
 
             if (!response.ok) {
                 const errorData = await response.json()
@@ -65,7 +72,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
             }
 
             const data = await response.json()
-            set({ 
+            set({
                 lastExecutedCode: code,
                 sandboxId: data.sandboxId,
                 streamlitUrl: data.url,
@@ -73,11 +80,14 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
             })
             return data.url
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to update sandbox'
-            set({ 
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to update sandbox'
+            set({
                 error: errorMessage,
                 isInitializing: false,
-                isLoadingSandbox: false
+                isLoadingSandbox: false,
             })
             console.error('Error updating sandbox:', error)
             return null
@@ -86,22 +96,25 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
 
     killSandbox: async () => {
         const { sandboxId } = get()
-        
+
         if (sandboxId) {
             try {
                 set({ error: null })
                 await fetch(`/api/sandbox/${sandboxId}/kill`, {
                     method: 'POST',
                 })
-                set({ 
+                set({
                     sandboxId: null,
                     streamlitUrl: null,
                     lastExecutedCode: null,
                     isLoadingSandbox: false,
-                    isGeneratingCode: false
+                    isGeneratingCode: false,
                 })
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Failed to kill sandbox'
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : 'Failed to kill sandbox'
                 set({ error: errorMessage })
                 console.error('Error killing sandbox:', error)
             }
