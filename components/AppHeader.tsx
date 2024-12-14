@@ -57,7 +57,7 @@ export function AppHeader({ appId, appName, initialVersions, initialUrl, streaml
         <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-dark-app z-50">
             <div className="h-full px-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Logo inverted={false} />
+                    <Logo inverted={true} />
                     <div className="hidden sm:block">
                         <h1 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                             {appName}

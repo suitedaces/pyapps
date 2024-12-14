@@ -164,7 +164,7 @@ const ChatsList = ({
     }, [chats, chatTitles, onGenerateTitle])
 
     const getChatTitle = (chat: Chat) => {
-        return chat.name || chatTitles[chat.id] || 'New Chat'
+        return chat.name || chatTitles[chat.id] || 'New Project'
     }
 
     return (
@@ -317,7 +317,7 @@ export default function AppSidebar({
                                                 className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
                                             >
                                                 {!open && <Plus className="h-4 w-4" />}
-                                                {open && <span>New Chat</span>}
+                                                {open && <span>New Project</span>}
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
                                     </SidebarMenu>
@@ -336,7 +336,7 @@ export default function AppSidebar({
                                                     tooltip="Your previous chats"
                                                 >
                                                     <MessageSquare className="h-4 w-4" />
-                                                    {open && <span className="ml-2">Chats</span>}
+                                                    {open && <span className="ml-2">Projects</span>}
                                                 </SidebarMenuButton>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuAction>
@@ -531,7 +531,7 @@ export default function AppSidebar({
                                             className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
                                         >
                                             {!open && <Plus className="h-4 w-4" />}
-                                            {open && <span>New Chat</span>}
+                                            {open && <span>New Project</span>}
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                 </SidebarMenu>
@@ -550,7 +550,7 @@ export default function AppSidebar({
                                                 tooltip="Your previous chats"
                                             >
                                                 <MessageSquare className="h-4 w-4" />
-                                                {open && <span className="ml-2">Chats</span>}
+                                                {open && <span className="ml-2">Projects</span>}
                                             </SidebarMenuButton>
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuAction>
