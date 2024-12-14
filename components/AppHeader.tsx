@@ -3,24 +3,39 @@
 import { Logo } from './core/Logo'
 import { ThemeSwitcherButton } from './ui/theme-button-switcher'
 import { Button } from './ui/button'
-import { RefreshCcw } from 'lucide-react'
+import { RefreshCcw, Info, Code2, Maximize2, Minimize2 } from 'lucide-react'
 import { VersionSelector } from './VersionSelector'
 import { AppVersion } from '@/lib/types'
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { StreamlitFrameRef } from './StreamlitFrame'
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from "@/components/ui/hover-card"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface AppHeaderProps {
     appId: string
     appName: string
+    appDescription?: string
     initialVersions: AppVersion[]
     initialUrl: string
     streamlitRef?: React.RefObject<StreamlitFrameRef>
+    onToggleCode?: () => void
 }
 
-export function AppHeader({ appId, appName, initialVersions, initialUrl, streamlitRef }: AppHeaderProps) {
+export function AppHeader({ appId, appName, appDescription = "No description available", initialVersions, initialUrl, streamlitRef, onToggleCode }: AppHeaderProps) {
     const { updateSandbox, setGeneratingCode, setGeneratedCode, setIsLoadingSandbox } = useSandboxStore()
     const isUpdatingRef = useRef(false)
+    const [showCode, setShowCode] = useState(false)
+    const [isMaximized, setIsMaximized] = useState(false)
 
     const handleVersionChange = useCallback(async (version: AppVersion) => {
         if (!version.code || isUpdatingRef.current) return
@@ -53,18 +68,80 @@ export function AppHeader({ appId, appName, initialVersions, initialUrl, streaml
         }
     }, [streamlitRef])
 
+    const toggleCodeView = () => {
+        onToggleCode?.()
+    }
+
+    const toggleMaximize = () => {
+        setIsMaximized(!isMaximized)
+    }
+
     return (
         <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-dark-app z-50">
             <div className="h-full px-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Logo inverted={true} />
-                    <div className="hidden sm:block">
-                        <h1 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                            {appName}
-                        </h1>
+                    <div className="flex items-center gap-2">
+                        <HoverCard>
+                            <HoverCardTrigger asChild>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                >
+                                    <Info className="h-4 w-4" />
+                                </Button>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-80">
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-semibold">{appName}</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        {appDescription}
+                                    </p>
+                                </div>
+                            </HoverCardContent>
+                        </HoverCard>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={toggleCodeView}
+                                    className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                >
+                                    <Code2 className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>View Code</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={toggleMaximize}
+                                    className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                >
+                                    {isMaximized ? (
+                                        <Minimize2 className="h-4 w-4" />
+                                    ) : (
+                                        <Maximize2 className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{isMaximized ? 'Minimize' : 'Maximize'}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                     <VersionSelector
                         appId={appId}
                         onVersionChange={handleVersionChange}

@@ -6,10 +6,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { enableDeprecationWarnings, BundledLanguage, createHighlighter } from 'shiki'
 
 enableDeprecationWarnings()
+
 interface CodeViewProps {
     code: string | { code: string }
     isGeneratingCode: boolean
     language?: BundledLanguage
+    className?: string
+    containerClassName?: string
 }
 
 const LoadingSandbox = dynamic(
@@ -31,18 +34,18 @@ const CODE_THEMES = {
 export function CodeView({
     code,
     isGeneratingCode,
-    language = 'python'
+    language = 'python',
+    className = '',
+    containerClassName = ''
 }: CodeViewProps) {
     const [displayCode, setDisplayCode] = useState('')
     const [highlightedHtml, setHighlightedHtml] = useState('')
-
     const codeRef = useRef('')
     const containerRef = useRef<HTMLDivElement>(null)
 
     // Initialize Shiki highlighter with dual themes
     useEffect(() => {
         const initHighlighter = async () => {
-            // Saare themes ko flat array me convert karte hai
             const allThemes = [
                 ...Object.values(CODE_THEMES.dark),
                 ...Object.values(CODE_THEMES.light)
@@ -90,14 +93,14 @@ export function CodeView({
     }
 
     return (
-        <Card className="bg-bg border-border h-full max-h-[82vh] flex-grow relative">
+        <Card className={`bg-bg border-border h-full ${containerClassName}`}>
             <CardContent className="p-0 h-full">
                 <div
                     ref={containerRef}
-                    className="overflow-auto h-full p-4 font-mono text-sm"
+                    className={`h-full font-mono text-sm ${className}`}
                 >
                     <div
-                        className="min-w-max relative shiki-container"
+                        className="min-w-max relative shiki-container overflow-x-auto"
                         dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                     />
 
