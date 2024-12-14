@@ -1,6 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card'
-import { Globe, Loader2 } from 'lucide-react'
-import { forwardRef, useImperativeHandle, useRef, useEffect, useMemo } from 'react'
+import {
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useMemo,
+    useRef,
+} from 'react'
 
 interface StreamlitPreviewProps {
     url: string | null
@@ -28,7 +33,7 @@ export const StreamlitPreview = forwardRef<
 
     // Expose refreshIframe method through ref
     useImperativeHandle(ref, () => ({
-        refreshIframe
+        refreshIframe,
     }))
 
     // Auto-refresh logic when URL changes
@@ -57,7 +62,9 @@ export const StreamlitPreview = forwardRef<
         if (!url) {
             return (
                 <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">No preview available</p>
+                    <p className="text-muted-foreground">
+                        No preview available
+                    </p>
                 </div>
             )
         }

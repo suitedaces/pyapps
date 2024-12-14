@@ -1,53 +1,53 @@
-"use client";
+'use client'
 
-import { cn } from "@/lib/utils";
-import { motion, type Transition } from "framer-motion";
-import type { CSSProperties } from "react";
+import { cn } from '@/lib/utils'
+import { motion, type Transition } from 'framer-motion'
+import type { CSSProperties } from 'react'
 
 type BorderTrailProps = {
-  className?: string;
-  size?: number;
-  transition?: Transition;
-  delay?: number;
-  onAnimationComplete?: () => void;
-  style?: CSSProperties;
-};
+    className?: string
+    size?: number
+    transition?: Transition
+    delay?: number
+    onAnimationComplete?: () => void
+    style?: CSSProperties
+}
 
 export function BorderTrail({
-  className,
-  size = 60,
-  transition,
-  delay,
-  onAnimationComplete,
-  style,
+    className,
+    size = 60,
+    transition,
+    delay,
+    onAnimationComplete,
+    style,
 }: BorderTrailProps) {
-  const BASE_TRANSITION = {
-    repeat: Number.POSITIVE_INFINITY,
-    duration: 8,
-    ease: "linear",
-  };
+    const BASE_TRANSITION = {
+        repeat: Number.POSITIVE_INFINITY,
+        duration: 8,
+        ease: 'linear',
+    }
 
-  return (
-    <div className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-transparent [mask-clip:padding-box,border-box] [mask-composite:intersect] [mask-image:linear-gradient(transparent,transparent),linear-gradient(#000,#000)]">
-      <motion.div
-        className={cn(
-          "absolute aspect-square bg-zinc-500 dark:bg-gradient-to-r dark:from-[rgba(59,196,242,0.51)] dark:via-[#F5833F_30%,#7A69F9_60%,#3BC4F2] dark:to-[rgba(242,99,120,0.51)]",
-          className
-        )}
-        style={{
-          width: size,
-          offsetPath: `rect(0 auto auto 0 round ${size}px)`,
-          ...style,
-        }}
-        animate={{
-          offsetDistance: ["0%", "100%"],
-        }}
-        transition={{
-          ...(transition ?? BASE_TRANSITION),
-          delay: delay,
-        }}
-        onAnimationComplete={onAnimationComplete}
-      />
-    </div>
-  );
+    return (
+        <div className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-transparent [mask-clip:padding-box,border-box] [mask-composite:intersect] [mask-image:linear-gradient(transparent,transparent),linear-gradient(#000,#000)]">
+            <motion.div
+                className={cn(
+                    'absolute aspect-square bg-zinc-500 dark:bg-gradient-to-r dark:from-[rgba(59,196,242,0.51)] dark:via-[#F5833F_30%,#7A69F9_60%,#3BC4F2] dark:to-[rgba(242,99,120,0.51)]',
+                    className
+                )}
+                style={{
+                    width: size,
+                    offsetPath: `rect(0 auto auto 0 round ${size}px)`,
+                    ...style,
+                }}
+                animate={{
+                    offsetDistance: ['0%', '100%'],
+                }}
+                transition={{
+                    ...(transition ?? BASE_TRANSITION),
+                    delay: delay,
+                }}
+                onAnimationComplete={onAnimationComplete}
+            />
+        </div>
+    )
 }

@@ -23,11 +23,24 @@ interface ToolState {
     }
 
     // Actions
-    startToolCall: (toolCallId: string, toolName: string, messageId?: string) => void
-    updateToolCallDelta: (toolCallId: string, delta: string, progress?: number, totalChunks?: number) => void
+    startToolCall: (
+        toolCallId: string,
+        toolName: string,
+        messageId?: string
+    ) => void
+    updateToolCallDelta: (
+        toolCallId: string,
+        delta: string,
+        progress?: number,
+        totalChunks?: number
+    ) => void
     completeToolCall: (toolCallId: string) => void
     resetToolCall: (toolCallId: string) => void
-    setToolCallProgress: (toolCallId: string, progress: number, totalChunks: number) => void
+    setToolCallProgress: (
+        toolCallId: string,
+        progress: number,
+        totalChunks: number
+    ) => void
 
     // View state management
     isCodeViewOpen: boolean
@@ -41,7 +54,7 @@ export const useToolState = create<ToolState>((set, get) => ({
         toolName: null,
         state: null,
         progress: 0,
-        totalChunks: 0
+        totalChunks: 0,
     },
 
     // Handle tool call start (streaming-start)
@@ -55,16 +68,16 @@ export const useToolState = create<ToolState>((set, get) => ({
                     messageId,
                     progress: 0,
                     totalChunks: 0,
-                    collectedContent: ''
-                }
+                    collectedContent: '',
+                },
             },
             currentToolCall: {
                 toolCallId,
                 toolName,
                 state: 'streaming-start',
                 progress: 0,
-                totalChunks: 0
-            }
+                totalChunks: 0,
+            },
         })),
 
     // Handle tool call delta updates
@@ -73,7 +86,7 @@ export const useToolState = create<ToolState>((set, get) => ({
             const currentState = state.loadingStates[toolCallId] || {
                 isLoading: true,
                 toolName: state.currentToolCall.toolName,
-                collectedContent: ''
+                collectedContent: '',
             }
 
             return {
@@ -83,15 +96,15 @@ export const useToolState = create<ToolState>((set, get) => ({
                         ...currentState,
                         collectedContent: currentState.collectedContent + delta,
                         progress,
-                        totalChunks
-                    }
+                        totalChunks,
+                    },
                 },
                 currentToolCall: {
                     ...state.currentToolCall,
                     state: 'delta',
                     progress,
-                    totalChunks
-                }
+                    totalChunks,
+                },
             }
         }),
 
@@ -102,14 +115,14 @@ export const useToolState = create<ToolState>((set, get) => ({
                 ...state.loadingStates,
                 [toolCallId]: {
                     ...state.loadingStates[toolCallId],
-                    isLoading: false
-                }
+                    isLoading: false,
+                },
             },
             currentToolCall: {
                 ...state.currentToolCall,
                 state: 'complete',
                 progress: state.currentToolCall.totalChunks,
-            }
+            },
         })),
 
     // Reset tool call state
@@ -123,8 +136,8 @@ export const useToolState = create<ToolState>((set, get) => ({
                     toolName: null,
                     state: null,
                     progress: 0,
-                    totalChunks: 0
-                }
+                    totalChunks: 0,
+                },
             }
         }),
 
@@ -136,17 +149,17 @@ export const useToolState = create<ToolState>((set, get) => ({
                 [toolCallId]: {
                     ...state.loadingStates[toolCallId],
                     progress,
-                    totalChunks
-                }
+                    totalChunks,
+                },
             },
             currentToolCall: {
                 ...state.currentToolCall,
                 progress,
-                totalChunks
-            }
+                totalChunks,
+            },
         })),
 
     // Code view state
     isCodeViewOpen: false,
-    setCodeViewOpen: (isOpen) => set({ isCodeViewOpen: isOpen })
+    setCodeViewOpen: (isOpen) => set({ isCodeViewOpen: isOpen }),
 }))

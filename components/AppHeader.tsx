@@ -1,25 +1,25 @@
 'use client'
 
-import { Logo } from './core/Logo'
-import { ThemeSwitcherButton } from './ui/theme-button-switcher'
-import { Button } from './ui/button'
-import { RefreshCcw, Info, Code2, Maximize2, Minimize2 } from 'lucide-react'
-import { VersionSelector } from './VersionSelector'
-import { AppVersion } from '@/lib/types'
-import { useCallback, useRef, useState } from 'react'
-import { useSandboxStore } from '@/lib/stores/sandbox-store'
-import { StreamlitFrameRef } from './StreamlitFrame'
 import {
     HoverCard,
     HoverCardContent,
     HoverCardTrigger,
-} from "@/components/ui/hover-card"
+} from '@/components/ui/hover-card'
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from '@/components/ui/tooltip'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { AppVersion } from '@/lib/types'
+import { Code2, Info, RefreshCcw } from 'lucide-react'
+import { useCallback, useRef } from 'react'
+import { Logo } from './core/Logo'
+import { StreamlitFrameRef } from './StreamlitFrame'
+import { Button } from './ui/button'
+import { ThemeSwitcherButton } from './ui/theme-button-switcher'
+import { VersionSelector } from './VersionSelector'
 
 interface AppHeaderProps {
     appId: string
@@ -31,34 +31,52 @@ interface AppHeaderProps {
     onToggleCode?: () => void
 }
 
-export function AppHeader({ appId, appName, appDescription = "No description available", initialVersions, initialUrl, streamlitRef, onToggleCode }: AppHeaderProps) {
-    const { updateSandbox, setGeneratingCode, setGeneratedCode, setIsLoadingSandbox } = useSandboxStore()
+export function AppHeader({
+    appId,
+    appName,
+    appDescription = 'No description available',
+    initialVersions,
+    initialUrl,
+    streamlitRef,
+    onToggleCode,
+}: AppHeaderProps) {
+    const {
+        updateSandbox,
+        setGeneratingCode,
+        setGeneratedCode,
+        setIsLoadingSandbox,
+    } = useSandboxStore()
     const isUpdatingRef = useRef(false)
 
-    const handleVersionChange = useCallback(async (version: AppVersion) => {
-        if (!version.code || isUpdatingRef.current) return
+    const handleVersionChange = useCallback(
+        async (version: AppVersion) => {
+            if (!version.code || isUpdatingRef.current) return
 
-        isUpdatingRef.current = true
-        setGeneratingCode(true)
-        
-        try {
-            setIsLoadingSandbox(true)
-            setGeneratedCode(version.code)
-            await updateSandbox(version.code, true)
-            
-            if (streamlitRef?.current) {
-                await new Promise(resolve => requestAnimationFrame(resolve))
-                await new Promise(resolve => setTimeout(resolve, 2000))
-                streamlitRef.current.refreshIframe()
+            isUpdatingRef.current = true
+            setGeneratingCode(true)
+
+            try {
+                setIsLoadingSandbox(true)
+                setGeneratedCode(version.code)
+                await updateSandbox(version.code, true)
+
+                if (streamlitRef?.current) {
+                    await new Promise((resolve) =>
+                        requestAnimationFrame(resolve)
+                    )
+                    await new Promise((resolve) => setTimeout(resolve, 2000))
+                    streamlitRef.current.refreshIframe()
+                }
+            } catch (error) {
+                console.error('Error updating version:', error)
+            } finally {
+                setGeneratingCode(false)
+                setIsLoadingSandbox(false)
+                isUpdatingRef.current = false
             }
-        } catch (error) {
-            console.error('Error updating version:', error)
-        } finally {
-            setGeneratingCode(false)
-            setIsLoadingSandbox(false)
-            isUpdatingRef.current = false
-        }
-    }, [updateSandbox, setGeneratingCode, setGeneratedCode, streamlitRef])
+        },
+        [updateSandbox, setGeneratingCode, setGeneratedCode, streamlitRef]
+    )
 
     const handleRefresh = useCallback(() => {
         if (streamlitRef?.current) {
@@ -78,9 +96,9 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
                     <div className="flex items-center gap-2">
                         <HoverCard>
                             <HoverCardTrigger asChild>
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
                                 >
                                     <Info className="h-4 w-4 text-neutral-700 dark:text-neutral-200" />
@@ -88,7 +106,9 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
                             </HoverCardTrigger>
                             <HoverCardContent className="w-80">
                                 <div className="space-y-2">
-                                    <h4 className="text-sm font-semibold">{appName}</h4>
+                                    <h4 className="text-sm font-semibold">
+                                        {appName}
+                                    </h4>
                                     <p className="text-sm text-muted-foreground">
                                         {appDescription}
                                     </p>
@@ -141,4 +161,4 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
             </div>
         </header>
     )
-} 
+}

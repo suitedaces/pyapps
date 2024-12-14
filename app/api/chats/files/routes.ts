@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import { getUser } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -14,12 +13,15 @@ export async function POST(req: NextRequest) {
     const user = await getUser()
 
     if (!user) {
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+        return NextResponse.json(
+            { error: 'Not authenticated' },
+            { status: 401 }
+        )
     }
 
     try {
         const body = await req.json()
-        
+
         // Validate request body
         const { chatId, fileId } = await ChatFileSchema.parseAsync(body)
 
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
         console.error('Failed to create chat-file association:', error)
         return NextResponse.json(
-            { error: 'Failed to create chat-file association' }, 
+            { error: 'Failed to create chat-file association' },
             { status: 500 }
         )
     }
@@ -53,7 +55,10 @@ export async function GET(req: NextRequest) {
     const { chatId } = await req.json()
 
     if (!user) {
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+        return NextResponse.json(
+            { error: 'Not authenticated' },
+            { status: 401 }
+        )
     }
 
     const { data, error } = await supabase

@@ -46,7 +46,7 @@ export function MessageButton({
             toolCallId: toolCall.toolCallId,
             state: loadingState?.isLoading ? 'loading' : 'complete',
             progress: loadingState?.progress || 0,
-            totalChunks: loadingState?.totalChunks || 0
+            totalChunks: loadingState?.totalChunks || 0,
         }
     }, [toolInvocations, loadingStates])
 
@@ -59,14 +59,24 @@ export function MessageButton({
             onCodeClick?.(messageId)
         } else if (toolInvocations?.length) {
             const streamlitCall = toolInvocations.find(
-                (inv) => inv.toolName === 'streamlitTool' && inv.state === 'result'
+                (inv) =>
+                    inv.toolName === 'streamlitTool' && inv.state === 'result'
             )
             if (streamlitCall?.result) {
                 onToolResultClick?.(streamlitCall.result)
                 onCodeClick?.(messageId)
             }
         }
-    }, [currentToolState, object, result, toolInvocations, messageId, onObjectClick, onToolResultClick, onCodeClick])
+    }, [
+        currentToolState,
+        object,
+        result,
+        toolInvocations,
+        messageId,
+        onObjectClick,
+        onToolResultClick,
+        onCodeClick,
+    ])
 
     // Early return if no object or tool invocations
     if (!object && !toolInvocations?.length) return null
@@ -97,7 +107,12 @@ export function MessageButton({
                     />
                 )
             }
-            return <Terminal strokeWidth={2} className="text-gray-900 dark:text-gray-100" />
+            return (
+                <Terminal
+                    strokeWidth={2}
+                    className="text-gray-900 dark:text-gray-100"
+                />
+            )
         })()
 
         const title = (() => {
@@ -145,7 +160,9 @@ export function MessageButton({
             className={buttonClasses}
             role="button"
             tabIndex={0}
-            aria-label={currentToolCall.state ? 'Generating code...' : 'View code'}
+            aria-label={
+                currentToolCall.state ? 'Generating code...' : 'View code'
+            }
         >
             {renderButtonContent()}
         </div>

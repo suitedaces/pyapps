@@ -60,7 +60,7 @@ export function getLocalStorage(key: string) {
 }
 
 export function generateUUID(): string {
-    return uuidv4();
+    return uuidv4()
 }
 function addToolMessageToChat({
     toolMessage,
@@ -165,61 +165,80 @@ export const truncate = (str: string) => {
 
 type DatabaseMessage = Database['public']['Tables']['messages']['Row']
 
-export function formatDatabaseMessages(dbMessages: DatabaseMessage[]): Message[] {
-    return dbMessages.map(msg => {
-        const messages: Message[] = []
-        
-        // Add user message
-        if (msg.user_message) {
-            messages.push({
-                id: `${msg.id}-user`,
-                role: 'user' as const,
-                content: msg.user_message,
-                createdAt: new Date(msg.created_at)
-            })
-        }
-        
-        // Add assistant message with tool results
-        if (msg.assistant_message) {
-            const toolInvocations: ToolInvocation[] = []
-            
-            // Process tool calls and results together
-            if (msg.tool_calls) {
-                const calls = (Array.isArray(msg.tool_calls) ? msg.tool_calls : [msg.tool_calls]) as any[];
-                const results = msg.tool_results ? 
-                    (Array.isArray(msg.tool_results) ? msg.tool_results : [msg.tool_results]) as any[] : []
-                
-                for (const call of calls) {
-                    const result = results.find((r: { tool_call_id: any }) => r?.tool_call_id === call?.id)
-                    
-                    const toolInvocation: ToolInvocation = {
-                        toolCallId: call?.toolCallId,
-                        toolName: call?.toolName,
-                        state: result ? 'result' as const : 'call' as const,
-                        args: call?.args,
-                        ...(result && {
-                            result: {
-                                code: result?.code,
-                                appName: result?.appName || 'No name generated',
-                                appDescription: result?.appDescription || 'No description generated'
-                            }
-                        })
-                    } as ToolInvocation
-                    
-                    toolInvocations.push(toolInvocation)
-                }
+export function formatDatabaseMessages(
+    dbMessages: DatabaseMessage[]
+): Message[] {
+    return dbMessages
+        .map((msg) => {
+            const messages: Message[] = []
+
+            // Add user message
+            if (msg.user_message) {
+                messages.push({
+                    id: `${msg.id}-user`,
+                    role: 'user' as const,
+                    content: msg.user_message,
+                    createdAt: new Date(msg.created_at),
+                })
             }
-        
-            messages.push({
-                id: `${msg.id}-assistant`,
-                role: 'assistant' as const,
-                content: msg.assistant_message,
-                createdAt: new Date(msg.created_at),
-                toolInvocations: toolInvocations
-            })
-        console.log("Formatted messages: ", messages)
-        }
-        
-        return messages
-    }).flat()
+
+            // Add assistant message with tool results
+            if (msg.assistant_message) {
+                const toolInvocations: ToolInvocation[] = []
+
+                // Process tool calls and results together
+                if (msg.tool_calls) {
+                    const calls = (
+                        Array.isArray(msg.tool_calls)
+                            ? msg.tool_calls
+                            : [msg.tool_calls]
+                    ) as any[]
+                    const results = msg.tool_results
+                        ? ((Array.isArray(msg.tool_results)
+                              ? msg.tool_results
+                              : [msg.tool_results]) as any[])
+                        : []
+
+                    for (const call of calls) {
+                        const result = results.find(
+                            (r: { tool_call_id: any }) =>
+                                r?.tool_call_id === call?.id
+                        )
+
+                        const toolInvocation: ToolInvocation = {
+                            toolCallId: call?.toolCallId,
+                            toolName: call?.toolName,
+                            state: result
+                                ? ('result' as const)
+                                : ('call' as const),
+                            args: call?.args,
+                            ...(result && {
+                                result: {
+                                    code: result?.code,
+                                    appName:
+                                        result?.appName || 'No name generated',
+                                    appDescription:
+                                        result?.appDescription ||
+                                        'No description generated',
+                                },
+                            }),
+                        } as ToolInvocation
+
+                        toolInvocations.push(toolInvocation)
+                    }
+                }
+
+                messages.push({
+                    id: `${msg.id}-assistant`,
+                    role: 'assistant' as const,
+                    content: msg.assistant_message,
+                    createdAt: new Date(msg.created_at),
+                    toolInvocations: toolInvocations,
+                })
+                console.log('Formatted messages: ', messages)
+            }
+
+            return messages
+        })
+        .flat()
 }

@@ -5,6 +5,7 @@ import { VariantProps, cva } from 'class-variance-authority'
 import { PanelLeft } from 'lucide-react'
 import * as React from 'react'
 
+import { useIsMobile } from '@/components/hooks/use-mobile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -16,7 +17,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useIsMobile } from '@/components/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
 const SIDEBAR_COOKIE_NAME = 'sidebar:state'
@@ -577,11 +577,12 @@ const SidebarMenuButton = React.forwardRef<
 
         // Check if children contains SidebarTrigger
         const hasTrigger = React.Children.toArray(children).some(
-            child => React.isValidElement(child) && child.type === SidebarTrigger
+            (child) =>
+                React.isValidElement(child) && child.type === SidebarTrigger
         )
 
         // If we have a SidebarTrigger child, render a div instead of a button
-        const Comp = hasTrigger ? 'div' : (asChild ? Slot : 'button')
+        const Comp = hasTrigger ? 'div' : asChild ? Slot : 'button'
 
         const button = (
             <Comp

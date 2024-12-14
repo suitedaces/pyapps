@@ -1,52 +1,70 @@
+import { CoreTool, tool } from 'ai'
 import { z } from 'zod'
-import { tool, CoreTool } from 'ai'
-
 
 const streamlitToolSchema = z.object({
-    code: z.string()
-        .describe('Complete, runnable Streamlit app code including all necessary imports. If the user has data, code should use the path "/app/s3/data/<filenamewithextension>" to read the data.'),
-    requiredLibraries: z.array(z.string())
-        .describe('List of Python package dependencies required to run the Streamlit app'),
-    appName: z.string()
+    code: z
+        .string()
+        .describe(
+            'Complete, runnable Streamlit app code including all necessary imports. If the user has data, code should use the path "/app/s3/data/<filenamewithextension>" to read the data.'
+        ),
+    requiredLibraries: z
+        .array(z.string())
+        .describe(
+            'List of Python package dependencies required to run the Streamlit app'
+        ),
+    appName: z
+        .string()
         .describe('Descriptive name for the Streamlit application'),
-    appDescription: z.string()
+    appDescription: z
+        .string()
         .max(200, 'Keep description concise')
-        .describe('Brief summary of the app\'s functionality and purpose')
+        .describe("Brief summary of the app's functionality and purpose"),
 })
 
-export const streamlitTool: CoreTool<z.ZodObject<{
-    code: z.ZodString,
-    requiredLibraries: z.ZodArray<z.ZodString>,
-    appName: z.ZodString,
-    appDescription: z.ZodString
-}>, {
-    code: string,
-    requiredLibraries: string[],
-    appName: string,
-    appDescription: string
-}> = tool({
+export const streamlitTool: CoreTool<
+    z.ZodObject<{
+        code: z.ZodString
+        requiredLibraries: z.ZodArray<z.ZodString>
+        appName: z.ZodString
+        appDescription: z.ZodString
+    }>,
+    {
+        code: string
+        requiredLibraries: string[]
+        appName: string
+        appDescription: string
+    }
+> = tool({
     parameters: streamlitToolSchema,
-    execute: async ({ code, requiredLibraries, appName, appDescription }: { code: string, requiredLibraries: string[], appName: string, appDescription: string }) => {
+    execute: async ({
+        code,
+        requiredLibraries,
+        appName,
+        appDescription,
+    }: {
+        code: string
+        requiredLibraries: string[]
+        appName: string
+        appDescription: string
+    }) => {
         console.log('Generated Streamlit code:', {
             codeLength: code.length,
             firstLines: code.split('\n').slice(0, 3).join('\n'),
             appName,
-            appDescription
+            appDescription,
         })
         return {
             code,
             requiredLibraries,
             appName,
-            appDescription
+            appDescription,
         }
-    }
+    },
 })
-
 
 // import { z } from 'zod'
 // import { generateObject, tool, CoreTool } from 'ai'
 // import { anthropic } from '@ai-sdk/anthropic'
-
 
 // export const streamlitTool: CoreTool<z.ZodObject<{
 //     dataDescription: z.ZodOptional<z.ZodString>,
@@ -83,7 +101,7 @@ export const streamlitTool: CoreTool<z.ZodObject<{
 //                         role: 'system',
 //                         content: `You are a Python code generation assistant specializing in Streamlit apps.
 // Generate a complete, runnable Streamlit app based on the given query.
-// ${fileDirectory ? `You're working with a file at path "/app/s3/data/${fileDirectory}". 
+// ${fileDirectory ? `You're working with a file at path "/app/s3/data/${fileDirectory}".
 // IMPORTANT: Always use the FULL PATH "/app/s3/data/<filename>" when reading files.
 // DO NOT use relative paths, always use the absolute path starting with "/app/s3/data/` : ''}
 // DO NOT use "st.experimental_rerun()" at any cost.
@@ -93,7 +111,7 @@ export const streamlitTool: CoreTool<z.ZodObject<{
 //                     { role: 'user', content: query }
 //                 ]
 //             })
-            
+
 //             console.log('Generated Streamlit code:', {
 //                 promptLength: query.length,
 //                 codeLength: code.length,

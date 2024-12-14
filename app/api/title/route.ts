@@ -36,7 +36,8 @@ export async function POST(req: Request) {
 
         console.log('📝 Found messages:', {
             userMessage: chatMessages.user_message?.slice(0, 50) + '...',
-            assistantMessage: chatMessages.assistant_message?.slice(0, 50) + '...'
+            assistantMessage:
+                chatMessages.assistant_message?.slice(0, 50) + '...',
         })
 
         // Generate title
@@ -46,8 +47,8 @@ export async function POST(req: Request) {
             messages: [
                 {
                     role: 'user',
-                    content: `Generate a concise, descriptive title (max 4 words) for this conversation. Focus on the main topic or question. Don't use quotes or punctuation.\nUser: ${chatMessages.user_message}\nAssistant: ${chatMessages.assistant_message}`
-                }
+                    content: `Generate a concise, descriptive title (max 4 words) for this conversation. Focus on the main topic or question. Don't use quotes or punctuation.\nUser: ${chatMessages.user_message}\nAssistant: ${chatMessages.assistant_message}`,
+                },
             ],
             maxTokens: 50,
             temperature: 0.7,
@@ -71,21 +72,22 @@ export async function POST(req: Request) {
         console.log('✅ Successfully updated chat title in database')
         return new Response(title, {
             headers: {
-                'Content-Type': 'application/json'
-            }
+                'Content-Type': 'application/json',
+            },
         })
     } catch (error) {
         console.error('❌ Error in title generation:', error)
         return new Response(
             JSON.stringify({
                 error: 'Internal server error',
-                details: error instanceof Error ? error.message : 'Unknown error'
+                details:
+                    error instanceof Error ? error.message : 'Unknown error',
             }),
             {
                 status: 500,
                 headers: {
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                },
             }
         )
     }

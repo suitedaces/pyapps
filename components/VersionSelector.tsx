@@ -9,8 +9,8 @@ import {
     useCallback,
     useEffect,
     useImperativeHandle,
-    useState,
     useRef,
+    useState,
 } from 'react'
 import { Button } from './ui/button'
 
@@ -111,7 +111,13 @@ export const VersionSelector = forwardRef<
             isLoading,
             hasInitialized: hasInitializedRef.current,
         })
-    }, [appId, versions.length, currentIndex, isLoading, hasInitializedRef.current])
+    }, [
+        appId,
+        versions.length,
+        currentIndex,
+        isLoading,
+        hasInitializedRef.current,
+    ])
 
     if (versions.length === 0 && !isLoading) return null
 
@@ -132,12 +138,14 @@ export const VersionSelector = forwardRef<
                 <ChevronLeft className="h-5 w-5" />
             </Button>
 
-            <div className={cn(
-                "flex items-center justify-center min-w-[120px] px-3 py-1.5 rounded-md",
-                "bg-neutral-100/80 dark:bg-neutral-800/80",
-                "border border-neutral-200 dark:border-neutral-700",
-                "backdrop-blur-sm"
-            )}>
+            <div
+                className={cn(
+                    'flex items-center justify-center min-w-[120px] px-3 py-1.5 rounded-md',
+                    'bg-neutral-100/80 dark:bg-neutral-800/80',
+                    'border border-neutral-200 dark:border-neutral-700',
+                    'backdrop-blur-sm'
+                )}
+            >
                 <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
                     {isLoading ? (
                         'Loading...'

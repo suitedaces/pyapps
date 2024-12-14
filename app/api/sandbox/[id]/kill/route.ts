@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
     const sandboxId = req.nextUrl.pathname.split('/')[3]
@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     try {
         const sandbox = await Sandbox.reconnect(sandboxId)
         await sandbox.close()
-        
+
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('Error killing sandbox:', error)

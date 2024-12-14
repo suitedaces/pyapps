@@ -4,12 +4,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { ScrollArea } from './ui/scroll-area'
-import { cn } from '@/lib/utils'
 
 // File validation schema
 const FileValidationSchema = z.object({
@@ -40,7 +40,13 @@ interface FilePreviewProps {
     textareaHeight: number
 }
 
-export function FilePreview({ file, onRemove, onError, isMinHeight, textareaHeight }: FilePreviewProps) {
+export function FilePreview({
+    file,
+    onRemove,
+    onError,
+    isMinHeight,
+    textareaHeight,
+}: FilePreviewProps) {
     const [isVisible, setIsVisible] = useState(true)
     const [preview, setPreview] = useState<string>('')
     const [isPreviewOpen, setIsPreviewOpen] = useState(false)
@@ -138,23 +144,23 @@ export function FilePreview({ file, onRemove, onError, isMinHeight, textareaHeig
         return {
             initial: {
                 opacity: 0,
-                y: isBottom ? -20 : 20
+                y: isBottom ? -20 : 20,
             },
             animate: {
                 opacity: 1,
                 y: 0,
                 transition: {
-                    type: "spring",
+                    type: 'spring',
                     stiffness: 500,
                     damping: 30,
-                    mass: 0.5
-                }
+                    mass: 0.5,
+                },
             },
             exit: {
                 opacity: 0,
                 y: isBottom ? -20 : 20,
-                transition: { duration: 0.2 }
-            }
+                transition: { duration: 0.2 },
+            },
         }
     }, [isMinHeight])
 
@@ -166,7 +172,7 @@ export function FilePreview({ file, onRemove, onError, isMinHeight, textareaHeig
                 position: isMinHeight ? 'top' : 'bottom',
                 height: isMinHeight ? 'min' : 'max',
                 animation: getPosition,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             })
         }
     }, [isMinHeight, getPosition])
@@ -178,11 +184,11 @@ export function FilePreview({ file, onRemove, onError, isMinHeight, textareaHeig
                     <motion.div
                         {...getPosition}
                         className={cn(
-                            "absolute w-full bg-slate-50 dark:bg-slate-900 border-x",
+                            'absolute w-full bg-slate-50 dark:bg-slate-900 border-x',
                             !isMinHeight
-                                ? "top-[130px] translate-y-full border-b rounded-b-xl" // Top position
-                                : "bottom-0 -mb-5 -translate-y-full border-t rounded-t-xl", // Bottom position
-                            "transform transition-transform duration-200"
+                                ? 'top-[130px] translate-y-full border-b rounded-b-xl' // Top position
+                                : 'bottom-0 -mb-5 -translate-y-full border-t rounded-t-xl', // Bottom position
+                            'transform transition-transform duration-200'
                         )}
                     >
                         <div className="p-2">

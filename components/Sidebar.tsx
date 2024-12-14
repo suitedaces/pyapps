@@ -1,13 +1,11 @@
 'use client'
 
-import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import { Session } from '@supabase/supabase-js'
-import { AnimatePresence, motion } from 'motion/react'
 import {
     AppWindow,
     BadgeCheck,
-    Bell,
     ChevronRight,
     ChevronsUpDown,
     CreditCard,
@@ -18,17 +16,16 @@ import {
     MessageSquare,
     MoreHorizontal,
     MoveRight,
-    Origami,
     Plus,
     Share,
     Sparkles,
     Trash2,
 } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-import { BorderTrail } from '@/components/core/border-trail'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -63,12 +60,12 @@ import {
     SidebarMenuSubButton,
     SidebarProvider,
     SidebarRail,
-    SidebarTrigger,
     SidebarSeparator,
+    SidebarTrigger,
 } from '@/components/ui/sidebar'
 
-import { Logo } from './core/Logo'
 import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
+import { Logo } from './core/Logo'
 
 interface Chat {
     id: string
@@ -124,7 +121,9 @@ const CustomSidebarMenuSubItem = ({
     children: React.ReactNode
     className?: string
 }) => (
-    <div className={`${className} ${isActive ? 'bg-accent/50' : 'bg-background hover:bg-accent/30'}`}>
+    <div
+        className={`${className} ${isActive ? 'bg-accent/50' : 'bg-background hover:bg-accent/30'}`}
+    >
         {children}
     </div>
 )
@@ -144,7 +143,7 @@ const ChatsList = ({
     currentChatId,
     isCreatingChat,
     chatTitles,
-    onGenerateTitle
+    onGenerateTitle,
 }: ChatsListProps) => {
     const router = useRouter()
     const visibleChats = chats.slice(0, 10)
@@ -266,7 +265,7 @@ export default function AppSidebar({
     chats = [],
     isCreatingChat,
     chatTitles,
-    onGenerateTitle
+    onGenerateTitle,
 }: SidebarProps) {
     const [open, setOpen] = useState(false)
     const [isChatsOpen, setIsChatsOpen] = useState(true)
@@ -276,13 +275,17 @@ export default function AppSidebar({
 
     useEffect(() => {
         const getSession = async () => {
-            const { data: { session: currentSession } } = await supabase.auth.getSession()
+            const {
+                data: { session: currentSession },
+            } = await supabase.auth.getSession()
             setSession(currentSession)
         }
 
         getSession()
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session)
         })
 
@@ -316,8 +319,12 @@ export default function AppSidebar({
                                                 onClick={() => router.push('/')}
                                                 className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
                                             >
-                                                {!open && <Plus className="h-4 w-4" />}
-                                                {open && <span>New Project</span>}
+                                                {!open && (
+                                                    <Plus className="h-4 w-4" />
+                                                )}
+                                                {open && (
+                                                    <span>New Project</span>
+                                                )}
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
                                     </SidebarMenu>
@@ -336,14 +343,19 @@ export default function AppSidebar({
                                                     tooltip="Your previous chats"
                                                 >
                                                     <MessageSquare className="h-4 w-4" />
-                                                    {open && <span className="ml-2">Projects</span>}
+                                                    {open && (
+                                                        <span className="ml-2">
+                                                            Projects
+                                                        </span>
+                                                    )}
                                                 </SidebarMenuButton>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuAction>
                                                         <ChevronRight
                                                             className={cn(
                                                                 'h-4 w-4 transition-transform',
-                                                                isChatsOpen && 'rotate-90'
+                                                                isChatsOpen &&
+                                                                    'rotate-90'
                                                             )}
                                                         />
                                                     </SidebarMenuAction>
@@ -357,7 +369,9 @@ export default function AppSidebar({
                                                 currentChatId={currentChatId}
                                                 isCreatingChat={isCreatingChat}
                                                 chatTitles={chatTitles}
-                                                onGenerateTitle={onGenerateTitle}
+                                                onGenerateTitle={
+                                                    onGenerateTitle
+                                                }
                                             />
                                         </CollapsibleContent>
                                     </Collapsible>
@@ -372,7 +386,11 @@ export default function AppSidebar({
                                                     tooltip="Manage your files"
                                                 >
                                                     <File className="h-4 w-4" />
-                                                    {open && <span className="ml-2">Files</span>}
+                                                    {open && (
+                                                        <span className="ml-2">
+                                                            Files
+                                                        </span>
+                                                    )}
                                                 </SidebarMenuButton>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuAction>
@@ -391,7 +409,11 @@ export default function AppSidebar({
                                                     tooltip="Your applications"
                                                 >
                                                     <AppWindow className="h-4 w-4" />
-                                                    {open && <span className="ml-2">Apps</span>}
+                                                    {open && (
+                                                        <span className="ml-2">
+                                                            Apps
+                                                        </span>
+                                                    )}
                                                 </SidebarMenuButton>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuAction>
@@ -415,21 +437,39 @@ export default function AppSidebar({
                                             >
                                                 <Avatar className="h-8 w-8 rounded-lg">
                                                     <AvatarImage
-                                                        src={session?.user?.user_metadata?.avatar_url || '/default-avatar.png'}
-                                                        alt={session?.user?.user_metadata?.full_name || 'User'}
+                                                        src={
+                                                            session?.user
+                                                                ?.user_metadata
+                                                                ?.avatar_url ||
+                                                            '/default-avatar.png'
+                                                        }
+                                                        alt={
+                                                            session?.user
+                                                                ?.user_metadata
+                                                                ?.full_name ||
+                                                            'User'
+                                                        }
                                                     />
                                                     <AvatarFallback className="rounded-lg">
-                                                        {session?.user?.user_metadata?.full_name?.[0] || 'U'}
+                                                        {session?.user
+                                                            ?.user_metadata
+                                                            ?.full_name?.[0] ||
+                                                            'U'}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 {open && (
                                                     <>
                                                         <div className="grid flex-1 text-left text-sm leading-tight ml-2">
                                                             <span className="truncate font-semibold">
-                                                                {session?.user?.user_metadata?.full_name || 'Guest User'}
+                                                                {session?.user
+                                                                    ?.user_metadata
+                                                                    ?.full_name ||
+                                                                    'Guest User'}
                                                             </span>
                                                             <span className="truncate text-xs">
-                                                                {session?.user?.email || 'Not signed in'}
+                                                                {session?.user
+                                                                    ?.email ||
+                                                                    'Not signed in'}
                                                             </span>
                                                         </div>
                                                         <ChevronsUpDown className="ml-auto size-4" />
@@ -446,19 +486,37 @@ export default function AppSidebar({
                                                 <div className="flex items-center gap-2">
                                                     <Avatar className="h-8 w-8 rounded-lg">
                                                         <AvatarImage
-                                                            src={session?.user?.user_metadata?.avatar_url || '/default-avatar.png'}
-                                                            alt={session?.user?.user_metadata?.full_name || 'User'}
+                                                            src={
+                                                                session?.user
+                                                                    ?.user_metadata
+                                                                    ?.avatar_url ||
+                                                                '/default-avatar.png'
+                                                            }
+                                                            alt={
+                                                                session?.user
+                                                                    ?.user_metadata
+                                                                    ?.full_name ||
+                                                                'User'
+                                                            }
                                                         />
                                                         <AvatarFallback className="rounded-lg">
-                                                            {session?.user?.user_metadata?.full_name?.[0] || 'U'}
+                                                            {session?.user
+                                                                ?.user_metadata
+                                                                ?.full_name?.[0] ||
+                                                                'U'}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                                         <span className="font-semibold">
-                                                            {session?.user?.user_metadata?.full_name || 'Guest User'}
+                                                            {session?.user
+                                                                ?.user_metadata
+                                                                ?.full_name ||
+                                                                'Guest User'}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground">
-                                                            {session?.user?.email || 'Not signed in'}
+                                                            {session?.user
+                                                                ?.email ||
+                                                                'Not signed in'}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -482,7 +540,9 @@ export default function AppSidebar({
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="cursor-default hover:!bg-transparent"
-                                                    onSelect={(e) => e.preventDefault()}
+                                                    onSelect={(e) =>
+                                                        e.preventDefault()
+                                                    }
                                                 >
                                                     <div className="w-full">
                                                         <ThemeSwitcherButton />
@@ -490,7 +550,9 @@ export default function AppSidebar({
                                                 </DropdownMenuItem>
                                             </DropdownMenuGroup>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={handleSignOut}>
+                                            <DropdownMenuItem
+                                                onClick={handleSignOut}
+                                            >
                                                 <LogOut className="mr-2 h-4 w-4" />
                                                 <span>Log out</span>
                                             </DropdownMenuItem>
@@ -510,14 +572,23 @@ export default function AppSidebar({
         <div className="flex z-50">
             <MobileSidebar />
             <SidebarProvider open={open} onOpenChange={setOpen}>
-                <Sidebar variant="sidebar" collapsible="icon" className="hidden md:flex">
+                <Sidebar
+                    variant="sidebar"
+                    collapsible="icon"
+                    className="hidden md:flex"
+                >
                     <SidebarHeader>
                         <SidebarMenu>
-                            <SidebarMenuItem className='w-full flex justify-between items-center'>
-                                <Link href="/" className="flex items-center gap-2">
+                            <SidebarMenuItem className="w-full flex justify-between items-center">
+                                <Link
+                                    href="/"
+                                    className="flex items-center gap-2"
+                                >
                                     <Logo inverted collapsed={!open} />
                                 </Link>
-                                {open && <SidebarTrigger className="relative z-30" />}
+                                {open && (
+                                    <SidebarTrigger className="relative z-30" />
+                                )}
                             </SidebarMenuItem>
                         </SidebarMenu>
                     </SidebarHeader>
@@ -530,7 +601,9 @@ export default function AppSidebar({
                                             onClick={() => router.push('/')}
                                             className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
                                         >
-                                            {!open && <Plus className="h-4 w-4" />}
+                                            {!open && (
+                                                <Plus className="h-4 w-4" />
+                                            )}
                                             {open && <span>New Project</span>}
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
@@ -550,14 +623,19 @@ export default function AppSidebar({
                                                 tooltip="Your previous chats"
                                             >
                                                 <MessageSquare className="h-4 w-4" />
-                                                {open && <span className="ml-2">Projects</span>}
+                                                {open && (
+                                                    <span className="ml-2">
+                                                        Projects
+                                                    </span>
+                                                )}
                                             </SidebarMenuButton>
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuAction>
                                                     <ChevronRight
                                                         className={cn(
                                                             'h-4 w-4 transition-transform',
-                                                            isChatsOpen && 'rotate-90'
+                                                            isChatsOpen &&
+                                                                'rotate-90'
                                                         )}
                                                     />
                                                 </SidebarMenuAction>
@@ -586,7 +664,11 @@ export default function AppSidebar({
                                                 tooltip="Manage your files"
                                             >
                                                 <File className="h-4 w-4" />
-                                                {open && <span className="ml-2">Files</span>}
+                                                {open && (
+                                                    <span className="ml-2">
+                                                        Files
+                                                    </span>
+                                                )}
                                             </SidebarMenuButton>
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuAction>
@@ -605,7 +687,11 @@ export default function AppSidebar({
                                                 tooltip="Your applications"
                                             >
                                                 <AppWindow className="h-4 w-4" />
-                                                {open && <span className="ml-2">Apps</span>}
+                                                {open && (
+                                                    <span className="ml-2">
+                                                        Apps
+                                                    </span>
+                                                )}
                                             </SidebarMenuButton>
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuAction>
@@ -622,7 +708,7 @@ export default function AppSidebar({
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 {!open && (
-                                    <SidebarMenuItem className='flex justify-center'>
+                                    <SidebarMenuItem className="flex justify-center">
                                         <SidebarMenuButton>
                                             <SidebarTrigger className="w-4 h-4" />
                                         </SidebarMenuButton>
@@ -634,7 +720,7 @@ export default function AppSidebar({
                     <SidebarFooter>
                         <SidebarMenu>
                             <SidebarMenu>
-                                <SidebarMenuItem className='flex justify-center'>
+                                <SidebarMenuItem className="flex justify-center">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <SidebarMenuButton
@@ -644,24 +730,31 @@ export default function AppSidebar({
                                                 <Avatar className="h-8 w-8 rounded-lg">
                                                     <AvatarImage
                                                         src={
-                                                            session?.user?.user_metadata
+                                                            session?.user
+                                                                ?.user_metadata
                                                                 ?.avatar_url ||
                                                             '/default-avatar.png'
                                                         }
                                                         alt={
-                                                            session?.user?.user_metadata
-                                                                ?.full_name || 'User'
+                                                            session?.user
+                                                                ?.user_metadata
+                                                                ?.full_name ||
+                                                            'User'
                                                         }
                                                     />
                                                     <AvatarFallback className="rounded-lg">
-                                                        {session?.user?.user_metadata
-                                                            ?.full_name?.[0] || 'U'}
+                                                        {session?.user
+                                                            ?.user_metadata
+                                                            ?.full_name?.[0] ||
+                                                            'U'}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                                     <span className="truncate font-semibold">
-                                                        {session?.user?.user_metadata
-                                                            ?.full_name || 'Guest User'}
+                                                        {session?.user
+                                                            ?.user_metadata
+                                                            ?.full_name ||
+                                                            'Guest User'}
                                                     </span>
                                                     <span className="truncate text-xs">
                                                         {session?.user?.email ||
@@ -706,7 +799,8 @@ export default function AppSidebar({
                                                                 'Guest User'}
                                                         </span>
                                                         <span className="truncate text-xs">
-                                                            {session?.user?.email ||
+                                                            {session?.user
+                                                                ?.email ||
                                                                 'Not signed in'}
                                                         </span>
                                                     </div>
@@ -731,7 +825,9 @@ export default function AppSidebar({
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="cursor-default hover:!bg-transparent"
-                                                    onSelect={(e) => e.preventDefault()}
+                                                    onSelect={(e) =>
+                                                        e.preventDefault()
+                                                    }
                                                 >
                                                     <div className="w-full">
                                                         <ThemeSwitcherButton />
@@ -739,7 +835,9 @@ export default function AppSidebar({
                                                 </DropdownMenuItem>
                                             </DropdownMenuGroup>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={handleSignOut}>
+                                            <DropdownMenuItem
+                                                onClick={handleSignOut}
+                                            >
                                                 <LogOut />
                                                 Log out
                                             </DropdownMenuItem>

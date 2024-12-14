@@ -1,64 +1,66 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
-import { XCircle } from "lucide-react"
+import { cn } from '@/lib/utils'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { AnimatePresence, motion } from 'framer-motion'
+import { XCircle } from 'lucide-react'
+import * as React from 'react'
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",
-  {
-    variants: {
-      variant: {
-        default: "bg-background text-foreground",
-        destructive:
-          "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
+    'relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground',
+    {
+        variants: {
+            variant: {
+                default: 'bg-background text-foreground',
+                destructive:
+                    'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+            },
+        },
+        defaultVariants: {
+            variant: 'default',
+        },
+    }
 )
 
 const Alert = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>
+    HTMLDivElement,
+    React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>
 >(({ className, variant, ...props }, ref) => (
-  <div
-    ref={ref}
-    role="alert"
-    className={cn(alertVariants({ variant }), className)}
-    {...props}
-  />
+    <div
+        ref={ref}
+        role="alert"
+        className={cn(alertVariants({ variant }), className)}
+        {...props}
+    />
 ))
-Alert.displayName = "Alert"
+Alert.displayName = 'Alert'
 
 const AlertTitle = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLHeadingElement>
+    HTMLParagraphElement,
+    React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
-  <h5
-    ref={ref}
-    className={cn("mb-1 font-medium leading-none tracking-tight", className)}
-    {...props}
-  />
+    <h5
+        ref={ref}
+        className={cn(
+            'mb-1 font-medium leading-none tracking-tight',
+            className
+        )}
+        {...props}
+    />
 ))
-AlertTitle.displayName = "AlertTitle"
+AlertTitle.displayName = 'AlertTitle'
 
 const AlertDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
+    HTMLParagraphElement,
+    React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("text-sm [&_p]:leading-relaxed", className)}
-    {...props}
-  />
+    <div
+        ref={ref}
+        className={cn('text-sm [&_p]:leading-relaxed', className)}
+        {...props}
+    />
 ))
-AlertDescription.displayName = "AlertDescription"
+AlertDescription.displayName = 'AlertDescription'
 
-export { Alert, AlertTitle, AlertDescription }
-
+export { Alert, AlertDescription, AlertTitle }
 
 interface AlertMessageProps {
     title?: string
@@ -73,7 +75,7 @@ export function AlertMessage({
     message,
     variant = 'default',
     className,
-    onDismiss
+    onDismiss,
 }: AlertMessageProps) {
     return (
         <AnimatePresence>
@@ -83,12 +85,12 @@ export function AlertMessage({
                 exit={{ opacity: 0, y: -20 }}
                 className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4"
             >
-                <Alert 
+                <Alert
                     variant={variant}
                     className={cn(
-                        "border shadow-lg",
+                        'border shadow-lg',
                         variant === 'destructive' ? 'bg-red-50' : 'bg-white',
-                        "relative cursor-pointer",
+                        'relative cursor-pointer',
                         className
                     )}
                     onClick={onDismiss}
@@ -98,10 +100,14 @@ export function AlertMessage({
                         {variant === 'destructive' && (
                             <XCircle className="h-4 w-4 text-red-600" />
                         )}
-                        <AlertDescription className={cn(
-                            "text-sm",
-                            variant === 'destructive' ? 'text-red-600' : 'text-gray-600'
-                        )}>
+                        <AlertDescription
+                            className={cn(
+                                'text-sm',
+                                variant === 'destructive'
+                                    ? 'text-red-600'
+                                    : 'text-gray-600'
+                            )}
+                        >
                             {message}
                         </AlertDescription>
                     </div>

@@ -1,19 +1,19 @@
 {
-  "name": "s3-mount-test",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node test-s3-mount.ts"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.515.0",
-    "@aws-sdk/s3-request-presigner": "^3.515.0",
-    "dotenv": "^16.4.5",
-    "e2b": "^0.16.2"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.24",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
-  }
+    "name": "s3-mount-test",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "test": "node test-s3-mount.ts"
+    },
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.515.0",
+        "@aws-sdk/s3-request-presigner": "^3.515.0",
+        "dotenv": "^16.4.5",
+        "e2b": "^0.16.2"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.24",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.3.3"
+    }
 }

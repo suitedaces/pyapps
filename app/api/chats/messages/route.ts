@@ -1,8 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
-import { getUser } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { encode } from 'gpt-tokenizer'
 
 interface TokenCount {
     promptTokens: number
@@ -52,13 +49,13 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { 
+        const {
             chatId,
-            userMessage, 
-            assistantMessage, 
-            toolCalls, 
+            userMessage,
+            assistantMessage,
+            toolCalls,
             toolResults,
-            tokenCount
+            tokenCount,
         } = await req.json()
 
         let currentChatId = chatId
@@ -93,15 +90,15 @@ export async function POST(req: Request) {
                     token_count: tokenCount,
                     created_at: new Date().toISOString(),
                 })
-            
+
             if (messageError) {
                 console.error('Error storing message:', messageError)
                 return new Response('Error storing message', { status: 500 })
             }
         }
 
-        return Response.json({ 
-            chatId: currentChatId 
+        return Response.json({
+            chatId: currentChatId,
         })
     } catch (error) {
         console.error('Error storing message chain:', error)
@@ -180,4 +177,4 @@ export async function DELETE(req: NextRequest) {
             { status: 500 }
         )
     }
-} 
+}
