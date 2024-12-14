@@ -1,4 +1,4 @@
-import { analyzeFile } from '@/lib/fileAnalyzer'
+import { analyzeCSV } from '@/lib/fileAnalyzer'
 import { uploadToS3 } from '@/lib/s3'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
@@ -86,10 +86,12 @@ export async function POST(req: NextRequest) {
             `text/${metadata.fileType}`
         )
 
-        // 3. Analyze file if CSV
         let analysis = null
         if (metadata.fileType === 'csv') {
-            analysis = await analyzeFile(fileContent, 'csv', { detailed: true })
+            analysis = await analyzeCSV(fileContent, {
+                sampleSize: 2000,
+                maxRows: 5
+            })
         }
 
         // 4. Store file record

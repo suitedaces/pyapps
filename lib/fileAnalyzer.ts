@@ -1,215 +1,262 @@
 import Papa from 'papaparse'
-import { FileContext } from './types'
 
 export interface AnalysisOptions {
     detailed?: boolean
     maxRows?: number
+    sampleSize?: number
 }
 
-export interface ColumnAnalysis {
-    uniqueCount: number
-    nullCount: number
-    min?: number
-    max?: number
-    mean?: number
+export interface ColumnMetadata {
+    name: string
+    type: {
+        primary: ColumnType
+        alt?: ColumnType
+        confidence: number
+        possible_types: ColumnType[]
+    }
+    samples: {
+        head: any[]
+        tail: any[]
+        random: any[]
+        uniques: any[]
+    }
+    stats: {
+        unique_count: number
+        null_count: number
+        empty_count: number
+        numeric_stats?: {
+            min: number
+            max: number
+            mean: number
+        }
+        string_stats?: {
+            min_length: number
+            max_length: number
+            patterns: string[]
+        }
+    }
 }
 
 export interface CSVAnalysis {
-    columns: string[]
-    rowCount: number
-    columnTypes: Record<string, ColumnType>
-    summary: Record<string, ColumnAnalysis>
-    sampleData: any[]
-}
-
-export interface JSONAnalysis {
-    structure: string
-    depth: number
-    sampleData?: any
-}
-
-export type FileAnalysis = CSVAnalysis | JSONAnalysis
-
-export async function analyzeFile(
-    content: string,
-    fileType: FileContext['fileType'],
-    options?: AnalysisOptions
-): Promise<FileAnalysis> {
-    console.log('📊 Starting file analysis:', {
-        fileType,
-        contentLength: content.length,
-        options,
-    })
-
-    try {
-        const result = await (async () => {
-            switch (fileType) {
-                case 'csv':
-                    return analyzeCSV(content, options)
-                case 'json':
-                    return analyzeJSON(content, options)
-                default:
-                    throw new Error(`Unsupported file type: ${fileType}`)
-            }
-        })()
-
-        console.log('✅ File analysis completed:', {
-            fileType,
-            analysisType: result.constructor.name,
-        })
-
-        return result
-    } catch (error) {
-        console.error('❌ File analysis failed:', {
-            fileType,
-            error: error instanceof Error ? error.message : 'Unknown error',
-        })
-        throw error
+    metadata: {
+        rows: number
+        columns: number
+        size_bytes: number
+        has_header: boolean
+        delimiter: string
+        encoding: string
+    }
+    column_info: ColumnMetadata[]
+    sample_rows: any[]
+    data_quality: {
+        complete_rows: number
+        duplicate_rows: number
+        consistent_types: boolean
     }
 }
+
+type ColumnType = 'number' | 'boolean' | 'date' | 'string' | 'mixed' | 'unknown'
 
 export async function analyzeCSV(
     content: string,
-    options?: AnalysisOptions
+    options: AnalysisOptions = {}
 ): Promise<CSVAnalysis> {
-    console.log('📊 Starting CSV analysis:', {
-        contentLength: content.length,
-        options,
-    })
+    const SAMPLE_SIZE = options.sampleSize || 1000
+    const columnTracker = new Map<string, {
+        values: Set<any>
+        types: Set<ColumnType>
+        nulls: number
+        empties: number
+        numbers: number[]
+        strings: Set<string>
+        patterns: Set<string>
+    }>()
 
-    try {
-        const parsed = Papa.parse(content.trim(), {
+    let rows: any[] = []
+    let rowCount = 0
+    let completeRows = 0
+    let duplicateHashes = new Set<string>()
+
+    return new Promise((resolve) => {
+        Papa.parse(content.trim(), {
             header: true,
             skipEmptyLines: true,
             dynamicTyping: true,
-        })
+            fastMode: true,
+            chunk: ({ data, meta }: { data: any[], meta: any }) => {
+                rowCount += data.length
 
-        console.log('📋 CSV parsing completed:', {
-            rowCount: parsed.data.length,
-            columnCount: parsed.meta.fields?.length,
-        })
+                // Initialize column tracking if first chunk
+                if (columnTracker.size === 0 && meta.fields) {
+                    meta.fields.forEach((field: string) => {
+                        columnTracker.set(field, {
+                            values: new Set(),
+                            types: new Set(),
+                            nulls: 0,
+                            empties: 0,
+                            numbers: [],
+                            strings: new Set(),
+                            patterns: new Set()
+                        })
+                    })
+                }
 
-        const columns = parsed.meta.fields || []
-        const rows = parsed.data as Record<string, any>[]
-        const rowCount = rows.length
+                // Sample management
+                if (rows.length < SAMPLE_SIZE * 2) {
+                    rows.push(...data.slice(0, SAMPLE_SIZE))
+                } else {
+                    rows.splice(SAMPLE_SIZE, SAMPLE_SIZE, ...data.slice(-SAMPLE_SIZE))
+                }
 
-        const analysis: CSVAnalysis = {
-            columns,
-            rowCount,
-            columnTypes: {},
-            summary: {},
-            sampleData: rows.slice(0, options?.maxRows || 5),
-        }
+                // Process each row
+                data.forEach((row: any) => {
+                    let isComplete = true
+                    const rowValues = Object.values(row)
+                    
+                    const rowHash = rowValues.join('|')
+                    if (duplicateHashes.has(rowHash)) {
+                        duplicateHashes.add(rowHash)
+                    }
 
-        columns.forEach((column) => {
-            const values = rows
-                .map((row) => row[column])
-                .filter((v) => v !== null && v !== undefined)
-            const type = inferColumnType(values)
-            analysis.columnTypes[column] = type
+                    columnTracker.forEach((tracker, columnName) => {
+                        const value = row[columnName]
 
-            if (options?.detailed) {
-                analysis.summary[column] = analyzeColumn(values, type)
+                        if (value === null || value === undefined) {
+                            tracker.nulls++
+                            isComplete = false
+                        } else if (value === '') {
+                            tracker.empties++
+                            isComplete = false
+                        } else {
+                            const inferredType = inferType(value)
+                            tracker.types.add(inferredType)
+
+                            if (tracker.values.size < SAMPLE_SIZE) {
+                                tracker.values.add(value)
+                            }
+
+                            if (typeof value === 'number') {
+                                tracker.numbers.push(value)
+                            } else if (typeof value === 'string') {
+                                if (tracker.strings.size < 100) {
+                                    tracker.strings.add(value)
+                                }
+                                if (tracker.patterns.size < 10) {
+                                    tracker.patterns.add(inferStringPattern(value))
+                                }
+                            }
+                        }
+                    })
+
+                    if (isComplete) completeRows++
+                })
+            },
+            complete: () => {
+                const analysis: CSVAnalysis = {
+                    metadata: {
+                        rows: rowCount,
+                        columns: columnTracker.size,
+                        size_bytes: content.length,
+                        has_header: true,
+                        delimiter: ',',
+                        encoding: 'utf-8'
+                    },
+                    column_info: Array.from(columnTracker.entries()).map(([name, tracker]) => {
+                        const primaryType = getPrimaryType(tracker.types)
+                        return {
+                            name,
+                            type: {
+                                primary: primaryType,
+                                confidence: tracker.types.size === 1 ? 1 : 0.8,
+                                possible_types: Array.from(tracker.types)
+                            },
+                            samples: {
+                                head: rows.slice(0, 5).map(r => r[name]),
+                                tail: rows.slice(-5).map(r => r[name]),
+                                random: getRandomElements(Array.from(tracker.values), 5),
+                                uniques: Array.from(tracker.values).slice(0, 10)
+                            },
+                            stats: {
+                                unique_count: tracker.values.size,
+                                null_count: tracker.nulls,
+                                empty_count: tracker.empties,
+                                ...(tracker.numbers.length > 0 && {
+                                    numeric_stats: calculateNumericStats(tracker.numbers)
+                                }),
+                                ...(tracker.strings.size > 0 && {
+                                    string_stats: {
+                                        min_length: Math.min(...Array.from(tracker.strings).map(s => s.length)),
+                                        max_length: Math.max(...Array.from(tracker.strings).map(s => s.length)),
+                                        patterns: Array.from(tracker.patterns)
+                                    }
+                                })
+                            }
+                        }
+                    }),
+                    sample_rows: rows.slice(0, options.maxRows || 5),
+                    data_quality: {
+                        complete_rows: completeRows,
+                        duplicate_rows: duplicateHashes.size,
+                        consistent_types: Array.from(columnTracker.values())
+                            .every(tracker => tracker.types.size <= 1)
+                    }
+                }
+                resolve(analysis)
             }
         })
+    })
+}
 
-        console.log('✅ CSV analysis completed:', {
-            columns: analysis.columns.length,
-            rowCount: analysis.rowCount,
-            sampleSize: analysis.sampleData.length,
-        })
+function inferType(value: any): ColumnType {
+    if (typeof value === 'number') return 'number'
+    if (typeof value === 'boolean') return 'boolean'
+    if (value instanceof Date) return 'date'
+    if (typeof value === 'string') {
+        if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date'
+        if (/^\d+$/.test(value)) return 'number'
+        if (/^(true|false)$/i.test(value)) return 'boolean'
+    }
+    return 'string'
+}
 
-        return analysis
-    } catch (error) {
-        console.error('❌ CSV analysis error:', error)
-        throw new Error('Failed to analyze CSV file')
+function getPrimaryType(types: Set<ColumnType>): ColumnType {
+    if (types.size === 0) return 'unknown'
+    if (types.size === 1) return types.values().next().value as ColumnType
+    if (types.has('number')) return 'number'
+    if (types.has('date')) return 'date'
+    if (types.has('boolean')) return 'boolean'
+    if (types.has('string')) return 'string'
+    return 'mixed'
+}
+
+function calculateNumericStats(numbers: number[]) {
+    return {
+        min: Math.min(...numbers),
+        max: Math.max(...numbers),
+        mean: numbers.reduce((a, b) => a + b, 0) / numbers.length
     }
 }
 
-export async function analyzeJSON(
-    content: string,
-    options?: AnalysisOptions
-): Promise<JSONAnalysis> {
-    console.log('📊 Starting JSON analysis')
-
-    try {
-        const data = JSON.parse(content)
-        const analysis: JSONAnalysis = {
-            structure: inferJSONStructure(data),
-            depth: calculateJSONDepth(data),
-            sampleData: options?.detailed ? data : undefined,
-        }
-
-        console.log('✅ JSON analysis completed:', {
-            structure: analysis.structure,
-            depth: analysis.depth,
-        })
-
-        return analysis
-    } catch (error) {
-        console.error('❌ JSON analysis error:', error)
-        throw new Error('Failed to analyze JSON file')
-    }
+function inferStringPattern(str: string): string {
+    return str.replace(/[A-Z]+/g, 'A')
+        .replace(/[a-z]+/g, 'a')
+        .replace(/[0-9]+/g, '9')
 }
 
-// Add type definition for column types
-type ColumnType = 'number' | 'boolean' | 'date' | 'string' | 'mixed' | 'unknown'
-
-function inferColumnType(values: any[]): ColumnType {
-    if (values.length === 0) return 'unknown'
-
-    const types = values.map((value) => {
-        if (typeof value === 'number') return 'number' as const
-        if (typeof value === 'boolean') return 'boolean' as const
-        if (value instanceof Date) return 'date' as const
-        if (typeof value === 'string') {
-            if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date' as const
-            if (/^\d+$/.test(value)) return 'number' as const
-            if (/^(true|false)$/i.test(value)) return 'boolean' as const
-        }
-        return 'string' as const
-    }) as ColumnType[]
-
-    // Use a type guard to ensure type safety
-    const isSameType = (type: ColumnType, acc: ColumnType): ColumnType => {
-        return type === acc ? type : 'mixed'
-    }
-
-    return types.reduce(isSameType, types[0] || 'unknown')
-}
-
-function analyzeColumn(values: any[], type: string): ColumnAnalysis {
-    const summary: ColumnAnalysis = {
-        uniqueCount: new Set(values).size,
-        nullCount: values.filter((v) => v === null || v === undefined).length,
-    }
-
-    if (type === 'number') {
-        const numbers = values.filter((v) => typeof v === 'number')
-        if (numbers.length > 0) {
-            summary.min = Math.min(...numbers)
-            summary.max = Math.max(...numbers)
-            summary.mean = numbers.reduce((a, b) => a + b, 0) / numbers.length
+function getRandomElements<T>(arr: T[], n: number): T[] {
+    const result = new Array<T>(n)
+    const len = arr.length
+    const taken = new Set<number>()
+    
+    if (n > len) return arr.slice()
+    
+    while (taken.size < n) {
+        const x = Math.floor(Math.random() * len)
+        if (!taken.has(x)) {
+            taken.add(x)
+            result[taken.size - 1] = arr[x]
         }
     }
-
-    return summary
-}
-
-function inferJSONStructure(data: any): string {
-    if (Array.isArray(data)) {
-        return `array[${data.length}]`
-    }
-    if (typeof data === 'object' && data !== null) {
-        return `object{${Object.keys(data).length}}`
-    }
-    return typeof data
-}
-
-function calculateJSONDepth(data: any): number {
-    if (typeof data !== 'object' || data === null) return 0
-    return (
-        1 +
-        Math.max(...Object.values(data).map((v) => calculateJSONDepth(v)), -1)
-    )
+    
+    return result
 }

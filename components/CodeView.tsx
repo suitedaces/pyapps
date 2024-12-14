@@ -96,14 +96,14 @@ export function CodeView({
     }
 
     return (
-        <Card className={`bg-bg border-border h-full ${containerClassName}`}>
-            <CardContent className="p-0 h-full">
+        <Card className={`bg-bg border-border h-full overflow-hidden ${containerClassName}`}>
+            <CardContent className="p-0 h-full overflow-hidden">
                 <div
                     ref={containerRef}
-                    className={`h-full font-mono text-sm ${className}`}
+                    className={`h-full overflow-y-auto font-mono text-sm ${className}`}
                 >
                     <div
-                        className="min-w-max relative shiki-container overflow-x-auto"
+                        className="min-w-max relative shiki-container overflow-x-auto p-4"
                         dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                     />
 
