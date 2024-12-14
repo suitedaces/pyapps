@@ -34,8 +34,6 @@ interface AppHeaderProps {
 export function AppHeader({ appId, appName, appDescription = "No description available", initialVersions, initialUrl, streamlitRef, onToggleCode }: AppHeaderProps) {
     const { updateSandbox, setGeneratingCode, setGeneratedCode, setIsLoadingSandbox } = useSandboxStore()
     const isUpdatingRef = useRef(false)
-    const [showCode, setShowCode] = useState(false)
-    const [isMaximized, setIsMaximized] = useState(false)
 
     const handleVersionChange = useCallback(async (version: AppVersion) => {
         if (!version.code || isUpdatingRef.current) return
@@ -72,10 +70,6 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
         onToggleCode?.()
     }
 
-    const toggleMaximize = () => {
-        setIsMaximized(!isMaximized)
-    }
-
     return (
         <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-dark-app z-50">
             <div className="h-full px-4 flex items-center justify-between">
@@ -89,7 +83,7 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
                                     size="icon" 
                                     className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
                                 >
-                                    <Info className="h-4 w-4" />
+                                    <Info className="h-4 w-4 text-neutral-700 dark:text-neutral-200" />
                                 </Button>
                             </HoverCardTrigger>
                             <HoverCardContent className="w-80">
@@ -110,14 +104,14 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={toggleCodeView}
+                                    onClick={handleRefresh}
                                     className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
                                 >
-                                    <Code2 className="h-4 w-4" />
+                                    <RefreshCcw className="h-4 w-4 text-neutral-700 dark:text-neutral-200" />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>View Code</p>
+                                <p>Refresh App</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
@@ -127,18 +121,14 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={toggleMaximize}
+                                    onClick={toggleCodeView}
                                     className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
                                 >
-                                    {isMaximized ? (
-                                        <Minimize2 className="h-4 w-4" />
-                                    ) : (
-                                        <Maximize2 className="h-4 w-4" />
-                                    )}
+                                    <Code2 className="h-4 w-4 text-neutral-700 dark:text-neutral-200" />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>{isMaximized ? 'Minimize' : 'Maximize'}</p>
+                                <p>View Code</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
@@ -146,14 +136,6 @@ export function AppHeader({ appId, appName, appDescription = "No description ava
                         appId={appId}
                         onVersionChange={handleVersionChange}
                     />
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleRefresh}
-                        className="hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                    >
-                        <RefreshCcw className="h-4 w-4" />
-                    </Button>
                     <ThemeSwitcherButton showLabel={false} />
                 </div>
             </div>

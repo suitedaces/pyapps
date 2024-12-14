@@ -118,29 +118,33 @@ export const VersionSelector = forwardRef<
     return (
         <div className="flex items-center gap-2">
             <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
                 onClick={() => navigateVersion('prev')}
                 disabled={isLoading || currentIndex === versions.length - 1}
                 className={cn(
-                    'h-8 w-8',
-                    'bg-white hover:bg-gray-100',
-                    'border border-gray-200',
-                    'text-gray-700',
+                    'h-9 w-9',
+                    'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                    'text-neutral-700 dark:text-neutral-200',
                     'transition-all duration-200'
                 )}
             >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-5 w-5" />
             </Button>
 
-            <div className="flex items-center justify-center min-w-[120px] px-3 py-1.5 bg-white border border-gray-200 rounded-md">
-                <span className="text-sm font-medium text-gray-700">
+            <div className={cn(
+                "flex items-center justify-center min-w-[120px] px-3 py-1.5 rounded-md",
+                "bg-neutral-100/80 dark:bg-neutral-800/80",
+                "border border-neutral-200 dark:border-neutral-700",
+                "backdrop-blur-sm"
+            )}>
+                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
                     {isLoading ? (
                         'Loading...'
                     ) : versions.length > 0 ? (
                         <>
                             Version {versions[currentIndex]?.version_number}
-                            <span className="text-xs text-gray-400 ml-1">
+                            <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-1">
                                 / {versions.length}
                             </span>
                         </>
@@ -151,19 +155,18 @@ export const VersionSelector = forwardRef<
             </div>
 
             <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
                 onClick={() => navigateVersion('next')}
                 disabled={isLoading || currentIndex === 0}
                 className={cn(
-                    'h-8 w-8',
-                    'bg-white hover:bg-gray-100',
-                    'border border-gray-200',
-                    'text-gray-700',
+                    'h-9 w-9',
+                    'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                    'text-neutral-700 dark:text-neutral-200',
                     'transition-all duration-200'
                 )}
             >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-5 w-5" />
             </Button>
         </div>
     )
