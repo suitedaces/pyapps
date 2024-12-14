@@ -5,11 +5,11 @@ import { AppClient } from './AppClient'
 import { AppVersion } from '@/lib/types'
 
 interface PageParams {
-    params: { id: string }
+    params: Promise<{ id: string }>
 }
 
 export default async function AppPage({ params }: PageParams) {
-    const { id } = params
+    const { id } = await params
     const user = await getUser()
     
     if (!user) {
