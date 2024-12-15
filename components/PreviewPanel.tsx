@@ -78,7 +78,7 @@ export const PreviewPanel = React.forwardRef<
         }
 
         return (
-            <div className="relative h-full z-40">
+            <div className="relative flex flex-col h-full z-40">
                 <AnimatePresence>
                     {showOverlay && (
                         <LoadingSandbox
@@ -90,7 +90,7 @@ export const PreviewPanel = React.forwardRef<
                         />
                     )}
                 </AnimatePresence>
-                <div className="h-full flex flex-col">
+                <div className="flex flex-col h-full">
                     <div className="flex items-center gap-2 p-2 border-b bg-muted/40">
                         <div className="flex items-center flex-grow gap-2 px-2 py-1.5 bg-background rounded-md border shadow-sm">
                             <Globe className="h-4 w-4 text-foreground/90" />
@@ -153,15 +153,16 @@ export const PreviewPanel = React.forwardRef<
                             </Tooltip>
                         </TooltipProvider>
                     </div>
-                    <div className="flex-grow relative">
+                    <div className="flex-1 min-h-0">
                         {showCodeView ? (
-                            <div className="h-full overflow-auto">
+                            <div className="h-full">
                                 {isGeneratingCode ? (
                                     <LoadingSandbox message="Generating code..." />
                                 ) : (
                                     <CodeView
                                         code={generatedCode}
                                         isGeneratingCode={isGeneratingCode}
+                                        containerClassName="h-full"
                                     />
                                 )}
                             </div>

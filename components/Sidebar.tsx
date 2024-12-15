@@ -66,6 +66,7 @@ import {
 
 import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
 import { Logo } from './core/Logo'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Chat {
     id: string
@@ -272,6 +273,7 @@ export default function AppSidebar({
     const router = useRouter()
     const [session, setSession] = useState<Session | null>(null)
     const supabase = createClient()
+    const { isPreviewMode, showAuthPrompt } = useAuth()
 
     useEffect(() => {
         const getSession = async () => {
@@ -568,6 +570,143 @@ export default function AppSidebar({
         </Sheet>
     )
 
+    const userProfile = isPreviewMode ? (
+        <SidebarMenuItem className="flex justify-center">
+            <Button 
+                variant="ghost" 
+                className="w-full" 
+                onClick={showAuthPrompt}
+            >
+                Sign in to save progress
+            </Button>
+        </SidebarMenuItem>
+    ) : (
+        <SidebarMenuItem className="flex justify-center">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                        size="lg"
+                        className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    >
+                        <Avatar className="h-8 w-8 rounded-lg">
+                            <AvatarImage
+                                src={
+                                    session?.user
+                                        ?.user_metadata
+                                        ?.avatar_url ||
+                                    '/default-avatar.png'
+                                }
+                                alt={
+                                    session?.user
+                                        ?.user_metadata
+                                        ?.full_name ||
+                                    'User'
+                                }
+                            />
+                            <AvatarFallback className="rounded-lg">
+                                {session?.user
+                                    ?.user_metadata
+                                    ?.full_name?.[0] ||
+                                    'U'}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                            <span className="truncate font-semibold">
+                                {session?.user
+                                    ?.user_metadata
+                                    ?.full_name ||
+                                    'Guest User'}
+                            </span>
+                            <span className="truncate text-xs">
+                                {session?.user?.email ||
+                                    'Not signed in'}
+                            </span>
+                        </div>
+                        <ChevronsUpDown className="ml-auto size-4" />
+                    </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                    className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                    side="bottom"
+                    align="end"
+                    sideOffset={4}
+                >
+                    <DropdownMenuLabel className="p-0 font-normal">
+                        <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                            <Avatar className="h-8 w-8 rounded-lg">
+                                <AvatarImage
+                                    src={
+                                        session?.user
+                                            ?.user_metadata
+                                            ?.avatar_url ||
+                                        '/default-avatar.png'
+                                    }
+                                    alt={
+                                        session?.user
+                                            ?.user_metadata
+                                            ?.full_name ||
+                                        'User'
+                                    }
+                                />
+                                <AvatarFallback className="rounded-lg">
+                                    CN
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="grid flex-1 text-left text-sm leading-tight">
+                                <span className="truncate font-semibold">
+                                    {session?.user
+                                        ?.user_metadata
+                                        ?.full_name ||
+                                        'Guest User'}
+                                </span>
+                                <span className="truncate text-xs">
+                                    {session?.user
+                                        ?.email ||
+                                        'Not signed in'}
+                                </span>
+                            </div>
+                        </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                        <DropdownMenuItem>
+                            <Sparkles />
+                            Upgrade to Pro
+                        </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                        <DropdownMenuItem>
+                            <BadgeCheck />
+                            Account
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                            <CreditCard />
+                            Billing
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            className="cursor-default hover:!bg-transparent"
+                            onSelect={(e) =>
+                                e.preventDefault()
+                            }
+                        >
+                            <div className="w-full">
+                                <ThemeSwitcherButton />
+                            </div>
+                        </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={handleSignOut}
+                    >
+                        <LogOut />
+                        Log out
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </SidebarMenuItem>
+    )
+
     return (
         <div className="flex z-50">
             <MobileSidebar />
@@ -720,130 +859,7 @@ export default function AppSidebar({
                     <SidebarFooter>
                         <SidebarMenu>
                             <SidebarMenu>
-                                <SidebarMenuItem className="flex justify-center">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <SidebarMenuButton
-                                                size="lg"
-                                                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                                            >
-                                                <Avatar className="h-8 w-8 rounded-lg">
-                                                    <AvatarImage
-                                                        src={
-                                                            session?.user
-                                                                ?.user_metadata
-                                                                ?.avatar_url ||
-                                                            '/default-avatar.png'
-                                                        }
-                                                        alt={
-                                                            session?.user
-                                                                ?.user_metadata
-                                                                ?.full_name ||
-                                                            'User'
-                                                        }
-                                                    />
-                                                    <AvatarFallback className="rounded-lg">
-                                                        {session?.user
-                                                            ?.user_metadata
-                                                            ?.full_name?.[0] ||
-                                                            'U'}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="grid flex-1 text-left text-sm leading-tight">
-                                                    <span className="truncate font-semibold">
-                                                        {session?.user
-                                                            ?.user_metadata
-                                                            ?.full_name ||
-                                                            'Guest User'}
-                                                    </span>
-                                                    <span className="truncate text-xs">
-                                                        {session?.user?.email ||
-                                                            'Not signed in'}
-                                                    </span>
-                                                </div>
-                                                <ChevronsUpDown className="ml-auto size-4" />
-                                            </SidebarMenuButton>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                                            side="bottom"
-                                            align="end"
-                                            sideOffset={4}
-                                        >
-                                            <DropdownMenuLabel className="p-0 font-normal">
-                                                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                                    <Avatar className="h-8 w-8 rounded-lg">
-                                                        <AvatarImage
-                                                            src={
-                                                                session?.user
-                                                                    ?.user_metadata
-                                                                    ?.avatar_url ||
-                                                                '/default-avatar.png'
-                                                            }
-                                                            alt={
-                                                                session?.user
-                                                                    ?.user_metadata
-                                                                    ?.full_name ||
-                                                                'User'
-                                                            }
-                                                        />
-                                                        <AvatarFallback className="rounded-lg">
-                                                            CN
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="grid flex-1 text-left text-sm leading-tight">
-                                                        <span className="truncate font-semibold">
-                                                            {session?.user
-                                                                ?.user_metadata
-                                                                ?.full_name ||
-                                                                'Guest User'}
-                                                        </span>
-                                                        <span className="truncate text-xs">
-                                                            {session?.user
-                                                                ?.email ||
-                                                                'Not signed in'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuGroup>
-                                                <DropdownMenuItem>
-                                                    <Sparkles />
-                                                    Upgrade to Pro
-                                                </DropdownMenuItem>
-                                            </DropdownMenuGroup>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuGroup>
-                                                <DropdownMenuItem>
-                                                    <BadgeCheck />
-                                                    Account
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem>
-                                                    <CreditCard />
-                                                    Billing
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    className="cursor-default hover:!bg-transparent"
-                                                    onSelect={(e) =>
-                                                        e.preventDefault()
-                                                    }
-                                                >
-                                                    <div className="w-full">
-                                                        <ThemeSwitcherButton />
-                                                    </div>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuGroup>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={handleSignOut}
-                                            >
-                                                <LogOut />
-                                                Log out
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </SidebarMenuItem>
+                                {userProfile}
                             </SidebarMenu>
                         </SidebarMenu>
                     </SidebarFooter>

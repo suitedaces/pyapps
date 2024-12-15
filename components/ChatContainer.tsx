@@ -23,6 +23,7 @@ import { useLocalStorage } from 'usehooks-ts'
 import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
 import AppSidebar from './Sidebar'
+import { AuthPrompt } from '@/components/ui/auth-prompt'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -89,7 +90,7 @@ export default function ChatContainer({
     initialAppId = null,
 }: ChatContainerProps) {
     const router = useRouter()
-    const { session, isLoading } = useAuth()
+    const { session, isLoading, isPreviewMode, shouldShowAuthPrompt } = useAuth()
     const { collapsed: sidebarCollapsed } = useSidebar()
     const {
         streamlitUrl,
@@ -694,10 +695,6 @@ export default function ChatContainer({
         return <div>Loading...</div>
     }
 
-    if (!session) {
-        return <LoginPage />
-    }
-
     const CustomHandle = ({ ...props }) => (
         <ResizableHandle
             {...props}
@@ -847,6 +844,8 @@ export default function ChatContainer({
                     </div>
                 </main>
             </div>
+
+            {shouldShowAuthPrompt && <AuthPrompt />}
         </div>
     )
 }

@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Message } from 'ai'
 import { XCircle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface FileUploadState {
     isUploading: boolean
@@ -50,6 +51,7 @@ export function Chat({
     isInChatPage = false,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const { isPreviewMode, showAuthPrompt } = useAuth()
 
     // Handle submission
     const handleSubmit = async (
@@ -59,6 +61,11 @@ export function Chat({
     ) => {
         e.preventDefault()
         if (!message.trim() && !file) return
+
+        if (isPreviewMode) {
+            showAuthPrompt()
+            return
+        }
 
         try {
             // Pass the event and message to parent's onSubmit

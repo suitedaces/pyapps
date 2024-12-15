@@ -124,7 +124,7 @@ export function MessageButton({
                     return 'Generating Streamlit App...'
                 }
             }
-            return object ? object.title : 'Streamlit App Code'
+            return object ? object.title : 'Streamlit App'
         })()
 
         const subtitle = (() => {
@@ -136,7 +136,7 @@ export function MessageButton({
                     return 'Generating code...'
                 }
             }
-            return 'Click to see code'
+            return ''
         })()
 
         return (
