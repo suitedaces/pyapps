@@ -120,6 +120,7 @@ export default function ChatContainer({
     const streamlitPreviewRef = useRef<{ refreshIframe: () => void } | null>(
         null
     )
+    const titleGeneratedRef = useRef<Set<string>>(new Set())
 
     // State management
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
@@ -327,7 +328,7 @@ export default function ChatContainer({
             try {
                 for (let attempt = 1; attempt <= 3; attempt++) {
                     try {
-                        const url = await updateSandbox(code, forceExecute)
+                        const url = await updateSandbox(code, forceExecute, currentChatId || undefined)
                         if (url) {
                             setStreamlitUrl(url)
                             if (streamlitPreviewRef.current?.refreshIframe) {
@@ -356,7 +357,7 @@ export default function ChatContainer({
                 setGeneratingCode(false)
             }
         },
-        [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox]
+        [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox, currentChatId]
     )
 
     // Improved file upload with abort controller
@@ -647,8 +648,23 @@ export default function ChatContainer({
     // Title generation
     const generateTitle = useCallback(
         async (chatId: string) => {
-            console.log('🎯 Starting title generation for chat:', chatId)
+            // Prevent duplicate generations for same chat
+            if (titleGeneratedRef.current.has(chatId)) {
+                return null
+            }
+
             try {
+                // Check current chat name in database
+                const chatResponse = await fetch(`/api/chats/${chatId}`)
+                const chatData = await chatResponse.json()
+                
+                // Only generate if it's the default name
+                if (chatData.chat?.name !== 'New Chat') {
+                    titleGeneratedRef.current.add(chatId)
+                    return null
+                }
+
+                console.log('🎯 Generating title for chat:', chatId)
                 const response = await fetch('/api/title', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -661,9 +677,10 @@ export default function ChatContainer({
                 console.log('✨ Generated title:', title)
 
                 // Update local state
-                setChatTitles((prev) => ({ ...prev, [chatId]: title }))
+                setChatTitles(prev => ({ ...prev, [chatId]: title }))
+                titleGeneratedRef.current.add(chatId)
 
-                // Refresh chats list immediately
+                // Refresh chats list
                 const chatsResponse = await fetch('/api/chats')
                 if (chatsResponse.ok) {
                     const data = await chatsResponse.json()
