@@ -328,7 +328,7 @@ export default function ChatContainer({
             try {
                 for (let attempt = 1; attempt <= 3; attempt++) {
                     try {
-                        const url = await updateSandbox(code, forceExecute, currentChatId || undefined)
+                        const url = await updateSandbox(code, forceExecute)
                         if (url) {
                             setStreamlitUrl(url)
                             if (streamlitPreviewRef.current?.refreshIframe) {
@@ -798,6 +798,7 @@ export default function ChatContainer({
                                                 view: 'code',
                                             }))
                                         }}
+                                        onTogglePanel={toggleRightContent}
                                         isInChatPage={
                                             isInChatPage || hasFirstMessage
                                         }

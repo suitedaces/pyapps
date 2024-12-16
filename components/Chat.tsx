@@ -33,6 +33,7 @@ interface ChatProps {
     onUpdateStreamlit: (code: string) => void
     onCodeClick: (code: string) => void
     isInChatPage: boolean
+    onTogglePanel: (panel: string) => void
 }
 
 export function Chat({
@@ -49,6 +50,7 @@ export function Chat({
     onUpdateStreamlit,
     onCodeClick,
     isInChatPage = false,
+    onTogglePanel,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
@@ -131,11 +133,9 @@ export function Chat({
                             key={message.id}
                             {...message}
                             isLastMessage={index === messages.length - 1}
-                            isLoading={
-                                isLoading && index === messages.length - 1
-                            }
+                            isLoading={isLoading}
                             onCodeClick={handleCodeClick}
-                            toolInvocations={message.toolInvocations}
+                            onTogglePanel={onTogglePanel}
                         />
                     ))}
                 <div ref={messagesEndRef} />

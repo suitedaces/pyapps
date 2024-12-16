@@ -3,14 +3,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
 import { App, ExecutionResult } from '@/lib/schema'
-import { useToolState } from '@/lib/stores/tool-state-store'
 import { cn } from '@/lib/utils'
 import { Message as AIMessage } from 'ai'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Terminal } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
+import { ActionPanel } from './action-panel'
 import { Markdown } from './markdown'
-import { MessageButton } from './message-button'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
@@ -24,6 +22,7 @@ interface MessageProps extends AIMessage {
     onToolResultClick?: (result: string) => void
     onCodeClick?: (messageId: string) => void
     isCreatingChat?: boolean
+    onTogglePanel?: () => void
 }
 
 export function Message({
@@ -39,12 +38,12 @@ export function Message({
     onCodeClick,
     isLoading,
     isCreatingChat = false,
+    onTogglePanel,
 }: MessageProps) {
     const isUser = role === 'user'
     const { session } = useAuth()
     const user = session?.user
     const messageEndRef = useRef<HTMLDivElement>(null)
-    const { currentToolCall } = useToolState()
 
     // Auto-scroll effect
     useEffect(() => {
@@ -58,25 +57,6 @@ export function Message({
         () => content.split('\n').filter(Boolean),
         [content]
     )
-
-    // Handle tool invocations display
-    const renderToolInvocations = () => {
-        if (!toolInvocations?.length) return null
-
-        return (
-            <MessageButton
-                toolInvocations={toolInvocations}
-                object={object}
-                result={result}
-                onObjectClick={onObjectClick}
-                onToolResultClick={onToolResultClick}
-                onCodeClick={onCodeClick}
-                messageId={id}
-                isLastMessage={isLastMessage}
-                isLoading={isLoading}
-            />
-        )
-    }
 
     return (
         <AnimatePresence mode="wait">
@@ -98,7 +78,6 @@ export function Message({
                             <AvatarFallback>A</AvatarFallback>
                         </Avatar>
                         <div className="mx-2 p-4 break-words w-full dark:text-dark-text">
-                            {/* Streamed content */}
                             <AnimatePresence mode="popLayout">
                                 {contentLines.map((line, i) => (
                                     <motion.div
@@ -115,27 +94,15 @@ export function Message({
                                 ))}
                             </AnimatePresence>
 
-                            {/* Tool streaming indicator */}
-                            {isLastMessage &&
-                                isLoading &&
-                                currentToolCall.toolName === 'streamlitTool' &&
-                                currentToolCall.state === 'streaming-start' && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300 mt-2"
-                                    >
-                                        <Terminal className="w-4 h-4 animate-pulse" />
-                                        <span>Generating Streamlit app...</span>
-                                    </motion.div>
-                                )}
+                            {Boolean(toolInvocations?.length) && (
+                                <ActionPanel
+                                    isLoading={isLoading}
+                                    isLastMessage={isLastMessage}
+                                    onTogglePanel={onTogglePanel}
+                                />
+                            )}
 
-                            {/* Tool invocations */}
-                            {renderToolInvocations()}
-
-                            {/* Typing indicator for streaming */}
-                            {isLastMessage && isLoading && (
+                            {isLastMessage && isLoading && !toolInvocations?.length && (
                                 <motion.div
                                     className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
                                     animate={{ opacity: [0, 1, 0] }}
