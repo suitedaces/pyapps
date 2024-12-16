@@ -39,6 +39,7 @@ interface ChatContainerProps {
     isNewChat?: boolean
     isInChatPage?: boolean
     initialAppId?: string | null
+    onChatDeleted?: () => void;
 }
 
 interface FileUploadState {
@@ -88,6 +89,7 @@ export default function ChatContainer({
     isInChatPage = false,
     initialFiles = [],
     initialAppId = null,
+    onChatDeleted,
 }: ChatContainerProps) {
     const router = useRouter()
     const { session, isLoading, isPreviewMode, shouldShowAuthPrompt } = useAuth()
@@ -276,6 +278,10 @@ export default function ChatContainer({
             try {
                 if (message.content && newChatIdRef.current) {
                     handleChatCreated(newChatIdRef.current)
+
+                    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+                    await generateTitle(newChatIdRef.current)
                     newChatIdRef.current = null
                 }
 
@@ -485,8 +491,26 @@ export default function ChatContainer({
     }, [])
 
     const handleChatSelect = useCallback(
-        (chatId: string) => {
-            router.push(`/chat/${chatId}`)
+        async (chatId: string) => {
+            try {
+                // Check if chat exists before navigating
+                const response = await fetch(`/api/chats/${chatId}`)
+                if (!response.ok) {
+                    // Chat was deleted, refresh the chats list
+                    const chatsResponse = await fetch('/api/chats')
+                    if (chatsResponse.ok) {
+                        const data = await chatsResponse.json()
+                        setSidebarChats(data.chats)
+                    }
+                    router.push('/')
+                    return
+                }
+                
+                router.push(`/chat/${chatId}`)
+            } catch (error) {
+                console.error('Error selecting chat:', error)
+                router.push('/')
+            }
         },
         [router]
     )
@@ -648,64 +672,39 @@ export default function ChatContainer({
     // Title generation
     const generateTitle = useCallback(
         async (chatId: string) => {
-            // Prevent duplicate generations for same chat
             if (titleGeneratedRef.current.has(chatId)) {
                 return null
             }
 
             try {
-                // Check current chat name in database
-                const chatResponse = await fetch(`/api/chats/${chatId}`)
-                const chatData = await chatResponse.json()
-                
-                // Only generate if it's the default name
-                if (chatData.chat?.name !== 'New Chat') {
-                    titleGeneratedRef.current.add(chatId)
-                    return null
-                }
-
-                console.log('🎯 Generating title for chat:', chatId)
-                const response = await fetch('/api/title', {
+                const response = await fetch(`/api/chats/${chatId}/title`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chatId }),
                 })
 
                 if (!response.ok) throw new Error('Failed to generate title')
 
-                const title = await response.text()
-                console.log('✨ Generated title:', title)
+                const data = await response.json()
+                
+                if (data.title) {
+                    setChatTitles(prev => ({ ...prev, [chatId]: data.title }))
+                    titleGeneratedRef.current.add(chatId)
 
-                // Update local state
-                setChatTitles(prev => ({ ...prev, [chatId]: title }))
-                titleGeneratedRef.current.add(chatId)
-
-                // Refresh chats list
-                const chatsResponse = await fetch('/api/chats')
-                if (chatsResponse.ok) {
-                    const data = await chatsResponse.json()
-                    setSidebarChats(data.chats)
+                    // Refresh chats list
+                    const chatsResponse = await fetch('/api/chats')
+                    if (chatsResponse.ok) {
+                        const data = await chatsResponse.json()
+                        setSidebarChats(data.chats)
+                    }
                 }
 
-                return title
+                return data.title
             } catch (error) {
-                console.error('❌ Error in generateTitle:', error)
+                console.error('Error generating title:', error)
                 return null
             }
         },
         [setSidebarChats]
     )
-
-    // Add this useEffect to trigger title generation for new chats
-    useEffect(() => {
-        if (currentChatId && !chatTitles[currentChatId]) {
-            console.log(
-                '🔄 Triggering title generation for new chat:',
-                currentChatId
-            )
-            generateTitle(currentChatId)
-        }
-    }, [currentChatId])
 
     // Loading states
     if (isLoading) {
@@ -738,6 +737,26 @@ export default function ChatContainer({
                 isCreatingChat={isCreatingChat}
                 chatTitles={chatTitles}
                 onGenerateTitle={generateTitle}
+                onChatDeleted={() => {
+                    // Clear current chat state
+                    setCurrentChatId(null)
+                    setCurrentAppId(null)
+                    setMessages([])
+                    setGeneratedCode('')
+                    setStreamlitUrl(null)
+                    
+                    // Reset UI state
+                    setRightPanel({
+                        isVisible: false,
+                        view: 'preview'
+                    })
+                    
+                    // Refresh chats list
+                    fetch('/api/chats')
+                        .then(response => response.json())
+                        .then(data => setSidebarChats(data.chats))
+                        .catch(console.error)
+                }}
             />
             <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
                 {sidebarCollapsed && (

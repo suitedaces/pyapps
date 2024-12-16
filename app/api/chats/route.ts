@@ -44,7 +44,7 @@ export async function POST(req: Request) {
             .from('chats')
             .insert({
                 user_id: user.id,
-                name: body.name || 'New Chat',
+                name: 'New Project',
             })
             .select()
             .single()

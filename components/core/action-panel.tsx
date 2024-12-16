@@ -67,10 +67,39 @@ export function ActionPanel({
                         isDisabled && 'pointer-events-none opacity-50'
                     )}
                 >
-                    <Icon className={cn(
-                        'h-4 w-4',
-                        'text-current'
-                    )} />
+                    {isLoading && isLastMessage ? (
+                        <motion.div
+                            initial={{ opacity: 1 }}
+                            animate={{ opacity: [1, 0.5, 1] }}
+                            transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                            }}
+                            className="relative"
+                        >
+                            <Icon className={cn(
+                                'h-4 w-4',
+                                'text-current'
+                            )} />
+                            <motion.div
+                                className="absolute inset-0 dark:bg-white bg-black"
+                                initial={{ scaleY: 0 }}
+                                animate={{ scaleY: [0, 1, 0] }}
+                                transition={{
+                                    duration: 1.5,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }}
+                                style={{ transformOrigin: 'bottom' }}
+                            />
+                        </motion.div>
+                    ) : (
+                        <Icon className={cn(
+                            'h-4 w-4',
+                            'text-current'
+                        )} />
+                    )}
                     <span>{text}</span>
                 </button>
             </motion.div>

@@ -84,14 +84,6 @@ CREATE TABLE public.chat_files (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- App files table
-CREATE TABLE public.app_files (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    app_id UUID REFERENCES public.apps(id),
-    file_id UUID REFERENCES public.files(id),
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
 -- Usage limits table
 CREATE TABLE public.usage_limits (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -300,3 +292,6 @@ BEGIN
     RETURN total_tokens;
 END;
 $$ LANGUAGE plpgsql;
+
+
+DROP TABLE IF EXISTS app_files;
