@@ -19,8 +19,6 @@ interface CodeViewProps {
     containerClassName?: string
 }
 
-const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), { ssr: false })
-
 const CODE_THEMES = {
     dark: {
         primary: 'github-dark-high-contrast',
@@ -90,10 +88,6 @@ export function CodeView({
             }
         }
     }, [code])
-
-    if (isGeneratingCode && !displayCode) {
-        return <LoadingSandbox message="Generating code..." />
-    }
 
     return (
         <Card className={`bg-bg border-border h-full overflow-hidden ${containerClassName}`}>
