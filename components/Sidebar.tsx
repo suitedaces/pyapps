@@ -10,14 +10,11 @@ import {
     ChevronsUpDown,
     CreditCard,
     File,
-    Folder,
     LogOut,
     Menu,
     MessageSquare,
-    MoreHorizontal,
     MoveRight,
     Plus,
-    Share,
     Sparkles,
     Trash2,
 } from 'lucide-react'
@@ -64,9 +61,6 @@ import {
     SidebarTrigger,
 } from '@/components/ui/sidebar'
 
-import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
-import { Logo } from './core/Logo'
-import { useAuth } from '@/contexts/AuthContext'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -77,7 +71,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/alert-dialog'
+import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
+import { useAuth } from '@/contexts/AuthContext'
+import { Logo } from './core/Logo'
 
 interface Chat {
     id: string
@@ -227,11 +224,11 @@ const ChatsList = ({
                                     {chat.name || `Chat ${chat.id.slice(0, 8)}`}
                                 </span>
                             </SidebarMenuSubButton>
-                            
+
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button 
-                                        variant="ghost" 
+                                    <Button
+                                        variant="ghost"
                                         size="icon"
                                         className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive transition-colors"
                                     >
@@ -244,7 +241,10 @@ const ChatsList = ({
                                             Delete Project
                                         </AlertDialogTitle>
                                         <AlertDialogDescription className="text-muted-foreground/80 pt-2">
-                                            Are you sure you want to delete this project? This action cannot be undone and will permanently delete all associated data.
+                                            Are you sure you want to delete this
+                                            project? This action cannot be
+                                            undone and will permanently delete
+                                            all associated data.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter className="mt-4 gap-2">
@@ -254,21 +254,33 @@ const ChatsList = ({
                                         <AlertDialogAction
                                             onClick={async () => {
                                                 try {
-                                                    const response = await fetch(`/api/chats/${chat.id}`, {
-                                                        method: 'DELETE',
-                                                    })
+                                                    const response =
+                                                        await fetch(
+                                                            `/api/chats/${chat.id}`,
+                                                            {
+                                                                method: 'DELETE',
+                                                            }
+                                                        )
 
                                                     if (!response.ok) {
-                                                        throw new Error('Failed to delete chat')
+                                                        throw new Error(
+                                                            'Failed to delete chat'
+                                                        )
                                                     }
 
                                                     onChatDeleted()
 
-                                                    if (currentChatId === chat.id) {
+                                                    if (
+                                                        currentChatId ===
+                                                        chat.id
+                                                    ) {
                                                         router.push('/')
                                                     }
                                                 } catch (error) {
-                                                    console.error('Failed to delete chat:', error)
+                                                    console.error(
+                                                        'Failed to delete chat:',
+                                                        error
+                                                    )
                                                 }
                                             }}
                                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 transition-colors"
@@ -612,11 +624,7 @@ export default function AppSidebar({
 
     const userProfile = isPreviewMode ? (
         <SidebarMenuItem className="flex justify-center">
-            <Button 
-                variant="ghost" 
-                className="w-full" 
-                onClick={showAuthPrompt}
-            >
+            <Button variant="ghost" className="w-full" onClick={showAuthPrompt}>
                 Sign in to save progress
             </Button>
         </SidebarMenuItem>
@@ -631,35 +639,26 @@ export default function AppSidebar({
                         <Avatar className="h-8 w-8 rounded-lg">
                             <AvatarImage
                                 src={
-                                    session?.user
-                                        ?.user_metadata
-                                        ?.avatar_url ||
+                                    session?.user?.user_metadata?.avatar_url ||
                                     '/default-avatar.png'
                                 }
                                 alt={
-                                    session?.user
-                                        ?.user_metadata
-                                        ?.full_name ||
+                                    session?.user?.user_metadata?.full_name ||
                                     'User'
                                 }
                             />
                             <AvatarFallback className="rounded-lg">
-                                {session?.user
-                                    ?.user_metadata
-                                    ?.full_name?.[0] ||
+                                {session?.user?.user_metadata?.full_name?.[0] ||
                                     'U'}
                             </AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 text-left text-sm leading-tight">
                             <span className="truncate font-semibold">
-                                {session?.user
-                                    ?.user_metadata
-                                    ?.full_name ||
+                                {session?.user?.user_metadata?.full_name ||
                                     'Guest User'}
                             </span>
                             <span className="truncate text-xs">
-                                {session?.user?.email ||
-                                    'Not signed in'}
+                                {session?.user?.email || 'Not signed in'}
                             </span>
                         </div>
                         <ChevronsUpDown className="ml-auto size-4" />
@@ -676,16 +675,13 @@ export default function AppSidebar({
                             <Avatar className="h-8 w-8 rounded-lg">
                                 <AvatarImage
                                     src={
-                                        session?.user
-                                            ?.user_metadata
+                                        session?.user?.user_metadata
                                             ?.avatar_url ||
                                         '/default-avatar.png'
                                     }
                                     alt={
-                                        session?.user
-                                            ?.user_metadata
-                                            ?.full_name ||
-                                        'User'
+                                        session?.user?.user_metadata
+                                            ?.full_name || 'User'
                                     }
                                 />
                                 <AvatarFallback className="rounded-lg">
@@ -694,15 +690,11 @@ export default function AppSidebar({
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">
-                                    {session?.user
-                                        ?.user_metadata
-                                        ?.full_name ||
+                                    {session?.user?.user_metadata?.full_name ||
                                         'Guest User'}
                                 </span>
                                 <span className="truncate text-xs">
-                                    {session?.user
-                                        ?.email ||
-                                        'Not signed in'}
+                                    {session?.user?.email || 'Not signed in'}
                                 </span>
                             </div>
                         </div>
@@ -726,9 +718,7 @@ export default function AppSidebar({
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             className="cursor-default hover:!bg-transparent"
-                            onSelect={(e) =>
-                                e.preventDefault()
-                            }
+                            onSelect={(e) => e.preventDefault()}
                         >
                             <div className="w-full">
                                 <ThemeSwitcherButton />
@@ -736,9 +726,7 @@ export default function AppSidebar({
                         </DropdownMenuItem>
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        onClick={handleSignOut}
-                    >
+                    <DropdownMenuItem onClick={handleSignOut}>
                         <LogOut />
                         Log out
                     </DropdownMenuItem>
@@ -899,9 +887,7 @@ export default function AppSidebar({
                     </SidebarGroup>
                     <SidebarFooter>
                         <SidebarMenu>
-                            <SidebarMenu>
-                                {userProfile}
-                            </SidebarMenu>
+                            <SidebarMenu>{userProfile}</SidebarMenu>
                         </SidebarMenu>
                     </SidebarFooter>
                     <SidebarRail />

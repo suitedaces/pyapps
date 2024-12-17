@@ -1,8 +1,8 @@
 // app/api/chats/[id]/title/route.ts
 import { createClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@ai-sdk/anthropic'
 import { generateText } from 'ai'
+import { NextRequest, NextResponse } from 'next/server'
 
 interface RouteContext {
     params: Promise<{ id: string }>
@@ -29,12 +29,13 @@ export async function POST(req: NextRequest, context: RouteContext) {
             messages: [
                 {
                     role: 'system',
-                    content: 'Generate a concise, descriptive title (max 6 words) for this chat conversation based on the first exchange. Focus on the main topic or goal. Return only the title, no quotes or additional text.'
+                    content:
+                        'Generate a concise, descriptive title (max 6 words) for this chat conversation based on the first exchange. Focus on the main topic or goal. Return only the title, no quotes or additional text.',
                 },
                 {
                     role: 'user',
-                    content: `User message: "${message.user_message}"\nAssistant response: "${message.assistant_message}"`
-                }
+                    content: `User message: "${message.user_message}"\nAssistant response: "${message.assistant_message}"`,
+                },
             ],
             maxTokens: 30,
             temperature: 0.7,

@@ -102,17 +102,19 @@ export function Message({
                                 />
                             )}
 
-                            {isLastMessage && isLoading && !toolInvocations?.length && (
-                                <motion.div
-                                    className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
-                                    animate={{ opacity: [0, 1, 0] }}
-                                    transition={{
-                                        duration: 1,
-                                        repeat: Infinity,
-                                        ease: 'linear',
-                                    }}
-                                />
-                            )}
+                            {isLastMessage &&
+                                isLoading &&
+                                !toolInvocations?.length && (
+                                    <motion.div
+                                        className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
+                                        animate={{ opacity: [0, 1, 0] }}
+                                        transition={{
+                                            duration: 1,
+                                            repeat: Infinity,
+                                            ease: 'linear',
+                                        }}
+                                    />
+                                )}
                         </div>
                     </div>
                 ) : (

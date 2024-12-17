@@ -48,14 +48,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [supabase.auth])
 
     return (
-        <AuthContext.Provider 
-            value={{ 
-                session, 
-                isLoading, 
-                isPreviewMode: !session, 
+        <AuthContext.Provider
+            value={{
+                session,
+                isLoading,
+                isPreviewMode: !session,
                 showAuthPrompt,
                 hideAuthPrompt,
-                shouldShowAuthPrompt
+                shouldShowAuthPrompt,
             }}
         >
             {children}

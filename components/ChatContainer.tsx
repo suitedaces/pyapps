@@ -1,8 +1,8 @@
 'use client'
 
 import { Chat } from '@/components/Chat'
-import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
+import { AuthPrompt } from '@/components/ui/auth-prompt'
 import { Button } from '@/components/ui/button'
 import {
     ResizableHandle,
@@ -22,9 +22,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalStorage } from 'usehooks-ts'
 import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
-import AppSidebar from './Sidebar'
-import { AuthPrompt } from '@/components/ui/auth-prompt'
 import LoadingAnimation from './LoadingAnimation'
+import AppSidebar from './Sidebar'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -40,7 +39,7 @@ interface ChatContainerProps {
     isNewChat?: boolean
     isInChatPage?: boolean
     initialAppId?: string | null
-    onChatDeleted?: () => void;
+    onChatDeleted?: () => void
 }
 
 interface FileUploadState {
@@ -93,7 +92,8 @@ export default function ChatContainer({
     onChatDeleted,
 }: ChatContainerProps) {
     const router = useRouter()
-    const { session, isLoading, isPreviewMode, shouldShowAuthPrompt } = useAuth()
+    const { session, isLoading, isPreviewMode, shouldShowAuthPrompt } =
+        useAuth()
     const { collapsed: sidebarCollapsed } = useSidebar()
     const {
         streamlitUrl,
@@ -183,9 +183,9 @@ export default function ChatContainer({
                 // Disable animations before navigation
                 document.body.style.pointerEvents = 'none'
                 document.body.classList.add('disable-animations')
-                
+
                 router.replace(`/chat/${chatId}`, { scroll: false })
-                
+
                 // Re-enable after a short delay
                 setTimeout(() => {
                     document.body.style.pointerEvents = 'auto'
@@ -377,7 +377,13 @@ export default function ChatContainer({
                 setGeneratingCode(false)
             }
         },
-        [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox, currentChatId]
+        [
+            updateSandbox,
+            setStreamlitUrl,
+            setGeneratingCode,
+            setIsLoadingSandbox,
+            currentChatId,
+        ]
     )
 
     // Improved file upload with abort controller
@@ -519,7 +525,7 @@ export default function ChatContainer({
                     router.push('/')
                     return
                 }
-                
+
                 router.push(`/chat/${chatId}`)
             } catch (error) {
                 console.error('Error selecting chat:', error)
@@ -698,9 +704,9 @@ export default function ChatContainer({
                 if (!response.ok) throw new Error('Failed to generate title')
 
                 const data = await response.json()
-                
+
                 if (data.title) {
-                    setChatTitles(prev => ({ ...prev, [chatId]: data.title }))
+                    setChatTitles((prev) => ({ ...prev, [chatId]: data.title }))
                     titleGeneratedRef.current.add(chatId)
 
                     // Refresh chats list
@@ -763,17 +769,17 @@ export default function ChatContainer({
                     setMessages([])
                     setGeneratedCode('')
                     setStreamlitUrl(null)
-                    
+
                     // Reset UI state
                     setRightPanel({
                         isVisible: false,
-                        view: 'preview'
+                        view: 'preview',
                     })
-                    
+
                     // Refresh chats list
                     fetch('/api/chats')
-                        .then(response => response.json())
-                        .then(data => setSidebarChats(data.chats))
+                        .then((response) => response.json())
+                        .then((data) => setSidebarChats(data.chats))
                         .catch(console.error)
                 }}
             />

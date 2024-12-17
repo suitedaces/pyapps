@@ -11,12 +11,14 @@ export async function GET(request: Request, context: RouteContext) {
 
     const { data: chat, error } = await supabase
         .from('chats')
-        .select(`
+        .select(
+            `
             *,
             app:app_id (
                 id
             )
-        `)
+        `
+        )
         .eq('id', id)
         .single()
 
@@ -33,12 +35,9 @@ export async function GET(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
     const { id } = await context.params
     const user = await getUser()
-    
+
     if (!user) {
-        return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        )
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const supabase = await createClient()
@@ -127,9 +126,8 @@ export async function DELETE(request: Request, context: RouteContext) {
         if (deleteError) throw deleteError
 
         return NextResponse.json({
-            message: 'Chat and related data deleted successfully'
+            message: 'Chat and related data deleted successfully',
         })
-
     } catch (error) {
         console.error('Delete error:', error)
         return NextResponse.json(
