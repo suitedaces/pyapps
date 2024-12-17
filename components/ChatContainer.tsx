@@ -174,9 +174,22 @@ export default function ChatContainer({
                 hasMessages: true,
             })
 
+            // Set message state before navigation
+            setHasFirstMessage(true)
+
             if (!hasNavigated.current && isNewChat) {
                 hasNavigated.current = true
-                router.replace(`/chat/${chatId}`)
+                // Disable animations before navigation
+                document.body.style.pointerEvents = 'none'
+                document.body.classList.add('disable-animations')
+                
+                router.replace(`/chat/${chatId}`, { scroll: false })
+                
+                // Re-enable after a short delay
+                setTimeout(() => {
+                    document.body.style.pointerEvents = 'auto'
+                    document.body.classList.remove('disable-animations')
+                }, 100)
             }
 
             // Refresh chat list with cleanup
