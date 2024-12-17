@@ -33,6 +33,7 @@ interface ChatProps {
     onUpdateStreamlit: (code: string) => void
     onCodeClick: (code: string) => void
     isInChatPage: boolean
+    onTogglePanel: (panel: string) => void
 }
 
 export function Chat({
@@ -49,6 +50,7 @@ export function Chat({
     onUpdateStreamlit,
     onCodeClick,
     isInChatPage = false,
+    onTogglePanel,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
@@ -100,7 +102,7 @@ export function Chat({
     }
 
     return (
-        <div className="flex flex-col relative z-20 text-black h-full overflow-hidden">
+        <div className="flex flex-col relative z-20 text-black h-full">
             {/* Error displays */}
             {errorState && (
                 <Alert
@@ -124,33 +126,33 @@ export function Chat({
             )}
 
             {/* Messages */}
-            <ScrollArea className="h-full p-4 space-y-4 w-full max-w-[800px] m-auto pb-6">
+            <ScrollArea className="flex-1 p-4 space-y-4 w-full max-w-[800px] m-auto pb-[120px]">
                 {Array.isArray(messages) &&
                     messages.map((message, index) => (
                         <AIMessage
                             key={message.id}
                             {...message}
                             isLastMessage={index === messages.length - 1}
-                            isLoading={
-                                isLoading && index === messages.length - 1
-                            }
+                            isLoading={isLoading}
                             onCodeClick={handleCodeClick}
-                            toolInvocations={message.toolInvocations}
+                            onTogglePanel={() => onTogglePanel('right')}
                         />
                     ))}
                 <div ref={messagesEndRef} />
             </ScrollArea>
 
-            {/* Chat input */}
-            <Chatbar
-                value={input}
-                onChange={onInputChange}
-                onSubmit={handleSubmit}
-                isLoading={isLoading || fileUploadState.isUploading}
-                onFileUpload={handleFileUpload}
-                fileUploadState={fileUploadState}
-                isInChatPage={isInChatPage}
-            />
+            {/* Chatbar with absolute positioning */}
+            <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-dark-app">
+                <Chatbar
+                    value={input}
+                    onChange={onInputChange}
+                    onSubmit={handleSubmit}
+                    isLoading={isLoading || fileUploadState.isUploading}
+                    onFileUpload={handleFileUpload}
+                    fileUploadState={fileUploadState}
+                    isInChatPage={isInChatPage}
+                />
+            </div>
         </div>
     )
 }

@@ -517,6 +517,19 @@ export interface Database {
                     created_at: string
                 } | null
             }
+            delete_chat_and_related: {
+                Args: {
+                    p_chat_id: string
+                    p_user_id: string
+                }
+                Returns: {
+                    chat_files_associations: number
+                    messages: number
+                    app_versions: number
+                    apps: number
+                    chat: number
+                }
+            }
         }
         Enums: {
             [_ in never]: never

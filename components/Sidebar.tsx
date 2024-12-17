@@ -67,6 +67,17 @@ import {
 import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
 import { Logo } from './core/Logo'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Chat {
     id: string
@@ -82,6 +93,7 @@ interface SidebarProps {
     isCreatingChat: boolean
     chatTitles: Record<string, string>
     onGenerateTitle: (chatId: string) => Promise<string | null>
+    onChatDeleted: () => void
 }
 
 const TypewriterText = ({ text }: { text: string }) => {
@@ -136,6 +148,7 @@ interface ChatsListProps {
     isCreatingChat: boolean
     chatTitles: Record<string, string>
     onGenerateTitle: (chatId: string) => Promise<string | null>
+    onChatDeleted: () => void
 }
 
 const ChatsList = ({
@@ -145,6 +158,7 @@ const ChatsList = ({
     isCreatingChat,
     chatTitles,
     onGenerateTitle,
+    onChatDeleted,
 }: ChatsListProps) => {
     const router = useRouter()
     const visibleChats = chats.slice(0, 10)
@@ -213,33 +227,57 @@ const ChatsList = ({
                                     {chat.name || `Chat ${chat.id.slice(0, 8)}`}
                                 </span>
                             </SidebarMenuSubButton>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <SidebarMenuAction className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible">
-                                        <MoreHorizontal />
-                                        <span className="sr-only">More</span>
-                                    </SidebarMenuAction>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    className="w-48"
-                                    side="right"
-                                    align="start"
-                                >
-                                    <DropdownMenuItem>
-                                        <Folder className="text-muted-foreground" />
-                                        <span>View Project</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <Share className="text-muted-foreground" />
-                                        <span>Share Project</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
-                                        <Trash2 className="text-muted-foreground" />
-                                        <span>Delete Project</span>
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="max-w-[400px]">
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle className="text-xl font-semibold text-foreground">
+                                            Delete Project
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription className="text-muted-foreground/80 pt-2">
+                                            Are you sure you want to delete this project? This action cannot be undone and will permanently delete all associated data.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter className="mt-4 gap-2">
+                                        <AlertDialogCancel className="border bg-background text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                                            Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={async () => {
+                                                try {
+                                                    const response = await fetch(`/api/chats/${chat.id}`, {
+                                                        method: 'DELETE',
+                                                    })
+
+                                                    if (!response.ok) {
+                                                        throw new Error('Failed to delete chat')
+                                                    }
+
+                                                    onChatDeleted()
+
+                                                    if (currentChatId === chat.id) {
+                                                        router.push('/')
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Failed to delete chat:', error)
+                                                }
+                                            }}
+                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 transition-colors"
+                                        >
+                                            Delete Project
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </CustomSidebarMenuSubItem>
                     </motion.div>
                 ))}
@@ -267,6 +305,7 @@ export default function AppSidebar({
     isCreatingChat,
     chatTitles,
     onGenerateTitle,
+    onChatDeleted,
 }: SidebarProps) {
     const [open, setOpen] = useState(false)
     const [isChatsOpen, setIsChatsOpen] = useState(true)
@@ -374,6 +413,7 @@ export default function AppSidebar({
                                                 onGenerateTitle={
                                                     onGenerateTitle
                                                 }
+                                                onChatDeleted={onChatDeleted}
                                             />
                                         </CollapsibleContent>
                                     </Collapsible>
@@ -789,6 +829,7 @@ export default function AppSidebar({
                                             isCreatingChat={isCreatingChat}
                                             chatTitles={chatTitles}
                                             onGenerateTitle={onGenerateTitle}
+                                            onChatDeleted={onChatDeleted}
                                         />
                                     </CollapsibleContent>
                                 </Collapsible>

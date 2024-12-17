@@ -18,7 +18,7 @@ import React, { useRef } from 'react'
 import { CodeView } from './CodeView'
 
 // Dynamically import LoadingSandbox with SSR disabled
-const LoadingSandbox = dynamic(() => import('./LoadingSandbox'), {
+const LoadingAnimation = dynamic(() => import('./LoadingAnimation'), {
     ssr: false,
     loading: () => (
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
@@ -81,7 +81,7 @@ export const PreviewPanel = React.forwardRef<
             <div className="relative flex flex-col h-full z-40">
                 <AnimatePresence>
                     {showOverlay && (
-                        <LoadingSandbox
+                        <LoadingAnimation
                             message={
                                 isLoadingSandbox
                                     ? 'Preparing your sandbox...'
@@ -157,7 +157,7 @@ export const PreviewPanel = React.forwardRef<
                         {showCodeView ? (
                             <div className="h-full">
                                 {isGeneratingCode ? (
-                                    <LoadingSandbox message="Generating code..." />
+                                    <LoadingAnimation message="Generating code..." />
                                 ) : (
                                     <CodeView
                                         code={generatedCode}
