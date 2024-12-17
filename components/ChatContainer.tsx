@@ -351,10 +351,10 @@ export default function ChatContainer({
                         if (url) {
                             setStreamlitUrl(url)
                             if (streamlitPreviewRef.current?.refreshIframe) {
-                                streamlitPreviewRef.current.refreshIframe()
                                 await new Promise((resolve) =>
-                                    setTimeout(resolve, 2000)
+                                    setTimeout(resolve, 2500)
                                 )
+                                streamlitPreviewRef.current.refreshIframe()
                                 setIsLoadingSandbox(false)
                             }
                             return url
