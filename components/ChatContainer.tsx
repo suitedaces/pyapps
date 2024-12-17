@@ -24,6 +24,7 @@ import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
 import AppSidebar from './Sidebar'
 import { AuthPrompt } from '@/components/ui/auth-prompt'
+import LoadingAnimation from './LoadingAnimation'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -352,7 +353,7 @@ export default function ChatContainer({
                             setStreamlitUrl(url)
                             if (streamlitPreviewRef.current?.refreshIframe) {
                                 await new Promise((resolve) =>
-                                    setTimeout(resolve, 2500)
+                                    setTimeout(resolve, 3000)
                                 )
                                 streamlitPreviewRef.current.refreshIframe()
                                 setIsLoadingSandbox(false)
@@ -721,7 +722,12 @@ export default function ChatContainer({
 
     // Loading states
     if (isLoading) {
-        return <div>Loading...</div>
+        return (
+            <div className="relative h-screen w-full">
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-0" />
+                <LoadingAnimation message="Loading..." />
+            </div>
+        )
     }
 
     const CustomHandle = ({ ...props }) => (
