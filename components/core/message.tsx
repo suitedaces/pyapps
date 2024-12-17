@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { Markdown } from './markdown'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
@@ -44,6 +45,8 @@ export function Message({
     const { session } = useAuth()
     const user = session?.user
     const messageEndRef = useRef<HTMLDivElement>(null)
+    const setGeneratingCode = useSandboxStore(state => state.setGeneratingCode)
+    const hasPanelOpened = useRef(false)
 
     // Auto-scroll effect
     useEffect(() => {
@@ -57,6 +60,30 @@ export function Message({
         () => content.split('\n').filter(Boolean),
         [content]
     )
+
+    // Update Message component to handle streamlit tool specifically
+    useEffect(() => {
+        const hasStreamlitTool = toolInvocations?.some(
+            (tool: { toolName: string }) => tool.toolName === 'streamlitTool'
+        )
+        
+        if (isLastMessage && isLoading && hasStreamlitTool && onTogglePanel && !hasPanelOpened.current) {
+            hasPanelOpened.current = true
+            // Directly use the store
+            setGeneratingCode(true)
+            
+            requestAnimationFrame(() => {
+                onTogglePanel()
+            })
+        }
+    }, [isLastMessage, isLoading, toolInvocations, setGeneratingCode, onTogglePanel])
+
+    // Reset the ref when the message changes
+    useEffect(() => {
+        if (id) {
+            hasPanelOpened.current = false
+        }
+    }, [id])
 
     return (
         <AnimatePresence mode="wait">

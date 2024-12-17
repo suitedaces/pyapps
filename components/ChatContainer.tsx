@@ -161,57 +161,49 @@ export default function ChatContainer({
         (model) => model.id === languageModel.model
     )
 
+    // Add new state for transition
+    const [isTransitioning, setIsTransitioning] = useState(false)
+
     // Move updateChatState before handleChatCreated
     const updateChatState = useCallback((updates: Partial<ChatState>) => {
         setChatState((prev) => ({ ...prev, ...updates }))
     }, [])
 
-    // Improved chat creation handler with race condition prevention
+    // Improved chat creation handler with better async handling
     const handleChatCreated = useCallback(
-        (chatId: string) => {
-            setCurrentChatId(chatId)
-            updateChatState({
-                status: 'active',
-                hasMessages: true,
-            })
+        async (chatId: string) => {
+            if (hasNavigated.current) return
+            setIsTransitioning(true)
 
-            // Set message state before navigation
-            setHasFirstMessage(true)
+            try {
+                // Batch state updates first
+                await Promise.all([
+                    new Promise<void>((resolve) => {
+                        React.startTransition(() => {
+                            setCurrentChatId(chatId)
+                            updateChatState({
+                                status: 'active',
+                                hasMessages: true,
+                            })
+                            setHasFirstMessage(true)
+                            resolve()
+                        })
+                    }),
+                    // Load chats in parallel but don't block on it
+                    fetch('/api/chats')
+                        .then(res => res.json())
+                        .then(data => setSidebarChats(data.chats))
+                        .catch(console.error)
+                ])
 
-            if (!hasNavigated.current && isNewChat) {
-                hasNavigated.current = true
-                // Disable animations before navigation
-                document.body.style.pointerEvents = 'none'
-                document.body.classList.add('disable-animations')
-                
-                router.replace(`/chat/${chatId}`, { scroll: false })
-                
-                // Re-enable after a short delay
-                setTimeout(() => {
-                    document.body.style.pointerEvents = 'auto'
-                    document.body.classList.remove('disable-animations')
-                }, 100)
-            }
-
-            // Refresh chat list with cleanup
-            const controller = new AbortController()
-            const loadChats = async () => {
-                try {
-                    const response = await fetch('/api/chats', {
-                        signal: controller.signal,
-                    })
-                    if (!response.ok) throw new Error('Failed to fetch chats')
-                    const data = await response.json()
-                    setSidebarChats(data.chats)
-                } catch (error) {
-                    if (error instanceof Error && error.name !== 'AbortError') {
-                        console.error('Error fetching chats:', error)
-                    }
+                // Navigate after state updates are complete
+                if (!hasNavigated.current && isNewChat) {
+                    hasNavigated.current = true
+                    await router.replace(`/chat/${chatId}`, { scroll: false })
                 }
+            } finally {
+                setIsTransitioning(false)
             }
-            loadChats()
-
-            return () => controller.abort()
         },
         [router, isNewChat, updateChatState]
     )
@@ -291,41 +283,29 @@ export default function ChatContainer({
         onFinish: async (message) => {
             try {
                 if (message.content && newChatIdRef.current) {
-                    handleChatCreated(newChatIdRef.current)
-
-                    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-                    await generateTitle(newChatIdRef.current)
+                    const chatId = newChatIdRef.current
                     newChatIdRef.current = null
+                    
+                    await Promise.all([
+                        handleChatCreated(chatId),
+                        generateTitle(chatId)
+                    ])
                 }
 
                 if (message.toolInvocations?.length) {
                     const streamlitCall = message.toolInvocations.find(
-                        (invocation) =>
-                            invocation.toolName === 'streamlitTool' &&
-                            invocation.state === 'result'
-                    )
+                        invocation => invocation.toolName === 'streamlitTool' && 
+                        invocation.state === 'result'
+                    ) as StreamlitToolCall | undefined
 
-                    if (
-                        streamlitCall?.state === 'result' &&
-                        streamlitCall.result?.code
-                    ) {
-                        setIsCreatingVersion(true)
+                    if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
                         setGeneratedCode(streamlitCall.result.code)
                         await updateStreamlitApp(streamlitCall.result.code)
-
-                        if (versionSelectorRef.current) {
-                            versionSelectorRef.current.refreshVersions()
-                        }
                     }
                 }
-
-                handleChatFinish()
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
-            } finally {
-                setIsCreatingVersion(false)
             }
         },
     })
@@ -744,6 +724,13 @@ export default function ChatContainer({
 
     return (
         <div className="bg-white dark:bg-dark-app relative flex h-screen overflow-hidden">
+            {/* Add transition overlay */}
+            {isTransitioning && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <LoadingAnimation message="Loading chat..." />
+                </div>
+            )}
+            
             <div className="absolute top-0 left-0 w-full h-full">
                 <div className="godrays top-0 left-0 w-full min-h-[30vh] relative z-5">
                     <div className="godrays-overlay dark:mix-blend-darken z-10" />

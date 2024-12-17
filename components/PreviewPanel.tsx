@@ -85,7 +85,9 @@ export const PreviewPanel = React.forwardRef<
                             message={
                                 isLoadingSandbox
                                     ? 'Preparing your sandbox...'
-                                    : 'Generating your code...'
+                                    : isGeneratingCode 
+                                        ? 'Creating your app...'  // Use same message for both states
+                                        : 'Loading...'
                             }
                         />
                     )}
