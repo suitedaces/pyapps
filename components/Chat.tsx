@@ -23,10 +23,10 @@ interface ChatProps {
     onSubmit: (
         e: React.FormEvent,
         message: string,
-        file?: File
+        file?: File,
+        fileId?: string
     ) => Promise<void>
     fileUploadState: FileUploadState
-    onFileUpload: (file: File) => void
     errorState: Error | null
     onErrorDismiss: () => void
     onChatFinish: () => void
@@ -43,7 +43,6 @@ export function Chat({
     onInputChange,
     onSubmit,
     fileUploadState = { isUploading: false, progress: 0, error: null },
-    onFileUpload,
     errorState = null,
     onErrorDismiss,
     onChatFinish,
@@ -59,19 +58,19 @@ export function Chat({
     const handleSubmit = async (
         e: React.FormEvent,
         message: string,
-        file?: File
+        file?: File,
+        fileId?: string
     ) => {
         e.preventDefault()
-        if (!message.trim() && !file) return
-
-        if (isPreviewMode) {
-            showAuthPrompt()
+        if ((!message.trim() && !file) || isPreviewMode) {
+            if (isPreviewMode) {
+                showAuthPrompt()
+            }
             return
         }
 
         try {
-            // Pass the event and message to parent's onSubmit
-            await onSubmit(e, message, file)
+            await onSubmit(e, message, file, fileId)
             onChatFinish?.()
         } catch (error) {
             console.error('Error submitting message:', error)
@@ -90,16 +89,6 @@ export function Chat({
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
         }
     }, [messages])
-
-    const handleFileUpload = (file: File) => {
-        // Just update the UI state to show file is selected
-        fileUploadState = {
-            isUploading: false,
-            progress: 0,
-            error: null,
-        }
-        onFileUpload(file) // Ye direct parent component ko file bhej raha hai
-    }
 
     return (
         <div className="flex flex-col relative z-20 text-black h-full">
@@ -147,8 +136,7 @@ export function Chat({
                     value={input}
                     onChange={onInputChange}
                     onSubmit={handleSubmit}
-                    isLoading={isLoading || fileUploadState.isUploading}
-                    onFileUpload={handleFileUpload}
+                    isLoading={isLoading}
                     fileUploadState={fileUploadState}
                     isInChatPage={isInChatPage}
                 />

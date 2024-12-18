@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         let analysis = null
         if (metadata.fileType === 'csv') {
             analysis = await analyzeCSV(fileContent, {
-                sampleSize: 2000,
+                sampleSize: 1000,
                 maxRows: 5
             })
         }
