@@ -1,5 +1,5 @@
 import { createClient, getUser } from '@/lib/supabase/server'
-import { Process, ProcessMessage, Sandbox } from 'e2b'
+import { Process, ProcessMessage, Sandbox } from '@e2b/code-interpreter'
 import { NextRequest, NextResponse } from 'next/server'
 
 interface RouteContext {

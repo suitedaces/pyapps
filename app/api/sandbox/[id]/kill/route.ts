@@ -1,4 +1,4 @@
-import { Sandbox } from 'e2b'
+import { Sandbox } from '@e2b/code-interpreter'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
