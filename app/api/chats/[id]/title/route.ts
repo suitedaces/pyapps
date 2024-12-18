@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
             messages: [
                 {
                     role: 'system',
-                    content: 'Generate a concise, descriptive title (max 6 words) for this chat conversation based on the first exchange. Focus on the main topic or goal.'
+                    content: 'You are a project title generator for a conversational streamlit app builder web app.'
                 },
                 {
                     role: 'user',
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
                 }
             ],
             schema: z.object({
-                title: z.string().max(100).describe('A concise title (max 8 words) that captures the main topic of the conversation, withoutq quotes or the word "conversation"')
+                title: z.string().max(100).describe('Generate an 8-word title. Do not include quotes or the words "conversation", "streamlit", "app"')
             }),
             temperature: 0.7,
         })

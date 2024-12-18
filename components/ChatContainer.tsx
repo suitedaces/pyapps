@@ -1,6 +1,6 @@
 'use client'
 
-import { Chat } from '@/components/Chat'
+import Chat from '@/components/Chat'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { Button } from '@/components/ui/button'
@@ -285,18 +285,45 @@ export default function ChatContainer({
                 if (message.content && newChatIdRef.current) {
                     const chatId = newChatIdRef.current
                     newChatIdRef.current = null
-                    
-                    await Promise.all([
-                        handleChatCreated(chatId),
-                        generateTitle(chatId)
-                    ])
+        
+                    // Navigate immediately if we're on root
+                    if (window.location.pathname === '/') {
+                        hasNavigated.current = true
+                        await router.replace(`/chat/${chatId}`, { scroll: false })
+                        
+                        // Do these operations after navigation
+                        Promise.all([
+                            generateTitle(chatId),
+                            message.toolInvocations?.length && handleToolInvocations(message.toolInvocations)
+                        ]).catch(console.error)
+                        
+                        return // Exit early after navigation
+                    }
+        
+                    // If not on root, update states normally
+                    // await handleChatCreated(chatId)
+                    generateTitle(chatId).catch(console.error) // Don't await
                 }
+
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
             }
         },
     })
+
+    const handleToolInvocations = useCallback(async (toolInvocations: any[]) => {
+        if (toolInvocations?.length) {
+            const streamlitCall = toolInvocations.find(
+                invocation => invocation.toolName === 'streamlitTool' && 
+            invocation.state === 'result'
+        ) as StreamlitToolCall | undefined
+            if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
+                setGeneratedCode(streamlitCall.result.code)
+                await updateStreamlitApp(streamlitCall.result.code)
+            }
+        }
+    }, [])
 
     // Improved Streamlit app management with retry logic
     const updateStreamlitApp = useCallback(

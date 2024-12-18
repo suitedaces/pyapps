@@ -8,7 +8,7 @@ import { Message } from 'ai'
 import { XCircle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-
+import React from 'react'
 interface FileUploadState {
     isUploading: boolean
     progress: number
@@ -36,7 +36,7 @@ interface ChatProps {
     onTogglePanel: (panel: string) => void
 }
 
-export function Chat({
+function Chat({
     messages = [],
     isLoading = false,
     input = '',
@@ -144,3 +144,5 @@ export function Chat({
         </div>
     )
 }
+
+export default React.memo(Chat)

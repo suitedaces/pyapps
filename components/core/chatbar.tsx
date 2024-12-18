@@ -287,6 +287,7 @@ export default function Chatbar({
                             isMinHeight={isTextareaMinHeight}
                             onError={handleFileError}
                             textareaHeight={textareaHeight}
+                            isSubmitted={isSubmitted}
                         />
                     </div>
                 )}
