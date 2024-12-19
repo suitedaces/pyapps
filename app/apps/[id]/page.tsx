@@ -33,7 +33,7 @@ export default async function AppPage({ params }: PageParams) {
 
     // Initialize sandbox with auth
     const sandboxResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/sandbox/new/execute`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/sandbox/new/execute`,
         {
             method: 'POST',
             headers: {
