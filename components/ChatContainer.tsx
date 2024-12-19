@@ -43,6 +43,7 @@ interface ChatContainerProps {
     onChatDeleted?: () => void;
 }
 
+
 interface FileUploadState {
     isUploading: boolean
     progress: number
