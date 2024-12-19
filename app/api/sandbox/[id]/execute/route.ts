@@ -6,6 +6,8 @@ interface RouteContext {
     params: Promise<{ id: string }>
 }
 
+export const maxDuration = 30;
+
 async function listUserSandboxes(userId: string): Promise<Sandbox[]> {
     try {
         const sandboxes = await Sandbox.list()
