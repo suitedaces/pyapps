@@ -8,7 +8,7 @@ import { z } from 'zod'
 const FileMetadataSchema = z.object({
     fileName: z.string().min(1),
     fileType: z.enum(['csv', 'json', 'txt']),
-    fileSize: z.number().max(5 * 1024 * 1024), // 5MB limit
+    fileSize: z.number().max(50 * 1024 * 1024), // 5MB limit
     chatId: z.string().optional(),
 })
 
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         let analysis = null
         if (metadata.fileType === 'csv') {
             analysis = await analyzeCSV(fileContent, {
-                sampleSize: 2000,
+                sampleSize: 1000,
                 maxRows: 5
             })
         }

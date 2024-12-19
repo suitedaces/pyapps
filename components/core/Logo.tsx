@@ -60,7 +60,7 @@ export function Logo({
                 |
             </span>
             {!collapsed && (
-                <span className="app text-gray-500 text-2xl">apps</span>
+                <span className="app text-gray-400 font-normal text-2xl">apps</span>
             )}
         </div>
     )

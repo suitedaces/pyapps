@@ -27,8 +27,8 @@ const FileValidationSchema = z.object({
                     'Invalid file type. Please upload a CSV, JSON, or TXT file.',
             }
         )
-        .refine((file) => file.size <= 5 * 1024 * 1024, {
-            message: 'File size must be less than 5MB.',
+        .refine((file) => file.size <= 50 * 1024 * 1024, {
+            message: 'File size must be less than 50MB.',
         }),
 })
 
@@ -38,6 +38,7 @@ interface FilePreviewProps {
     onError?: (error: string) => void
     isMinHeight: boolean
     textareaHeight: number
+    isSubmitted?: boolean
 }
 
 export function FilePreview({
@@ -46,6 +47,7 @@ export function FilePreview({
     onError,
     isMinHeight,
     textareaHeight,
+    isSubmitted = false,
 }: FilePreviewProps) {
     const [isVisible, setIsVisible] = useState(true)
     const [preview, setPreview] = useState<string>('')
@@ -81,6 +83,12 @@ export function FilePreview({
             validateAndLoadFile()
         }
     }, [file, onError])
+
+    useEffect(() => {
+        if (isSubmitted) {
+            setIsVisible(false)
+        }
+    }, [isSubmitted])
 
     const readFileContent = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -180,7 +188,7 @@ export function FilePreview({
     return (
         <>
             <AnimatePresence mode="wait">
-                {isVisible && (
+                {isVisible && !isSubmitted && (
                     <motion.div
                         {...getPosition}
                         className={cn(

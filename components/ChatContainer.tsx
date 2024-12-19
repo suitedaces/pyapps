@@ -1,6 +1,6 @@
 'use client'
 
-import { Chat } from '@/components/Chat'
+import Chat from '@/components/Chat'
 import LoginPage from '@/components/LoginPage'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { Button } from '@/components/ui/button'
@@ -285,30 +285,45 @@ export default function ChatContainer({
                 if (message.content && newChatIdRef.current) {
                     const chatId = newChatIdRef.current
                     newChatIdRef.current = null
-                    
-                    await Promise.all([
-                        handleChatCreated(chatId),
-                        generateTitle(chatId)
-                    ])
-                }
-
-                if (message.toolInvocations?.length) {
-                    const streamlitCall = message.toolInvocations.find(
-                        invocation => invocation.toolName === 'streamlitTool' && 
-                        invocation.state === 'result'
-                    ) as StreamlitToolCall | undefined
-
-                    if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
-                        setGeneratedCode(streamlitCall.result.code)
-                        await updateStreamlitApp(streamlitCall.result.code)
+        
+                    // Navigate immediately if we're on root
+                    if (window.location.pathname === '/') {
+                        hasNavigated.current = true
+                        await router.replace(`/chat/${chatId}`, { scroll: false })
+                        
+                        // Do these operations after navigation
+                        Promise.all([
+                            generateTitle(chatId),
+                            message.toolInvocations?.length && handleToolInvocations(message.toolInvocations)
+                        ]).catch(console.error)
+                        
+                        return // Exit early after navigation
                     }
+        
+                    // If not on root, update states normally
+                    // await handleChatCreated(chatId)
+                    generateTitle(chatId).catch(console.error) // Don't await
                 }
+
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
             }
         },
     })
+
+    const handleToolInvocations = useCallback(async (toolInvocations: any[]) => {
+        if (toolInvocations?.length) {
+            const streamlitCall = toolInvocations.find(
+                invocation => invocation.toolName === 'streamlitTool' && 
+            invocation.state === 'result'
+        ) as StreamlitToolCall | undefined
+            if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
+                setGeneratedCode(streamlitCall.result.code)
+                await updateStreamlitApp(streamlitCall.result.code)
+            }
+        }
+    }, [])
 
     // Improved Streamlit app management with retry logic
     const updateStreamlitApp = useCallback(
@@ -362,47 +377,18 @@ export default function ChatContainer({
 
     // Improved file upload with abort controller
     const handleFileUpload = useCallback(
-        async (file: File) => {
-            // Abort any existing upload
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort()
-            }
-
-            abortControllerRef.current = new AbortController()
-            setFileUploadState({ isUploading: true, progress: 0, error: null })
-
+        async (file: File, fileId: string) => {
             try {
-                const formData = new FormData()
-                formData.append('file', file)
-
-                // Always include current chat ID if it exists
-                if (currentChatId) {
-                    formData.append('chatId', currentChatId)
-                }
-
-                const uploadResponse = await fetch('/api/files', {
-                    method: 'POST',
-                    body: formData,
-                    signal: abortControllerRef.current.signal,
-                })
-
-                if (!uploadResponse.ok) throw new Error('Upload failed')
-                const fileData = await uploadResponse.json()
-
+                // Clear UI states first
                 if (isNewChat) {
-                    pendingFileLinkId.current = fileData.id
+                    pendingFileLinkId.current = fileId
+                    updateChatState({ status: 'active' }) // This will clear typing text
                 }
+                
+                // Set loading states
+                setHasFirstMessage(true)
 
-                const fileContent = await file.text()
-                const sanitizedContent = fileContent
-                    .split('\n')
-                    .map((row) => row.replace(/[\r\n]+/g, ''))
-                    .join('\n')
-
-                const rows = sanitizedContent.split('\n')
-                const columnNames = rows[0]
-                const previewRows = rows.slice(1, 6).join('\n')
-
+                // Now append the message
                 await append(
                     {
                         content: `Create a Streamlit app to visualize this data.`,
@@ -412,41 +398,40 @@ export default function ChatContainer({
                     {
                         body: {
                             chatId: currentChatId,
-                            fileId: fileData.id,
+                            fileId: fileId,
                             fileName: file.name,
-                            fileContent: sanitizedContent,
                         },
                     }
                 )
-
-                setFileUploadState({
-                    isUploading: false,
-                    progress: 100,
-                    error: null,
-                })
             } catch (error) {
-                if (error instanceof Error && error.name !== 'AbortError') {
-                    console.error('Error uploading file:', error)
-                    setFileUploadState({
-                        isUploading: false,
-                        progress: 0,
-                        error: 'Failed to upload file. Please try again.',
-                    })
-                }
+                console.error('Error processing file:', error)
+                setErrorState(error as Error)
             }
         },
-        [append, currentChatId]
+        [append, currentChatId, isNewChat, updateChatState]
     )
 
-    // Event handlers
+    // Add handleSubmit to wrap the originalHandleSubmit
     const handleSubmit = useCallback(
-        async (e: React.FormEvent, message: string, file?: File) => {
+        async (e: React.FormEvent, message: string, file?: File, fileId?: string) => {
             e.preventDefault()
             setHasFirstMessage(true)
-            originalHandleSubmit(e)
+
+            if (file && fileId) {
+                // Handle file upload case
+                await handleFileUpload(file, fileId)
+            } else if (message.trim()) {
+                // Handle normal message case
+                await originalHandleSubmit(e, {
+                    body: {
+                        message,
+                    }
+                })
+            }
+            
             updateChatState({ status: 'active' })
         },
-        [originalHandleSubmit, updateChatState]
+        [originalHandleSubmit, handleFileUpload, updateChatState]
     )
 
     const handleInputChange = useCallback(
@@ -810,7 +795,6 @@ export default function ChatContainer({
                                         onInputChange={handleInputChange}
                                         onSubmit={handleSubmit}
                                         fileUploadState={fileUploadState}
-                                        onFileUpload={handleFileUpload}
                                         errorState={errorState}
                                         onErrorDismiss={() =>
                                             setErrorState(null)

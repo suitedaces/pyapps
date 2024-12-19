@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { ArrowUp, Loader2, PaperclipIcon } from 'lucide-react'
 import * as React from 'react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 interface ChatbarProps {
     value: string
@@ -16,10 +16,10 @@ interface ChatbarProps {
     onSubmit: (
         e: React.FormEvent,
         message: string,
-        file?: File
+        file?: File,
+        fileId?: string
     ) => Promise<void>
     isLoading?: boolean
-    onFileUpload?: (file: File) => void
     fileUploadState?: {
         isUploading: boolean
         progress: number
@@ -38,16 +38,16 @@ export default function Chatbar({
     onChange,
     onSubmit,
     isLoading = false,
-    onFileUpload,
-    fileUploadState,
     isInChatPage = false,
     isCentered = false,
-}: ChatbarProps) {
+}: ChatbarProps): JSX.Element {
     // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
     const [isSubmitted, setIsSubmitted] = React.useState(false)
     const [isAnimating, setIsAnimating] = React.useState(false)
+    const [uploadedFileId, setUploadedFileId] = useState<string | null>(null)
+    const [isUploading, setIsUploading] = useState(false)
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
@@ -153,17 +153,40 @@ export default function Chatbar({
         }
     }, [])
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0]
         if (selectedFile) {
             setFile(selectedFile)
+            setIsUploading(true)
 
-            if (textareaRef.current) {
-                const currentHeight = textareaRef.current.offsetHeight
-                textareaRef.current.style.height = `${MAX_HEIGHT}px`
-                setTextareaHeight(MAX_HEIGHT)
-                setIsTextareaMinHeight(currentHeight === MIN_HEIGHT) // Use actual height check
-                previousHeightRef.current = MAX_HEIGHT
+            try {
+                const formData = new FormData()
+                formData.append('file', selectedFile)
+
+                const uploadResponse = await fetch('/api/files', {
+                    method: 'POST',
+                    body: formData,
+                })
+
+                if (!uploadResponse.ok) throw new Error('Upload failed')
+                const fileData = await uploadResponse.json()
+                setUploadedFileId(fileData.id)
+
+                if (textareaRef.current) {
+                    const currentHeight = textareaRef.current.offsetHeight
+                    textareaRef.current.style.height = `${MAX_HEIGHT}px`
+                    setTextareaHeight(MAX_HEIGHT)
+                    setIsTextareaMinHeight(currentHeight === MIN_HEIGHT)
+                    previousHeightRef.current = MAX_HEIGHT
+                }
+            } catch (error) {
+                console.error('Upload failed:', error)
+                handleRemoveFile()
+                if (handleFileError) {
+                    handleFileError('Failed to upload file. Please try again.')
+                }
+            } finally {
+                setIsUploading(false)
             }
         }
     }
@@ -171,25 +194,26 @@ export default function Chatbar({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!isLoading && (value.trim() || file)) {
-            setIsSubmitted(true)
-            setIsAnimating(true)
+        if (isLoading || isUploading) return
 
-            if (onFileUpload && file) {
-                onFileUpload(file)
-            }
+        setIsSubmitted(true)
+        setIsAnimating(true)
 
-            try {
-                await onSubmit(e, value, file || undefined)
-                // Clear the file after successful submission
+        try {
+            if (file && uploadedFileId) {
+                // File submission
+                await onSubmit(e, '', file, uploadedFileId)
                 handleRemoveFile()
-                // Let parent component handle clearing the message
-                adjustHeight(true)
-            } catch (error) {
-                console.error('Failed to send message:', error)
-            } finally {
-                setIsSubmitted(false)
+                setUploadedFileId(null)
+            } else if (value.trim()) {
+                // Normal message submission
+                await onSubmit(e, value)
             }
+            adjustHeight(true)
+        } catch (error) {
+            console.error('Failed to send message:', error)
+        } finally {
+            setIsSubmitted(false)
         }
     }
 
@@ -263,6 +287,7 @@ export default function Chatbar({
                             isMinHeight={isTextareaMinHeight}
                             onError={handleFileError}
                             textareaHeight={textareaHeight}
+                            isSubmitted={isSubmitted}
                         />
                     </div>
                 )}
@@ -275,7 +300,7 @@ export default function Chatbar({
                         onKeyDown={handleKeyDown}
                         placeholder={
                             file
-                                ? 'File attached. Add a message or press Send.'
+                                ? 'Press Enter to start project with file!'
                                 : 'Type your message...'
                         }
                         className={cn(
@@ -283,7 +308,8 @@ export default function Chatbar({
                             'focus-visible:ring-1 focus-visible:ring-offset-0',
                             'scrollbar-thumb-rounded scrollbar-track-rounded',
                             'scrollbar-thin scrollbar-thumb-border',
-                            'dark:bg-dark-app dark:text-dark-text dark:border-dark-border'
+                            'dark:bg-dark-app dark:text-dark-text dark:border-dark-border',
+                            file && 'opacity-50' // Add opacity when disabled
                         )}
                         style={{
                             minHeight: isInChatPage
@@ -299,7 +325,7 @@ export default function Chatbar({
                             height: `${textareaHeight}px`, // Explicitly set height
                             transition: 'all 0.3s ease-in-out',
                         }}
-                        disabled={isLoading}
+                        disabled={isLoading || isUploading || !!file} // Disable when file is attached
                         onFocus={() => checkAndUpdateHeight()} // Check height on focus
                         onBlur={() => checkAndUpdateHeight()} // Check height on blur
                     />
@@ -353,9 +379,9 @@ export default function Chatbar({
                                 'dark:disabled:bg-dark-app dark:disabled:border-dark-border',
                                 isCentered && 'h-11 w-11'
                             )}
-                            disabled={isLoading || (!value.trim() && !file)}
+                            disabled={isLoading || isUploading || (!value.trim() && !file) || (!!file && !uploadedFileId)}
                         >
-                            {isLoading ? (
+                            {(isLoading || isUploading) ? (
                                 <Loader2
                                     className={cn(
                                         'h-5 w-5 animate-spin text-black dark:text-dark-text',

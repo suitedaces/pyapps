@@ -28,19 +28,11 @@ export interface CSVAnalysis {
     }
     column_info: {
         name: string
-        type: {
-            primary: ColumnType
-            confidence: number
-        }
+        type: ColumnType
         sample_values: any[]
-        stats: {
-            unique_count: number
-            null_count: number
-            numeric_stats?: {
-                min: number
-                max: number
-                mean: number
-            }
+        numeric_stats?: {
+            min: number
+            max: number
         }
     }[]
 }
@@ -125,25 +117,18 @@ export async function analyzeCSV(
         }
     }
 
-    function getPrimaryType(types: Map<ColumnType, number>): {
-        primary: ColumnType
-        confidence: number
-    } {
-        const total = Array.from(types.values()).reduce((a, b) => a + b, 0)
+    function getPrimaryType(types: Map<ColumnType, number>): ColumnType {
         const entries = Array.from(types.entries())
             .filter(([type]) => type !== 'null')
             .sort((a, b) => b[1] - a[1])
 
-        if (entries.length === 0) return { primary: 'null', confidence: 1 }
-        if (entries.length === 1) return { primary: entries[0][0], confidence: 1 }
+        if (entries.length === 0) return 'null'
+        if (entries.length === 1) return entries[0][0]
 
         const [primaryType, primaryCount] = entries[0]
-        const confidence = primaryCount / total
-
-        return {
-            primary: confidence > 0.7 ? primaryType : 'mixed',
-            confidence
-        }
+        const total = Array.from(types.values()).reduce((a, b) => a + b, 0)
+        
+        return primaryCount / total > 0.7 ? primaryType : 'mixed'
     }
 
     return new Promise((resolve) => {
@@ -175,23 +160,18 @@ export async function analyzeCSV(
                     },
                     column_info: headerRow.map(column => {
                         const stats = columnStats.get(column)!
-                        const type = getPrimaryType(stats.types)
-
                         return {
                             name: column,
-                            type,
-                            sample_values: Array.from(stats.values).slice(0, 5),
-                            stats: {
-                                unique_count: stats.values.size,
-                                null_count: stats.nullCount,
-                                ...(stats.numbers.count > 0 && {
-                                    numeric_stats: {
-                                        min: stats.numbers.min!,
-                                        max: stats.numbers.max!,
-                                        mean: stats.numbers.sum / stats.numbers.count
-                                    }
-                                })
-                            }
+                            type: getPrimaryType(stats.types),
+                            sample_values: Array.from(stats.values)
+                                .filter(value => value !== null && value !== undefined && value !== '')
+                                .slice(0, 5),
+                            ...(stats.numbers.count > 0 && {
+                                numeric_stats: {
+                                    min: stats.numbers.min!,
+                                    max: stats.numbers.max!
+                                }
+                            })
                         }
                     })
                 }

@@ -18,8 +18,13 @@ export async function analyzeCSV(csvContent: string): Promise<CSVAnalysis> {
                 const data = results.data as string[][]
                 const headers = data[0]
                 const rows = data.slice(1)
-                const sampleSize = Math.min(1000, rows.length)
+                const sampleSize = Math.min(2000, rows.length)
                 const sampleRows = rows.slice(0, sampleSize)
+
+                // Filter out rows that are empty or contain only null/empty values
+                const nonNullRows = sampleRows.filter(row => 
+                    row.some(cell => cell != null && cell.trim() !== '')
+                )
 
                 const analysis: CSVAnalysis = {
                     totalRows: rows.length,
@@ -29,7 +34,7 @@ export async function analyzeCSV(csvContent: string): Promise<CSVAnalysis> {
                             sampleRows.map((row) => row[index])
                         ),
                     })),
-                    sampleRows: sampleRows.slice(0, 11), // Keep first 10 rows for display
+                    sampleRows: nonNullRows.slice(0, 10), // Take first 10 non-null rows
                 }
 
                 resolve(analysis)

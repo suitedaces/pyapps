@@ -80,7 +80,7 @@ async function storeMessage(
     toolResults: any,
     tokenCount: number
 ) {
-    await supabase.from('messages').insert({
+    return supabase.from('messages').insert({
         chat_id: chatId,
         user_id: userId,
         user_message: userMessage,
@@ -89,6 +89,13 @@ async function storeMessage(
         tool_results: toolResults as Json,
         token_count: tokenCount,
         created_at: new Date().toISOString(),
+    }).then(() => {
+        // Fire and forget - no need to wait
+        supabase.from('chats')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', chatId)
+            .then(() => {})
+            .catch(console.error)
     })
 }
 
@@ -197,17 +204,16 @@ async function handleStreamlitAppVersioning(
 
     const { code, appName, appDescription } = toolResult.result
 
-    // Check for existing app
-    const { data: chat } = await supabase
-        .from('chats')
-        .select('app_id')
-        .eq('id', chatId)
-        .single()
+    // Get chat and current version in parallel
+    const [chatResult, currentVersionResult] = await Promise.all([
+        supabase.from('chats').select('app_id').eq('id', chatId).single(),
+        supabase.from('apps').select('id, current_version_id').eq('id', chatId).single()
+    ])
 
-    let appId = chat?.app_id
+    let appId = chatResult?.data?.app_id
 
     if (!appId) {
-        // Create new app flow
+        // Create new app flow - Execute in parallel where possible
         const app = await createNewApp(
             supabase,
             userId,
@@ -225,17 +231,20 @@ async function handleStreamlitAppVersioning(
             appDescription || ''
         )
 
+        // Execute these operations in parallel
         await Promise.all([
             updateAppCurrentVersion(supabase, appId, version.id),
-            linkChatToApp(supabase, chatId, appId),
+            linkChatToApp(supabase, chatId, appId)
         ])
     } else {
-        // Update existing app flow
+        // Update existing app flow - Check if code has changed
         const currentVersion = await getCurrentAppVersion(supabase, appId)
 
         if (currentVersion?.code !== code) {
-            const nextVersion = await getNextVersionNumber(supabase, appId)
-
+            // Get next version number first
+            const nextVersion: number = await getNextVersionNumber(supabase, appId)
+            
+            // Create the new version
             const version = await createAppVersion(
                 supabase,
                 appId,
@@ -245,6 +254,7 @@ async function handleStreamlitAppVersioning(
                 appDescription || ''
             )
 
+            // Update the current version
             await updateAppCurrentVersion(supabase, appId, version.id)
         }
     }
@@ -310,34 +320,39 @@ export async function POST(req: Request) {
                 try {
                     const userMessage = messages[messages.length - 1].content
 
-                    // Handle Streamlit versioning if tool results exist
-                    if (toolResults?.length) {
-                        const streamlitResult = toolResults.find(
-                            (result: any) =>
-                                result.toolName === 'streamlitTool' &&
-                                result.result?.code
-                        )
-
-                        if (streamlitResult) {
-                            appId = await handleStreamlitAppVersioning(
-                                supabase,
-                                user.id,
-                                newChatId,
-                                streamlitResult
+                    // Execute these operations in parallel
+                    const [appIdResult] = await Promise.all([
+                        // Only handle versioning if we have tool results
+                        toolResults?.length ? (async () => {
+                            const streamlitResult = toolResults.find(
+                                (result: any) =>
+                                    result.toolName === 'streamlitTool' &&
+                                    result.result?.code
                             )
-                        }
-                    }
+                            if (streamlitResult) {
+                                return handleStreamlitAppVersioning(
+                                    supabase,
+                                    user.id,
+                                    newChatId,
+                                    streamlitResult
+                                )
+                            }
+                            return null
+                        })() : Promise.resolve(null),
+                        // Store message in parallel
+                        storeMessage(
+                            supabase,
+                            newChatId,
+                            user.id,
+                            userMessage,
+                            text,
+                            toolCalls,
+                            toolResults,
+                            usage.totalTokens
+                        )
+                    ])
 
-                    await storeMessage(
-                        supabase,
-                        newChatId,
-                        user.id,
-                        userMessage,
-                        text,
-                        toolCalls,
-                        toolResults,
-                        usage.totalTokens
-                    )
+                    appId = appIdResult || appId
                 } catch (error) {
                     console.error('Error in message handling:', error)
                     throw error
