@@ -5,6 +5,8 @@ import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
 
+export const maxDuration = 100;
+
 // Types
 interface StreamlitToolResult {
     toolName: string
