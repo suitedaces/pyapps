@@ -20,10 +20,23 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const body = await req.json()
+        const { chatId, fileId } = await ChatFileSchema.parseAsync(await req.json())
 
-        // Validate request body
-        const { chatId, fileId } = await ChatFileSchema.parseAsync(body)
+        // First verify the file exists and belongs to user
+        const { data: fileExists } = await supabase
+            .from('files')
+            .select('id')
+            .eq('id', fileId)
+            .eq('user_id', user.id)
+            .single()
+
+        if (!fileExists) {
+            console.error('File not found or unauthorized')
+            return NextResponse.json(
+                { error: 'File not found or unauthorized' },
+                { status: 404 }
+            )
+        }
 
         // Create chat-file association
         const { data, error } = await supabase
@@ -36,7 +49,10 @@ export async function POST(req: NextRequest) {
             .select()
             .single()
 
-        if (error) throw error
+        if (error) {
+            console.error('Error associating file with chat:', error)
+            throw error
+        }
 
         return NextResponse.json(data)
     } catch (error) {

@@ -107,7 +107,8 @@ export default function ChatContainer({
         chatFiles,
         loadChatFiles,
         linkFileToChat,
-        unlinkFileFromChat 
+        unlinkFileFromChat,
+        currentFile  // Add this to check file state
     } = useFileStore()
 
     // Refs for preventing race conditions
@@ -225,6 +226,7 @@ export default function ChatContainer({
             config: languageModel,
             experimental_streamData: true,
             fileId: currentFileId,
+            chatFiles: chatFiles[currentChatId || ''] || []
         },
         onResponse: async (response) => {
             const newChatId = response.headers.get('x-chat-id')
@@ -406,6 +408,7 @@ export default function ChatContainer({
                         chatId: currentChatId,
                         fileId: fileId,
                         fileName: file.name,
+                        chatFiles: chatFiles[currentChatId || ''] || []
                     },
                 })
 
@@ -456,7 +459,7 @@ export default function ChatContainer({
                 setErrorState(error as Error)
             }
         },
-        [append, currentChatId, handleChatCreated]
+        [append, currentChatId, handleChatCreated, chatFiles]
     )
 
     // Add handleSubmit to wrap the originalHandleSubmit
@@ -465,21 +468,25 @@ export default function ChatContainer({
             e.preventDefault()
             setHasFirstMessage(true)
 
-            if (file && fileId) {
-                // Handle file upload case
-                await handleFileUpload(file, fileId)
-            } else if (message.trim()) {
-                // Handle normal message case
-                await originalHandleSubmit(e, {
-                    body: {
-                        message,
-                    }
-                })
+            try {
+                if (file && fileId) {
+                    await handleFileUpload(file, fileId)
+                } else if (message.trim()) {
+                    await originalHandleSubmit(e, {
+                        body: {
+                            message,
+                            fileId: currentFileId,
+                            chatFiles: chatFiles[currentChatId || ''] || []
+                        }
+                    })
+                }
+                
+                updateChatState({ status: 'active' })
+            } catch (error) {
+                console.error('Failed to submit:', error)
             }
-            
-            updateChatState({ status: 'active' })
         },
-        [originalHandleSubmit, handleFileUpload, updateChatState]
+        [originalHandleSubmit, handleFileUpload, updateChatState, currentFileId, chatFiles, currentChatId]
     )
 
     const handleInputChange = useCallback(
@@ -579,20 +586,9 @@ export default function ChatContainer({
     
     useEffect(() => {
         if (currentChatId) {
-            fetch(`/api/chats/files?chatId=${currentChatId}`)
-                .then(res => res.json())
-                .then(data => {
-                    // Set the first file as current if it exists
-                    if (data.files?.[0]?.id) {
-                        setCurrentFileId(data.files[0].id)
-                    }
-                    console.log("FILES LINKED", data.files)
-                })
-                .catch(console.error)
-        } else {
-            setCurrentFileId(null)
+            loadChatFiles(currentChatId)
         }
-    }, [currentChatId])
+    }, [currentChatId, loadChatFiles])
     
 
     useEffect(() => {
@@ -766,13 +762,6 @@ export default function ChatContainer({
         </ResizableHandle>
     )
 
-    // Load chat files when chat changes
-    useEffect(() => {
-        if (currentChatId) {
-            loadChatFiles(currentChatId)
-        }
-    }, [currentChatId, loadChatFiles])
-
     return (
         <div className="bg-white dark:bg-dark-app relative flex h-screen overflow-hidden">
             {/* Add transition overlay */}
@@ -844,15 +833,17 @@ export default function ChatContainer({
                                         : 'h-screen'
                                 )}
                             >
-                                {!isInChatPage &&
-                                    chatState.status === 'initial' && (
-                                        <TypingText
-                                            className="text-black dark:text-dark-text font-bold text-3xl"
-                                            text="From Data to Apps, in seconds"
-                                            speed={30}
-                                            show={true}
-                                        />
-                                    )}
+                                {!isInChatPage && 
+                                 chatState.status === 'initial' && 
+                                 !hasFirstMessage // Add this condition to handle file selection state
+                                && (
+                                    <TypingText
+                                        className="text-black dark:text-dark-text font-bold text-3xl"
+                                        text="From Data to Apps, in seconds"
+                                        speed={30}
+                                        show={true}
+                                    />
+                                )}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
                                         messages={messages}
