@@ -200,7 +200,7 @@ export default function ChatContainer({
                 // Navigate after state updates are complete
                 if (!hasNavigated.current && isNewChat) {
                     hasNavigated.current = true
-                    await router.replace(`/chat/${chatId}`, { scroll: false })
+                    window.history.replaceState(null, '', `/chat/${chatId}`)
                 }
             } finally {
                 setIsTransitioning(false)
@@ -290,7 +290,7 @@ export default function ChatContainer({
                     // Navigate immediately if we're on root
                     if (window.location.pathname === '/') {
                         hasNavigated.current = true
-                        await router.replace(`/chat/${chatId}`, { scroll: false })
+                        window.history.replaceState(null, '', `/chat/${chatId}`)
                         
                         // Do these operations after navigation
                         Promise.all([
