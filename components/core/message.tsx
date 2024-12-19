@@ -4,14 +4,35 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
 import { App, ExecutionResult } from '@/lib/schema'
 import { cn } from '@/lib/utils'
-import { Message as AIMessage } from 'ai'
+import { Message as AIMessage, JSONValue } from 'ai'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { Markdown } from './markdown'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { Button } from '@/components/ui/button'
 
-interface MessageProps extends AIMessage {
+// Define the action type
+interface MessageAction {
+    label: string
+    action: string
+    prompt: string
+}
+
+// Make MessageData compatible with JSONValue by adding index signature
+interface MessageData {
+    type: string
+    actions?: MessageAction[]
+    [key: string]: JSONValue | MessageAction[] | undefined
+}
+
+// Create a custom Message type that extends AIMessage with our custom data
+interface CustomMessage extends Omit<AIMessage, 'data'> {
+    data?: MessageData
+}
+
+// Now MessageProps extends our CustomMessage instead of AIMessage directly
+interface MessageProps extends CustomMessage {
     isLastMessage?: boolean
     isLoading?: boolean
     object?: App
@@ -24,6 +45,7 @@ interface MessageProps extends AIMessage {
     onCodeClick?: (messageId: string) => void
     isCreatingChat?: boolean
     onTogglePanel?: () => void
+    onInputChange?: (value: string) => void
 }
 
 export function Message({
@@ -40,6 +62,8 @@ export function Message({
     isLoading,
     isCreatingChat = false,
     onTogglePanel,
+    data,
+    onInputChange,
 }: MessageProps) {
     const isUser = role === 'user'
     const { session } = useAuth()
@@ -72,9 +96,9 @@ export function Message({
             // Directly use the store
             setGeneratingCode(true)
             
-            requestAnimationFrame(() => {
-                onTogglePanel()
-            })
+            // requestAnimationFrame(() => {
+            //     onTogglePanel()
+            // })
         }
     }, [isLastMessage, isLoading, toolInvocations, setGeneratingCode, onTogglePanel])
 
@@ -84,6 +108,12 @@ export function Message({
             hasPanelOpened.current = false
         }
     }, [id])
+
+    const handleActionClick = (prompt: string) => {
+        if (onInputChange) {
+            onInputChange(prompt)
+        }
+    }
 
     return (
         <AnimatePresence mode="wait">
@@ -120,6 +150,21 @@ export function Message({
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
+
+                            {data?.type === 'action_buttons' && data.actions && (
+                                <div className="flex flex-wrap gap-2 mt-4">
+                                    {data.actions.map((action, index) => (
+                                        <Button
+                                            key={index}
+                                            onClick={() => handleActionClick(action.prompt)}
+                                            variant="outline"
+                                            className="bg-white hover:bg-gray-50 dark:bg-dark-app dark:hover:bg-dark-border"
+                                        >
+                                            {action.label}
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
 
                             {Boolean(toolInvocations?.length) && (
                                 <ActionPanel
@@ -172,3 +217,5 @@ export function Message({
 }
 
 export default Message
+
+export type { MessageData }

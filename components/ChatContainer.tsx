@@ -25,6 +25,7 @@ import { TypingText } from './core/typing-text'
 import AppSidebar from './Sidebar'
 import { AuthPrompt } from '@/components/ui/auth-prompt'
 import LoadingAnimation from './LoadingAnimation'
+import { useFileStore } from '@/lib/stores/file-store'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -41,12 +42,6 @@ interface ChatContainerProps {
     isInChatPage?: boolean
     initialAppId?: string | null
     onChatDeleted?: () => void;
-}
-
-interface FileUploadState {
-    isUploading: boolean
-    progress: number
-    error: string | null
 }
 
 interface StreamlitToolCall {
@@ -108,6 +103,13 @@ export default function ChatContainer({
         setIsLoadingSandbox,
     } = useSandboxStore()
 
+    const { 
+        chatFiles,
+        loadChatFiles,
+        linkFileToChat,
+        unlinkFileFromChat 
+    } = useFileStore()
+
     // Refs for preventing race conditions
     const abortControllerRef = useRef<AbortController | null>(null)
     const pendingFileLinkId = useRef<string | null>(null)
@@ -141,11 +143,6 @@ export default function ChatContainer({
     const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [isCreatingVersion, setIsCreatingVersion] = useState(false)
     const [errorState, setErrorState] = useState<Error | null>(null)
-    const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
-        isUploading: false,
-        progress: 0,
-        error: null,
-    })
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
     const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [currentAppId, setCurrentAppId] = useState<string | null>(
@@ -164,49 +161,50 @@ export default function ChatContainer({
     // Add new state for transition
     const [isTransitioning, setIsTransitioning] = useState(false)
 
+    // Add fileId state that persists across routes
+    const [currentFileId, setCurrentFileId] = useState<string | null>(null)
+
     // Move updateChatState before handleChatCreated
     const updateChatState = useCallback((updates: Partial<ChatState>) => {
         setChatState((prev) => ({ ...prev, ...updates }))
     }, [])
 
     // Improved chat creation handler with better async handling
-    const handleChatCreated = useCallback(
-        async (chatId: string) => {
-            if (hasNavigated.current) return
-            setIsTransitioning(true)
+    const handleChatCreated = useCallback(async (chatId: string) => {
+        if (hasNavigated.current) return
+        setIsTransitioning(true)
 
-            try {
-                // Batch state updates first
-                await Promise.all([
-                    new Promise<void>((resolve) => {
-                        React.startTransition(() => {
-                            setCurrentChatId(chatId)
-                            updateChatState({
-                                status: 'active',
-                                hasMessages: true,
-                            })
-                            setHasFirstMessage(true)
-                            resolve()
+        try {
+            await Promise.all([
+                // Handle state updates
+                new Promise<void>((resolve) => {
+                    React.startTransition(() => {
+                        setCurrentChatId(chatId)
+                        updateChatState({
+                            status: 'active',
+                            hasMessages: true,
                         })
-                    }),
-                    // Load chats in parallel but don't block on it
-                    fetch('/api/chats')
-                        .then(res => res.json())
-                        .then(data => setSidebarChats(data.chats))
-                        .catch(console.error)
-                ])
+                        setHasFirstMessage(true)
+                        resolve()
+                    })
+                }),
+                // Link file if exists
+                currentFileId ? linkFileToChat(chatId, currentFileId) : Promise.resolve(),
+                // Load chats in parallel
+                fetch('/api/chats')
+                    .then(res => res.json())
+                    .then(data => setSidebarChats(data.chats))
+                    .catch(console.error)
+            ])
 
-                // Navigate after state updates are complete
-                if (!hasNavigated.current && isNewChat) {
-                    hasNavigated.current = true
-                    await router.replace(`/chat/${chatId}`, { scroll: false })
-                }
-            } finally {
-                setIsTransitioning(false)
+            if (!hasNavigated.current && isNewChat) {
+                hasNavigated.current = true
+                await router.replace(`/chat/${chatId}`, { scroll: false })
             }
-        },
-        [router, isNewChat, updateChatState]
-    )
+        } finally {
+            setIsTransitioning(false)
+        }
+    }, [router, isNewChat, updateChatState, currentFileId, linkFileToChat])
 
     // Chat hook with improved error handling
     const {
@@ -226,6 +224,7 @@ export default function ChatContainer({
             model: currentModel,
             config: languageModel,
             experimental_streamData: true,
+            fileId: currentFileId,
         },
         onResponse: async (response) => {
             const newChatId = response.headers.get('x-chat-id')
@@ -291,7 +290,6 @@ export default function ChatContainer({
                         hasNavigated.current = true
                         await router.replace(`/chat/${chatId}`, { scroll: false })
                         
-                        // Do these operations after navigation
                         Promise.all([
                             generateTitle(chatId),
                             message.toolInvocations?.length && handleToolInvocations(message.toolInvocations)
@@ -302,7 +300,7 @@ export default function ChatContainer({
         
                     // If not on root, update states normally
                     // await handleChatCreated(chatId)
-                    generateTitle(chatId).catch(console.error) // Don't await
+                    // generateTitle(chatId).catch(console.error) // Don't await
                 }
 
             } catch (error) {
@@ -378,37 +376,87 @@ export default function ChatContainer({
     // Improved file upload with abort controller
     const handleFileUpload = useCallback(
         async (file: File, fileId: string) => {
-            try {
-                // Clear UI states first
-                if (isNewChat) {
-                    pendingFileLinkId.current = fileId
-                    updateChatState({ status: 'active' }) // This will clear typing text
-                }
-                
-                // Set loading states
-                setHasFirstMessage(true)
+            setCurrentFileId(fileId)
+            setHasFirstMessage(true)
 
-                // Now append the message
-                await append(
-                    {
-                        content: `Create a Streamlit app to visualize this data.`,
-                        role: 'user',
-                        createdAt: new Date(),
-                    },
-                    {
-                        body: {
-                            chatId: currentChatId,
-                            fileId: fileId,
-                            fileName: file.name,
-                        },
+            
+            try {
+                // Append UI message
+                await append({
+                    content: "I see you've uploaded a file! What would you like to do with it?",
+                    role: 'assistant',
+                    createdAt: new Date(),
+                    data: {
+                        type: 'action_buttons',
+                        actions: [
+                            {
+                                label: 'Suggest Metrics',
+                                action: 'suggest_metrics',
+                                prompt: 'Analyze this data and suggest relevant metrics and visualizations we could create.'
+                            },
+                            {
+                                label: 'Create App',
+                                action: 'create_app',
+                                prompt: 'Create a Streamlit app to visualize this data.'
+                            }
+                        ]
                     }
-                )
+                },                 {
+                    body: {
+                        chatId: currentChatId,
+                        fileId: fileId,
+                        fileName: file.name,
+                    },
+                })
+
+                // Store message in database - send existing chatId if we have one
+                const messageResponse = await fetch('/api/chats/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatId: currentChatId || undefined, // Send if exists
+                        assistantMessage: "I see you've uploaded a file! What would you like to do with it?",
+                        data: {
+                            type: 'action_buttons',
+                            actions: [
+                                {
+                                    label: 'Suggest Metrics',
+                                    action: 'suggest_metrics',
+                                    prompt: 'Analyze this data and suggest relevant metrics and visualizations we could create.'
+                                },
+                                {
+                                    label: 'Create App',
+                                    action: 'create_app',
+                                    prompt: 'Create a Streamlit app to visualize this data.'
+                                }
+                            ]
+                        }
+                    }),
+                })
+            
+
+                const data = await messageResponse.json()
+                
+                // If we got a new chat ID, handle it
+                if (data.chatId && !currentChatId) {
+                    // Now link the file to the new chat
+                    await fetch('/api/chats/files', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chatId: data.chatId,
+                            fileId: fileId,
+                        }),
+                    })
+                    await handleChatCreated(data.chatId)
+                }
+
             } catch (error) {
-                console.error('Error processing file:', error)
+                console.error('Error in file upload flow:', error)
                 setErrorState(error as Error)
             }
         },
-        [append, currentChatId, isNewChat, updateChatState]
+        [append, currentChatId, handleChatCreated]
     )
 
     // Add handleSubmit to wrap the originalHandleSubmit
@@ -528,13 +576,24 @@ export default function ChatContainer({
         }))
     }, [])
 
-    // Effects
-    // useEffect(() => {
-    //     if (chatLoading) {
-    //         setGeneratingCode(true)
-    //         setGeneratedCode('')
-    //     }
-    // }, [chatLoading, setGeneratingCode, setGeneratedCode])
+    
+    useEffect(() => {
+        if (currentChatId) {
+            fetch(`/api/chats/files?chatId=${currentChatId}`)
+                .then(res => res.json())
+                .then(data => {
+                    // Set the first file as current if it exists
+                    if (data.files?.[0]?.id) {
+                        setCurrentFileId(data.files[0].id)
+                    }
+                    console.log("FILES LINKED", data.files)
+                })
+                .catch(console.error)
+        } else {
+            setCurrentFileId(null)
+        }
+    }, [currentChatId])
+    
 
     useEffect(() => {
         const loadChats = async () => {
@@ -707,6 +766,13 @@ export default function ChatContainer({
         </ResizableHandle>
     )
 
+    // Load chat files when chat changes
+    useEffect(() => {
+        if (currentChatId) {
+            loadChatFiles(currentChatId)
+        }
+    }, [currentChatId, loadChatFiles])
+
     return (
         <div className="bg-white dark:bg-dark-app relative flex h-screen overflow-hidden">
             {/* Add transition overlay */}
@@ -794,23 +860,13 @@ export default function ChatContainer({
                                         input={input}
                                         onInputChange={handleInputChange}
                                         onSubmit={handleSubmit}
-                                        fileUploadState={fileUploadState}
                                         errorState={errorState}
-                                        onErrorDismiss={() =>
-                                            setErrorState(null)
-                                        }
+                                        onErrorDismiss={() => setErrorState(null)}
                                         onChatFinish={handleChatFinish}
                                         onUpdateStreamlit={updateStreamlitApp}
-                                        onCodeClick={() => {
-                                            setRightPanel((prev) => ({
-                                                ...prev,
-                                                view: 'code',
-                                            }))
-                                        }}
+                                        onCodeClick={handleCodeViewToggle}
                                         onTogglePanel={toggleRightContent}
-                                        isInChatPage={
-                                            isInChatPage || hasFirstMessage
-                                        }
+                                        isInChatPage={isInChatPage || hasFirstMessage}
                                     />
                                 </div>
                             </div>

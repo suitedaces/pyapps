@@ -1,3 +1,5 @@
+import { JSONValue } from "ai"
+
 export type Json =
     | string
     | number
@@ -194,6 +196,7 @@ export interface Database {
                     tool_calls: Json | null
                     tool_results: Json | null
                     token_count: number
+                    client_data: Json | null
                     created_at: string
                 }
                 Insert: {
@@ -205,6 +208,7 @@ export interface Database {
                     tool_calls?: Json | null
                     tool_results?: Json | null
                     token_count: number
+                    client_data?: JSONValue | null
                     created_at?: string
                 }
                 Update: {
@@ -216,6 +220,7 @@ export interface Database {
                     tool_calls?: Json | null
                     tool_results?: Json | null
                     token_count?: number
+                    client_data?: JSONValue | null
                     created_at?: string
                 }
                 Relationships: [

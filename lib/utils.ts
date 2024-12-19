@@ -2,6 +2,7 @@ import {
     CoreMessage,
     CoreToolMessage,
     generateId,
+    JSONValue,
     Message,
     ToolInvocation,
 } from 'ai'
@@ -234,6 +235,7 @@ export function formatDatabaseMessages(
                     content: msg.assistant_message,
                     createdAt: new Date(msg.created_at),
                     toolInvocations: toolInvocations,
+                    data: msg.client_data as JSONValue,
                 })
                 console.log('Formatted messages: ', messages)
             }

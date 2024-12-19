@@ -4,6 +4,7 @@ import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
+import { AnalysisOptions } from '../../../../lib/fileAnalyzer';
 
 // Types
 interface StreamlitToolResult {
@@ -74,7 +75,7 @@ async function storeMessage(
     supabase: any,
     chatId: string,
     userId: string,
-    userMessage: string,
+    userMessage: string | null,
     assistantMessage: string,
     toolCalls: any,
     toolResults: any,
@@ -307,12 +308,15 @@ export async function POST(req: Request) {
         const fileContext = await getFileContext(supabase, fileId, user.id)
         const systemPrompt = buildSystemPrompt(fileContext)
 
+        console.log('🔍 System prompt!!!!\n\n\n', systemPrompt)
+
         console.log('🔍 Streaming with fileContext:', fileContext)
         const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [{ role: 'system', content: systemPrompt }, ...messages],
             tools: { streamlitTool },
             experimental_toolCallStreaming: true,
+            
             onFinish: async (event) => {
                 const { text, toolCalls, toolResults, usage } = event
                 if (!text) return

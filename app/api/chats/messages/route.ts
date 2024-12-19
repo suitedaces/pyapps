@@ -56,17 +56,19 @@ export async function POST(req: Request) {
             toolCalls,
             toolResults,
             tokenCount,
+            data
         } = await req.json()
 
+        console.log('REQUEST BODY, ', data)
         let currentChatId = chatId
 
         // Only create a new chat if we don't have one AND we have a message to store
-        if (!currentChatId && userMessage && assistantMessage) {
+        if (!currentChatId && assistantMessage) {
             const { data: chat } = await supabase
                 .from('chats')
                 .insert({
                     user_id: user.id,
-                    name: userMessage.slice(0, 50) + '...',
+                    name: userMessage || 'New Project',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                 })
@@ -77,7 +79,7 @@ export async function POST(req: Request) {
         }
 
         // Only store message if we have both user and assistant messages
-        if (currentChatId && userMessage && assistantMessage) {
+        if (currentChatId && assistantMessage) {
             const { data: message, error: messageError } = await supabase
                 .from('messages')
                 .insert({
@@ -87,7 +89,8 @@ export async function POST(req: Request) {
                     assistant_message: assistantMessage,
                     tool_calls: toolCalls,
                     tool_results: toolResults,
-                    token_count: tokenCount,
+                    token_count: tokenCount || 0,
+                    client_data: data,
                     created_at: new Date().toISOString(),
                 })
 

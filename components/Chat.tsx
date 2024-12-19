@@ -9,11 +9,9 @@ import { XCircle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import React from 'react'
-interface FileUploadState {
-    isUploading: boolean
-    progress: number
-    error: string | null
-}
+import { MessageData } from '@/components/core/message'
+import { useFileStore } from '@/lib/stores/file-store'
+import { metadata } from '../app/layout';
 
 interface ChatProps {
     messages: Message[]
@@ -26,7 +24,6 @@ interface ChatProps {
         file?: File,
         fileId?: string
     ) => Promise<void>
-    fileUploadState: FileUploadState
     errorState: Error | null
     onErrorDismiss: () => void
     onChatFinish: () => void
@@ -42,7 +39,6 @@ function Chat({
     input = '',
     onInputChange,
     onSubmit,
-    fileUploadState = { isUploading: false, progress: 0, error: null },
     errorState = null,
     onErrorDismiss,
     onChatFinish,
@@ -53,6 +49,7 @@ function Chat({
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
+    const { isUploading, progress, error: fileError } = useFileStore()
 
     // Handle submission
     const handleSubmit = async (
@@ -90,6 +87,14 @@ function Chat({
         }
     }, [messages])
 
+    // Use fileError from FileStore
+    useEffect(() => {
+        if (fileError) {
+            // Handle file error
+            console.error('File upload error:', fileError)
+        }
+    }, [fileError])
+
     return (
         <div className="flex flex-col relative z-20 text-black h-full">
             {/* Error displays */}
@@ -104,29 +109,39 @@ function Chat({
                 </Alert>
             )}
 
-            {fileUploadState.error && (
+            {fileError && (
                 <Alert
                     variant="destructive"
                     className="mb-4 absolute top-0 left-0 right-0 z-50"
                 >
                     <XCircle className="h-4 w-4" />
-                    <AlertDescription>{fileUploadState.error}</AlertDescription>
+                    <AlertDescription>
+                        {typeof fileError === 'string' ? fileError : fileError}
+                    </AlertDescription>
                 </Alert>
             )}
 
             {/* Messages */}
             <ScrollArea className="flex-1 p-4 space-y-4 w-full max-w-[800px] m-auto pb-[120px]">
                 {Array.isArray(messages) &&
-                    messages.map((message, index) => (
-                        <AIMessage
-                            key={message.id}
-                            {...message}
-                            isLastMessage={index === messages.length - 1}
-                            isLoading={isLoading}
-                            onCodeClick={handleCodeClick}
-                            onTogglePanel={() => onTogglePanel('right')}
-                        />
-                    ))}
+                    messages.map((message, index) => {
+                        const typedMessage = {
+                            ...message,
+                            data: message.data as MessageData | undefined
+                        }
+                        
+                        return (
+                            <AIMessage
+                                key={message.id}
+                                {...typedMessage}
+                                isLastMessage={index === messages.length - 1}
+                                isLoading={isLoading}
+                                onCodeClick={handleCodeClick}
+                                onTogglePanel={() => onTogglePanel('right')}
+                                onInputChange={onInputChange}
+                            />
+                        )
+                    })}
                 <div ref={messagesEndRef} />
             </ScrollArea>
 
@@ -137,7 +152,6 @@ function Chat({
                     onChange={onInputChange}
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
-                    fileUploadState={fileUploadState}
                     isInChatPage={isInChatPage}
                 />
             </div>

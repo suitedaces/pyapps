@@ -10,6 +10,7 @@ import { X } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { ScrollArea } from './ui/scroll-area'
+import { useFileStore } from '@/lib/stores/file-store'
 
 // File validation schema
 const FileValidationSchema = z.object({
@@ -33,8 +34,6 @@ const FileValidationSchema = z.object({
 })
 
 interface FilePreviewProps {
-    file: File
-    onRemove: () => void
     onError?: (error: string) => void
     isMinHeight: boolean
     textareaHeight: number
@@ -42,53 +41,60 @@ interface FilePreviewProps {
 }
 
 export function FilePreview({
-    file,
-    onRemove,
     onError,
     isMinHeight,
     textareaHeight,
-    isSubmitted = false,
+    isSubmitted = false
 }: FilePreviewProps) {
+    const { 
+        currentFile, 
+        reset: resetFile,
+        setError: setFileError,
+        error: fileError 
+    } = useFileStore()
+    
     const [isVisible, setIsVisible] = useState(true)
     const [preview, setPreview] = useState<string>('')
     const [isPreviewOpen, setIsPreviewOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+
+    // Use FileStore's error state
+    const handleError = (errorMessage: string) => {
+        setFileError(errorMessage)
+        onError?.(errorMessage)
+    }
 
     useEffect(() => {
         const validateAndLoadFile = async () => {
+            if (!currentFile) return
+            
             setIsLoading(true)
-            setError(null)
+            setFileError(null)  // Reset error in FileStore
 
             try {
-                // Validate file
-                await FileValidationSchema.parseAsync({ file })
-
-                // Read file content
-                const text = await readFileContent(file)
+                await FileValidationSchema.parseAsync({ file: currentFile })
+                const text = await readFileContent(currentFile)
                 setPreview(text)
             } catch (err) {
-                const errorMessage =
-                    err instanceof z.ZodError
-                        ? err.errors[0].message
-                        : 'Error loading file preview'
-                setError(errorMessage)
-                onError?.(errorMessage)
+                const errorMessage = err instanceof z.ZodError 
+                    ? err.errors[0].message 
+                    : 'Error loading file preview'
+                handleError(errorMessage)
             } finally {
                 setIsLoading(false)
             }
         }
 
-        if (file) {
+        if (currentFile) {
             validateAndLoadFile()
         }
-    }, [file, onError])
+    }, [currentFile, setFileError, onError])
 
     useEffect(() => {
         if (isSubmitted) {
             setIsVisible(false)
         }
-    }, [isSubmitted])
+    }, [isSubmitted, isLoading])
 
     const readFileContent = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -142,7 +148,7 @@ export function FilePreview({
     const handleRemove = (e: React.MouseEvent) => {
         e.stopPropagation()
         setIsVisible(false)
-        onRemove()
+        resetFile()
     }
 
     // Simplified animation logic
@@ -185,10 +191,18 @@ export function FilePreview({
         }
     }, [isMinHeight, getPosition])
 
+    const handlePreviewClick = () => {
+        if (currentFile && !fileError && isPreviewable(currentFile)) {
+            setIsPreviewOpen(true)
+        }
+    }
+
+    if (!currentFile) return null;
+
     return (
         <>
             <AnimatePresence mode="wait">
-                {isVisible && !isSubmitted && (
+                {isVisible && (
                     <motion.div
                         {...getPosition}
                         className={cn(
@@ -202,14 +216,10 @@ export function FilePreview({
                         <div className="p-2">
                             <motion.div
                                 className={`relative bg-white dark:bg-slate-800 rounded-lg border p-3 w-44 cursor-pointer
-                                    ${error ? 'border-red-500' : 'hover:border-primary/50'} transition-colors`}
-                                onClick={() =>
-                                    isPreviewable(file) &&
-                                    !error &&
-                                    setIsPreviewOpen(true)
-                                }
-                                whileHover={{ scale: error ? 1 : 1.02 }}
-                                whileTap={{ scale: error ? 1 : 0.98 }}
+                                    ${fileError ? 'border-red-500' : 'hover:border-primary/50'} transition-colors`}
+                                onClick={handlePreviewClick}
+                                whileHover={{ scale: fileError ? 1 : 1.02 }}
+                                whileTap={{ scale: fileError ? 1 : 0.98 }}
                             >
                                 <motion.button
                                     whileHover={{ scale: 1.1 }}
@@ -223,21 +233,21 @@ export function FilePreview({
                                 <div className="flex flex-col items-center gap-1.5">
                                     <div className="text-center">
                                         <span className="text-sm dark:text-white font-medium line-clamp-2 text-center">
-                                            {file.name}
+                                            {currentFile.name}
                                         </span>
                                     </div>
 
                                     <span className="text-xs text-muted-foreground">
-                                        {Math.round(file.size / 1024)}KB
+                                        {Math.round(currentFile.size / 1024)}KB
                                     </span>
 
-                                    {error ? (
+                                    {fileError ? (
                                         <span className="text-xs font-semibold bg-red-100 text-red-600 px-2 py-1 rounded w-full text-center">
-                                            {error}
+                                            {fileError}
                                         </span>
                                     ) : (
                                         <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-1 rounded w-full text-center">
-                                            {file.name
+                                            {currentFile.name
                                                 .split('.')
                                                 .pop()
                                                 ?.toUpperCase() || 'FILE'}
@@ -256,7 +266,7 @@ export function FilePreview({
                         <DialogTitle className="flex items-center gap-2">
                             <span>Preview:</span>
                             <span className="font-normal text-muted-foreground">
-                                {file.name}
+                                {currentFile.name}
                             </span>
                         </DialogTitle>
                     </DialogHeader>
@@ -266,9 +276,9 @@ export function FilePreview({
                                 <div className="text-center text-muted-foreground">
                                     Loading preview...
                                 </div>
-                            ) : error ? (
+                            ) : fileError ? (
                                 <div className="text-center text-red-500">
-                                    {error}
+                                    {fileError}
                                 </div>
                             ) : (
                                 <pre className="text-sm whitespace-pre-wrap font-mono overflow-x-auto">

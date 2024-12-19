@@ -52,7 +52,9 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient()
     const user = await getUser()
 
-    const { chatId } = await req.json()
+    // Get chatId from URL search params instead of body
+    const searchParams = req.nextUrl.searchParams
+    const chatId = searchParams.get('chatId')
 
     if (!user) {
         return NextResponse.json(
@@ -61,13 +63,27 @@ export async function GET(req: NextRequest) {
         )
     }
 
-    const { data, error } = await supabase
-        .from('chat_files')
-        .select('*')
-        .eq('chat_id', chatId)
-        .eq('user_id', user.id)
+    if (!chatId) {
+        return NextResponse.json(
+            { error: 'Chat ID is required' },
+            { status: 400 }
+        )
+    }
 
-    if (error) throw error
+    try {
+        const { data, error } = await supabase
+            .from('chat_files')
+            .select('*')
+            .eq('chat_id', chatId)
 
-    return NextResponse.json(data)
+        if (error) throw error
+
+        return NextResponse.json({ files: data })
+    } catch (error) {
+        console.error('Failed to fetch chat files:', error)
+        return NextResponse.json(
+            { error: 'Failed to fetch chat files' },
+            { status: 500 }
+        )
+    }
 }
