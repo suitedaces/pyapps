@@ -9,6 +9,8 @@ import { XCircle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import React from 'react'
+import AppSuggestions from '@/components/core/app-suggestions'
+
 interface FileUploadState {
     isUploading: boolean
     progress: number
@@ -130,16 +132,24 @@ function Chat({
                 <div ref={messagesEndRef} />
             </ScrollArea>
 
-            {/* Chatbar with absolute positioning */}
+            {/* Chatbar container with proper spacing for suggestions */}
             <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-dark-app">
-                <Chatbar
-                    value={input}
-                    onChange={onInputChange}
-                    onSubmit={handleSubmit}
-                    isLoading={isLoading}
-                    fileUploadState={fileUploadState}
-                    isInChatPage={isInChatPage}
-                />
+                <div className="relative">
+                    <div className="absolute bottom-[calc(40vh+120px)] left-0 right-0 z-50">
+                        <AppSuggestions 
+                            isVisible={!isInChatPage}
+                            onSelect={onInputChange}
+                        />
+                    </div>
+                    <Chatbar
+                        value={input}
+                        onChange={onInputChange}
+                        onSubmit={handleSubmit}
+                        isLoading={isLoading}
+                        fileUploadState={fileUploadState}
+                        isInChatPage={isInChatPage}
+                    />
+                </div>
             </div>
         </div>
     )
