@@ -10,18 +10,27 @@ import {
 } from '@/components/ui/resizable'
 import { ThemeProvider } from '@/contexts/ThemeProvider'
 import { AppVersion } from '@/lib/types'
-import { Circle } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { Circle, Loader2 } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 
 interface AppClientProps {
     app: AppVersion
-    sandboxUrl: string
     id: string
 }
 
-export function AppClient({ app, sandboxUrl, id }: AppClientProps) {
+export function AppClient({ app, id }: AppClientProps) {
+    const { updateSandbox, streamlitUrl, isLoadingSandbox } = useSandboxStore()
     const streamlitRef = useRef<StreamlitFrameRef>(null)
     const [showCode, setShowCode] = useState(false)
+
+    useEffect(() => {
+        // Initialize sandbox when component mounts
+        const initSandbox = async () => {
+            await updateSandbox(app.code, true) // Force execute to match previous behavior
+        }
+        initSandbox()
+    }, []) // Empty dependency array to run only on mount, like before
 
     const CustomHandle = ({ ...props }) => (
         <ResizableHandle
@@ -43,7 +52,7 @@ export function AppClient({ app, sandboxUrl, id }: AppClientProps) {
                     appName={app.name || ''}
                     appDescription={app.description || undefined}
                     initialVersions={[app]}
-                    initialUrl={sandboxUrl}
+                    initialUrl={streamlitUrl || ''}
                     streamlitRef={streamlitRef}
                     onToggleCode={() => setShowCode(!showCode)}
                 />
@@ -51,10 +60,16 @@ export function AppClient({ app, sandboxUrl, id }: AppClientProps) {
                     <ResizablePanelGroup direction="horizontal">
                         <ResizablePanel defaultSize={showCode ? 60 : 100}>
                             <div className="h-[calc(100vh-3.5rem)]">
-                                <StreamlitFrame
-                                    ref={streamlitRef}
-                                    url={sandboxUrl}
-                                />
+                                {(!streamlitUrl) ? (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-dark-app/50 backdrop-blur-sm">
+                                        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+                                    </div>
+                                ) : (
+                                    <StreamlitFrame
+                                        ref={streamlitRef}
+                                        url={streamlitUrl}
+                                    />
+                                )}
                             </div>
                         </ResizablePanel>
                         {showCode && (
