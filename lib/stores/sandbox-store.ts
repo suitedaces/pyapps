@@ -47,6 +47,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
         const { sandboxId, lastExecutedCode } = get()
 
         if (!forceExecute && code === lastExecutedCode) {
+            set({ isLoadingSandbox: false, isGeneratingCode: false })
             return get().streamlitUrl
         }
 
@@ -77,6 +78,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 sandboxId: data.sandboxId,
                 streamlitUrl: data.url,
                 isInitializing: false,
+                isGeneratingCode: false,
             })
             return data.url
         } catch (error) {
@@ -88,6 +90,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 error: errorMessage,
                 isInitializing: false,
                 isLoadingSandbox: false,
+                isGeneratingCode: false,
             })
             console.error('Error updating sandbox:', error)
             return null
