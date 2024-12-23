@@ -1,5 +1,6 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { AppVersion } from '@/lib/types'
+import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { AppClient } from './AppClient'
 
@@ -27,28 +28,6 @@ export default async function AppPage({ params }: PageParams) {
         notFound()
     }
 
-    // Initialize sandbox with proper auth headers
-    const sandboxResponse = await fetch('/api/sandbox/new/execute', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            code: app[0].code,
-        }),
-    })
-
-    if (!sandboxResponse.ok) {
-        console.error(
-            'Failed to initialize sandbox:',
-            await sandboxResponse.text()
-        )
-        return <div>Failed to load app. Please try again later.</div>
-    }
-
-    const { url: sandboxUrl } = await sandboxResponse.json()
-
-    return (
-        <AppClient app={app[0] as AppVersion} sandboxUrl={sandboxUrl} id={id} />
-    )
+    // let it handle the sandbox initialization using the store
+    return <AppClient app={app[0] as AppVersion} id={id} />
 }
