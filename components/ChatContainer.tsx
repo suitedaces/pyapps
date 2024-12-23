@@ -66,13 +66,6 @@ interface StreamlitToolCall {
     }
 }
 
-interface SandboxState {
-    id: string | null
-    status: 'idle' | 'generating' | 'loading' | 'error'
-    errors: Array<{ message: string }>
-    isCreatingVersion: boolean
-}
-
 interface RightPanelState {
     isVisible: boolean
     view: 'code' | 'preview'
@@ -162,8 +155,9 @@ export default function ChatContainer({
         (model) => model.id === languageModel.model
     )
 
-    // Add new state for transition
-    const [isTransitioning, setIsTransitioning] = useState(false)
+    // Add a new state for remount keys
+    const [previewKey, setPreviewKey] = useState<number>(0)
+    const [versionKey, setVersionKey] = useState<number>(0)
 
     // Move updateChatState before handleChatCreated
     const updateChatState = useCallback((updates: Partial<ChatState>) => {
@@ -174,7 +168,6 @@ export default function ChatContainer({
     const handleChatCreated = useCallback(
         async (chatId: string) => {
             if (hasNavigated.current) return
-            setIsTransitioning(true)
 
             try {
                 // Batch state updates first
@@ -190,26 +183,24 @@ export default function ChatContainer({
                             resolve()
                         })
                     }),
-                    // Load chats in parallel but don't block on it
                     fetch('/api/chats')
                         .then(res => res.json())
                         .then(data => setSidebarChats(data.chats))
                         .catch(console.error)
                 ])
 
-                // Navigate after state updates are complete
                 if (!hasNavigated.current && isNewChat) {
                     hasNavigated.current = true
                     window.history.replaceState(null, '', `/chat/${chatId}`)
                 }
-            } finally {
-                setIsTransitioning(false)
+            } catch (error) {
+                console.error('Error creating chat:', error)
+                setErrorState(error as Error)
             }
         },
         [router, isNewChat, updateChatState]
     )
 
-    // Chat hook with improved error handling
     const {
         messages,
         isLoading: chatLoading,
@@ -231,6 +222,7 @@ export default function ChatContainer({
         onResponse: async (response) => {
             const newChatId = response.headers.get('x-chat-id')
             const newAppId = response.headers.get('x-app-id')
+            console.log('🔄 New App ID:', newAppId)
             if (newChatId && !currentChatId) {
                 newChatIdRef.current = newChatId
             }
@@ -283,7 +275,7 @@ export default function ChatContainer({
         },
         onFinish: async (message) => {
             try {
-                if (message.content && newChatIdRef.current) {
+                if (message.content && newChatIdRef.current && !currentChatId) {
                     const chatId = newChatIdRef.current
                     newChatIdRef.current = null
         
@@ -295,15 +287,21 @@ export default function ChatContainer({
                         // Do these operations after navigation
                         Promise.all([
                             generateTitle(chatId),
-                            message.toolInvocations?.length && handleToolInvocations(message.toolInvocations)
+                            message.toolInvocations && message.toolInvocations.length > 0 ? handleToolInvocations(message.toolInvocations) : Promise.resolve()
                         ]).catch(console.error)
                         
-                        return // Exit early after navigation
+                        return
                     }
-        
-                    // If not on root, update states normally
-                    // await handleChatCreated(chatId)
-                    generateTitle(chatId).catch(console.error) // Don't await
+                }
+
+                // Only handle tool invocations if they exist and have length
+                if (message.toolInvocations && message.toolInvocations.length > 0) {
+                    await handleToolInvocations(message.toolInvocations)
+                }
+
+                // Always refresh version selector if it exists
+                if (versionSelectorRef.current) {
+                    versionSelectorRef.current.refreshVersions()
                 }
 
             } catch (error) {
@@ -312,19 +310,6 @@ export default function ChatContainer({
             }
         },
     })
-
-    const handleToolInvocations = useCallback(async (toolInvocations: any[]) => {
-        if (toolInvocations?.length) {
-            const streamlitCall = toolInvocations.find(
-                invocation => invocation.toolName === 'streamlitTool' && 
-            invocation.state === 'result'
-        ) as StreamlitToolCall | undefined
-            if (streamlitCall?.state === 'result' && streamlitCall.result?.code) {
-                setGeneratedCode(streamlitCall.result.code)
-                await updateStreamlitApp(streamlitCall.result.code)
-            }
-        }
-    }, [])
 
     // Improved Streamlit app management with retry logic
     const updateStreamlitApp = useCallback(
@@ -375,6 +360,22 @@ export default function ChatContainer({
         },
         [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox, currentChatId]
     )
+    
+    const handleToolInvocations = useCallback(async (toolInvocations: any[]) => {
+        if (!toolInvocations || toolInvocations.length === 0) return;
+
+        const streamlitCall = toolInvocations.find(
+            invocation => 
+                invocation?.toolName === 'streamlitTool' && 
+                invocation?.state === 'result' &&
+                invocation?.result?.code
+        ) as StreamlitToolCall | undefined
+
+        if (streamlitCall?.result?.code) {
+            setGeneratedCode(streamlitCall.result.code)
+            await updateStreamlitApp(streamlitCall.result.code)
+        }
+    }, [])
 
     // Improved file upload with abort controller
     const handleFileUpload = useCallback(
@@ -711,11 +712,11 @@ export default function ChatContainer({
     return (
         <div className="bg-white dark:bg-dark-app relative flex h-screen overflow-hidden">
             {/* Add transition overlay */}
-            {isTransitioning && (
+            {/* {isTransitioning && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
                     <LoadingAnimation message="Loading chat..." />
                 </div>
-            )}
+            )} */}
             
             <div className="absolute top-0 left-0 w-full h-full">
                 <div className="godrays top-0 left-0 w-full min-h-[30vh] relative z-5">
@@ -826,6 +827,7 @@ export default function ChatContainer({
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
                                 >
                                     <PreviewPanel
+                                        key={`preview-${previewKey}`}
                                         ref={streamlitPreviewRef}
                                         appId={currentAppId || undefined}
                                         streamlitUrl={streamlitUrl}
@@ -845,6 +847,7 @@ export default function ChatContainer({
                     <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
                         {currentAppId && (
                             <VersionSelector
+                                key={`version-${versionKey}`}
                                 appId={currentAppId}
                                 onVersionChange={handleVersionChange}
                                 ref={versionSelectorRef}

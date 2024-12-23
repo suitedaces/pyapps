@@ -31,12 +31,7 @@ export function Message({
     content,
     id,
     isLastMessage = false,
-    object,
-    result,
     toolInvocations,
-    onObjectClick,
-    onToolResultClick,
-    onCodeClick,
     isLoading,
     isCreatingChat = false,
     onTogglePanel,
@@ -60,23 +55,6 @@ export function Message({
         () => content.split('\n').filter(Boolean),
         [content]
     )
-
-    // Update Message component to handle streamlit tool specifically
-    useEffect(() => {
-        const hasStreamlitTool = toolInvocations?.some(
-            (tool: { toolName: string }) => tool.toolName === 'streamlitTool'
-        )
-        
-        if (isLastMessage && isLoading && hasStreamlitTool && onTogglePanel && !hasPanelOpened.current) {
-            hasPanelOpened.current = true
-            // Directly use the store
-            setGeneratingCode(true)
-            
-            requestAnimationFrame(() => {
-                onTogglePanel()
-            })
-        }
-    }, [isLastMessage, isLoading, toolInvocations, setGeneratingCode, onTogglePanel])
 
     // Reset the ref when the message changes
     useEffect(() => {
