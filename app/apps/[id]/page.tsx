@@ -1,6 +1,5 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { AppVersion } from '@/lib/types'
-import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { AppClient } from './AppClient'
 
@@ -29,18 +28,15 @@ export default async function AppPage({ params }: PageParams) {
     }
 
     // Initialize sandbox with proper auth headers
-    const sandboxResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/sandbox/new/execute`,
-        {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                code: app[0].code,
-            }),
-        }
-    )
+    const sandboxResponse = await fetch('/api/sandbox/new/execute', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            code: app[0].code,
+        }),
+    })
 
     if (!sandboxResponse.ok) {
         console.error(
