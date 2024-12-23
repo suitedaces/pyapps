@@ -28,13 +28,6 @@ export default async function AppPage({ params }: PageParams) {
         notFound()
     }
 
-    // Get all cookies for proper authentication
-    const cookieStore = await cookies()
-    const cookieHeader = cookieStore
-        .getAll()
-        .map((cookie: any) => `${cookie.name}=${cookie.value}`)
-        .join('; ')
-
     // Initialize sandbox with proper auth headers
     const sandboxResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BASE_URL}/api/sandbox/new/execute`,
@@ -42,7 +35,6 @@ export default async function AppPage({ params }: PageParams) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Cookie: cookieHeader,
             },
             body: JSON.stringify({
                 code: app[0].code,
