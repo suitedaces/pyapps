@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 # Python data science packages
 RUN pip3 install --no-cache-dir \
     streamlit pandas numpy matplotlib seaborn plotly \
-    scikit-learn statsmodels scikit-learn xgboost streamlit-extras prophet yfinance spotipy
+    scikit-learn statsmodels scikit-learn xgboost streamlit-extras prophet yfinance spotipy PyPDF2[crypto]
 
 # Configure FUSE and mount point
 RUN sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
