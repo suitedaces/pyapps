@@ -18,6 +18,7 @@ export default async function AppPage({ params }: PageParams) {
 
     const supabase = await createClient()
 
+    // Get the app data
     const { data: app, error } = await supabase
         .rpc('get_app_versions', { p_app_id: id })
         .select()
@@ -27,25 +28,21 @@ export default async function AppPage({ params }: PageParams) {
         notFound()
     }
 
-    // Get auth token for sandbox request
+    // Get all cookies for proper authentication
     const cookieStore = await cookies()
-    const supabaseToken = cookieStore.get('sb-token')?.value
+    const cookieHeader = cookieStore
+        .getAll()
+        .map((cookie: any) => `${cookie.name}=${cookie.value}`)
+        .join('; ')
 
-    // Initialize sandbox with auth
+    // Initialize sandbox with proper auth headers
     const sandboxResponse = await fetch(
         `${process.env.NEXT_PUBLIC_BASE_URL}/api/sandbox/new/execute`,
         {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${supabaseToken}`,
-                Cookie: cookieStore
-                    .getAll()
-                    .map(
-                        (cookie: { name: string; value: string }) =>
-                            `${cookie.name}=${cookie.value}`
-                    )
-                    .join('; '),
+                Cookie: cookieHeader,
             },
             body: JSON.stringify({
                 code: app[0].code,
