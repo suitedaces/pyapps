@@ -121,9 +121,7 @@ export default function ChatContainer({
 
     // State management
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
-    const currentChatId = window.location.pathname.startsWith('/chat/') 
-            ? window.location.pathname.split('/').pop() 
-            : undefined
+    const [currentChatId, setCurrentChatId] = useState<string | undefined>(undefined)
     const [rightPanel, setRightPanel] = useState<RightPanelState>({
         isVisible: false,
         view: 'preview',
@@ -246,18 +244,7 @@ export default function ChatContainer({
                     
                     // Set navigating state before pushing route
                     if (currentChatId === undefined) {
-                        setIsNavigating(true)
-                        
-                        // Keep the messages during navigation
-                        const currentMessages = messages
-                        
-                        window.history.replaceState(null, '', `/chat/${chatId}`)
-                        
-                        // Small delay to ensure messages persist
-                        setTimeout(() => {
-                            setMessages(currentMessages)
-                            setIsNavigating(false)
-                        }, 100)
+                        router.push(`/chat/${chatId}`)
                         
                         // Handle other operations
                         Promise.all([
@@ -626,7 +613,16 @@ export default function ChatContainer({
             setGeneratedCode('')
         }
     }, [sandboxId, killSandbox, setStreamlitUrl, setGeneratedCode])
-
+    
+    // Add useEffect to handle window-dependent logic
+    useEffect(() => {
+        // This will only run on the client side
+        const pathname = window.location.pathname
+        const chatId = pathname.startsWith('/chat/') 
+            ? pathname.split('/').pop() 
+            : undefined
+        setCurrentChatId(chatId)
+    }, [])
     // Title generation
     const generateTitle = useCallback(
         async (chatId: string) => {
