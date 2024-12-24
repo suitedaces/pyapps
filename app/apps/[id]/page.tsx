@@ -1,6 +1,5 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { AppVersion } from '@/lib/types'
-import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { AppClient } from './AppClient'
 
