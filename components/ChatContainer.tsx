@@ -121,9 +121,7 @@ export default function ChatContainer({
 
     // State management
     const [sidebarChats, setSidebarChats] = useState<any[]>([])
-    const [currentChatId, setCurrentChatId] = useState<string | null>(
-        initialChat?.id || null
-    )
+    const [currentChatId, setCurrentChatId] = useState<string | undefined>(undefined)
     const [rightPanel, setRightPanel] = useState<RightPanelState>({
         isVisible: false,
         view: 'preview',
@@ -133,7 +131,6 @@ export default function ChatContainer({
         hasMessages: initialMessages?.length > 0,
     })
     const [sandboxId, setSandboxId] = useState<string | null>(null)
-    const [isCreatingVersion, setIsCreatingVersion] = useState(false)
     const [errorState, setErrorState] = useState<Error | null>(null)
     const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
         isUploading: false,
@@ -159,47 +156,13 @@ export default function ChatContainer({
     const [previewKey, setPreviewKey] = useState<number>(0)
     const [versionKey, setVersionKey] = useState<number>(0)
 
+    // Add this state to track navigation
+    const [isNavigating, setIsNavigating] = useState(false)
+
     // Move updateChatState before handleChatCreated
     const updateChatState = useCallback((updates: Partial<ChatState>) => {
         setChatState((prev) => ({ ...prev, ...updates }))
     }, [])
-
-    // Improved chat creation handler with better async handling
-    const handleChatCreated = useCallback(
-        async (chatId: string) => {
-            if (hasNavigated.current) return
-
-            try {
-                // Batch state updates first
-                await Promise.all([
-                    new Promise<void>((resolve) => {
-                        React.startTransition(() => {
-                            setCurrentChatId(chatId)
-                            updateChatState({
-                                status: 'active',
-                                hasMessages: true,
-                            })
-                            setHasFirstMessage(true)
-                            resolve()
-                        })
-                    }),
-                    fetch('/api/chats')
-                        .then(res => res.json())
-                        .then(data => setSidebarChats(data.chats))
-                        .catch(console.error)
-                ])
-
-                if (!hasNavigated.current && isNewChat) {
-                    hasNavigated.current = true
-                    window.history.replaceState(null, '', `/chat/${chatId}`)
-                }
-            } catch (error) {
-                console.error('Error creating chat:', error)
-                setErrorState(error as Error)
-            }
-        },
-        [router, isNewChat, updateChatState]
-    )
 
     const {
         messages,
@@ -211,7 +174,7 @@ export default function ChatContainer({
         setMessages,
     } = useChat({
         api: '/api/chats/stream',
-        id: currentChatId ?? undefined,
+        id: currentChatId || undefined,
         initialMessages: formatDatabaseMessages(initialMessages || []),
         body: {
             chatId: currentChatId,
@@ -278,16 +241,17 @@ export default function ChatContainer({
                 if (message.content && newChatIdRef.current && !currentChatId) {
                     const chatId = newChatIdRef.current
                     newChatIdRef.current = null
-        
-                    // Navigate immediately if we're on root
-                    if (window.location.pathname === '/') {
-                        hasNavigated.current = true
-                        window.history.replaceState(null, '', `/chat/${chatId}`)
+                    
+                    // Set navigating state before pushing route
+                    if (currentChatId === undefined) {
+                        router.push(`/chat/${chatId}`)
                         
-                        // Do these operations after navigation
+                        // Handle other operations
                         Promise.all([
                             generateTitle(chatId),
-                            message.toolInvocations && message.toolInvocations.length > 0 ? handleToolInvocations(message.toolInvocations) : Promise.resolve()
+                            message.toolInvocations && message.toolInvocations.length > 0 
+                                ? handleToolInvocations(message.toolInvocations) 
+                                : Promise.resolve()
                         ]).catch(console.error)
                         
                         return
@@ -649,7 +613,16 @@ export default function ChatContainer({
             setGeneratedCode('')
         }
     }, [sandboxId, killSandbox, setStreamlitUrl, setGeneratedCode])
-
+    
+    // Add useEffect to handle window-dependent logic
+    useEffect(() => {
+        // This will only run on the client side
+        const pathname = window.location.pathname
+        const chatId = pathname.startsWith('/chat/') 
+            ? pathname.split('/').pop() 
+            : undefined
+        setCurrentChatId(chatId)
+    }, [])
     // Title generation
     const generateTitle = useCallback(
         async (chatId: string) => {
@@ -711,12 +684,10 @@ export default function ChatContainer({
 
     return (
         <div className="bg-white dark:bg-dark-app relative flex h-screen overflow-hidden">
-            {/* Add transition overlay */}
-            {/* {isTransitioning && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <LoadingAnimation message="Loading chat..." />
-                </div>
-            )} */}
+            {/* Add a simple fade transition during navigation */}
+            {isNavigating && (
+                <div className="absolute inset-0 bg-background/50 z-50 transition-opacity duration-200" />
+            )}
             
             <div className="absolute top-0 left-0 w-full h-full">
                 <div className="godrays top-0 left-0 w-full min-h-[30vh] relative z-5">
@@ -725,14 +696,13 @@ export default function ChatContainer({
             </div>
             <AppSidebar
                 onChatSelect={handleChatSelect}
-                currentChatId={currentChatId}
+                currentChatId={currentChatId || null}
                 chats={sidebarChats}
                 isCreatingChat={isCreatingChat}
                 chatTitles={chatTitles}
                 onGenerateTitle={generateTitle}
                 onChatDeleted={() => {
                     // Clear current chat state
-                    setCurrentChatId(null)
                     setCurrentAppId(null)
                     setMessages([])
                     setGeneratedCode('')
@@ -749,6 +719,7 @@ export default function ChatContainer({
                         .then(response => response.json())
                         .then(data => setSidebarChats(data.chats))
                         .catch(console.error)
+                    router.push('/')
                 }}
             />
             <div className="flex-1 flex flex-col bg-white dark:bg-dark-app min-w-0">
@@ -791,8 +762,8 @@ export default function ChatContainer({
                                     )}
                                 <div className="max-w-[800px] mx-auto w-full h-full">
                                     <Chat
-                                        messages={messages}
-                                        isLoading={chatLoading}
+                                        messages={isNavigating ? [] : messages}
+                                        isLoading={chatLoading || isNavigating}
                                         input={input}
                                         onInputChange={handleInputChange}
                                         onSubmit={handleSubmit}

@@ -66,7 +66,6 @@ async function killStreamlitProcess(sandbox: Sandbox) {
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
-    const supabase = await createClient()
     const user = await getUser()
 
     const { id } = await context.params
