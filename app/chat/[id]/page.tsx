@@ -1,11 +1,20 @@
 import ChatContainer from '@/components/ChatContainer'
+import LoadingAnimation from '@/components/LoadingAnimation'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { AppVersion } from '@/lib/types'
 import { formatDatabaseMessages } from '@/lib/utils'
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 
 interface PageParams {
     params: Promise<{ id: string }>
+}
+
+// Add a loading component
+function ChatLoading() {
+    return <div className="h-screen w-full flex items-center justify-center">
+        <LoadingAnimation message="Loading chat..." />
+    </div>
 }
 
 export default async function ChatPage({ params }: PageParams) {
@@ -33,7 +42,6 @@ export default async function ChatPage({ params }: PageParams) {
                 data: AppVersion[]
                 error: any
             }>,
-            // Fetch associated files through chat_files junction table
             supabase
                 .from('chat_files')
                 .select(
@@ -49,10 +57,6 @@ export default async function ChatPage({ params }: PageParams) {
                 )
                 .eq('chat_id', id),
         ])
-    console.log('chatResponse', chatResponse)
-    console.log('messagesResponse', messagesResponse)
-    console.log('versionResponse', versionResponse)
-    console.log('filesResponse', filesResponse)
 
     if (chatResponse.error || !chatResponse.data) {
         console.error('Error fetching chat:', chatResponse.error)
@@ -64,7 +68,6 @@ export default async function ChatPage({ params }: PageParams) {
         notFound()
     }
 
-    // Extract files from the response
     const files =
         filesResponse.data
             ?.map((row) => row.files)
@@ -76,14 +79,18 @@ export default async function ChatPage({ params }: PageParams) {
 
     const messages = formatDatabaseMessages(messagesResponse.data ?? [])
 
+    // Add a key prop to force remount of ChatContainer
     return (
-        <ChatContainer
-            initialChat={chatResponse.data}
-            initialMessages={messages}
-            initialVersion={versionResponse.data}
-            initialFiles={files}
-            initialAppId={chatResponse.data.app_id}
-            isInChatPage={true}
-        />
+        <Suspense fallback={<ChatLoading />}>
+            <ChatContainer
+                key={id}
+                initialChat={chatResponse.data}
+                initialMessages={messages}
+                initialVersion={versionResponse.data}
+                initialFiles={files}
+                initialAppId={chatResponse.data.app_id}
+                isInChatPage={true}
+            />
+        </Suspense>
     )
 }
