@@ -65,9 +65,57 @@ async function killStreamlitProcess(sandbox: Sandbox) {
     }
 }
 
+// Add new function to list session sandboxes
+async function listSessionSandboxes(sessionId: string): Promise<Sandbox[]> {
+    try {
+        const sandboxes = await Sandbox.list()
+        const sessionSandboxes = sandboxes.filter(
+            (s) =>
+                s.metadata &&
+                typeof s.metadata === 'object' &&
+                'sessionId' in s.metadata &&
+                s.metadata.sessionId === sessionId
+        )
+
+        const fullSandboxes = await Promise.all(
+            sessionSandboxes.map((s) => Sandbox.reconnect(s.sandboxID))
+        )
+        return fullSandboxes
+    } catch (error) {
+        console.error('Error listing session sandboxes:', error)
+        return []
+    }
+}
+
 export async function POST(req: NextRequest, context: RouteContext) {
     const user = await getUser()
     const { id } = await context.params
+    const sessionId = req.headers.get('x-session-id')
+    const appId = req.headers.get('x-app-id')
+
+    // Get app owner's user ID
+    let ownerUserId: string | null = null
+    if (appId) {
+        const supabase = await createClient()
+        const { data: app } = await supabase
+            .from('apps')
+            .select('user_id')
+            .eq('id', appId)
+            .single()
+        
+        ownerUserId = app?.user_id || null
+    }
+
+    if (!ownerUserId && user) {
+        ownerUserId = user.id
+    }
+
+    if (!ownerUserId) {
+        return NextResponse.json(
+            { error: 'Could not determine app owner' },
+            { status: 400 }
+        )
+    }
 
     try {
         const body = await req.json()
@@ -108,22 +156,44 @@ export async function POST(req: NextRequest, context: RouteContext) {
                 })
             }
 
-            // Setup S3 mount for authenticated users
-            if (id === 'new' || existingSandboxes.length === 0) {
-                await setupS3Mount(sandbox, user.id)
-            }
+            // Keep sandbox alive
+            await sandbox.keepAlive(2 * 60 * 1000) // 2 minutes
         } else {
-            // Public access flow - create temporary sandbox
-            sandbox = await Sandbox.create({
-                apiKey: process.env.E2B_API_KEY!,
-                template: 'streamlit-sandbox-s3',
-                metadata: {
-                    isPublic: 'true',
-                    createdAt: new Date().toISOString(),
-                },
-            })
+            // Require session ID for unauthenticated users
+            if (!sessionId) {
+                return NextResponse.json(
+                    { error: 'Session ID required for unauthenticated users' },
+                    { status: 400 }
+                )
+            }
+
+            // Handle unauthenticated user flow
+            const existingSandboxes = await listSessionSandboxes(sessionId)
+            
+            if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
+                sandbox = await Sandbox.reconnect(id)
+                await killStreamlitProcess(sandbox)
+                await cleanupOldSandboxes(existingSandboxes, id)
+            } else if (existingSandboxes.length > 0) {
+                sandbox = existingSandboxes[0]
+                await killStreamlitProcess(sandbox)
+                await cleanupOldSandboxes(existingSandboxes, sandbox.id)
+            } else {
+                sandbox = await Sandbox.create({
+                    apiKey: process.env.E2B_API_KEY!,
+                    template: 'streamlit-sandbox-s3',
+                    metadata: {
+                        sessionId,
+                        isPublic: 'true',
+                        createdAt: new Date().toISOString(),
+                    },
+                })
+                // Keep sandbox alive
+                await sandbox.keepAlive(0.5 * 60 * 1000) // 30 seconds
+            }
         }
 
+        await setupS3Mount(sandbox, ownerUserId)
         // Write and execute code (common for both flows)
         console.log('Writing code to sandbox: ', codeContent)
         await sandbox.filesystem.write('/app/app.py', codeContent)
@@ -136,9 +206,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
             onStderr: (data: ProcessMessage) =>
                 console.error('Streamlit stderr:', data),
         })
-
-        // Keep sandbox alive
-        await sandbox.keepAlive(2 * 60 * 1000) // 2 minutes
 
         const url = sandbox.getHostname(8501)
         console.log('Sandbox URL:', url)

@@ -1,13 +1,9 @@
-'use client'
-
 import React from 'react'
 import { Button } from "@/components/ui/button"
-import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "@/contexts/AuthContext"
 import { Logo } from "@/components/core/Logo"
 import { createClient } from "@/lib/supabase/client"
-import { useTheme } from "next-themes"
 import { X } from 'lucide-react'
 import {
   Card,
@@ -16,15 +12,9 @@ import {
   CardHeader,
 } from "@/components/ui/card"
 
-interface AuthPromptProps {
-    canClose?: boolean;
-}
-
-export function AuthPrompt({ canClose = true }: AuthPromptProps) {
-    const router = useRouter()
+export function AuthPrompt({ canClose = true }) {
     const { hideAuthPrompt } = useAuth()
     const supabase = createClient()
-    const { theme } = useTheme()
 
     const handleGoogleSignIn = async () => {
         await supabase.auth.signInWithOAuth({
@@ -62,14 +52,16 @@ export function AuthPrompt({ canClose = true }: AuthPromptProps) {
                         
                         <CardHeader className="space-y-4 relative z-10">
                             <div className="flex justify-between items-center">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={hideAuthPrompt}
-                                    className="text-muted-foreground hover:text-foreground"
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
+                                {canClose && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={hideAuthPrompt}
+                                        className="text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                )}
                             </div>
                         </CardHeader>
 
