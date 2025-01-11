@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -14,7 +16,11 @@ import {
   CardHeader,
 } from "@/components/ui/card"
 
-export function AuthPrompt() {
+interface AuthPromptProps {
+    canClose?: boolean;
+}
+
+export function AuthPrompt({ canClose = true }: AuthPromptProps) {
     const router = useRouter()
     const { hideAuthPrompt } = useAuth()
     const supabase = createClient()
@@ -36,7 +42,7 @@ export function AuthPrompt() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-                onClick={hideAuthPrompt}
+                onClick={canClose ? hideAuthPrompt : undefined}
             >
                 <motion.div
                     initial={{ scale: 0.95, opacity: 0 }}
@@ -44,7 +50,7 @@ export function AuthPrompt() {
                     exit={{ scale: 0.95, opacity: 0 }}
                     transition={{ type: "spring", damping: 20 }}
                     className="w-full max-w-md relative"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={canClose ? (e) => e.stopPropagation() : undefined}
                 >
                     <Card className="relative border shadow-lg overflow-hidden">
                         {/* Godrays effect */}

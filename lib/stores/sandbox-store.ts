@@ -63,13 +63,12 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code }),
+                    body: JSON.stringify({ code })
                 }
             )
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.details || 'Failed to execute code')
+                throw new Error('Failed to execute code')
             }
 
             const data = await response.json()
@@ -79,20 +78,16 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 streamlitUrl: data.url,
                 isInitializing: false,
                 isGeneratingCode: false,
+                error: null
             })
             return data.url
         } catch (error) {
-            const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to update sandbox'
             set({
-                error: errorMessage,
+                error: 'Failed to update sandbox',
                 isInitializing: false,
                 isLoadingSandbox: false,
-                isGeneratingCode: false,
+                isGeneratingCode: false
             })
-            console.error('Error updating sandbox:', error)
             return null
         }
     },

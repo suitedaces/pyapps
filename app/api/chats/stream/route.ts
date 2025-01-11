@@ -138,7 +138,7 @@ async function createNewApp(
             user_id: userId,
             name,
             description,
-            is_public: false,
+            is_public: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             created_by: userId,
