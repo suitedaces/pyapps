@@ -31,7 +31,7 @@ export function AuthPrompt({ canClose = true }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md"
                 onClick={canClose ? hideAuthPrompt : undefined}
             >
                 <motion.div
@@ -42,22 +42,21 @@ export function AuthPrompt({ canClose = true }) {
                     className="w-full max-w-md relative"
                     onClick={canClose ? (e) => e.stopPropagation() : undefined}
                 >
-                    <Card className="relative border shadow-lg overflow-hidden">
-                        {/* Godrays effect */}
+                    <Card className="relative border-0 shadow-2xl overflow-hidden rounded-2xl bg-background/50 backdrop-blur-sm ring-1 ring-border/10">
                         <div className="absolute inset-0">
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-rose-500/10 to-transparent dark:from-transparent dark:via-rose-500/5 dark:to-transparent animate-aurora" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/10 to-transparent dark:from-transparent dark:via-blue-500/5 dark:to-transparent animate-aurora delay-75" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/10 to-transparent dark:from-transparent dark:via-purple-500/5 dark:to-transparent animate-aurora delay-150" />
+                            <div className="absolute inset-0 bg-gradient-to-tr from-rose-500/10 via-transparent to-blue-500/10 dark:from-rose-500/5 dark:to-blue-500/5 animate-gradient" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-emerald-500/10 dark:from-purple-500/5 dark:to-emerald-500/5 animate-gradient delay-100" />
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-background/50 to-background" />
                         </div>
                         
-                        <CardHeader className="space-y-4 relative z-10">
-                            <div className="flex justify-between items-center">
+                        <CardHeader className="relative z-10">
+                            <div className="flex justify-end items-center">
                                 {canClose && (
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         onClick={hideAuthPrompt}
-                                        className="text-muted-foreground hover:text-foreground"
+                                        className="text-muted-foreground hover:bg-red-500/10 h-8 w-8"
                                     >
                                         <X className="h-4 w-4" />
                                     </Button>
@@ -65,29 +64,31 @@ export function AuthPrompt({ canClose = true }) {
                             </div>
                         </CardHeader>
 
-                        <CardContent className="space-y-4 pb-8 relative z-10">
+                        <CardContent className="space-y-8 pb-8 relative z-10 px-8">
                             <motion.div
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.2 }}
-                                className="space-y-2 text-center"
+                                className="space-y-4 text-center"
                             >
                                 <h2 className="text-2xl font-bold tracking-tight flex justify-center items-center">
                                     <motion.div
                                         initial={{ x: -20, opacity: 0 }}
                                         animate={{ x: 0, opacity: 1 }}
                                         transition={{ delay: 0.1 }}
-                                >
-                                        <Logo inverted={window.matchMedia('(prefers-color-scheme: dark)').matches} className="w-32" />
+                                        className="relative"
+                                    >
+                                        <div className="absolute -inset-1 bg-gradient-to-r from-rose-500/20 via-blue-500/20 to-purple-500/20 blur-sm" />
+                                        <Logo inverted={window.matchMedia('(prefers-color-scheme: dark)').matches} className="w-32 relative" />
                                     </motion.div>
                                 </h2>
-                                <h3 className="text-pretty">
+                                <h3 className="text-pretty text-muted-foreground/80 text-base">
                                    Build Python data apps in seconds!
                                 </h3>
                             </motion.div>
                         </CardContent>
 
-                        <CardFooter className="relative z-10">
+                        <CardFooter className="relative z-10 pb-8 px-8">
                             <motion.div 
                                 className="w-full"
                                 initial={{ y: 20, opacity: 0 }}
@@ -97,7 +98,7 @@ export function AuthPrompt({ canClose = true }) {
                                 <Button 
                                     size="lg"
                                     variant="secondary"
-                                    className="w-full relative group hover:opacity-90 transition-opacity"
+                                    className="w-full relative group hover:opacity-90 transition-all duration-200 rounded-xl border shadow-sm bg-background/80 backdrop-blur-sm hover:shadow-md hover:scale-[1.02]"
                                     onClick={handleGoogleSignIn}
                                 >
                                     <div className="absolute left-4">

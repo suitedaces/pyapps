@@ -277,3 +277,19 @@ body {
     animation: none !important;
     transition: none !important;
 }
+
+@keyframes gradient {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.animate-gradient {
+  animation: gradient 8s ease infinite;
+}
