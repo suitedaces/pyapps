@@ -4,7 +4,7 @@ import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
-export const maxDuration = 100;
+export const maxDuration = 100
 // Types
 interface StreamlitToolResult {
     toolName: string
@@ -138,7 +138,7 @@ async function createNewApp(
             user_id: userId,
             name,
             description,
-            is_public: false,
+            is_public: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             created_by: userId,

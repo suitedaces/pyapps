@@ -3,16 +3,18 @@
 import { AppHeader } from '@/components/AppHeader'
 import { CodeView } from '@/components/CodeView'
 import { StreamlitFrame, StreamlitFrameRef } from '@/components/StreamlitFrame'
+import { AuthPrompt } from '@/components/ui/auth-prompt'
 import {
     ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
 } from '@/components/ui/resizable'
+import { useAuth } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeProvider'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { AppVersion } from '@/lib/types'
 import { Circle, Loader2 } from 'lucide-react'
-import { useRef, useState, useEffect } from 'react'
-import { useSandboxStore } from '@/lib/stores/sandbox-store'
+import { useEffect, useRef, useState } from 'react'
 
 interface AppClientProps {
     app: AppVersion
@@ -23,14 +25,26 @@ export function AppClient({ app, id }: AppClientProps) {
     const { updateSandbox, streamlitUrl, isLoadingSandbox } = useSandboxStore()
     const streamlitRef = useRef<StreamlitFrameRef>(null)
     const [showCode, setShowCode] = useState(false)
+    const { showAuthPrompt, session, shouldShowAuthPrompt } = useAuth()
 
     useEffect(() => {
         // Initialize sandbox when component mounts
         const initSandbox = async () => {
-            await updateSandbox(app.code, true) // Force execute to match previous behavior
+            await updateSandbox(app.code, true, id) // Force execute to match previous behavior
         }
         initSandbox()
     }, []) // Empty dependency array to run only on mount, like before
+
+    useEffect(() => {
+        // Show auth prompt after 10 seconds if user is not authenticated
+        if (!session) {
+            const timer = setTimeout(() => {
+                showAuthPrompt()
+            }, 30000) // 30 seconds
+
+            return () => clearTimeout(timer)
+        }
+    }, [session, showAuthPrompt])
 
     const CustomHandle = ({ ...props }) => (
         <ResizableHandle
@@ -47,6 +61,7 @@ export function AppClient({ app, id }: AppClientProps) {
     return (
         <ThemeProvider>
             <div className="min-h-screen flex flex-col bg-white dark:bg-dark-app">
+                {shouldShowAuthPrompt && <AuthPrompt canClose={false} />}
                 <AppHeader
                     appId={id}
                     appName={app.name || ''}
@@ -60,7 +75,7 @@ export function AppClient({ app, id }: AppClientProps) {
                     <ResizablePanelGroup direction="horizontal">
                         <ResizablePanel defaultSize={showCode ? 60 : 100}>
                             <div className="h-[calc(100vh-3.5rem)]">
-                                {(!streamlitUrl) ? (
+                                {!streamlitUrl ? (
                                     <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-dark-app/50 backdrop-blur-sm">
                                         <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
                                     </div>

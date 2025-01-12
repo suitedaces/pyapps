@@ -10,11 +10,6 @@ interface PageParams {
 export default async function AppPage({ params }: PageParams) {
     const { id } = await params
     const user = await getUser()
-
-    if (!user) {
-        notFound()
-    }
-
     const supabase = await createClient()
 
     // Get the app data
@@ -27,6 +22,6 @@ export default async function AppPage({ params }: PageParams) {
         notFound()
     }
 
-    // let it handle the sandbox initialization using the store
+    // Return AppClient with user context
     return <AppClient app={app[0] as AppVersion} id={id} />
 }

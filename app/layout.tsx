@@ -1,7 +1,7 @@
 import { AuthProvider } from '@/contexts/AuthContext'
 import { SidebarProvider } from '@/contexts/SidebarContext'
-import { ThemeProvider } from '@/providers/theme-provider'
 import { cn } from '@/lib/utils'
+import { ThemeProvider } from '@/providers/theme-provider'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'

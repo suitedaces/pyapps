@@ -1,11 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card'
-import {
-    forwardRef,
-    useEffect,
-    useImperativeHandle,
-    useMemo,
-    useRef,
-} from 'react'
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 
 interface StreamlitPreviewProps {
     url: string | null
@@ -40,9 +34,7 @@ export const StreamlitPreview = forwardRef<
         if (!url) {
             return (
                 <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">
-                        Nothing to show.
-                    </p>
+                    <p className="text-muted-foreground">Nothing to show.</p>
                 </div>
             )
         }

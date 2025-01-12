@@ -12,9 +12,11 @@ interface PageParams {
 
 // Add a loading component
 function ChatLoading() {
-    return <div className="h-screen w-full flex items-center justify-center">
-        <LoadingAnimation message="Loading chat..." />
-    </div>
+    return (
+        <div className="h-screen w-full flex items-center justify-center">
+            <LoadingAnimation message="Loading chat..." />
+        </div>
+    )
 }
 
 export default async function ChatPage({ params }: PageParams) {

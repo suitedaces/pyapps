@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { NextRequest, NextResponse } from 'next/server'
 import { anthropic } from '@ai-sdk/anthropic'
 import { generateObject } from 'ai'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 interface RouteContext {
@@ -29,15 +29,21 @@ export async function POST(req: NextRequest, context: RouteContext) {
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a project title generator for a conversational streamlit app builder web app.'
+                    content:
+                        'You are a project title generator for a conversational streamlit app builder web app.',
                 },
                 {
                     role: 'user',
-                    content: `User message: "${message.user_message}"\nAssistant response: "${message.assistant_message}"`
-                }
+                    content: `User message: "${message.user_message}"\nAssistant response: "${message.assistant_message}"`,
+                },
             ],
             schema: z.object({
-                title: z.string().max(100).describe('Generate an 8-word title. Do not include quotes or the words "conversation", "streamlit", "app"')
+                title: z
+                    .string()
+                    .max(100)
+                    .describe(
+                        'Generate an 8-word title. Do not include quotes or the words "conversation", "streamlit", "app"'
+                    ),
             }),
             temperature: 0.7,
         })

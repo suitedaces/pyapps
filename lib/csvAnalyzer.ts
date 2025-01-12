@@ -22,8 +22,8 @@ export async function analyzeCSV(csvContent: string): Promise<CSVAnalysis> {
                 const sampleRows = rows.slice(0, sampleSize)
 
                 // Filter out rows that are empty or contain only null/empty values
-                const nonNullRows = sampleRows.filter(row => 
-                    row.some(cell => cell != null && cell.trim() !== '')
+                const nonNullRows = sampleRows.filter((row) =>
+                    row.some((cell) => cell != null && cell.trim() !== '')
                 )
 
                 const analysis: CSVAnalysis = {

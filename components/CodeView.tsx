@@ -1,7 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
-import dynamic from 'next/dynamic'
 import { useEffect, useRef, useState } from 'react'
 import {
     BundledLanguage,
@@ -90,7 +89,9 @@ export function CodeView({
     }, [code])
 
     return (
-        <Card className={`bg-bg border-border h-full overflow-hidden ${containerClassName}`}>
+        <Card
+            className={`bg-bg border-border h-full overflow-hidden ${containerClassName}`}
+        >
             <CardContent className="p-0 h-full overflow-hidden">
                 <div
                     ref={containerRef}

@@ -16,7 +16,8 @@ interface SandboxState {
     // Methods
     updateSandbox: (
         code: string,
-        forceExecute?: boolean
+        forceExecute?: boolean,
+        appId?: string
     ) => Promise<string | null>
     killSandbox: () => Promise<void>
     clearError: () => void
@@ -24,6 +25,17 @@ interface SandboxState {
     setStreamlitUrl: (url: string | null) => void
     setIsLoadingSandbox: (loading: boolean) => void
     setGeneratedCode: (code: string) => void
+}
+
+// Add helper functions at the top
+const getSessionId = () => {
+    if (typeof window === 'undefined') return null
+    let sessionId = sessionStorage.getItem('sandbox_session_id')
+    if (!sessionId) {
+        sessionId = Math.random().toString(36).substring(2, 15)
+        sessionStorage.setItem('sandbox_session_id', sessionId)
+    }
+    return sessionId
 }
 
 export const useSandboxStore = create<SandboxState>((set, get) => ({
@@ -43,8 +55,13 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
     setGeneratingCode: (isGenerating) =>
         set({ isGeneratingCode: isGenerating }),
 
-    updateSandbox: async (code: string, forceExecute: boolean = false) => {
+    updateSandbox: async (
+        code: string,
+        forceExecute: boolean = false,
+        appId?: string
+    ) => {
         const { sandboxId, lastExecutedCode } = get()
+        const sessionId = getSessionId()
 
         if (!forceExecute && code === lastExecutedCode) {
             set({ isLoadingSandbox: false, isGeneratingCode: false })
@@ -62,14 +79,17 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 `/api/sandbox/${sandboxId || 'new'}/execute`,
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Session-Id': sessionId || '',
+                        ...(appId && { 'X-App-Id': appId }),
+                    },
                     body: JSON.stringify({ code }),
                 }
             )
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.details || 'Failed to execute code')
+                throw new Error('Failed to execute code')
             }
 
             const data = await response.json()
@@ -79,32 +99,32 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 streamlitUrl: data.url,
                 isInitializing: false,
                 isGeneratingCode: false,
+                error: null,
             })
             return data.url
         } catch (error) {
-            const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to update sandbox'
             set({
-                error: errorMessage,
+                error: 'Failed to update sandbox',
                 isInitializing: false,
                 isLoadingSandbox: false,
                 isGeneratingCode: false,
             })
-            console.error('Error updating sandbox:', error)
             return null
         }
     },
 
     killSandbox: async () => {
         const { sandboxId } = get()
+        const sessionId = getSessionId()
 
         if (sandboxId) {
             try {
                 set({ error: null })
                 await fetch(`/api/sandbox/${sandboxId}/kill`, {
                     method: 'POST',
+                    headers: {
+                        'X-Session-Id': sessionId || '',
+                    },
                 })
                 set({
                     sandboxId: null,

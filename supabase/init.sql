@@ -29,7 +29,7 @@ CREATE TABLE public.apps (
     user_id UUID REFERENCES auth.users(id),
     name TEXT NOT NULL,
     description TEXT,
-    is_public BOOLEAN DEFAULT FALSE,
+    is_public BOOLEAN DEFAULT TRUE,
     public_id TEXT UNIQUE,
     current_version_id UUID,
     created_at TIMESTAMPTZ DEFAULT now(),

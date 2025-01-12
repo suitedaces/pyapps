@@ -19,32 +19,57 @@ CREATE POLICY "Users can delete their own files" ON public.files
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Apps table policies
-CREATE POLICY "Users can view their own apps or public apps" ON public.apps
-    FOR SELECT USING (auth.uid() = user_id OR is_public = TRUE);
+DROP POLICY IF EXISTS "Users can view their own apps or public apps" ON public.apps;
+DROP POLICY IF EXISTS "Anyone can view public apps" ON public.apps;
+DROP POLICY IF EXISTS "Users can view versions of their own apps or public apps" ON public.app_versions;
+DROP POLICY IF EXISTS "Anyone can view versions of public apps" ON public.app_versions;
+
+CREATE POLICY "Anyone can view public apps" ON public.apps
+    FOR SELECT USING (is_public = TRUE);
+
+CREATE POLICY "Users can view their own apps" ON public.apps
+    FOR SELECT USING (auth.uid() = user_id);
+
 CREATE POLICY "Users can insert their own apps" ON public.apps
     FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 CREATE POLICY "Users can update their own apps" ON public.apps
     FOR UPDATE USING (auth.uid() = user_id);
+
 CREATE POLICY "Users can delete their own apps" ON public.apps
     FOR DELETE USING (auth.uid() = user_id);
 
 -- App versions table policies
-CREATE POLICY "Users can view versions of their own apps or public apps" ON public.app_versions
-    FOR SELECT USING (EXISTS (
-        SELECT 1 FROM public.apps
-        WHERE apps.id = app_versions.app_id
-        AND (apps.user_id = auth.uid() OR apps.is_public = TRUE)
-    ));
+CREATE POLICY "Anyone can view versions of public apps" ON public.app_versions
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.apps
+            WHERE apps.id = app_versions.app_id
+            AND apps.is_public = TRUE
+        )
+    );
+
+CREATE POLICY "Users can view versions of their own apps" ON public.app_versions
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.apps
+            WHERE apps.id = app_versions.app_id
+            AND apps.user_id = auth.uid()
+        )
+    );
+
 CREATE POLICY "Users can insert versions to their own apps" ON public.app_versions
     FOR INSERT WITH CHECK (EXISTS (
         SELECT 1 FROM public.apps
         WHERE apps.id = app_versions.app_id AND apps.user_id = auth.uid()
     ));
+
 CREATE POLICY "Users can update versions of their own apps" ON public.app_versions
     FOR UPDATE USING (EXISTS (
         SELECT 1 FROM public.apps
         WHERE apps.id = app_versions.app_id AND apps.user_id = auth.uid()
     ));
+
 CREATE POLICY "Users can delete versions of their own apps" ON public.app_versions
     FOR DELETE USING (EXISTS (
         SELECT 1 FROM public.apps
