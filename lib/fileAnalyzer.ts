@@ -48,33 +48,36 @@ export async function analyzeCSV(
 
     function inferType(value: any): ColumnType {
         if (value === null || value === undefined || value === '') return 'null'
-        
+
         // Fast path for primitive types
         if (typeof value === 'number') return 'number'
         if (typeof value === 'boolean') return 'boolean'
-        
+
         if (typeof value === 'string') {
             const trimmed = value.trim()
-            
+
             // Number check
             if (/^-?\d*\.?\d+$/.test(trimmed)) return 'number'
-            
+
             // Boolean check
             if (/^(true|false)$/i.test(trimmed)) return 'boolean'
-            
+
             // Date check - only common formats for performance
-            if (/^\d{4}-\d{2}-\d{2}/.test(trimmed) || // ISO date
-                /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}/.test(trimmed)) { // Common date formats
+            if (
+                /^\d{4}-\d{2}-\d{2}/.test(trimmed) || // ISO date
+                /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}/.test(trimmed)
+            ) {
+                // Common date formats
                 return 'date'
             }
         }
-        
+
         return 'string'
     }
 
     function updateColumnStats(column: string, value: any) {
         let stats = columnStats.get(column)
-        
+
         if (!stats) {
             stats = {
                 values: new Set(),
@@ -82,8 +85,8 @@ export async function analyzeCSV(
                 nullCount: 0,
                 numbers: {
                     sum: 0,
-                    count: 0
-                }
+                    count: 0,
+                },
             }
             columnStats.set(column, stats)
         }
@@ -101,17 +104,26 @@ export async function analyzeCSV(
         }
 
         // Handle numeric values
-        const numValue = type === 'number' ? 
-            (typeof value === 'number' ? value : parseFloat(value)) : 
-            NaN
+        const numValue =
+            type === 'number'
+                ? typeof value === 'number'
+                    ? value
+                    : parseFloat(value)
+                : NaN
 
         if (!isNaN(numValue)) {
             stats.numbers.count++
             stats.numbers.sum += numValue
-            if (stats.numbers.min === undefined || numValue < stats.numbers.min) {
+            if (
+                stats.numbers.min === undefined ||
+                numValue < stats.numbers.min
+            ) {
                 stats.numbers.min = numValue
             }
-            if (stats.numbers.max === undefined || numValue > stats.numbers.max) {
+            if (
+                stats.numbers.max === undefined ||
+                numValue > stats.numbers.max
+            ) {
                 stats.numbers.max = numValue
             }
         }
@@ -127,7 +139,7 @@ export async function analyzeCSV(
 
         const [primaryType, primaryCount] = entries[0]
         const total = Array.from(types.values()).reduce((a, b) => a + b, 0)
-        
+
         return primaryCount / total > 0.7 ? primaryType : 'mixed'
     }
 
@@ -137,15 +149,15 @@ export async function analyzeCSV(
             skipEmptyLines: true,
             dynamicTyping: true,
             fastMode: true,
-            chunk: ({ data, meta }: { data: any[], meta: any }) => {
+            chunk: ({ data, meta }: { data: any[]; meta: any }) => {
                 if (rowCount === 0 && meta.fields) {
                     headerRow = meta.fields
                 }
 
                 rowCount += data.length
 
-                data.forEach(row => {
-                    headerRow.forEach(column => {
+                data.forEach((row) => {
+                    headerRow.forEach((column) => {
                         updateColumnStats(column, row[column])
                     })
                 })
@@ -156,27 +168,32 @@ export async function analyzeCSV(
                         rows: rowCount,
                         columns: headerRow.length,
                         size_bytes: content.length,
-                        has_header: true
+                        has_header: true,
                     },
-                    column_info: headerRow.map(column => {
+                    column_info: headerRow.map((column) => {
                         const stats = columnStats.get(column)!
                         return {
                             name: column,
                             type: getPrimaryType(stats.types),
                             sample_values: Array.from(stats.values)
-                                .filter(value => value !== null && value !== undefined && value !== '')
+                                .filter(
+                                    (value) =>
+                                        value !== null &&
+                                        value !== undefined &&
+                                        value !== ''
+                                )
                                 .slice(0, 5),
                             ...(stats.numbers.count > 0 && {
                                 numeric_stats: {
                                     min: stats.numbers.min!,
-                                    max: stats.numbers.max!
-                                }
-                            })
+                                    max: stats.numbers.max!,
+                                },
+                            }),
                         }
-                    })
+                    }),
                 }
                 resolve(analysis)
-            }
+            },
         })
     })
 }

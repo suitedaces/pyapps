@@ -1,6 +1,6 @@
+import { getUser } from '@/lib/supabase/server'
 import { Sandbox } from '@e2b/code-interpreter'
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
     const sandboxId = req.nextUrl.pathname.split('/')[3]
@@ -9,24 +9,20 @@ export async function POST(req: NextRequest) {
 
     try {
         const sandbox = await Sandbox.reconnect(sandboxId)
-        
+
         // Verify ownership
         if (!user && !sessionId) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            )
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const metadata = (await Sandbox.list()).find(s => s.sandboxID === sandboxId)?.metadata as any
+        const metadata = (await Sandbox.list()).find(
+            (s) => s.sandboxID === sandboxId
+        )?.metadata as any
         if (
             (!user && metadata.sessionId !== sessionId) ||
             (user && metadata.userId !== user.id)
         ) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            )
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
         await sandbox.close()

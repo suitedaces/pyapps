@@ -379,9 +379,14 @@ export default function Chatbar({
                                 'dark:disabled:bg-dark-app dark:disabled:border-dark-border',
                                 isCentered && 'h-11 w-11'
                             )}
-                            disabled={isLoading || isUploading || (!value.trim() && !file) || (!!file && !uploadedFileId)}
+                            disabled={
+                                isLoading ||
+                                isUploading ||
+                                (!value.trim() && !file) ||
+                                (!!file && !uploadedFileId)
+                            }
                         >
-                            {(isLoading || isUploading) ? (
+                            {isLoading || isUploading ? (
                                 <Loader2
                                     className={cn(
                                         'h-5 w-5 animate-spin text-black dark:text-dark-text',

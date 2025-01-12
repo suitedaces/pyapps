@@ -3,13 +3,13 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
 import { App, ExecutionResult } from '@/lib/schema'
+import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { cn } from '@/lib/utils'
 import { Message as AIMessage } from 'ai'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { Markdown } from './markdown'
-import { useSandboxStore } from '@/lib/stores/sandbox-store'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
@@ -40,7 +40,9 @@ export function Message({
     const { session } = useAuth()
     const user = session?.user
     const messageEndRef = useRef<HTMLDivElement>(null)
-    const setGeneratingCode = useSandboxStore(state => state.setGeneratingCode)
+    const setGeneratingCode = useSandboxStore(
+        (state) => state.setGeneratingCode
+    )
     const hasPanelOpened = useRef(false)
 
     // Auto-scroll effect
@@ -107,17 +109,19 @@ export function Message({
                                 />
                             )}
 
-                            {isLastMessage && isLoading && !toolInvocations?.length && (
-                                <motion.div
-                                    className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
-                                    animate={{ opacity: [0, 1, 0] }}
-                                    transition={{
-                                        duration: 1,
-                                        repeat: Infinity,
-                                        ease: 'linear',
-                                    }}
-                                />
-                            )}
+                            {isLastMessage &&
+                                isLoading &&
+                                !toolInvocations?.length && (
+                                    <motion.div
+                                        className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
+                                        animate={{ opacity: [0, 1, 0] }}
+                                        transition={{
+                                            duration: 1,
+                                            repeat: Infinity,
+                                            ease: 'linear',
+                                        }}
+                                    />
+                                )}
                         </div>
                     </div>
                 ) : (

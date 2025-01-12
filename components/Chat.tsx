@@ -4,11 +4,10 @@ import Chatbar from '@/components/core/chatbar'
 import { Message as AIMessage } from '@/components/core/message'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useAuth } from '@/contexts/AuthContext'
 import { Message } from 'ai'
 import { XCircle } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 interface FileUploadState {
     isUploading: boolean
     progress: number

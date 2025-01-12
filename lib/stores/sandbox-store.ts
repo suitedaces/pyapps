@@ -55,7 +55,11 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
     setGeneratingCode: (isGenerating) =>
         set({ isGeneratingCode: isGenerating }),
 
-    updateSandbox: async (code: string, forceExecute: boolean = false, appId?: string) => {
+    updateSandbox: async (
+        code: string,
+        forceExecute: boolean = false,
+        appId?: string
+    ) => {
         const { sandboxId, lastExecutedCode } = get()
         const sessionId = getSessionId()
 
@@ -75,12 +79,12 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 `/api/sandbox/${sandboxId || 'new'}/execute`,
                 {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Session-Id': sessionId || '',
-                        ...(appId && { 'X-App-Id': appId })
+                        ...(appId && { 'X-App-Id': appId }),
                     },
-                    body: JSON.stringify({ code })
+                    body: JSON.stringify({ code }),
                 }
             )
 
@@ -95,7 +99,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 streamlitUrl: data.url,
                 isInitializing: false,
                 isGeneratingCode: false,
-                error: null
+                error: null,
             })
             return data.url
         } catch (error) {
@@ -103,7 +107,7 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                 error: 'Failed to update sandbox',
                 isInitializing: false,
                 isLoadingSandbox: false,
-                isGeneratingCode: false
+                isGeneratingCode: false,
             })
             return null
         }

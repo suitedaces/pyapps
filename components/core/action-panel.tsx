@@ -26,14 +26,14 @@ export function ActionPanel({
             return {
                 icon: Play,
                 text: 'App',
-                variant: 'default' as const
+                variant: 'default' as const,
             }
         }
 
         return {
             icon: Code2,
             text: 'Generating code...',
-            variant: 'secondary' as const
+            variant: 'secondary' as const,
         }
     }
 
@@ -74,14 +74,11 @@ export function ActionPanel({
                             transition={{
                                 duration: 1.5,
                                 repeat: Infinity,
-                                ease: "easeInOut"
+                                ease: 'easeInOut',
                             }}
                             className="relative"
                         >
-                            <Icon className={cn(
-                                'h-4 w-4',
-                                'text-current'
-                            )} />
+                            <Icon className={cn('h-4 w-4', 'text-current')} />
                             <motion.div
                                 className="absolute inset-0 dark:bg-white bg-black"
                                 initial={{ scaleY: 0 }}
@@ -89,16 +86,13 @@ export function ActionPanel({
                                 transition={{
                                     duration: 1.5,
                                     repeat: Infinity,
-                                    ease: "easeInOut"
+                                    ease: 'easeInOut',
                                 }}
                                 style={{ transformOrigin: 'bottom' }}
                             />
                         </motion.div>
                     ) : (
-                        <Icon className={cn(
-                            'h-4 w-4',
-                            'text-current'
-                        )} />
+                        <Icon className={cn('h-4 w-4', 'text-current')} />
                     )}
                     <span>{text}</span>
                 </button>

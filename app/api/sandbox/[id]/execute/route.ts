@@ -6,7 +6,7 @@ interface RouteContext {
     params: Promise<{ id: string }>
 }
 
-export const maxDuration = 30;
+export const maxDuration = 30
 
 async function listUserSandboxes(userId: string): Promise<Sandbox[]> {
     try {
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
             .select('user_id')
             .eq('id', appId)
             .single()
-        
+
         ownerUserId = app?.user_id || null
     }
 
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         if (user) {
             // Authenticated user flow - keep existing functionality
             const existingSandboxes = await listUserSandboxes(user.id)
-            
+
             if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
                 sandbox = await Sandbox.reconnect(id)
                 await killStreamlitProcess(sandbox)
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
             // Handle unauthenticated user flow
             const existingSandboxes = await listSessionSandboxes(sessionId)
-            
+
             if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
                 sandbox = await Sandbox.reconnect(id)
                 await killStreamlitProcess(sandbox)

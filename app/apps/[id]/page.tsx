@@ -23,8 +23,5 @@ export default async function AppPage({ params }: PageParams) {
     }
 
     // Return AppClient with user context
-    return <AppClient 
-        app={app[0] as AppVersion} 
-        id={id}
-    />
+    return <AppClient app={app[0] as AppVersion} id={id} />
 }
