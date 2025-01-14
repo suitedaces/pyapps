@@ -24,15 +24,6 @@ interface MessageProps extends AIMessage {
     onCodeClick?: (messageId: string) => void
     isCreatingChat?: boolean
     onTogglePanel?: () => void
-    data?: {
-        type: string
-        actions?: Array<{
-            label: string
-            action: string
-            prompt: string
-        }>
-    }
-    onActionClick?: (prompt: string) => void
 }
 
 export function Message({
@@ -44,8 +35,6 @@ export function Message({
     isLoading,
     isCreatingChat = false,
     onTogglePanel,
-    data,
-    onActionClick,
 }: MessageProps) {
     const isUser = role === 'user'
     const { session } = useAuth()
@@ -111,20 +100,6 @@ export function Message({
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
-
-                            {data?.type === 'action_buttons' && data.actions && (
-                                <div className="flex flex-wrap gap-2 mt-4">
-                                    {data.actions.map((action, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => onActionClick?.(action.prompt)}
-                                            className="px-4 py-2 text-sm rounded-lg border border-border bg-white hover:bg-gray-50 dark:bg-dark-app dark:hover:bg-dark-border transition-colors"
-                                        >
-                                            {action.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
 
                             {Boolean(toolInvocations?.length) && (
                                 <ActionPanel
