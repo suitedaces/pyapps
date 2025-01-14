@@ -1,268 +1,131 @@
-import Link from 'next/link'
-import { memo } from 'react'
-import ReactMarkdown from 'react-markdown'
+'use client'
+
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
+import remarkRehype from 'remark-rehype'
+import rehypeStringify from 'rehype-stringify'
+import rehypeRaw from 'rehype-raw'
+import { BundledLanguage, createHighlighter } from 'shiki'
 
-function parseCSVToMarkdownTable(text: string): string {
-    const mainTextMatch = text.match(/^(.*?)\s*(?=⚠️|$)/)
-    const mainText = mainTextMatch ? mainTextMatch[1].trim() : ''
-    const processedContent = []
-    let headers: string[] = []
+// Base styles that don't change with theme
+const markdownStyles = `
+    [&>ol]:list-decimal [&>ol]:ml-6 [&>ol]:space-y-2
+    [&>ul]:list-disc [&>ul]:ml-6 [&>ul]:space-y-2
+    [&_li>ul]:list-disc [&_li>ul]:ml-6 [&_li>ul]:mt-2 [&_li>ul]:space-y-2
+    [&_li>ol]:list-decimal [&_li>ol]:ml-6 [&_li>ol]:mt-2 [&_li>ol]:space-y-2
+    [&_li]:pl-2
 
-    if (mainText) {
-        processedContent.push(mainText)
+    [&]:w-full [&]:max-w-full [&]:overflow-hidden
+    
+    [&_pre]:relative [&_pre]:my-2 [&_pre]:rounded-lg
+    [&_pre]:bg-transparent
+    [&_pre]:border dark:[&_pre]:border-neutral-800
+    [&_pre]:w-full [&_pre]:overflow-x-auto
+    
+    [&_.shiki]:!bg-transparent [&_.shiki]:w-full
+    [&_.shiki-container]:w-full [&_.shiki-container]:px-4 [&_.shiki-container]:py-3
+    [&_.shiki-container]:overflow-x-auto [&_.shiki-container]:bg-white dark:[&_.shiki-container]:bg-transparent
+    [&_.shiki-container]:min-w-0 [&_.shiki-container]:max-w-full [&_.shiki-container]:rounded-lg
+    [&_.shiki-container]:text-black dark:[&_.shiki-container]:text-neutral-100
+
+    [&_code:not(pre code)]:bg-neutral-200 dark:[&_code:not(pre code)]:bg-transparent
+    [&_code:not(pre code)]:text-neutral-800 dark:[&_code:not(pre code)]:text-neutral-200
+    [&_code:not(pre code)]:rounded [&_code:not(pre code)]:px-1.5 [&_code:not(pre code)]:py-0.5
+    [&_code:not(pre code)]:border dark:[&_code:not(pre code)]:border-neutral-600
+
+    [&_a]:text-blue-500 [&_a]:underline hover:[&_a]:text-blue-400
+    [&_blockquote]:border-l-4 [&_blockquote]:border-neutral-700 [&_blockquote]:pl-4 [&_blockquote]:italic
+    [&_table]:border-collapse [&_table]:w-full
+    [&_th]:border [&_th]:border-neutral-800 [&_th]:p-2 [&_th]:bg-neutral-900
+    [&_td]:border [&_td]:border-neutral-800 [&_td]:p-2
+`
+
+export const assistantMarkdownStyles = `
+    ${markdownStyles}
+    [&_p]:my-2
+    space-y-4
+`
+
+export const userMarkdownStyles = `
+    ${markdownStyles}
+    [&_p]:my-0
+    [&>*:first-child]:mt-0
+    [&>*:last-child]:mb-0
+    space-y-2
+`
+
+const CODE_THEMES = {
+    dark: {
+        primary: 'github-dark-high-contrast',
+    },
+    light: {
+        primary: 'github-light',
+    },
+} as const
+
+let highlighterPromise: Promise<any> | null = null
+
+async function initHighlighter() {
+    if (!highlighterPromise) {
+        const allThemes = [
+            ...Object.values(CODE_THEMES.dark),
+            ...Object.values(CODE_THEMES.light),
+        ]
+
+        highlighterPromise = createHighlighter({
+            themes: allThemes,
+            langs: [
+                'python', 'typescript', 'javascript', 'jsx', 'tsx', 
+                'json', 'bash', 'shell', 'markdown', 'yaml', 
+                'dockerfile', 'html', 'css', 'sql'
+            ],
+        })
     }
+    return highlighterPromise
+}
 
-    const columnMatch = text.match(
-        /⚠️ EXACT column names:\s*([^]*?)(?=First 5 rows:|$)/
-    )
-    if (columnMatch) {
-        headers = columnMatch[1]
-            .trim()
-            .split(',')
-            .map((col) => col.trim())
-        processedContent.push(`⚠️ EXACT column names: ${headers.join(', ')}`)
-    }
-
-    const rowsMatch = text.match(
-        /First 5 rows:\s*([^]*?)(?=Create a complex|$)/
-    )
-    if (rowsMatch && headers.length > 0) {
-        const rowsData = rowsMatch[1]
-            .trim()
-            .split(/\s+(?=D-\d{4})/)
-            .map((row) => row.trim())
-            .filter(Boolean)
-
-        const headerRow = `| ${headers.join(' | ')} |`
-        const separatorRow = `| ${headers.map(() => '---').join(' | ')} |`
-
-        const tableRows = rowsData.map((row) => {
-            const cells = row.split(',').map((cell) => cell.trim())
-            return `| ${cells.join(' | ')} |`
+async function highlightCode(code: string, lang: string) {
+    const highlighter = await initHighlighter()
+    try {
+        const html = highlighter.codeToHtml(code.trim(), {
+            lang: lang as BundledLanguage || 'text',
+            themes: {
+                light: CODE_THEMES.light.primary,
+                dark: CODE_THEMES.dark.primary,
+            },
         })
 
-        processedContent.push(`
-  ${headerRow}
-  ${separatorRow}
-  ${tableRows.join('\n')}`)
+        return html
+    } catch (e) {
+        console.error('Highlighting error:', e)
+        return `<pre><code>${code}</code></pre>`
     }
-
-    const finalInstructionMatch = text.match(/Create a complex.*$/)
-    if (finalInstructionMatch) {
-        processedContent.push(finalInstructionMatch[0])
-    }
-
-    return processedContent.join('\n\n')
 }
 
-const NonMemoizedMarkdown = ({ children }: { children: string }) => {
-    const components = {
-        code: ({ node, inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || '')
-            return !inline && match ? (
-                <pre
-                    {...props}
-                    className={`${className} text-sm w-[80dvw] md:max-w-[500px] overflow-x-scroll bg-zinc-100 p-3 rounded-lg mt-2 dark:bg-zinc-800`}
-                >
-                    <code className={match[1]}>{children}</code>
-                </pre>
-            ) : (
-                <code
-                    className={`${className} text-sm bg-zinc-100 dark:bg-zinc-800 py-0.5 px-1 rounded-md`}
-                    {...props}
-                >
-                    {children}
-                </code>
-            )
-        },
-        ol: ({ node, children, ...props }: any) => {
-            return (
-                <ol className="list-decimal list-outside ml-4" {...props}>
-                    {children}
-                </ol>
-            )
-        },
-        li: ({ node, children, ...props }: any) => {
-            return (
-                <li className="py-1" {...props}>
-                    {children}
-                </li>
-            )
-        },
-        ul: ({ node, children, ...props }: any) => {
-            return (
-                <ul className="list-decimal list-outside ml-4" {...props}>
-                    {children}
-                </ul>
-            )
-        },
-        strong: ({ node, children, ...props }: any) => {
-            return (
-                <span className="font-semibold" {...props}>
-                    {children}
-                </span>
-            )
-        },
-        a: ({ node, children, ...props }: any) => {
-            return (
-                <Link
-                    className="text-blue-500 hover:underline"
-                    target="_blank"
-                    rel="noreferrer"
-                    {...props}
-                >
-                    {children}
-                </Link>
-            )
-        },
+async function processCodeBlocks(content: string) {
+    const codeBlocks = content.match(/```(\w+)?\n([\s\S]*?)```/g) || []
+    let processedContent = content
+
+    for (const block of codeBlocks) {
+        const [, lang, code] = block.match(/```(\w+)?\n([\s\S]*?)```/) || []
+        const highlighted = await highlightCode(code || '', lang || 'text')
+        processedContent = processedContent.replace(block, `<div class="shiki-container">${highlighted}</div>`)
     }
 
-    return (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-            {children}
-        </ReactMarkdown>
-    )
+    return processedContent
 }
 
-export const Markdown = memo(
-    NonMemoizedMarkdown,
-    (prevProps, nextProps) => prevProps.children === nextProps.children
-)
+export async function markdownToHtml(content: string) {
+    const processedContent = await processCodeBlocks(content)
 
-// User Message Markdown
-
-const NonMemoUserMarkdown = ({ children }: { children: string }) => {
-    const processedContent = parseCSVToMarkdownTable(children)
-
-    const components = {
-        code: ({ node, inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || '')
-            return !inline && match ? (
-                <pre
-                    {...props}
-                    className={`${className} text-sm w-[80dvw] md:max-w-[500px] overflow-x-scroll bg-zinc-100 p-3 rounded-lg mt-2 dark:bg-zinc-800`}
-                >
-                    <code className={match[1]}>{children}</code>
-                </pre>
-            ) : (
-                <code
-                    className={`${className} text-sm bg-zinc-100 dark:bg-zinc-800 py-0.5 px-1 rounded-md`}
-                    {...props}
-                >
-                    {children}
-                </code>
-            )
-        },
-        table: ({ children, ...props }: any) => (
-            <div className="overflow-x-auto my-4 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                <table
-                    className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700"
-                    {...props}
-                >
-                    {children}
-                </table>
-            </div>
-        ),
-        thead: ({ children, ...props }: any) => (
-            <thead className="bg-zinc-50 dark:bg-zinc-800" {...props}>
-                {children}
-            </thead>
-        ),
-        th: ({ children, ...props }: any) => (
-            <th
-                className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-300 uppercase tracking-wider"
-                {...props}
-            >
-                {children}
-            </th>
-        ),
-        td: ({ children, ...props }: any) => (
-            <td
-                className="px-6 py-4 whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-300"
-                {...props}
-            >
-                {children}
-            </td>
-        ),
-        ol: ({ node, children, ...props }: any) => {
-            return (
-                <ol className="list-decimal list-outside ml-4" {...props}>
-                    {children}
-                </ol>
-            )
-        },
-        li: ({ node, children, ...props }: any) => {
-            return (
-                <li className="py-1" {...props}>
-                    {children}
-                </li>
-            )
-        },
-        ul: ({ node, children, ...props }: any) => {
-            return (
-                <ul className="list-decimal list-outside ml-4" {...props}>
-                    {children}
-                </ul>
-            )
-        },
-        strong: ({ node, children, ...props }: any) => {
-            return (
-                <span className="font-semibold" {...props}>
-                    {children}
-                </span>
-            )
-        },
-        a: ({ node, children, ...props }: any) => {
-            return (
-                <Link
-                    className="text-blue-500 hover:underline"
-                    target="_blank"
-                    rel="noreferrer"
-                    {...props}
-                >
-                    {children}
-                </Link>
-            )
-        },
-        div: ({ className, children, ...props }: any) => {
-            return (
-                <div className={className} {...props}>
-                    {children}
-                </div>
-            )
-        },
-    }
-
-    return (
-        <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={components}
-            allowElement={(element) => true}
-            allowedElements={[
-                'div',
-                'p',
-                'table',
-                'thead',
-                'tbody',
-                'tr',
-                'th',
-                'td',
-                'code',
-                'pre',
-                'ol',
-                'ul',
-                'li',
-                'strong',
-                'a',
-            ]}
-        >
-            {processedContent}
-        </ReactMarkdown>
-    )
+    const file = await unified()
+        .use(remarkParse)
+        .use(remarkGfm)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeRaw)
+        .use(rehypeStringify)
+        .process(processedContent)
+    
+    return String(file)
 }
-
-export const UserMarkdown = memo(
-    NonMemoUserMarkdown,
-    (prevProps, nextProps) => prevProps.children === nextProps.children
-)

@@ -3,13 +3,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
 import { App, ExecutionResult } from '@/lib/schema'
-import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { cn } from '@/lib/utils'
 import { Message as AIMessage } from 'ai'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { ActionPanel } from './action-panel'
-import { Markdown } from './markdown'
+import { assistantMarkdownStyles, userMarkdownStyles, markdownToHtml } from './markdown'
 
 interface MessageProps extends AIMessage {
     isLastMessage?: boolean
@@ -40,30 +39,23 @@ export function Message({
     const { session } = useAuth()
     const user = session?.user
     const messageEndRef = useRef<HTMLDivElement>(null)
-    const setGeneratingCode = useSandboxStore(
-        (state) => state.setGeneratingCode
-    )
-    const hasPanelOpened = useRef(false)
+    const contentRef = useRef<HTMLDivElement>(null)
+    
+    useEffect(() => {
+        if (contentRef.current) {
+            markdownToHtml(content).then(html => {
+                if (contentRef.current) {
+                    contentRef.current.innerHTML = html
+                }
+            })
+        }
+    }, [content])
 
-    // Auto-scroll effect
     useEffect(() => {
         if (isLastMessage && messageEndRef.current) {
             messageEndRef.current.scrollIntoView({ behavior: 'smooth' })
         }
     }, [isLastMessage, content])
-
-    // Memoize content lines for better streaming performance
-    const contentLines = useMemo(
-        () => content.split('\n').filter(Boolean),
-        [content]
-    )
-
-    // Reset the ref when the message changes
-    useEffect(() => {
-        if (id) {
-            hasPanelOpened.current = false
-        }
-    }, [id])
 
     return (
         <AnimatePresence mode="wait">
@@ -80,26 +72,15 @@ export function Message({
                 )}
             >
                 {!isUser ? (
-                    <div className="flex flex-row items-start w-full">
+                    <div className="flex flex-row items-start w-full overflow-hidden">
                         <Avatar className="w-8 h-8 bg-[#FFD700] border-2 mt-5 border-border flex-shrink-0">
                             <AvatarFallback>A</AvatarFallback>
                         </Avatar>
-                        <div className="mx-2 p-4 break-words w-full dark:text-dark-text">
-                            <AnimatePresence mode="popLayout">
-                                {contentLines.map((line, i) => (
-                                    <motion.div
-                                        key={`${id}-${i}`}
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        transition={{
-                                            duration: 0.2,
-                                            delay: i * 0.1,
-                                        }}
-                                    >
-                                        <Markdown>{line}</Markdown>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
+                        <div className="mx-2 p-4 break-words w-full dark:text-dark-text overflow-hidden">
+                            <div 
+                                ref={contentRef}
+                                className={cn("max-w-[calc(100%-2rem)] overflow-x-auto", assistantMarkdownStyles)}
+                            />
 
                             {Boolean(toolInvocations?.length) && (
                                 <ActionPanel
@@ -109,27 +90,26 @@ export function Message({
                                 />
                             )}
 
-                            {isLastMessage &&
-                                isLoading &&
-                                !toolInvocations?.length && (
-                                    <motion.div
-                                        className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
-                                        animate={{ opacity: [0, 1, 0] }}
-                                        transition={{
-                                            duration: 1,
-                                            repeat: Infinity,
-                                            ease: 'linear',
-                                        }}
-                                    />
-                                )}
+                            {isLastMessage && isLoading && !toolInvocations?.length && (
+                                <motion.div
+                                    className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
+                                    animate={{ opacity: [0, 1, 0] }}
+                                    transition={{
+                                        duration: 1,
+                                        repeat: Infinity,
+                                        ease: 'linear',
+                                    }}
+                                />
+                            )}
                         </div>
                     </div>
                 ) : (
                     <div className="flex flex-row items-start gap-2 max-w-[85%]">
-                        <div className="grow shrink mx-2 p-4 rounded-lg bg-background border border-border text-foreground overflow-auto">
-                            <div className="whitespace-pre-wrap break-words max-w-full">
-                                <Markdown>{content}</Markdown>
-                            </div>
+                        <div className="grow-0 mx-2 py-2 px-3 rounded-lg bg-background border border-border text-foreground overflow-auto">
+                            <div 
+                                ref={contentRef}
+                                className={userMarkdownStyles}
+                            />
                         </div>
                         <Avatar className="w-8 h-8 bg-blue-500 border-2 border-border flex-shrink-0 mt-1">
                             {user?.user_metadata?.avatar_url ? (
