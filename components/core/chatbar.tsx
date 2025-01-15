@@ -10,6 +10,7 @@ import { ArrowUp, Loader2, PaperclipIcon } from 'lucide-react'
 import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { FileSelector } from '@/components/FileSelector'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface ChatbarProps {
     value: string
@@ -48,6 +49,7 @@ export default function Chatbar({
     selectedFileIds = [],
     onFileSelect,
 }: ChatbarProps): JSX.Element {
+    const { session, showAuthPrompt } = useAuth()
     // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -288,6 +290,14 @@ export default function Chatbar({
         onFileSelect?.(fileIds)
     }
 
+    const handlePaperclipClick = () => {
+        if (!session) {
+            showAuthPrompt()
+            return
+        }
+        fileInputRef.current?.click()
+    }
+
     return (
         <motion.div
             className="p-4 w-full absolute bg-background dark:bg-dark-app"
@@ -423,7 +433,7 @@ export default function Chatbar({
                                 variant="ghost"
                                 size="icon"
                                 className="h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border"
-                                onClick={() => fileInputRef.current?.click()}
+                                onClick={handlePaperclipClick}
                                 disabled={isLoading}
                             >
                                 <PaperclipIcon
