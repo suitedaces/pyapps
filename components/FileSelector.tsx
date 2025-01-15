@@ -6,7 +6,13 @@ import {
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn, truncate } from '@/lib/utils'
-import { Files } from 'lucide-react'
+import { Files, Sheet } from 'lucide-react'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useEffect, useState } from 'react'
 
 interface File {
@@ -92,10 +98,35 @@ export function FileSelector({
                 sideOffset={5}
             >
                 <div className="px-4 py-2 border-b">
-                    <h4 className="font-medium">Your Files</h4>
+                    <h4 className="font-medium">Your Data</h4>
                 </div>
                 <ScrollArea className="h-[300px]">
                     <div className="p-4">
+                        <div className="mb-4">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="w-full px-2 py-1.5 rounded-md text-sm opacity-60 cursor-not-allowed bg-muted/50 flex items-center gap-2">
+                                            <Sheet className="h-4 w-4 text-green-600" />
+                                            <span>Add Google Sheets</span>
+                                            <span className="ml-auto text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                Coming Soon
+                                            </span>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                        <p className="text-sm">
+                                            Google Sheets integration coming soon!
+                                        </p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+
+                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                            Local Files
+                        </div>
+
                         {files.length === 0 ? (
                             <p className="text-sm text-muted-foreground text-center py-4">
                                 No files available
