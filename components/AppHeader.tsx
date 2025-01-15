@@ -20,6 +20,7 @@ import { StreamlitFrameRef } from './StreamlitFrame'
 import { Button } from './ui/button'
 import { ThemeSwitcherButton } from './ui/theme-button-switcher'
 import { VersionSelector } from './VersionSelector'
+import Link from 'next/link'
 
 interface AppHeaderProps {
     appId: string
@@ -35,8 +36,6 @@ export function AppHeader({
     appId,
     appName,
     appDescription = 'No description available',
-    initialVersions,
-    initialUrl,
     streamlitRef,
     onToggleCode,
 }: AppHeaderProps) {
@@ -92,7 +91,9 @@ export function AppHeader({
         <header className="h-14 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-dark-app z-50">
             <div className="h-full px-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Logo inverted={true} />
+                    <Link href="/">
+                        <Logo inverted={true} />
+                    </Link>
                     <div className="flex items-center gap-2">
                         <HoverCard>
                             <HoverCardTrigger asChild>
@@ -162,3 +163,4 @@ export function AppHeader({
         </header>
     )
 }
+
