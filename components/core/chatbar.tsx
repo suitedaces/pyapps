@@ -9,6 +9,7 @@ import { motion } from 'framer-motion'
 import { ArrowUp, Loader2, PaperclipIcon } from 'lucide-react'
 import * as React from 'react'
 import { useEffect, useState } from 'react'
+import { FileSelector } from '@/components/FileSelector'
 
 interface ChatbarProps {
     value: string
@@ -27,6 +28,7 @@ interface ChatbarProps {
     }
     isInChatPage?: boolean
     isCentered?: boolean
+    chatId?: string
 }
 
 const MIN_HEIGHT = 54
@@ -40,6 +42,7 @@ export default function Chatbar({
     isLoading = false,
     isInChatPage = false,
     isCentered = false,
+    chatId,
 }: ChatbarProps): JSX.Element {
     // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
@@ -48,6 +51,7 @@ export default function Chatbar({
     const [isAnimating, setIsAnimating] = React.useState(false)
     const [uploadedFileId, setUploadedFileId] = useState<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
+    const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
@@ -260,6 +264,43 @@ export default function Chatbar({
         // For example, showing a toast notification
     }, [])
 
+    // Load initial selected files
+    useEffect(() => {
+        const loadSelectedFiles = async () => {
+            if (!chatId) return
+            try {
+                const response = await fetch(`/api/chats/${chatId}/files`)
+                if (!response.ok) throw new Error('Failed to fetch files')
+                const files = await response.json()
+                setSelectedFileIds(files.map((f: any) => f.id))
+            } catch (error) {
+                console.error('Error loading selected files:', error)
+            }
+        }
+
+        if (chatId) {
+            loadSelectedFiles()
+        }
+    }, [chatId])
+
+    const handleFileSelect = async (fileIds: string[]) => {
+        setSelectedFileIds(fileIds)
+        if (chatId) {
+            try {
+                const response = await fetch(`/api/chats/${chatId}/files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileIds }),
+                })
+                if (!response.ok) {
+                    throw new Error('Failed to update file associations')
+                }
+            } catch (error) {
+                console.error('Error updating file associations:', error)
+            }
+        }
+    }
+
     return (
         <motion.div
             className="p-4 w-full absolute bg-background dark:bg-dark-app"
@@ -309,7 +350,7 @@ export default function Chatbar({
                             'scrollbar-thumb-rounded scrollbar-track-rounded',
                             'scrollbar-thin scrollbar-thumb-border',
                             'dark:bg-dark-app dark:text-dark-text dark:border-dark-border',
-                            file && 'opacity-50' // Add opacity when disabled
+                            file && 'opacity-50'
                         )}
                         style={{
                             minHeight: isInChatPage
@@ -322,51 +363,54 @@ export default function Chatbar({
                                 : isAnimating
                                   ? '54px'
                                   : `${MAX_HEIGHT}px`,
-                            height: `${textareaHeight}px`, // Explicitly set height
+                            height: `${textareaHeight}px`,
                             transition: 'all 0.3s ease-in-out',
                         }}
-                        disabled={isLoading || isUploading || !!file} // Disable when file is attached
-                        onFocus={() => checkAndUpdateHeight()} // Check height on focus
-                        onBlur={() => checkAndUpdateHeight()} // Check height on blur
+                        disabled={isLoading || isUploading || !!file}
+                        onFocus={() => checkAndUpdateHeight()}
+                        onBlur={() => checkAndUpdateHeight()}
                     />
 
                     <motion.div
                         className="absolute flex justify-between pl-4 bottom-2 right-2 gap-2"
                         animate={{
-                            width: isInChatPage
-                                ? '100px'
-                                : isAnimating
-                                  ? '100px'
-                                  : '100%',
+                            opacity: isInChatPage || isAnimating ? 1 : 1,
                         }}
                         transition={{
                             duration: 0.3,
                             ease: 'easeInOut',
                         }}
                     >
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            onChange={handleFileChange}
-                            accept=".csv"
-                        />
-
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isLoading}
-                        >
-                            <PaperclipIcon
-                                className={cn(
-                                    'h-5 w-5',
-                                    isCentered && 'h-6 w-6'
-                                )}
+                        <div className="flex gap-2">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={handleFileChange}
+                                accept=".csv"
                             />
-                        </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isLoading}
+                            >
+                                <PaperclipIcon
+                                    className={cn(
+                                        'h-5 w-5',
+                                        isCentered && 'h-6 w-6'
+                                    )}
+                                />
+                            </Button>
+
+                            <FileSelector
+                                onFileSelect={handleFileSelect}
+                                selectedFileIds={selectedFileIds}
+                                chatId={chatId}
+                            />
+                        </div>
 
                         <Button
                             type="submit"

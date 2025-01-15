@@ -802,6 +802,7 @@ export default function ChatContainer({
                                         isInChatPage={
                                             isInChatPage || hasFirstMessage
                                         }
+                                        chatId={currentChatId}
                                     />
                                 </div>
                             </div>

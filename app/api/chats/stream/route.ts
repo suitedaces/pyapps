@@ -21,6 +21,17 @@ interface FileContext {
     analysis: string
 }
 
+interface FileData {
+    file_name: string
+    file_type: string
+    analysis: string | null
+    user_id: string
+}
+
+interface ChatFile {
+    files: FileData | null
+}
+
 // Chat Management
 async function createNewChat(supabase: any, userId: string, chatName: string) {
     const { data: chat, error } = await supabase
@@ -48,25 +59,39 @@ async function linkFileToChat(supabase: any, chatId: string, fileId: string) {
 // File Management
 async function getFileContext(
     supabase: any,
-    fileId: string,
+    chatId: string | undefined,
     userId: string
-): Promise<FileContext | undefined> {
-    if (!fileId) return undefined
+): Promise<FileContext[] | undefined> {
+    if (!chatId) return undefined
 
-    const { data: fileData } = await supabase
-        .from('files')
-        .select('*')
-        .eq('id', fileId)
-        .eq('user_id', userId)
-        .single()
+    // Get all files associated with the chat
+    const { data: chatFiles, error } = await supabase
+        .from('chat_files')
+        .select(`
+            files (
+                file_name,
+                file_type,
+                analysis,
+                user_id
+            )
+        `)
+        .eq('chat_id', chatId)
 
-    if (!fileData) return undefined
+    if (error || !chatFiles?.length) return undefined
 
-    return {
-        fileName: fileData.file_name,
-        fileType: fileData.file_type,
-        analysis: fileData.analysis,
-    }
+    // Filter and map the files
+    const files = (chatFiles as ChatFile[])
+        .map(row => row.files)
+        .filter((file): file is FileData => 
+            file !== null && file.user_id === userId
+        )
+        .map(file => ({
+            fileName: file.file_name,
+            fileType: file.file_type,
+            analysis: file.analysis || '',
+        }))
+
+    return files.length > 0 ? files : undefined
 }
 
 // Message Management
@@ -256,10 +281,14 @@ async function linkChatToApp(supabase: any, chatId: string, appId: string) {
     await supabase.from('chats').update({ app_id: appId }).eq('id', chatId)
 }
 
-function buildSystemPrompt(fileContext: FileContext | undefined): string {
-    if (!fileContext) return CHAT_SYSTEM_PROMPT
+function buildSystemPrompt(fileContexts: FileContext[] | undefined): string {
+    if (!fileContexts?.length) return CHAT_SYSTEM_PROMPT
 
-    return `${CHAT_SYSTEM_PROMPT}\n\nYou are working with a ${fileContext.fileType.toUpperCase()} file named "${fileContext.fileName}" in the directory "/app/s3/data/${fileContext.fileName}". Here's some information about the file: ${fileContext.analysis}`
+    const fileDescriptions = fileContexts.map(context => 
+        `- A ${context.fileType.toUpperCase()} file named "${context.fileName}" in the directory "/app/s3/data/${context.fileName}". Analysis: ${context.analysis}`
+    ).join('\n')
+
+    return `${CHAT_SYSTEM_PROMPT}\n\nYou are working with the following files:\n${fileDescriptions}`
 }
 
 export async function POST(req: Request) {
@@ -293,11 +322,11 @@ export async function POST(req: Request) {
             await linkFileToChat(supabase, newChatId, fileId)
         }
 
-        // Get file context if needed
-        const fileContext = await getFileContext(supabase, fileId, user.id)
-        const systemPrompt = buildSystemPrompt(fileContext)
+        // Get file contexts if needed
+        const fileContexts = await getFileContext(supabase, newChatId, user.id)
+        const systemPrompt = buildSystemPrompt(fileContexts)
 
-        console.log('🔍 Streaming with fileContext:', fileContext)
+        console.log('🔍 Streaming with fileContexts:', fileContexts)
         const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [{ role: 'system', content: systemPrompt }, ...messages],
