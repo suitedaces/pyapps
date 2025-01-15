@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Session } from '@supabase/supabase-js'
+import { FileData, AppData } from '@/lib/types'
 import {
     AppWindow,
     BadgeCheck,
@@ -310,6 +311,157 @@ const ChatsList = ({
     )
 }
 
+const FilesList = () => {
+    const [files, setFiles] = useState<FileData[]>([])
+    const [loading, setLoading] = useState(true)
+    const router = useRouter()
+    const supabase = createClient()
+    const { session } = useAuth()
+
+    useEffect(() => {
+        const fetchFiles = async () => {
+            if (!session?.user?.id) return
+            
+            try {
+                const { data, error } = await supabase
+                    .from('files')
+                    .select('*')
+                    .eq('user_id', session.user.id)
+                    .order('updated_at', { ascending: false })
+                    .limit(3)
+
+                if (error) throw error
+
+                const mappedFiles = data.map(file => ({
+                    id: file.id,
+                    name: file.file_name,
+                    type: file.file_type,
+                    updated_at: file.updated_at
+                }))
+                setFiles(mappedFiles)
+            } catch (error) {
+                console.error('Error fetching files:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchFiles()
+    }, [supabase, session?.user?.id])
+
+    if (loading) {
+        return (
+            <SidebarMenuSub>
+                <CustomSidebarMenuSubItem>
+                    <SidebarMenuSubButton className="w-full text-left flex items-center gap-2">
+                        <div className="h-4 w-4 animate-pulse bg-muted rounded" />
+                        <div className="h-4 w-24 animate-pulse bg-muted rounded" />
+                    </SidebarMenuSubButton>
+                </CustomSidebarMenuSubItem>
+            </SidebarMenuSub>
+        )
+    }
+
+    return (
+        <SidebarMenuSub>
+            {files.map((file) => (
+                <CustomSidebarMenuSubItem key={file.id}>
+                    <SidebarMenuSubButton
+                        className="w-full text-left flex items-center gap-2"
+                        onClick={() => router.push(`/files/${file.id}`)}
+                    >
+                        <File className="h-4 w-4" />
+                        <span className="truncate">{file.name}</span>
+                    </SidebarMenuSubButton>
+                </CustomSidebarMenuSubItem>
+            ))}
+            {files.length > 0 && (
+                <CustomSidebarMenuSubItem className="group/item relative hover:underline mt-2">
+                    <SidebarMenuSubButton
+                        className="w-full cursor-pointer text-muted-foreground/70 hover:text-muted-foreground flex items-center gap-1 text-sm pl-2"
+                        onClick={() => router.push('/files')}
+                    >
+                        View all
+                        <MoveRight className="h-3 w-3" />
+                    </SidebarMenuSubButton>
+                </CustomSidebarMenuSubItem>
+            )}
+        </SidebarMenuSub>
+    )
+}
+
+const AppsList = () => {
+    const [apps, setApps] = useState<AppData[]>([])
+    const [loading, setLoading] = useState(true)
+    const router = useRouter()
+    const supabase = createClient()
+    const { session } = useAuth()
+
+    useEffect(() => {
+        const fetchApps = async () => {
+            if (!session?.user?.id) return
+            
+            try {
+                const { data, error } = await supabase
+                    .from('apps')
+                    .select('*')
+                    .eq('user_id', session.user.id)
+                    .order('updated_at', { ascending: false })
+                    .limit(3)
+
+                if (error) throw error
+                setApps(data)
+            } catch (error) {
+                console.error('Error fetching apps:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchApps()
+    }, [supabase, session?.user?.id])
+
+    if (loading) {
+        return (
+            <SidebarMenuSub>
+                <CustomSidebarMenuSubItem>
+                    <SidebarMenuSubButton className="w-full text-left flex items-center gap-2">
+                        <div className="h-4 w-4 animate-pulse bg-muted rounded" />
+                        <div className="h-4 w-24 animate-pulse bg-muted rounded" />
+                    </SidebarMenuSubButton>
+                </CustomSidebarMenuSubItem>
+            </SidebarMenuSub>
+        )
+    }
+
+    return (
+        <SidebarMenuSub>
+            {apps.map((app) => (
+                <CustomSidebarMenuSubItem key={app.id}>
+                    <SidebarMenuSubButton 
+                        className="w-full text-left flex items-center gap-2"
+                        onClick={() => router.push(`/apps/${app.id}`)}
+                    >
+                        <AppWindow className="h-4 w-4" />
+                        <span className="truncate">{app.name}</span>
+                    </SidebarMenuSubButton>
+                </CustomSidebarMenuSubItem>
+            ))}
+            {apps.length > 0 && (
+                <CustomSidebarMenuSubItem className="group/item relative hover:underline mt-2">
+                    <SidebarMenuSubButton
+                        className="w-full cursor-pointer text-muted-foreground/70 hover:text-muted-foreground flex items-center gap-1 text-sm pl-2"
+                        onClick={() => router.push('/apps')}
+                    >
+                        View all
+                        <MoveRight className="h-3 w-3" />
+                    </SidebarMenuSubButton>
+                </CustomSidebarMenuSubItem>
+            )}
+        </SidebarMenuSub>
+    )
+}
+
 export default function AppSidebar({
     onChatSelect,
     currentChatId,
@@ -321,6 +473,8 @@ export default function AppSidebar({
 }: SidebarProps) {
     const [open, setOpen] = useState(false)
     const [isChatsOpen, setIsChatsOpen] = useState(true)
+    const [isFilesOpen, setIsFilesOpen] = useState(false)
+    const [isAppsOpen, setIsAppsOpen] = useState(false)
     const router = useRouter()
     const [session, setSession] = useState<Session | null>(null)
     const supabase = createClient()
@@ -432,12 +586,16 @@ export default function AppSidebar({
 
                                     <SidebarSeparator className="my-2" />
 
-                                    <Collapsible>
+                                    <Collapsible
+                                        open={isFilesOpen}
+                                        onOpenChange={setIsFilesOpen}
+                                    >
                                         <SidebarMenu>
                                             <SidebarMenuItem className="flex justify-center">
                                                 <SidebarMenuButton
                                                     className="w-full flex items-center jusitfy-between"
                                                     tooltip="Manage your files"
+                                                    onClick={() => router.push('/files')}
                                                 >
                                                     <File className="h-4 w-4" />
                                                     {open && (
@@ -448,19 +606,32 @@ export default function AppSidebar({
                                                 </SidebarMenuButton>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuAction>
-                                                        <ChevronRight className="h-4 w-4" />
+                                                        <ChevronRight 
+                                                            className={cn(
+                                                                'h-4 w-4 transition-transform',
+                                                                isFilesOpen &&
+                                                                    'rotate-90'
+                                                            )}
+                                                        />
                                                     </SidebarMenuAction>
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
                                         </SidebarMenu>
+                                        <CollapsibleContent>
+                                            <FilesList />
+                                        </CollapsibleContent>
                                     </Collapsible>
 
-                                    <Collapsible>
+                                    <Collapsible
+                                        open={isAppsOpen}
+                                        onOpenChange={setIsAppsOpen}
+                                    >
                                         <SidebarMenu>
                                             <SidebarMenuItem className="flex justify-center">
                                                 <SidebarMenuButton
                                                     className="w-full flex items-center jusitfy-between"
                                                     tooltip="Your applications"
+                                                    onClick={() => router.push('/apps')}
                                                 >
                                                     <AppWindow className="h-4 w-4" />
                                                     {open && (
@@ -471,11 +642,20 @@ export default function AppSidebar({
                                                 </SidebarMenuButton>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuAction>
-                                                        <ChevronRight className="h-4 w-4" />
+                                                        <ChevronRight 
+                                                            className={cn(
+                                                                'h-4 w-4 transition-transform',
+                                                                isAppsOpen &&
+                                                                    'rotate-90'
+                                                            )}
+                                                        />
                                                     </SidebarMenuAction>
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
                                         </SidebarMenu>
+                                        <CollapsibleContent>
+                                            <AppsList />
+                                        </CollapsibleContent>
                                     </Collapsible>
                                 </SidebarGroup>
                             </ScrollArea>
@@ -824,12 +1004,16 @@ export default function AppSidebar({
 
                                 <SidebarSeparator className="my-2" />
 
-                                <Collapsible>
+                                <Collapsible
+                                    open={isFilesOpen}
+                                    onOpenChange={setIsFilesOpen}
+                                >
                                     <SidebarMenu>
                                         <SidebarMenuItem className="flex justify-center">
                                             <SidebarMenuButton
                                                 className="w-full flex items-center jusitfy-between"
                                                 tooltip="Manage your files"
+                                                onClick={() => router.push('/files')}
                                             >
                                                 <File className="h-4 w-4" />
                                                 {open && (
@@ -840,19 +1024,32 @@ export default function AppSidebar({
                                             </SidebarMenuButton>
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuAction>
-                                                    <ChevronRight className="h-4 w-4" />
+                                                    <ChevronRight 
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isFilesOpen &&
+                                                                'rotate-90'
+                                                        )}
+                                                    />
                                                 </SidebarMenuAction>
                                             </CollapsibleTrigger>
                                         </SidebarMenuItem>
                                     </SidebarMenu>
+                                    <CollapsibleContent>
+                                        <FilesList />
+                                    </CollapsibleContent>
                                 </Collapsible>
 
-                                <Collapsible>
+                                <Collapsible
+                                    open={isAppsOpen}
+                                    onOpenChange={setIsAppsOpen}
+                                >
                                     <SidebarMenu>
                                         <SidebarMenuItem className="flex justify-center">
                                             <SidebarMenuButton
                                                 className="w-full flex items-center jusitfy-between"
                                                 tooltip="Your applications"
+                                                onClick={() => router.push('/apps')}
                                             >
                                                 <AppWindow className="h-4 w-4" />
                                                 {open && (
@@ -863,11 +1060,20 @@ export default function AppSidebar({
                                             </SidebarMenuButton>
                                             <CollapsibleTrigger asChild>
                                                 <SidebarMenuAction>
-                                                    <ChevronRight className="h-4 w-4" />
+                                                    <ChevronRight 
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isAppsOpen &&
+                                                                'rotate-90'
+                                                        )}
+                                                    />
                                                 </SidebarMenuAction>
                                             </CollapsibleTrigger>
                                         </SidebarMenuItem>
                                     </SidebarMenu>
+                                    <CollapsibleContent>
+                                        <AppsList />
+                                    </CollapsibleContent>
                                 </Collapsible>
                             </SidebarGroup>
                         </ScrollArea>

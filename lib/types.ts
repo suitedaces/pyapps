@@ -189,3 +189,23 @@ export interface CustomMessage extends Message {
         [key: string]: any
     }>
 }
+
+export interface FileData {
+    id: string
+    name: string
+    type: string
+    updated_at: string
+    size?: number
+    user_id?: string
+}
+
+export interface AppData {
+    id: string
+    name: string
+    description: string | null
+    updated_at: string
+    is_public: boolean
+    public_id: string | null
+    current_version_id: string | null
+    created_at: string
+}

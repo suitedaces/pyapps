@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Message } from 'ai'
 import { XCircle } from 'lucide-react'
 import React, { useEffect, useRef } from 'react'
+
 interface FileUploadState {
     isUploading: boolean
     progress: number
@@ -33,6 +34,9 @@ interface ChatProps {
     onCodeClick: (code: string) => void
     isInChatPage: boolean
     onTogglePanel: (panel: string) => void
+    chatId?: string
+    selectedFileIds?: string[]
+    onFileSelect?: (fileIds: string[]) => void
 }
 
 function Chat({
@@ -49,6 +53,9 @@ function Chat({
     onCodeClick,
     isInChatPage = false,
     onTogglePanel,
+    chatId,
+    selectedFileIds = [],
+    onFileSelect,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
@@ -138,6 +145,9 @@ function Chat({
                     isLoading={isLoading}
                     fileUploadState={fileUploadState}
                     isInChatPage={isInChatPage}
+                    chatId={chatId}
+                    selectedFileIds={selectedFileIds}
+                    onFileSelect={onFileSelect}
                 />
             </div>
         </div>

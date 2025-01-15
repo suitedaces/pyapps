@@ -267,40 +267,6 @@ export interface Database {
                     },
                 ]
             }
-            app_files: {
-                Row: {
-                    id: string
-                    app_id: string
-                    file_id: string
-                    created_at: string
-                }
-                Insert: {
-                    id?: string
-                    app_id: string
-                    file_id: string
-                    created_at?: string
-                }
-                Update: {
-                    id?: string
-                    app_id?: string
-                    file_id?: string
-                    created_at?: string
-                }
-                Relationships: [
-                    {
-                        foreignKeyName: 'app_files_app_id_fkey'
-                        columns: ['app_id']
-                        referencedRelation: 'apps'
-                        referencedColumns: ['id']
-                    },
-                    {
-                        foreignKeyName: 'app_files_file_id_fkey'
-                        columns: ['file_id']
-                        referencedRelation: 'files'
-                        referencedColumns: ['id']
-                    },
-                ]
-            }
             usage_limits: {
                 Row: {
                     id: string

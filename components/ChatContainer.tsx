@@ -144,6 +144,7 @@ export default function ChatContainer({
         initialAppId || null
     )
     const [chatTitles, setChatTitles] = useState<Record<string, string>>({})
+    const [persistedFileIds, setPersistedFileIds] = useState<string[]>([])
 
     // Model configuration
     const [languageModel] = useLocalStorage<LLMModelConfig>('languageModel', {
@@ -409,13 +410,14 @@ export default function ChatContainer({
                 await originalHandleSubmit(e, {
                     body: {
                         message,
+                        fileIds: persistedFileIds,
                     },
                 })
             }
 
             updateChatState({ status: 'active' })
         },
-        [originalHandleSubmit, handleFileUpload, updateChatState]
+        [originalHandleSubmit, handleFileUpload, updateChatState, persistedFileIds]
     )
 
     const handleInputChange = useCallback(
@@ -678,6 +680,17 @@ export default function ChatContainer({
         [setSidebarChats]
     )
 
+    const handleFileSelection = useCallback((fileIds: string[]) => {
+        setPersistedFileIds(fileIds)
+        if (currentChatId) {
+            fetch(`/api/chats/${currentChatId}/files`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileIds }),
+            }).catch(console.error)
+        }
+    }, [currentChatId])
+
     // Loading states
     if (isLoading) {
         return (
@@ -802,6 +815,9 @@ export default function ChatContainer({
                                         isInChatPage={
                                             isInChatPage || hasFirstMessage
                                         }
+                                        selectedFileIds={persistedFileIds}
+                                        onFileSelect={handleFileSelection}
+                                        chatId={currentChatId}
                                     />
                                 </div>
                             </div>
