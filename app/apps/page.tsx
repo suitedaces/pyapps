@@ -112,7 +112,7 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
             />
           </div>
           <button 
-            onClick={() => router.push('/apps/new')} 
+            onClick={() => router.push('/')} 
             className="flex items-center gap-2 text-foreground hover:text-foreground/70 transition-colors"
           >
             <Plus size={16} />
