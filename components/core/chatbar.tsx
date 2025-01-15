@@ -29,6 +29,8 @@ interface ChatbarProps {
     isInChatPage?: boolean
     isCentered?: boolean
     chatId?: string
+    selectedFileIds?: string[]
+    onFileSelect?: (fileIds: string[]) => void
 }
 
 const MIN_HEIGHT = 54
@@ -43,6 +45,8 @@ export default function Chatbar({
     isInChatPage = false,
     isCentered = false,
     chatId,
+    selectedFileIds = [],
+    onFileSelect,
 }: ChatbarProps): JSX.Element {
     // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
@@ -51,7 +55,6 @@ export default function Chatbar({
     const [isAnimating, setIsAnimating] = React.useState(false)
     const [uploadedFileId, setUploadedFileId] = useState<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
-    const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
@@ -244,17 +247,6 @@ export default function Chatbar({
         })
     }
 
-    // Debug logging
-    useEffect(() => {
-        if (process.env.NODE_ENV === 'development') {
-            console.log('[Chatbar] State Update:', {
-                height: textareaRef.current?.offsetHeight,
-                isMinHeight: isTextareaMinHeight,
-                timestamp: new Date().toISOString(),
-            })
-        }
-    }, [isTextareaMinHeight])
-
     // Add handleFileError function
     const handleFileError = React.useCallback((error: string) => {
         if (process.env.NODE_ENV === 'development') {
@@ -272,7 +264,7 @@ export default function Chatbar({
                 const response = await fetch(`/api/chats/${chatId}/files`)
                 if (!response.ok) throw new Error('Failed to fetch files')
                 const files = await response.json()
-                setSelectedFileIds(files.map((f: any) => f.id))
+                onFileSelect?.(files.map((f: any) => f.id))
             } catch (error) {
                 console.error('Error loading selected files:', error)
             }
@@ -281,24 +273,10 @@ export default function Chatbar({
         if (chatId) {
             loadSelectedFiles()
         }
-    }, [chatId])
+    }, [chatId, onFileSelect])
 
     const handleFileSelect = async (fileIds: string[]) => {
-        setSelectedFileIds(fileIds)
-        if (chatId) {
-            try {
-                const response = await fetch(`/api/chats/${chatId}/files`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fileIds }),
-                })
-                if (!response.ok) {
-                    throw new Error('Failed to update file associations')
-                }
-            } catch (error) {
-                console.error('Error updating file associations:', error)
-            }
-        }
+        onFileSelect?.(fileIds)
     }
 
     return (
@@ -374,7 +352,7 @@ export default function Chatbar({
                     <motion.div
                         className="absolute flex justify-between pl-4 bottom-2 right-2 gap-2"
                         animate={{
-                            opacity: isInChatPage || isAnimating ? 1 : 1,
+                            justifyContent: isInChatPage || isAnimating ? 'flex-end' : 'space-between'
                         }}
                         transition={{
                             duration: 0.3,
@@ -389,6 +367,7 @@ export default function Chatbar({
                                 onChange={handleFileChange}
                                 accept=".csv"
                             />
+
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -420,8 +399,7 @@ export default function Chatbar({
                                 'bg-gradient-to-tr from-[#FFDE56] to-[#4989BB]',
                                 'dark:from-[#03f241] dark:via-[#d549dd] dark:to-[#03e5f2]',
                                 'disabled:bg-none disabled:bg-[#F5F5F5] disabled:border disabled:border-[#D4D4D4]',
-                                'dark:disabled:bg-dark-app dark:disabled:border-dark-border',
-                                isCentered && 'h-11 w-11'
+                                'dark:disabled:bg-dark-app dark:disabled:border-dark-border'
                             )}
                             disabled={
                                 isLoading ||

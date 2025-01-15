@@ -35,6 +35,8 @@ interface ChatProps {
     isInChatPage: boolean
     onTogglePanel: (panel: string) => void
     chatId?: string
+    selectedFileIds?: string[]
+    onFileSelect?: (fileIds: string[]) => void
 }
 
 function Chat({
@@ -52,6 +54,8 @@ function Chat({
     isInChatPage = false,
     onTogglePanel,
     chatId,
+    selectedFileIds = [],
+    onFileSelect,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
@@ -142,6 +146,8 @@ function Chat({
                     fileUploadState={fileUploadState}
                     isInChatPage={isInChatPage}
                     chatId={chatId}
+                    selectedFileIds={selectedFileIds}
+                    onFileSelect={onFileSelect}
                 />
             </div>
         </div>
