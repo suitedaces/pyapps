@@ -410,13 +410,14 @@ export default function ChatContainer({
                 await originalHandleSubmit(e, {
                     body: {
                         message,
+                        fileIds: persistedFileIds,
                     },
                 })
             }
 
             updateChatState({ status: 'active' })
         },
-        [originalHandleSubmit, handleFileUpload, updateChatState]
+        [originalHandleSubmit, handleFileUpload, updateChatState, persistedFileIds]
     )
 
     const handleInputChange = useCallback(

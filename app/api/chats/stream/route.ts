@@ -301,8 +301,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { messages, chatId, fileId, fileName, fileContent } =
-            await req.json()
+        const { messages, chatId, fileId, fileName, fileIds } = await req.json()
         let newChatId = chatId
         let appId: string | null = null
 
@@ -320,6 +319,13 @@ export async function POST(req: Request) {
         // Handle file association
         if (fileId && newChatId) {
             await linkFileToChat(supabase, newChatId, fileId)
+        }
+
+        // Handle multiple file associations if fileIds are provided
+        if (fileIds?.length && newChatId) {
+            await Promise.all(
+                fileIds.map((fId: string) => linkFileToChat(supabase, newChatId, fId))
+            )
         }
 
         // Get file contexts if needed
