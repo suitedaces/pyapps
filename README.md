@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# py_apps - Build & Share Data Apps in Seconds
 
-## Getting Started
+py_apps is a web app that enables users to create and share data apps with no coding knowledge.
 
-First, run the development server:
+## 🌟 Features
 
+- **AI-Powered App Creation**: Create Streamlit apps through natural language conversation with Claude 3
+- **File Management**: Upload and analyze CSV, JSON, and text files
+- **Version Control**: Track and manage different versions of your Streamlit apps
+- **Real-time Preview**: See your Streamlit apps in action as you develop them
+- **Dark Mode Support**: Full dark mode support for comfortable viewing
+- **Responsive Design**: Works seamlessly across desktop and mobile devices
+
+## 🛠 Tech Stack
+
+- **Frontend**: Next.js 15, React 18, TailwindCSS
+- **Backend**: Next.js API Routes, Supabase
+- **AI**: Claude 3 (Anthropic)
+- **Data Processing**: PapaParse, SheetJS
+- **Authentication**: Supabase Auth
+- **Storage**: AWS S3
+- **Sandbox**: E2B Code Interpreter
+- **UI Components**: Radix UI, shadcn/ui
+- **State Management**: Zustand
+- **Styling**: TailwindCSS, CSS Modules
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- Supabase account
+- AWS S3 bucket
+- E2B account
+- Anthropic API key
+
+### Environment Variables
+
+Create a `.env` file with the following variables:
+
+```bash
+ANTHROPIC_API_KEY=your_anthropic_api_key
+E2B_API_KEY=your_e2b_api_key
+AWS_S3_BUCKET=your_bucket_name
+AWS_REGION=your_aws_region
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+```
+
+### Installation
+
+1. Clone the repository
+```bash
+git clone https://github.com/yourusername/py_apps.git
+cd py_apps
+```
+
+2. Install dependencies
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Run the development server
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+```
+├── app/                  # Next.js app directory
+│   ├── api/             # API routes
+│   ├── apps/            # App-related pages
+│   ├── auth/            # Authentication pages
+│   ├── chat/            # Chat interface
+│   └── files/           # File management
+├── components/          # React components
+├── contexts/            # React contexts
+├── lib/                 # Utility functions and types
+│   ├── stores/         # Zustand stores
+│   ├── supabase/       # Supabase client
+│   └── tools/          # AI tools
+├── public/             # Static assets
+└── scripts/            # Helper scripts
+```
 
-## Learn More
+## 🔒 Authentication
 
-To learn more about Next.js, take a look at the following resources:
+The application uses Supabase Authentication with the following features:
+- Google OAuth
+- Email/Password authentication
+- Password reset functionality
+- Session management
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 💾 Database Schema
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+Key tables in the Supabase database:
+- `apps`: Stores application metadata
+- `app_versions`: Tracks different versions of apps
+- `chats`: Stores chat conversations
+- `messages`: Contains chat messages
+- `files`: Manages uploaded files
+- `users`: User information
