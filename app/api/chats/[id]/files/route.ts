@@ -1,11 +1,6 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-
-interface RouteContext {
-    params: { id: string }
-}
-
 // Validation schema
 const FileAssociationSchema = z.object({
     fileIds: z.array(z.string()),
@@ -13,10 +8,11 @@ const FileAssociationSchema = z.object({
 
 export async function POST(
     req: NextRequest,
-    context: RouteContext
+    context: { params: Promise<{ id: string }> }
 ) {
     const supabase = await createClient()
     const user = await getUser()
+    const { id } = await context.params
 
     if (!user) {
         return NextResponse.json(
@@ -33,7 +29,7 @@ export async function POST(
         const { data: chat, error: chatError } = await supabase
             .from('chats')
             .select('id')
-            .eq('id', context.params.id)
+            .eq('id', id)
             .eq('user_id', user.id)
             .single()
 
@@ -48,13 +44,13 @@ export async function POST(
         await supabase
             .from('chat_files')
             .delete()
-            .eq('chat_id', context.params.id)
+            .eq('chat_id', id)
 
         // Create new associations
         if (fileIds.length > 0) {
             const { error } = await supabase.from('chat_files').insert(
                 fileIds.map((fileId) => ({
-                    chat_id: context.params.id,
+                    chat_id: id,
                     file_id: fileId,
                 }))
             )
@@ -74,10 +70,11 @@ export async function POST(
 
 export async function GET(
     req: NextRequest,
-    context: RouteContext
+    context: { params: Promise<{ id: string }> }
 ) {
     const supabase = await createClient()
     const user = await getUser()
+    const { id } = await context.params
 
     if (!user) {
         return NextResponse.json(
@@ -91,7 +88,7 @@ export async function GET(
         const { data: chat, error: chatError } = await supabase
             .from('chats')
             .select('id')
-            .eq('id', context.params.id)
+            .eq('id', id)
             .eq('user_id', user.id)
             .single()
 
@@ -115,7 +112,7 @@ export async function GET(
                 )
             `
             )
-            .eq('chat_id', context.params.id)
+            .eq('chat_id', id)
 
         if (error) throw error
 
