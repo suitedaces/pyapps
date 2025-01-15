@@ -78,6 +78,14 @@ export async function POST(req: NextRequest) {
 
         const fileContent = await file.text()
 
+        // Check for existing file with same name
+        const { data: existingFile } = await supabase
+            .from('files')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('file_name', metadata.fileName)
+            .single()
+
         // 2. Upload to S3
         const s3Key = `${session.user.id}/data/${metadata.fileName}`
         await uploadToS3(
@@ -94,23 +102,44 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        // 4. Store file record
-        const { data: fileData, error: fileError } = await supabase
-            .from('files')
-            .insert({
-                user_id: session.user.id,
-                file_name: metadata.fileName,
-                file_type: metadata.fileType,
-                file_size: metadata.fileSize,
-                s3_key: s3Key,
-                analysis: analysis ? JSON.stringify(analysis) : undefined,
-            })
-            .select()
-            .single()
+        let fileData
+        if (existingFile) {
+            // Update existing file
+            const { data: updatedFile, error: updateError } = await supabase
+                .from('files')
+                .update({
+                    file_type: metadata.fileType,
+                    file_size: metadata.fileSize,
+                    s3_key: s3Key,
+                    analysis: analysis ? JSON.stringify(analysis) : undefined,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingFile.id)
+                .select()
+                .single()
 
-        if (fileError) throw fileError
+            if (updateError) throw updateError
+            fileData = updatedFile
+        } else {
+            // Create new file
+            const { data: newFile, error: insertError } = await supabase
+                .from('files')
+                .insert({
+                    user_id: session.user.id,
+                    file_name: metadata.fileName,
+                    file_type: metadata.fileType,
+                    file_size: metadata.fileSize,
+                    s3_key: s3Key,
+                    analysis: analysis ? JSON.stringify(analysis) : undefined,
+                })
+                .select()
+                .single()
 
-        // 5. Link file to chat if chatId provided
+            if (insertError) throw insertError
+            fileData = newFile
+        }
+
+        // Link file to chat if chatId provided
         if (chatId) {
             await supabase.from('chat_files').insert({
                 chat_id: chatId,

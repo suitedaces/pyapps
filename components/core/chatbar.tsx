@@ -179,6 +179,15 @@ export default function Chatbar({
                 const fileData = await uploadResponse.json()
                 setUploadedFileId(fileData.id)
 
+                // Update file selection with the new/updated file
+                if (onFileSelect) {
+                    const newFileIds = [...selectedFileIds]
+                    if (!newFileIds.includes(fileData.id)) {
+                        newFileIds.push(fileData.id)
+                    }
+                    onFileSelect(newFileIds)
+                }
+
                 if (textareaRef.current) {
                     const currentHeight = textareaRef.current.offsetHeight
                     textareaRef.current.style.height = `${MAX_HEIGHT}px`
