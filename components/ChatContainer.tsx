@@ -683,11 +683,19 @@ export default function ChatContainer({
     const handleFileSelection = useCallback((fileIds: string[]) => {
         setPersistedFileIds(fileIds)
         if (currentChatId) {
+            // First remove any existing chat_files associations
             fetch(`/api/chats/${currentChatId}/files`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileIds }),
-            }).catch(console.error)
+                method: 'DELETE',
+            })
+            .then(() => {
+                // Then create new associations for all selected files
+                fetch(`/api/chats/${currentChatId}/files`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileIds }),
+                })
+            })
+            .catch(console.error)
         }
     }, [currentChatId])
 

@@ -110,7 +110,7 @@ export function FileSelector({
                                             <Sheet className="h-4 w-4 text-green-600" />
                                             <span>Add Google Sheets</span>
                                             <span className="ml-auto text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                                Coming Soon
+                                                Coming Soon!
                                             </span>
                                         </div>
                                     </TooltipTrigger>
