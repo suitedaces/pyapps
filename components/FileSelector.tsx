@@ -14,6 +14,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useEffect, useState } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface File {
     id: string
@@ -39,6 +40,7 @@ export function FileSelector({
         new Set(selectedFileIds)
     )
     const [isOpen, setIsOpen] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
         setSelectedIds(new Set(selectedFileIds))
@@ -46,6 +48,8 @@ export function FileSelector({
 
     useEffect(() => {
         const fetchFiles = async () => {
+            if (!isOpen && selectedFileIds.length === 0) return
+            setIsLoading(true)
             try {
                 const response = await fetch('/api/files')
                 if (!response.ok) throw new Error('Failed to fetch files')
@@ -53,12 +57,12 @@ export function FileSelector({
                 setFiles(data)
             } catch (error) {
                 console.error('Error fetching files:', error)
+            } finally {
+                setIsLoading(false)
             }
         }
 
-        if (isOpen || selectedFileIds.length > 0) {
-            fetchFiles()
-        }
+        fetchFiles()
     }, [isOpen, selectedFileIds.length])
 
     const handleFileClick = (fileId: string) => {
@@ -71,6 +75,17 @@ export function FileSelector({
         setSelectedIds(newSelectedIds)
         onFileSelect(Array.from(newSelectedIds))
     }
+
+    const LoadingSkeleton = () => (
+        <div className="space-y-2">
+            {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between px-2 py-1.5">
+                    <Skeleton className="h-4 w-[120px]" />
+                    <Skeleton className="h-4 w-[60px]" />
+                </div>
+            ))}
+        </div>
+    )
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -126,7 +141,9 @@ export function FileSelector({
                             Local Files
                         </div>
 
-                        {files.length === 0 ? (
+                        {isLoading ? (
+                            <LoadingSkeleton />
+                        ) : files.length === 0 ? (
                             <p className="text-sm text-muted-foreground text-center py-4">
                                 No files available
                             </p>
@@ -168,4 +185,4 @@ export function FileSelector({
             </PopoverContent>
         </Popover>
     )
-} 
+}
