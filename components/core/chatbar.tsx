@@ -358,48 +358,7 @@ export default function Chatbar({
                         onBlur={() => checkAndUpdateHeight()}
                     />
 
-                    <motion.div
-                        className="absolute flex justify-between pl-4 bottom-2 right-2 gap-2"
-                        animate={{
-                            justifyContent: isInChatPage || isAnimating ? 'flex-end' : 'space-between'
-                        }}
-                        transition={{
-                            duration: 0.3,
-                            ease: 'easeInOut',
-                        }}
-                    >
-                        <div className="flex gap-2">
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                className="hidden"
-                                onChange={handleFileChange}
-                                accept=".csv"
-                            />
-
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isLoading}
-                            >
-                                <PaperclipIcon
-                                    className={cn(
-                                        'h-5 w-5',
-                                        isCentered && 'h-6 w-6'
-                                    )}
-                                />
-                            </Button>
-
-                            <FileSelector
-                                onFileSelect={handleFileSelect}
-                                selectedFileIds={selectedFileIds}
-                                chatId={chatId}
-                            />
-                        </div>
-
+                    <div className="absolute bottom-2 right-2">
                         <Button
                             type="submit"
                             size="icon"
@@ -434,7 +393,54 @@ export default function Chatbar({
                                 />
                             )}
                         </Button>
-                    </motion.div>
+                    </div>
+
+                    <div className={cn(
+                        "absolute bottom-2",
+                        isInChatPage ? "right-14" : "left-4"
+                    )}>
+                        <motion.div
+                            className="flex gap-2"
+                            initial={false}
+                            animate={{
+                                x: (!isInChatPage && isAnimating) ? 'calc(100vw - 200px)' : 0
+                            }}
+                            transition={{
+                                duration: 0.3,
+                                ease: 'easeInOut',
+                            }}
+                        >
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={handleFileChange}
+                                accept=".csv"
+                            />
+
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isLoading}
+                            >
+                                <PaperclipIcon
+                                    className={cn(
+                                        'h-5 w-5',
+                                        isCentered && 'h-6 w-6'
+                                    )}
+                                />
+                            </Button>
+
+                            <FileSelector
+                                onFileSelect={handleFileSelect}
+                                selectedFileIds={selectedFileIds}
+                                chatId={chatId}
+                            />
+                        </motion.div>
+                    </div>
                 </div>
             </form>
         </motion.div>
