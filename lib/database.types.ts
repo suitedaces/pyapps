@@ -194,6 +194,7 @@ export interface Database {
                     tool_calls: Json | null
                     tool_results: Json | null
                     token_count: number
+                    data: Json | null
                     created_at: string
                 }
                 Insert: {
@@ -205,6 +206,7 @@ export interface Database {
                     tool_calls?: Json | null
                     tool_results?: Json | null
                     token_count: number
+                    data?: Json | null
                     created_at?: string
                 }
                 Update: {
@@ -216,6 +218,7 @@ export interface Database {
                     tool_calls?: Json | null
                     tool_results?: Json | null
                     token_count?: number
+                    data?: Json | null
                     created_at?: string
                 }
                 Relationships: [

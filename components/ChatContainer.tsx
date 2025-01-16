@@ -16,6 +16,7 @@ import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn, formatDatabaseMessages } from '@/lib/utils'
 import { useChat } from 'ai/react'
+import { JSONValue } from 'ai'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -40,6 +41,7 @@ interface ChatContainerProps {
     isInChatPage?: boolean
     initialAppId?: string | null
     onChatDeleted?: () => void
+    onChatFinish?: () => void
 }
 
 interface FileUploadState {
@@ -75,17 +77,15 @@ interface ChatState {
 }
 
 export default function ChatContainer({
-    initialChat,
     initialMessages = [],
     initialVersion = null,
     isNewChat = false,
     isInChatPage = false,
-    initialFiles = [],
     initialAppId = null,
     onChatDeleted,
 }: ChatContainerProps) {
     const router = useRouter()
-    const { session, isLoading, isPreviewMode, shouldShowAuthPrompt } =
+    const { session, isLoading, shouldShowAuthPrompt } =
         useAuth()
     const { collapsed: sidebarCollapsed } = useSidebar()
     const {
@@ -269,10 +269,7 @@ export default function ChatContainer({
                     await handleToolInvocations(message.toolInvocations)
                 }
 
-                // Always refresh version selector if it exists
-                if (versionSelectorRef.current) {
-                    versionSelectorRef.current.refreshVersions()
-                }
+                // Always refresh version selector if it exist
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
@@ -362,27 +359,80 @@ export default function ChatContainer({
                 // Clear UI states first
                 if (isNewChat) {
                     pendingFileLinkId.current = fileId
-                    updateChatState({ status: 'active' }) // This will clear typing text
+                    updateChatState({ status: 'active' })
                 }
 
                 // Set loading states
                 setHasFirstMessage(true)
 
-                // Now append the message
-                await append(
-                    {
-                        content: `Create a Streamlit app to visualize this data.`,
-                        role: 'user',
-                        createdAt: new Date(),
-                    },
-                    {
-                        body: {
-                            chatId: currentChatId,
-                            fileId: fileId,
-                            fileName: file.name,
+                const assistantMessage = "What would you like to do with this data?"
+                const messageData = {
+                    type: 'action_buttons',
+                    actions: [
+                        {
+                            label: "Write a Query",
+                            action: "populate_input",
+                            value: "Can you help me write a query to analyze this data?"
                         },
-                    }
-                )
+                        {
+                            label: "Suggest Metrics",
+                            action: "populate_input",
+                            value: "What are some interesting metrics or questions we can explore with this data?"
+                        },
+                        {
+                            label: "Create App!",
+                            action: "populate_input",
+                            value: "Create a Streamlit app to visualize key insights from this data"
+                        }
+                    ]
+                }
+
+                // First append to UI
+                await append({
+                    id: `file-upload-${Date.now()}`,
+                    role: 'assistant',
+                    content: assistantMessage,
+                    createdAt: new Date(),
+                    data: messageData as JSONValue
+                })
+
+                // Then store in database
+                const response = await fetch('/api/chats/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        chatId: currentChatId,
+                        userMessage: "", // Empty for initial file upload
+                        assistantMessage,
+                        data: messageData,
+                        tokenCount: 0,
+                        toolCalls: [],
+                        toolResults: []
+                    })
+                })
+
+                const { chatId } = await response.json()
+
+                // Link file to chat
+                if (chatId && fileId) {
+                    await fetch(`/api/chats/${chatId}/files`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fileIds: [fileId]
+                        })
+                    })
+                }
+
+                // If we were on home page, route to new chat
+                if (!currentChatId) {
+                    router.push(`/chat/${chatId}`)
+                }
+
             } catch (error) {
                 console.error('Error processing file:', error)
                 setErrorState(error as Error)

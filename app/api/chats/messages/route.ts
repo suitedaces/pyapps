@@ -56,17 +56,18 @@ export async function POST(req: Request) {
             toolCalls,
             toolResults,
             tokenCount,
+            data
         } = await req.json()
 
         let currentChatId = chatId
 
-        // Only create a new chat if we don't have one AND we have a message to store
-        if (!currentChatId && userMessage && assistantMessage) {
+        // Create a new chat if we don't have one (for both regular messages and file uploads)
+        if (!currentChatId) {
             const { data: chat } = await supabase
                 .from('chats')
                 .insert({
                     user_id: user.id,
-                    name: userMessage.slice(0, 50) + '...',
+                    name: userMessage ? userMessage.slice(0, 50) + '...' : 'New Chat',
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                 })
@@ -76,17 +77,18 @@ export async function POST(req: Request) {
             currentChatId = chat?.id
         }
 
-        // Only store message if we have both user and assistant messages
-        if (currentChatId && userMessage && assistantMessage) {
+        // Store message if we have an assistant message (allows empty user message for file uploads)
+        if (currentChatId && assistantMessage) {
             const { data: message, error: messageError } = await supabase
                 .from('messages')
                 .insert({
                     chat_id: currentChatId,
                     user_id: user.id,
-                    user_message: userMessage,
+                    user_message: userMessage || '',
                     assistant_message: assistantMessage,
                     tool_calls: toolCalls,
                     tool_results: toolResults,
+                    data: data,
                     token_count: tokenCount,
                     created_at: new Date().toISOString(),
                 })

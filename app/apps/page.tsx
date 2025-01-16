@@ -111,7 +111,7 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
               className="w-full h-10 pl-10 bg-transparent text-foreground placeholder:text-foreground/50 outline-none"
             />
           </div>
-          <button 
+          <button
             onClick={() => router.push('/')} 
             className="flex items-center gap-2 text-foreground hover:text-foreground/70 transition-colors"
           >

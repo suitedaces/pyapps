@@ -63,6 +63,7 @@ export interface DatabaseMessage {
     assistant_message: string
     tool_calls: ToolCall[] | Json
     tool_results: Json | null
+    data: Json | null
     token_count: number
     created_at: string
 }

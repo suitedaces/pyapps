@@ -10,7 +10,13 @@ import { useEffect, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { assistantMarkdownStyles, userMarkdownStyles, markdownToHtml } from './markdown'
 
-interface MessageProps extends AIMessage {
+interface ActionButton {
+    label: string
+    value: string
+    [key: string]: string
+}
+
+interface MessageProps extends Omit<AIMessage, 'data'> {
     isLastMessage?: boolean
     isLoading?: boolean
     object?: App
@@ -23,6 +29,11 @@ interface MessageProps extends AIMessage {
     onCodeClick?: (messageId: string) => void
     isCreatingChat?: boolean
     onTogglePanel?: () => void
+    data?: {
+        type: string
+        actions?: ActionButton[]
+    }
+    onInputChange?: (value: string) => void
 }
 
 export function Message({
@@ -34,6 +45,8 @@ export function Message({
     isLoading,
     isCreatingChat = false,
     onTogglePanel,
+    data,
+    onInputChange,
 }: MessageProps) {
     const isUser = role === 'user'
     const { session } = useAuth()
@@ -81,6 +94,39 @@ export function Message({
                                 ref={contentRef}
                                 className={cn("max-w-[calc(100%-2rem)] overflow-x-auto", assistantMarkdownStyles)}
                             />
+
+                            {data?.type === 'action_buttons' && data.actions && (
+                                <motion.div 
+                                    className="flex flex-wrap gap-2 mt-4"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                >
+                                    {data.actions.map((action, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => {
+                                                console.log('Action button clicked:', action.value);
+                                                if (onInputChange) {
+                                                    console.log('Calling onInputChange with:', action.value);
+                                                    onInputChange(action.value);
+                                                } else {
+                                                    console.log('onInputChange is not defined');
+                                                }
+                                            }}
+                                            className={cn(
+                                                "px-4 py-2 rounded-lg text-sm font-medium",
+                                                "bg-gradient-to-tr from-[#FFDE56] to-[#4989BB] hover:opacity-90",
+                                                "dark:from-[#03f241] dark:via-[#d549dd] dark:to-[#03e5f2]",
+                                                "text-black dark:text-white",
+                                                "transition-all duration-200 shadow-lg hover:shadow-xl"
+                                            )}
+                                        >
+                                            {action.label}
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            )}
 
                             {Boolean(toolInvocations?.length) && (
                                 <ActionPanel

@@ -127,10 +127,12 @@ function Chat({
                         <AIMessage
                             key={message.id}
                             {...message}
+                            data={message.data as { type: string; actions?: any[] }}
                             isLastMessage={index === messages.length - 1}
                             isLoading={isLoading}
                             onCodeClick={handleCodeClick}
                             onTogglePanel={() => onTogglePanel('right')}
+                            onInputChange={onInputChange}
                         />
                     ))}
                 <div ref={messagesEndRef} />
