@@ -5,16 +5,22 @@ import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export function AuthPrompt({ canClose = true }) {
     const { hideAuthPrompt } = useAuth()
     const supabase = createClient()
+    const [isDarkMode, setIsDarkMode] = useState(false)
+
+    useEffect(() => {
+        setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches)
+    }, [])
 
     const handleGoogleSignIn = async () => {
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `http://localhost:3000/auth/callback`,
+                redirectTo: `https://pyapps.co/auth/callback`,
             },
         })
     }
@@ -74,11 +80,7 @@ export function AuthPrompt({ canClose = true }) {
                                     >
                                         <div className="absolute -inset-1 bg-gradient-to-r from-rose-500/20 via-blue-500/20 to-purple-500/20 blur-sm" />
                                         <Logo
-                                            inverted={
-                                                window.matchMedia(
-                                                    '(prefers-color-scheme: dark)'
-                                                ).matches
-                                            }
+                                            inverted={isDarkMode}
                                             className="w-32 relative"
                                         />
                                     </motion.div>
