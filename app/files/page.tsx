@@ -11,10 +11,13 @@ import { AppLayout } from "@/components/AppLayout"
 import { useInView } from "react-intersection-observer"
 import debounce from 'lodash/debounce'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { AuthPrompt } from '@/components/ui/auth-prompt'
 
 const ITEMS_PER_PAGE = 12
 
 function FilesContent({ onFileSelect }: { onFileSelect: (file: FileData) => void }) {
+  const { session, isPreviewMode } = useAuth()
   const [files, setFiles] = useState<FileData[]>([])
   const [loading, setLoading] = useState(false)
   const [initialLoad, setInitialLoad] = useState(true)
@@ -80,8 +83,45 @@ function FilesContent({ onFileSelect }: { onFileSelect: (file: FileData) => void
   )
 
   useEffect(() => {
-    fetchFiles(0, '')
-  }, [fetchFiles])
+    const fetchFiles = async () => {
+      if (!session?.user?.id) return
+      
+      try {
+        loadingRef.current = true
+        setLoading(true)
+        
+        let query = supabase
+          .from('files')
+          .select('*', { count: 'exact' })
+          .order('updated_at', { ascending: false })
+          .range(0 * ITEMS_PER_PAGE, (0 + 1) * ITEMS_PER_PAGE - 1)
+
+        const { data, error, count } = await query
+
+        if (error) throw error
+
+        const mappedFiles = (data || []).map(file => ({
+          id: file.id,
+          name: file.file_name,
+          type: file.file_type,
+          updated_at: file.updated_at,
+          size: file.file_size,
+          user_id: file.user_id
+        }))
+
+        setFiles(mappedFiles)
+        setHasMore(count ? (0 + 1) * ITEMS_PER_PAGE < count : false)
+      } catch (error) {
+        console.error('Error fetching files:', error)
+      } finally {
+        loadingRef.current = false
+        setLoading(false)
+        setInitialLoad(false)
+      }
+    }
+
+    fetchFiles()
+  }, [supabase, session?.user?.id])
 
   useEffect(() => {
     if (!initialLoad) {
@@ -97,6 +137,10 @@ function FilesContent({ onFileSelect }: { onFileSelect: (file: FileData) => void
       fetchFiles(nextPage, searchQuery)
     }
   }, [inView, hasMore, page, fetchFiles, searchQuery])
+
+  if (isPreviewMode) {
+    return <AuthPrompt canClose={false} />
+  }
 
   if (initialLoad) {
     return <LoadingCards />
@@ -148,6 +192,7 @@ function FilesContent({ onFileSelect }: { onFileSelect: (file: FileData) => void
 }
 
 export default function FilesPage() {
+  const { isPreviewMode } = useAuth()
   const [showDetails, setShowDetails] = useState(false)
   const [selectedFile, setSelectedFile] = useState<FileData | null>(null)
   const [chats, setChats] = useState<any[]>([])
@@ -168,6 +213,10 @@ export default function FilesPage() {
     }
     fetchChats()
   }, [])
+
+  if (isPreviewMode) {
+    return <AuthPrompt canClose={false} />
+  }
 
   return (
     <AppLayout
