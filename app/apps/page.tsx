@@ -12,6 +12,7 @@ import { useInView } from "react-intersection-observer";
 import debounce from 'lodash/debounce';
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { AuthPrompt } from '@/components/ui/auth-prompt'
 
 const ITEMS_PER_PAGE = 12;
 
@@ -25,7 +26,7 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
   const supabase = createClient();
   const { ref, inView } = useInView();
   const loadingRef = useRef(false);
-  const { session } = useAuth();
+  const { session, isPreviewMode } = useAuth();
   const router = useRouter();
 
   const fetchApps = useCallback(async (pageIndex: number, search: string) => {
@@ -75,8 +76,37 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
   );
 
   useEffect(() => {
-    fetchApps(0, '');
-  }, [fetchApps]);
+    const fetchApps = async () => {
+      if (!session?.user?.id) return
+      
+      try {
+        loadingRef.current = true
+        setLoading(true)
+        
+        let query = supabase
+          .from('apps')
+          .select('*', { count: 'exact' })
+          .eq('user_id', session.user.id)
+          .order('updated_at', { ascending: false })
+          .range(0 * ITEMS_PER_PAGE, (0 + 1) * ITEMS_PER_PAGE - 1)
+
+        const { data, error, count } = await query
+
+        if (error) throw error
+
+        setApps(data || [])
+        setHasMore(count ? (0 + 1) * ITEMS_PER_PAGE < count : false)
+      } catch (error) {
+        console.error('Error fetching apps:', error)
+      } finally {
+        loadingRef.current = false
+        setLoading(false)
+        setInitialLoad(false)
+      }
+    }
+
+    fetchApps()
+  }, [supabase, session?.user?.id])
 
   useEffect(() => {
     if (!initialLoad) {
@@ -92,6 +122,10 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
       fetchApps(nextPage, searchQuery);
     }
   }, [inView, hasMore, page, fetchApps, searchQuery]);
+
+  if (isPreviewMode) {
+    return <AuthPrompt canClose={false} />
+  }
 
   if (initialLoad) {
     return <LoadingCards />;
