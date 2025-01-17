@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface File {
     id: string
@@ -35,6 +36,7 @@ export function FileSelector({
     selectedFileIds = [],
     className,
 }: FileSelectorProps) {
+    const { session, showAuthPrompt } = useAuth()
     const [files, setFiles] = useState<File[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(
         new Set(selectedFileIds)
@@ -49,6 +51,7 @@ export function FileSelector({
     useEffect(() => {
         const fetchFiles = async () => {
             if (!isOpen && selectedFileIds.length === 0) return
+            if (!session) return
             setIsLoading(true)
             try {
                 const response = await fetch('/api/files')
@@ -63,7 +66,7 @@ export function FileSelector({
         }
 
         fetchFiles()
-    }, [isOpen, selectedFileIds.length])
+    }, [isOpen, selectedFileIds.length, session])
 
     const handleFileClick = (fileId: string) => {
         const newSelectedIds = new Set(selectedIds)
@@ -99,7 +102,7 @@ export function FileSelector({
                     )}
                 >
                     <Files className="h-5 w-5" />
-                    {selectedIds.size > 0 && (
+                    {session && selectedIds.size > 0 && (
                         <div className="absolute -top-1 -right-1 bg-green-500 dark:bg-[#03f241] text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
                             {selectedIds.size}
                         </div>
@@ -116,69 +119,90 @@ export function FileSelector({
                 </div>
                 <ScrollArea className="h-[300px]">
                     <div className="p-4">
-                        <div className="mb-4">
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="w-full px-2 py-1.5 rounded-md text-sm opacity-60 cursor-not-allowed bg-muted/50 flex items-center gap-2">
-                                            <Sheet className="h-4 w-4 text-green-600" />
-                                            <span>Add Google Sheets</span>
-                                            <span className="ml-auto text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                                Coming Soon!
-                                            </span>
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="left">
-                                        <p className="text-sm">
-                                            Google Sheets integration coming soon!
-                                        </p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-
-                        <div className="text-xs font-medium text-muted-foreground mb-2">
-                            Local Files
-                        </div>
-
-                        {isLoading ? (
-                            <LoadingSkeleton />
-                        ) : files.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">
-                                No files available
-                            </p>
-                        ) : (
-                            <div className="space-y-2">
-                                {files.map((file) => (
-                                    <button
-                                        key={file.id}
-                                        onClick={() =>
-                                            handleFileClick(file.id)
-                                        }
-                                        className={cn(
-                                            'w-full text-left px-2 py-1.5 rounded-md text-sm',
-                                            'hover:bg-secondary/50 transition-colors',
-                                            'flex items-center justify-between',
-                                            selectedIds.has(file.id) &&
-                                                'bg-green-100 dark:bg-[#03f241]/10 hover:bg-green-100 dark:hover:bg-[#03f241]/10 text-green-900 dark:text-[#03f241]'
-                                        )}
+                        {!session ? (
+                            <>
+                                <div className="mb-4">
+                                    <div 
+                                        onClick={showAuthPrompt}
+                                        className="w-full px-2 py-1.5 rounded-md text-sm bg-secondary/50 hover:bg-secondary cursor-pointer flex items-center gap-2"
                                     >
-                                        <span className="truncate">
-                                            {truncate(file.file_name)}
-                                        </span>
-                                        <span className={cn(
-                                            "text-xs ml-2",
-                                            selectedIds.has(file.id)
-                                                ? 'text-green-700 dark:text-[#03f241]/70'
-                                                : 'text-muted-foreground'
-                                        )}>
-                                            {new Date(
-                                                file.created_at
-                                            ).toLocaleDateString()}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
+                                        <Sheet className="h-4 w-4 text-green-600" />
+                                        <span>Connect Google Sheets</span>
+                                    </div>
+                                </div>
+                                <div className="text-center py-4">
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                        Login to connect your data
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="mb-4">
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="w-full px-2 py-1.5 rounded-md text-sm opacity-60 cursor-not-allowed bg-muted/50 flex items-center gap-2">
+                                                    <Sheet className="h-4 w-4 text-green-600" />
+                                                    <span>Add Google Sheets</span>
+                                                    <span className="ml-auto text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                        Coming Soon!
+                                                    </span>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="left">
+                                                <p className="text-sm">
+                                                    Google Sheets integration coming soon!
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
+
+                                <div className="text-xs font-medium text-muted-foreground mb-2">
+                                    Local Files
+                                </div>
+
+                                {isLoading ? (
+                                    <LoadingSkeleton />
+                                ) : files.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                        No files available
+                                    </p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {files.map((file) => (
+                                            <button
+                                                key={file.id}
+                                                onClick={() =>
+                                                    handleFileClick(file.id)
+                                                }
+                                                className={cn(
+                                                    'w-full text-left px-2 py-1.5 rounded-md text-sm',
+                                                    'hover:bg-secondary/50 transition-colors',
+                                                    'flex items-center justify-between',
+                                                    selectedIds.has(file.id) &&
+                                                        'bg-green-100 dark:bg-[#03f241]/10 hover:bg-green-100 dark:hover:bg-[#03f241]/10 text-green-900 dark:text-[#03f241]'
+                                                )}
+                                            >
+                                                <span className="truncate">
+                                                    {truncate(file.file_name)}
+                                                </span>
+                                                <span className={cn(
+                                                    "text-xs ml-2",
+                                                    selectedIds.has(file.id)
+                                                        ? 'text-green-700 dark:text-[#03f241]/70'
+                                                        : 'text-muted-foreground'
+                                                )}>
+                                                    {new Date(
+                                                        file.created_at
+                                                    ).toLocaleDateString()}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </ScrollArea>
