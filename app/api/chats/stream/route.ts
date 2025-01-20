@@ -4,9 +4,8 @@ import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 import { Message, streamText } from 'ai'
 
-export const maxDuration = 100
+export const maxDuration = 150
 
-// Types
 interface StreamlitToolCall {
     toolCallId: string
     toolName: string
