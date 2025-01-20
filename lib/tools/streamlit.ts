@@ -1,8 +1,6 @@
-import { ProcessMessage, Sandbox } from 'e2b'
-import { CoreTool, tool } from 'ai'
+import { Sandbox } from 'e2b'
+import { tool } from 'ai'
 import { z } from 'zod'
-import fs from 'fs'
-import path from 'path'
 
 const streamlitToolSchema = z.object({
     code: z
@@ -36,41 +34,28 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
         appDescription,
     }: StreamlitToolInput) => {
         try {
-            // Create E2B sandbox instance
-            const sandbox = await Sandbox.create()
+            const sandbox = await Sandbox.create({
+                template: 'streamlit-sandbox-s3'
+            })
+            
+            await sandbox.filesystem.makeDir('/app')
+            await sandbox.filesystem.write('/app/test.py', code)
 
-            // Read the check.py script
-            const checkScript = fs.readFileSync(
-                path.join(process.cwd(), 'lib/tools/check.py'),
-                'utf-8'
-            )
-
-            // Save both files to sandbox
-            await sandbox.filesystem.makeDir('/test')
-            await sandbox.filesystem.write('/test/check.py', checkScript)
-            await sandbox.filesystem.write('/test/app.py', code)
-
-            // Execute check.py to validate app.py
+            // Run with streamlit in headless mode to check for errors
             const execution = await sandbox.process.startAndWait({
-                cmd: 'python /test/check.py',
-            })
-            const errors = execution.stdout + execution.stderr
-            console.log('Errors!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:', errors)
-            console.log('Generated Streamlit code:', {
-                codeLength: code.length,
-                firstLines: code.split('\n').slice(0, 3).join('\n'),
-                appName,
-                appDescription,
-                errors: errors || 'No errors found'
+                cmd: 'python /app/test.py',
             })
 
-            // Close sandbox after execution
+            // Get all output
+            const fullOutput = execution.stdout + execution.stderr
+            
+            // Extract only traceback and subsequent content
+            const tracebackMatch = fullOutput.match(/Traceback \(most recent call last\):[\s\S]*$/m)
+            const errors = tracebackMatch ? tracebackMatch[0] : 'No errors found!'
+
             await sandbox.close()
 
-            console.log('Errors in sandbox:', errors)
-            return {
-                errors: errors || 'No errors found!'
-            }
+            return { errors }
         } catch (error) {
             console.error('Sandbox execution error:', error)
             throw error

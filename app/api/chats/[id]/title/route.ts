@@ -1,9 +1,11 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { anthropic } from '@ai-sdk/anthropic'
-import { generateText } from 'ai'
+import { generateObject } from 'ai'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
 export async function POST(
-    request: Request,
+    req: NextRequest,
     context: { params: { id: string } }
 ) {
     const { id } = await context.params
@@ -11,7 +13,7 @@ export async function POST(
     const user = await getUser()
 
     if (!user) {
-        return new Response('Unauthorized', { status: 401 })
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
@@ -25,54 +27,58 @@ export async function POST(
 
         if (error) throw error
         if (!chat?.messages?.length) {
-            return new Response(
-                JSON.stringify({ title: 'New Chat' }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
+            return NextResponse.json(
+                { title: 'New Chat' },
+                { status: 200 }
             )
         }
 
         // Get the first user message
         const firstUserMessage = chat.messages.find(m => m.role === 'user')
         if (!firstUserMessage) {
-            return new Response(
-                JSON.stringify({ title: 'New Chat' }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
+            return NextResponse.json(
+                { title: 'New Chat' },
+                { status: 200 }
             )
         }
 
-        // Generate title using AI
-        const { text: title } = await generateText({
+        // Generate title using AI with schema validation
+        const { object } = await generateObject({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a helpful assistant that generates concise, descriptive titles for chat conversations. Generate a title that is at most 6 words long based on the first message in the chat.'
+                    content: 'You are a project title generator. Generate concise, descriptive titles based on conversation content.'
                 },
                 {
                     role: 'user',
                     content: firstUserMessage.content
                 }
             ],
-            maxTokens: 50,
+            schema: z.object({
+                title: z
+                    .string()
+                    .max(50)
+                    .describe('Generate a 6-word title that captures the essence of the conversation')
+            }),
             temperature: 0.7
         })
 
         // Update chat title
-        await supabase
+        const { error: updateError } = await supabase
             .from('chats')
-            .update({ name: title || 'New Chat' })
+            .update({ name: object.title || 'New Chat' })
             .eq('id', id)
             .eq('user_id', user.id)
 
-        return new Response(
-            JSON.stringify({ title: title || 'New Chat' }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+        if (updateError) throw updateError
+
+        return NextResponse.json({ title: object.title || 'New Chat' })
     } catch (error) {
         console.error('Error generating title:', error)
-        return new Response(
-            JSON.stringify({ error: 'Failed to generate title' }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        return NextResponse.json(
+            { error: 'Failed to generate title' },
+            { status: 500 }
         )
     }
 }
