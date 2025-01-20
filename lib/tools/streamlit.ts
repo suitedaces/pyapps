@@ -1,6 +1,8 @@
 import { Sandbox } from 'e2b'
 import { tool } from 'ai'
 import { z } from 'zod'
+import { setupS3Mount } from '@/lib/s3'
+import { getUser } from '@/lib/supabase/server'
 
 const streamlitToolSchema = z.object({
     code: z
@@ -34,9 +36,16 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
         appDescription,
     }: StreamlitToolInput) => {
         try {
+            const user = await getUser()
+            if (!user) {
+                throw new Error('User not authenticated')
+            }
+
             const sandbox = await Sandbox.create({
                 template: 'streamlit-sandbox-s3'
             })
+            
+            await setupS3Mount(sandbox, user.id)
             
             await sandbox.filesystem.makeDir('/app')
             await sandbox.filesystem.write('/app/test.py', code)

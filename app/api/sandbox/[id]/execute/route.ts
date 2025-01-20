@@ -1,10 +1,10 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { Process, ProcessMessage, Sandbox } from '@e2b/code-interpreter'
 import { NextRequest, NextResponse } from 'next/server'
-
+import { setupS3Mount } from '@/lib/s3'
 interface RouteContext {
     params: Promise<{ id: string }>
-}
+}   
 
 export const maxDuration = 30
 
@@ -235,43 +235,3 @@ export async function POST(req: NextRequest, context: RouteContext) {
 }
 
 // Helper function for S3 mount setup
-async function setupS3Mount(sandbox: Sandbox, userId: string) {
-    // Ensure directory exists
-    await sandbox.process.start({
-        cmd: 'sudo mkdir -p /app/s3',
-    })
-
-    // Write credentials file
-    await sandbox.process.start({
-        cmd: `echo "${process.env.AWS_ACCESS_KEY_ID}:${process.env.AWS_SECRET_ACCESS_KEY}" | sudo tee /etc/passwd-s3fs > /dev/null && sudo chmod 600 /etc/passwd-s3fs`,
-    })
-
-    // Mount S3 with debug output
-    await sandbox.process.start({
-        cmd: `sudo s3fs "pyapps:/${userId}" /app/s3 \
-            -o passwd_file=/etc/passwd-s3fs \
-            -o url="https://s3.amazonaws.com" \
-            -o endpoint=${process.env.AWS_REGION} \
-            -o allow_other \
-            -o umask=0000 \
-            -o dbglevel=info \
-            -o use_path_request_style \
-            -o default_acl=private \
-            -o use_cache=/tmp`,
-        onStdout: (output: ProcessMessage) => {
-            console.log('Mount stdout:', output.line)
-        },
-        onStderr: (output: ProcessMessage) => {
-            console.error('Mount stderr:', output.line)
-        },
-    })
-
-    // Verify mount
-    const verifyMount = (await sandbox.process.start({
-        cmd: 'df -h | grep s3fs || echo "not mounted"',
-    })) as Process & { text: string }
-
-    if (verifyMount.text?.includes('not mounted')) {
-        throw new Error('Failed to verify S3 mount')
-    }
-}
