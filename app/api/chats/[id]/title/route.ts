@@ -1,67 +1,78 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { anthropic } from '@ai-sdk/anthropic'
-import { generateObject } from 'ai'
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
+import { generateText } from 'ai'
 
-interface RouteContext {
-    params: Promise<{ id: string }>
-}
+export async function POST(
+    request: Request,
+    context: { params: { id: string } }
+) {
+    const { id } = await context.params
+    const supabase = await createClient()
+    const user = await getUser()
 
-export async function POST(req: NextRequest, context: RouteContext) {
+    if (!user) {
+        return new Response('Unauthorized', { status: 401 })
+    }
+
     try {
-        const supabase = await createClient()
-        const { id } = await context.params
-
-        // Get the first message for this chat
-        const { data: message, error: messageError } = await supabase
-            .from('messages')
-            .select('user_message, assistant_message')
-            .eq('chat_id', id)
-            .order('created_at', { ascending: true })
-            .limit(1)
+        // Get chat messages directly from chats table
+        const { data: chat, error } = await supabase
+            .from('chats')
+            .select('messages')
+            .eq('id', id)
+            .eq('user_id', user.id)
             .single()
 
-        if (messageError) throw messageError
+        if (error) throw error
+        if (!chat?.messages?.length) {
+            return new Response(
+                JSON.stringify({ title: 'New Chat' }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
 
-        const { object } = await generateObject({
-            model: anthropic('claude-3-haiku-20240307'),
+        // Get the first user message
+        const firstUserMessage = chat.messages.find(m => m.role === 'user')
+        if (!firstUserMessage) {
+            return new Response(
+                JSON.stringify({ title: 'New Chat' }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
+
+        // Generate title using AI
+        const { text: title } = await generateText({
+            model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [
                 {
                     role: 'system',
-                    content:
-                        'You are a project title generator for a conversational streamlit app builder web app.',
+                    content: 'You are a helpful assistant that generates concise, descriptive titles for chat conversations. Generate a title that is at most 6 words long based on the first message in the chat.'
                 },
                 {
                     role: 'user',
-                    content: `User message: "${message.user_message}"\nAssistant response: "${message.assistant_message}"`,
-                },
+                    content: firstUserMessage.content
+                }
             ],
-            schema: z.object({
-                title: z
-                    .string()
-                    .max(100)
-                    .describe(
-                        'Generate an 8-word title. Do not include quotes or the words "conversation", "streamlit", "app"'
-                    ),
-            }),
-            temperature: 0.7,
+            maxTokens: 50,
+            temperature: 0.7
         })
 
-        // Update chat title in database
-        const { error: updateError } = await supabase
+        // Update chat title
+        await supabase
             .from('chats')
-            .update({ name: object.title })
+            .update({ name: title || 'New Chat' })
             .eq('id', id)
+            .eq('user_id', user.id)
 
-        if (updateError) throw updateError
-
-        return NextResponse.json({ title: object.title })
+        return new Response(
+            JSON.stringify({ title: title || 'New Chat' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     } catch (error) {
         console.error('Error generating title:', error)
-        return NextResponse.json(
-            { error: 'Failed to generate title' },
-            { status: 500 }
+        return new Response(
+            JSON.stringify({ error: 'Failed to generate title' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
         )
     }
 }

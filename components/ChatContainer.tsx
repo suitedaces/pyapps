@@ -82,7 +82,6 @@ export default function ChatContainer({
     isNewChat = false,
     isInChatPage = false,
     initialAppId = null,
-    onChatDeleted,
 }: ChatContainerProps) {
     const router = useRouter()
     const { session, isLoading, shouldShowAuthPrompt } =
@@ -177,17 +176,17 @@ export default function ChatContainer({
     } = useChat({
         api: '/api/chats/stream',
         id: currentChatId || undefined,
-        initialMessages: formatDatabaseMessages(initialMessages || []),
+        initialMessages: initialMessages || [],
         body: {
             chatId: currentChatId,
             model: currentModel,
             config: languageModel,
             experimental_streamData: true,
+            fileIds: persistedFileIds
         },
         onResponse: async (response) => {
             const newChatId = response.headers.get('x-chat-id')
             const newAppId = response.headers.get('x-app-id')
-            console.log('🔄 New App ID:', newAppId)
             if (newChatId && !currentChatId) {
                 newChatIdRef.current = newChatId
             }
@@ -342,14 +341,14 @@ export default function ChatContainer({
                     invocation?.toolName === 'streamlitTool' &&
                     invocation?.state === 'result' &&
                     invocation?.result?.code
-            ) as StreamlitToolCall | undefined
+            )
 
             if (streamlitCall?.result?.code) {
                 setGeneratedCode(streamlitCall.result.code)
-                await updateStreamlitApp(streamlitCall.result.code)
+                await updateStreamlitApp(streamlitCall.result.code, true)
             }
         },
-        []
+        [setGeneratedCode, updateStreamlitApp]
     )
 
     // Improved file upload with abort controller
@@ -396,28 +395,9 @@ export default function ChatContainer({
                     data: messageData as JSONValue
                 })
 
-                // Then store in database
-                const response = await fetch('/api/chats/messages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        chatId: currentChatId,
-                        userMessage: "", // Empty for initial file upload
-                        assistantMessage,
-                        data: messageData,
-                        tokenCount: 0,
-                        toolCalls: [],
-                        toolResults: []
-                    })
-                })
-
-                const { chatId } = await response.json()
-
                 // Link file to chat
-                if (chatId && fileId) {
-                    await fetch(`/api/chats/${chatId}/files`, {
+                if (currentChatId && fileId) {
+                    await fetch(`/api/chats/${currentChatId}/files`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -430,7 +410,7 @@ export default function ChatContainer({
 
                 // If we were on home page, route to new chat
                 if (!currentChatId) {
-                    router.push(`/chat/${chatId}`)
+                    router.push(`/chat/${currentChatId}`)
                 }
 
             } catch (error) {
@@ -459,7 +439,6 @@ export default function ChatContainer({
                 // Handle normal message case
                 await originalHandleSubmit(e, {
                     body: {
-                        message,
                         fileIds: persistedFileIds,
                     },
                 })
@@ -564,14 +543,6 @@ export default function ChatContainer({
         }))
     }, [])
 
-    // Effects
-    // useEffect(() => {
-    //     if (chatLoading) {
-    //         setGeneratingCode(true)
-    //         setGeneratedCode('')
-    //     }
-    // }, [chatLoading, setGeneratingCode, setGeneratedCode])
-
     useEffect(() => {
         const loadChats = async () => {
             if (!session?.user?.id) return
@@ -590,73 +561,47 @@ export default function ChatContainer({
 
     useEffect(() => {
         const initializeChat = async () => {
-            if (
-                !currentChatId ||
-                isVersionSwitching.current ||
-                hasInitialized.current
-            )
-                return
-
+            if (!currentChatId || isVersionSwitching.current || hasInitialized.current) return
             hasInitialized.current = true
 
             try {
-                if (initialMessages?.length) {
-                    setMessages(initialMessages)
-                }
-
-                if (!initialAppId && !currentAppId) {
-                    const chatResponse = await fetch(
-                        `/api/chats/${currentChatId}`
-                    )
-                    const chatData = await chatResponse.json()
-                    setCurrentAppId(chatData.app_id)
-                }
-
-                const versionData = Array.isArray(initialVersion)
-                    ? initialVersion[0]
-                    : initialVersion
-
+                // Handle initial version if available
+                const versionData = Array.isArray(initialVersion) ? initialVersion[0] : initialVersion
                 if (versionData?.code) {
                     setRightPanel((prev) => ({
                         ...prev,
                         isVisible: true,
                     }))
+                    setGeneratingCode(true)
                     setGeneratedCode(versionData.code)
                     await updateStreamlitApp(versionData.code, true)
                 }
 
+                // Load and set messages
                 if (!initialMessages?.length) {
-                    const messagesResponse = await fetch(
-                        `/api/chats/messages?chatId=${currentChatId}`
-                    )
-                    if (!messagesResponse.ok)
-                        throw new Error('Failed to fetch messages')
+                    const messagesResponse = await fetch(`/api/chats/messages?chatId=${currentChatId}`)
+                    if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                     const data = await messagesResponse.json()
-
+                    
                     if (data.messages?.length) {
-                        setMessages(formatDatabaseMessages(data.messages))
-
-                        const lastStreamlitCode = data.messages
-                            .filter((msg: any) => msg.tool_results?.length)
-                            .map((msg: any) => {
-                                const toolResult = msg.tool_results.find(
-                                    (t: any) => t.name === 'streamlitTool'
-                                )
-                                return toolResult?.result
-                            })
-                            .filter(Boolean)
-                            .pop()
-
-                        if (lastStreamlitCode) {
-                            setRightPanel((prev) => ({
-                                ...prev,
-                                isVisible: true,
-                            }))
-                            setGeneratingCode(true)
-                            setGeneratedCode(lastStreamlitCode)
-                            await updateStreamlitApp(lastStreamlitCode, true)
-                        }
+                        // Convert messages to Vercel AI SDK format
+                        const formattedMessages = data.messages.map((msg: any) => ({
+                            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                            role: msg.role,
+                            content: msg.content,
+                            ...(msg.toolInvocations && { toolInvocations: msg.toolInvocations })
+                        }))
+                        setMessages(formattedMessages)
                     }
+                } else {
+                    // Format initial messages if provided
+                    const formattedMessages = initialMessages.map((msg: any) => ({
+                        id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                        role: msg.role,
+                        content: msg.content,
+                        ...(msg.toolInvocations && { toolInvocations: msg.toolInvocations })
+                    }))
+                    setMessages(formattedMessages)
                 }
             } catch (error) {
                 console.error('Error initializing chat:', error)
@@ -667,7 +612,7 @@ export default function ChatContainer({
         }
 
         initializeChat()
-    }, [currentChatId])
+    }, [currentChatId, initialMessages, initialVersion, setGeneratedCode, setGeneratingCode, updateStreamlitApp])
 
     // Cleanup effect
     useEffect(() => {

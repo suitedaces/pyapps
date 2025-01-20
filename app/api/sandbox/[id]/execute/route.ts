@@ -195,7 +195,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
         await setupS3Mount(sandbox, ownerUserId)
         // Write and execute code (common for both flows)
-        console.log('Writing code to sandbox: ', codeContent)
+        // console.log('Writing code to sandbox: ', codeContent)
         await sandbox.filesystem.write('/app/app.py', codeContent)
 
         console.log('Starting Streamlit process')

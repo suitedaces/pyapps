@@ -1,5 +1,8 @@
+import { ProcessMessage, Sandbox } from 'e2b'
 import { CoreTool, tool } from 'ai'
 import { z } from 'zod'
+import fs from 'fs'
+import path from 'path'
 
 const streamlitToolSchema = z.object({
     code: z
@@ -21,115 +24,56 @@ const streamlitToolSchema = z.object({
         .describe("Brief summary of the app's functionality and purpose"),
 })
 
-export const streamlitTool: CoreTool<
-    z.ZodObject<{
-        code: z.ZodString
-        requiredLibraries: z.ZodArray<z.ZodString>
-        appName: z.ZodString
-        appDescription: z.ZodString
-    }>,
-    {
-        code: string
-        requiredLibraries: string[]
-        appName: string
-        appDescription: string
-    }
-> = tool({
+type StreamlitToolInput = z.infer<typeof streamlitToolSchema>
+type StreamlitToolOutput = { errors: string }
+
+export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutput>({
     parameters: streamlitToolSchema,
     execute: async ({
         code,
         requiredLibraries,
         appName,
         appDescription,
-    }: {
-        code: string
-        requiredLibraries: string[]
-        appName: string
-        appDescription: string
-    }) => {
-        console.log('Generated Streamlit code:', {
-            codeLength: code.length,
-            firstLines: code.split('\n').slice(0, 3).join('\n'),
-            appName,
-            appDescription,
-        })
-        return {
-            code,
-            requiredLibraries,
-            appName,
-            appDescription,
+    }: StreamlitToolInput) => {
+        try {
+            // Create E2B sandbox instance
+            const sandbox = await Sandbox.create()
+
+            // Read the check.py script
+            const checkScript = fs.readFileSync(
+                path.join(process.cwd(), 'lib/tools/check.py'),
+                'utf-8'
+            )
+
+            // Save both files to sandbox
+            await sandbox.filesystem.makeDir('/test')
+            await sandbox.filesystem.write('/test/check.py', checkScript)
+            await sandbox.filesystem.write('/test/app.py', code)
+
+            // Execute check.py to validate app.py
+            const execution = await sandbox.process.startAndWait({
+                cmd: 'python /test/check.py',
+            })
+            const errors = execution.stdout + execution.stderr
+            console.log('Errors!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:', errors)
+            console.log('Generated Streamlit code:', {
+                codeLength: code.length,
+                firstLines: code.split('\n').slice(0, 3).join('\n'),
+                appName,
+                appDescription,
+                errors: errors || 'No errors found'
+            })
+
+            // Close sandbox after execution
+            await sandbox.close()
+
+            console.log('Errors in sandbox:', errors)
+            return {
+                errors: errors || 'No errors found!'
+            }
+        } catch (error) {
+            console.error('Sandbox execution error:', error)
+            throw error
         }
     },
 })
-
-// import { z } from 'zod'
-// import { generateObject, tool, CoreTool } from 'ai'
-// import { anthropic } from '@ai-sdk/anthropic'
-
-// export const streamlitTool: CoreTool<z.ZodObject<{
-//     dataDescription: z.ZodOptional<z.ZodString>,
-//     query: z.ZodString,
-//     fileDirectory: z.ZodOptional<z.ZodString>
-// }>, {
-//     code: string,
-//     appName: string,
-//     appDescription: string
-// }> = tool({
-//     parameters: z.object({
-//         dataDescription: z.string().max(1000, 'Please be concise, less words, more details.').optional().describe('If a file exists, description of the data, column names, and insights about the data that the user is interested in.'),
-//         query: z.string().max(1000, 'Please be concise and to the point, yet detailed.').describe('Detailed instructions on what the user may want to see in the Streamlit app. NOT the actual code.'),
-//         fileDirectory: z
-//             .string()
-//             .regex(/^\/app\/s3\/data\/.+\/$/, 'Must be in the format "/app/s3/data/<fileNameWithExtension/>"')
-//             .optional()
-//             .describe('Should always be in the format "/app/s3/data/<fileNameWithExtension/>"'),
-//     }),
-//     execute: async ({ dataDescription, query, fileDirectory }: { dataDescription?: string, query: string, fileDirectory?: string }) => {
-//         console.log('Starting streamlitTool execution:', { query, fileDirectory })
-
-//         try {
-//             console.log('Generating Streamlit code with Claude...')
-//             const { object: { code, appName, appDescription } } = await generateObject({
-//                 model: anthropic('claude-3-5-sonnet-20241022'),
-//                 schema: z.object({
-//                     code: z.string().describe('ONLY the generated Streamlit code. Do not include any other text.'),
-//                     appName: z.string().describe('Name of the app you created.'),
-//                     appDescription: z.string().describe('Short description of the app you created.')
-//                 }),
-//                 messages: [
-//                     {
-//                         role: 'system',
-//                         content: `You are a Python code generation assistant specializing in Streamlit apps.
-// Generate a complete, runnable Streamlit app based on the given query.
-// ${fileDirectory ? `You're working with a file at path "/app/s3/data/${fileDirectory}".
-// IMPORTANT: Always use the FULL PATH "/app/s3/data/<filename>" when reading files.
-// DO NOT use relative paths, always use the absolute path starting with "/app/s3/data/` : ''}
-// DO NOT use "st.experimental_rerun()" at any cost.
-// Only respond with the code, no potential errors, no explanations!
-// Include all necessary imports at the beginning of the file.`.replace(/\n/g, ' ')
-//                     },
-//                     { role: 'user', content: query }
-//                 ]
-//             })
-
-//             console.log('Generated Streamlit code:', {
-//                 promptLength: query.length,
-//                 codeLength: code.length,
-//                 firstLines: code.split('\n').slice(0, 3).join('\n'),
-//                 appName,
-//                 appDescription
-//             })
-
-//             return { code, appName, appDescription }
-
-//         } catch (error) {
-//             console.error('Error in streamlit tool:', {
-//                 error,
-//                 query,
-//                 dataDescription,
-//                 fileDirectory
-//             })
-//             throw error
-//         }
-//     }
-// })

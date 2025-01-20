@@ -59,6 +59,27 @@ function Chat({
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
+    const scrollTimeoutRef = useRef<NodeJS.Timeout>()
+
+    // Auto-scroll when messages change
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            // Clear any existing timeout
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current)
+            }
+            // Set new timeout for scroll
+            scrollTimeoutRef.current = setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+            }, 100)
+        }
+        // Cleanup
+        return () => {
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current)
+            }
+        }
+    }, [messages])
 
     // Handle submission
     const handleSubmit = async (
@@ -89,13 +110,6 @@ function Chat({
         onUpdateStreamlit?.(code)
     }
 
-    // Auto-scroll when messages change
-    useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
-        }
-    }, [messages])
-
     return (
         <div className="flex flex-col relative z-20 text-black h-full">
             {/* Error displays */}
@@ -123,18 +137,26 @@ function Chat({
             {/* Messages */}
             <ScrollArea className="flex-1 p-4 space-y-4 w-full max-w-[800px] m-auto pb-[120px]">
                 {Array.isArray(messages) &&
-                    messages.map((message, index) => (
-                        <AIMessage
-                            key={message.id}
-                            {...message}
-                            data={message.data as { type: string; actions?: any[] }}
-                            isLastMessage={index === messages.length - 1}
-                            isLoading={isLoading}
-                            onCodeClick={handleCodeClick}
-                            onTogglePanel={() => onTogglePanel('right')}
-                            onInputChange={onInputChange}
-                        />
-                    ))}
+                    messages.map((message, index) => {
+                        // Determine if this is the first message in a group of assistant messages
+                        const prevMessage = index > 0 ? messages[index - 1] : null;
+                        const showAvatar = message.role === 'assistant' && 
+                            (!prevMessage || prevMessage.role === 'user' || prevMessage.role === 'system');
+
+                        return (
+                            <AIMessage
+                                key={`${message.id}-${index}`}
+                                {...message}
+                                data={message.data as { type: string; actions?: any[] }}
+                                isLastMessage={index === messages.length - 1}
+                                isLoading={isLoading}
+                                onCodeClick={handleCodeClick}
+                                onTogglePanel={() => onTogglePanel('right')}
+                                onInputChange={onInputChange}
+                                showAvatar={showAvatar}
+                            />
+                        );
+                    })}
                 <div ref={messagesEndRef} />
             </ScrollArea>
 

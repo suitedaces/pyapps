@@ -16,8 +16,21 @@ interface ActionButton {
     [key: string]: string
 }
 
-interface MessageProps extends Omit<AIMessage, 'data'> {
+interface MessageContent {
+    text?: string
+    type?: string
+    args?: any
+    toolName?: string
+    toolCallId?: string
+    result?: any
+}
+
+interface MessageProps {
+    id: string
+    role: 'system' | 'user' | 'assistant' | 'tool' | 'data'
+    content: string | MessageContent[] | any
     isLastMessage?: boolean
+    showAvatar?: boolean
     isLoading?: boolean
     object?: App
     result?: ExecutionResult
@@ -34,6 +47,7 @@ interface MessageProps extends Omit<AIMessage, 'data'> {
         actions?: ActionButton[]
     }
     onInputChange?: (value: string) => void
+    toolInvocations?: any[]
 }
 
 export function Message({
@@ -47,7 +61,11 @@ export function Message({
     onTogglePanel,
     data,
     onInputChange,
+    showAvatar = true,
 }: MessageProps) {
+    // Skip rendering for tool messages
+    if (role === 'tool') return null;
+    
     const isUser = role === 'user'
     const { session } = useAuth()
     const user = session?.user
@@ -55,13 +73,32 @@ export function Message({
     const contentRef = useRef<HTMLDivElement>(null)
     
     useEffect(() => {
-        if (contentRef.current) {
-            markdownToHtml(content).then(html => {
+        const renderMarkdown = async () => {
+            if (!contentRef.current) return
+            
+            let textContent = ''
+            if (typeof content === 'string') {
+                textContent = content
+            } else if (Array.isArray(content)) {
+                // Extract text content from array of content objects
+                textContent = content
+                    .filter(item => item.type === 'text')
+                    .map(item => item.text)
+                    .join('\n\n')
+            }
+            
+            if (!textContent) return
+            
+            try {
+                const html = await markdownToHtml(textContent)
                 if (contentRef.current) {
                     contentRef.current.innerHTML = html
                 }
-            })
+            } catch (error) {
+                console.error('Error rendering markdown:', error)
+            }
         }
+        renderMarkdown()
     }, [content])
 
     useEffect(() => {
@@ -69,6 +106,15 @@ export function Message({
             messageEndRef.current.scrollIntoView({ behavior: 'smooth' })
         }
     }, [isLastMessage, content])
+
+    // Extract tool calls from content if it's an array
+    const extractedToolCalls = Array.isArray(content) 
+        ? content.filter(item => item.type === 'tool-call').map(item => ({
+            toolName: item.toolName,
+            toolCallId: item.toolCallId,
+            args: item.args
+        }))
+        : undefined
 
     return (
         <AnimatePresence mode="wait">
@@ -81,15 +127,22 @@ export function Message({
                 className={cn(
                     'flex w-full',
                     isUser ? 'justify-end' : 'justify-start',
-                    'mb-4'
+                    'mb-0'
                 )}
             >
                 {!isUser ? (
                     <div className="flex flex-row items-start w-full overflow-hidden">
-                        <Avatar className="w-8 h-8 bg-[#FFD700] border-2 mt-5 border-border flex-shrink-0">
+                        <Avatar className={cn(
+                            "w-8 h-8 bg-[#FFD700] border-2 mt-5 border-border flex-shrink-0",
+                            !showAvatar && "opacity-0"
+                        )}>
                             <AvatarFallback>A</AvatarFallback>
                         </Avatar>
-                        <div className="mx-2 p-4 break-words w-full dark:text-dark-text overflow-hidden">
+                        <div className={cn(
+                            "mx-2 break-words w-full dark:text-dark-text overflow-hidden",
+                            showAvatar ? "p-4" : "p-1",
+                            showAvatar ? "mt-0" : "-mt-2"
+                        )}>
                             <div 
                                 ref={contentRef}
                                 className={cn("max-w-[calc(100%-2rem)] overflow-x-auto", assistantMarkdownStyles)}
@@ -106,12 +159,8 @@ export function Message({
                                         <button
                                             key={index}
                                             onClick={() => {
-                                                console.log('Action button clicked:', action.value);
                                                 if (onInputChange) {
-                                                    console.log('Calling onInputChange with:', action.value);
-                                                    onInputChange(action.value);
-                                                } else {
-                                                    console.log('onInputChange is not defined');
+                                                    onInputChange(action.value)
                                                 }
                                             }}
                                             className={cn(
@@ -128,7 +177,7 @@ export function Message({
                                 </motion.div>
                             )}
 
-                            {Boolean(toolInvocations?.length) && (
+                            {(Boolean(toolInvocations?.length) || Boolean(extractedToolCalls?.length)) && (
                                 <ActionPanel
                                     isLoading={isLoading}
                                     isLastMessage={isLastMessage}
@@ -136,7 +185,7 @@ export function Message({
                                 />
                             )}
 
-                            {isLastMessage && isLoading && !toolInvocations?.length && (
+                            {isLastMessage && isLoading && !toolInvocations?.length && !extractedToolCalls?.length && (
                                 <motion.div
                                     className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
                                     animate={{ opacity: [0, 1, 0] }}
@@ -150,7 +199,7 @@ export function Message({
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-row items-start gap-2 max-w-[85%]">
+                    <div className="flex flex-row items-start gap-2 max-w-[85%] mb-4">
                         <div className="grow-0 mx-2 py-2 px-3 rounded-lg bg-background border border-border text-foreground overflow-auto">
                             <div 
                                 ref={contentRef}

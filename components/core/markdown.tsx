@@ -104,12 +104,15 @@ async function highlightCode(code: string, lang: string) {
 }
 
 async function processCodeBlocks(content: string) {
-    const codeBlocks = content.match(/```(\w+)?\n([\s\S]*?)```/g) || []
+    if (!content) return ''
+    
+    const codeBlockRegex = /```([\w]*)\n([\s\S]*?)```/g
     let processedContent = content
+    let match
 
-    for (const block of codeBlocks) {
-        const [, lang, code] = block.match(/```(\w+)?\n([\s\S]*?)```/) || []
-        const highlighted = await highlightCode(code || '', lang || 'text')
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+        const [block, lang, code] = match
+        const highlighted = await highlightCode(code, lang || 'text')
         processedContent = processedContent.replace(block, `<div class="shiki-container">${highlighted}</div>`)
     }
 
@@ -117,15 +120,21 @@ async function processCodeBlocks(content: string) {
 }
 
 export async function markdownToHtml(content: string) {
-    const processedContent = await processCodeBlocks(content)
+    if (!content) return ''
 
-    const file = await unified()
-        .use(remarkParse)
-        .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true })
-        .use(rehypeRaw)
-        .use(rehypeStringify)
-        .process(processedContent)
-    
-    return String(file)
+    try {
+        const processedContent = await processCodeBlocks(content)
+        const file = await unified()
+            .use(remarkParse)
+            .use(remarkGfm)
+            .use(remarkRehype, { allowDangerousHtml: true })
+            .use(rehypeRaw)
+            .use(rehypeStringify)
+            .process(processedContent)
+        
+        return String(file)
+    } catch (error) {
+        console.error('Error processing markdown:', error)
+        return content
+    }
 }

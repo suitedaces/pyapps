@@ -150,6 +150,23 @@ export interface Database {
                     user_id: string
                     app_id: string | null
                     name: string | null
+                    messages: {
+                        id: string
+                        role: 'system' | 'user' | 'assistant' | 'data'
+                        content: string
+                        createdAt?: string
+                        name?: string
+                        data?: Json
+                        annotations?: Json[]
+                        toolInvocations?: {
+                            state: 'call' | 'partial-call' | 'result'
+                            toolCallId: string
+                            toolName: string
+                            args?: Json
+                            result?: Json
+                        }[]
+                        experimental_attachments?: Json[]
+                    }[] | null
                     created_at: string
                     updated_at: string
                 }
@@ -158,6 +175,23 @@ export interface Database {
                     user_id: string
                     app_id?: string | null
                     name?: string | null
+                    messages?: {
+                        id: string
+                        role: 'system' | 'user' | 'assistant' | 'data'
+                        content: string
+                        createdAt?: string
+                        name?: string
+                        data?: Json
+                        annotations?: Json[]
+                        toolInvocations?: {
+                            state: 'call' | 'partial-call' | 'result'
+                            toolCallId: string
+                            toolName: string
+                            args?: Json
+                            result?: Json
+                        }[]
+                        experimental_attachments?: Json[]
+                    }[] | null
                     created_at?: string
                     updated_at?: string
                 }
@@ -166,6 +200,23 @@ export interface Database {
                     user_id?: string
                     app_id?: string | null
                     name?: string | null
+                    messages?: {
+                        id: string
+                        role: 'system' | 'user' | 'assistant' | 'data'
+                        content: string
+                        createdAt?: string
+                        name?: string
+                        data?: Json
+                        annotations?: Json[]
+                        toolInvocations?: {
+                            state: 'call' | 'partial-call' | 'result'
+                            toolCallId: string
+                            toolName: string
+                            args?: Json
+                            result?: Json
+                        }[]
+                        experimental_attachments?: Json[]
+                    }[] | null
                     created_at?: string
                     updated_at?: string
                 }

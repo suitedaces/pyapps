@@ -1,14 +1,16 @@
-import { Json } from '@/lib/database.types'
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
-import { streamText } from 'ai'
+import { Message, streamText } from 'ai'
+
 export const maxDuration = 100
+
 // Types
-interface StreamlitToolResult {
+interface StreamlitToolCall {
+    toolCallId: string
     toolName: string
-    result?: {
+    args: {
         code: string
         appName: string
         appDescription: string
@@ -61,7 +63,7 @@ async function getFileContext(
     supabase: any,
     chatId: string | undefined,
     userId: string
-): Promise<FileContext[] | undefined> {
+): Promise<Set<FileContext> | undefined> {
     if (!chatId) return undefined
 
     // Get all files associated with the chat
@@ -76,46 +78,29 @@ async function getFileContext(
             )
         `)
         .eq('chat_id', chatId)
+        .filter('files.user_id', 'eq', userId)
 
     if (error || !chatFiles?.length) return undefined
 
-    // Filter and map the files
-    const files = (chatFiles as ChatFile[])
-        .map(row => row.files)
-        .filter((file): file is FileData => 
-            file !== null && file.user_id === userId
-        )
-        .map(file => ({
-            fileName: file.file_name,
-            fileType: file.file_type,
-            analysis: file.analysis || '',
-        }))
+    // Create a Map to store unique files by fileName
+    const uniqueFiles = new Map<string, FileContext>()
+    
+    chatFiles.forEach((row: any) => {
+        const file = row.files
+        if (file && file.file_name) {
+            uniqueFiles.set(file.file_name, {
+                fileName: file.file_name,
+                fileType: file.file_type,
+                analysis: file.analysis || '',
+            })
+        }
+    })
 
-    return files.length > 0 ? files : undefined
+    const files = Array.from(uniqueFiles.values())
+    return files.length > 0 ? new Set(files) : undefined
 }
 
 // Message Management
-async function storeMessage(
-    supabase: any,
-    chatId: string,
-    userId: string,
-    userMessage: string,
-    assistantMessage: string,
-    toolCalls: any,
-    toolResults: any,
-    tokenCount: number
-) {
-    await supabase.from('messages').insert({
-        chat_id: chatId,
-        user_id: userId,
-        user_message: userMessage,
-        assistant_message: assistantMessage,
-        tool_calls: toolCalls as Json,
-        tool_results: toolResults as Json,
-        token_count: tokenCount,
-        created_at: new Date().toISOString(),
-    })
-}
 
 // App Version Management
 async function getNextVersionNumber(
@@ -216,11 +201,11 @@ async function handleStreamlitAppVersioning(
     supabase: any,
     userId: string,
     chatId: string,
-    toolResult: StreamlitToolResult
+    toolCall: StreamlitToolCall
 ): Promise<string | null> {
-    if (!toolResult.result) return null
+    if (!toolCall.args) return null
 
-    const { code, appName, appDescription } = toolResult.result
+    const { code, appName, appDescription } = toolCall.args
 
     // Check for existing app
     const { data: chat } = await supabase
@@ -281,12 +266,21 @@ async function linkChatToApp(supabase: any, chatId: string, appId: string) {
     await supabase.from('chats').update({ app_id: appId }).eq('id', chatId)
 }
 
-function buildSystemPrompt(fileContexts: FileContext[] | undefined): string {
-    if (!fileContexts?.length) return CHAT_SYSTEM_PROMPT
+function buildSystemPrompt(fileContexts: Set<FileContext> | undefined): string {
+    if (!fileContexts?.size) return CHAT_SYSTEM_PROMPT
 
-    const fileDescriptions = fileContexts.map(context => 
-        `- A ${context.fileType.toUpperCase()} file named "${context.fileName}" in the directory "/app/s3/data/${context.fileName}". Analysis: ${context.analysis}`
-    ).join('\n')
+    // Convert Set to Array and remove duplicates based on fileName
+    const uniqueContexts = Array.from(
+        new Map(
+            Array.from(fileContexts).map(context => [context.fileName, context])
+        ).values()
+    )
+
+    const fileDescriptions = uniqueContexts
+        .map(context => 
+            `- A ${context.fileType.toUpperCase()} file named "${context.fileName}" in the directory "/app/s3/data/${context.fileName}". Analysis: ${context.analysis}`
+        )
+        .join('\n')
 
     return `${CHAT_SYSTEM_PROMPT}\n\nYou are working with the following files:\n${fileDescriptions}`
 }
@@ -301,7 +295,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { messages, chatId, fileId, fileName, fileIds } = await req.json()
+        const { messages, chatId, fileId, fileIds } = await req.json()
         let newChatId = chatId
         let appId: string | null = null
 
@@ -316,12 +310,10 @@ export async function POST(req: Request) {
             newChatId = chat.id
         }
 
-        // Handle file association
+        // Handle file associations
         if (fileId && newChatId) {
             await linkFileToChat(supabase, newChatId, fileId)
         }
-
-        // Handle multiple file associations if fileIds are provided
         if (fileIds?.length && newChatId) {
             await Promise.all(
                 fileIds.map((fId: string) => linkFileToChat(supabase, newChatId, fId))
@@ -337,44 +329,62 @@ export async function POST(req: Request) {
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [{ role: 'system', content: systemPrompt }, ...messages],
             tools: { streamlitTool },
+            maxSteps: 5,
             experimental_toolCallStreaming: true,
             onFinish: async (event) => {
-                const { text, toolCalls, toolResults, usage } = event
-                if (!text) return
+                const { response } = event
+                if (!response?.messages?.length) return
 
                 try {
-                    const userMessage = messages[messages.length - 1].content
+                    // Combine existing and new messages
+                    const allMessages = [...messages, ...response.messages]
+                    console.log('💾 Processing messages:', JSON.stringify(allMessages, null, 2))
 
-                    // Handle Streamlit versioning if tool results exist
-                    if (toolResults?.length) {
-                        const streamlitResult = toolResults.find(
-                            (result: any) =>
-                                result.toolName === 'streamlitTool' &&
-                                result.result?.code
+                    // Find all assistant messages with tool calls
+                    const streamlitCalls = allMessages
+                        .filter(msg => msg.role === 'assistant' && Array.isArray(msg.content))
+                        .flatMap(msg => msg.content)
+                        .filter((content: any) => 
+                            content.type === 'tool-call' && 
+                            content.toolName === 'streamlitTool' &&
+                            content.args?.code
                         )
 
-                        if (streamlitResult) {
-                            appId = await handleStreamlitAppVersioning(
-                                supabase,
-                                user.id,
-                                newChatId,
-                                streamlitResult
-                            )
+                    // Get the latest Streamlit call
+                    const latestStreamlitCall = streamlitCalls[streamlitCalls.length - 1]
+                    console.log('🔍 Latest Streamlit call:', JSON.stringify(latestStreamlitCall, null, 2))
+
+                    if (latestStreamlitCall) {
+                        // Transform to expected format
+                        const transformedCall = {
+                            toolCallId: latestStreamlitCall.toolCallId,
+                            toolName: latestStreamlitCall.toolName,
+                            args: latestStreamlitCall.args
                         }
+                        console.log('✨ Creating app version with:', JSON.stringify(transformedCall, null, 2))
+
+                        appId = await handleStreamlitAppVersioning(
+                            supabase,
+                            user.id,
+                            newChatId,
+                            transformedCall
+                        )
+                        console.log('✅ Created app with ID:', appId)
                     }
 
-                    await storeMessage(
-                        supabase,
-                        newChatId,
-                        user.id,
-                        userMessage,
-                        text,
-                        toolCalls,
-                        toolResults,
-                        usage.totalTokens
-                    )
+                    // Store all messages
+                    await supabase
+                        .from('chats')
+                        .update({
+                            updated_at: new Date().toISOString(),
+                            messages: allMessages,
+                        })
+                        .eq('id', newChatId)
+                        .eq('user_id', user.id)
+
+                    console.log('✅ Successfully stored messages')
                 } catch (error) {
-                    console.error('Error in message handling:', error)
+                    console.error('❌ Error in message handling:', error)
                     throw error
                 }
             },
@@ -394,8 +404,7 @@ export async function POST(req: Request) {
         return new Response(
             JSON.stringify({
                 error: 'Internal server error',
-                details:
-                    error instanceof Error ? error.message : 'Unknown error',
+                details: error instanceof Error ? error.message : 'Unknown error',
             }),
             {
                 status: 500,
