@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
 import { App, ExecutionResult } from '@/lib/schema'
 import { cn } from '@/lib/utils'
-import { Message as AIMessage } from 'ai'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 import { ActionPanel } from './action-panel'
@@ -165,11 +164,13 @@ export function Message({
                                                 }
                                             }}
                                             className={cn(
-                                                "px-4 py-2 rounded-lg text-sm font-medium",
-                                                "bg-gradient-to-tr from-[#FFDE56] to-[#4989BB] hover:opacity-90",
-                                                "dark:from-[#03f241] dark:via-[#d549dd] dark:to-[#03e5f2]",
-                                                "text-black dark:text-white",
-                                                "transition-all duration-200 shadow-lg hover:shadow-xl"
+                                                "px-4 py-2 text-sm font-medium",
+                                                "bg-black dark:bg-dark-background",
+                                                "text-white",
+                                                "border-2 border-black dark:border-white",
+                                                "shadow-[2px_2px_0px_0px_rgba(0,0,0)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255)]",
+                                                "hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
+                                                "transition-all"
                                             )}
                                         >
                                             {action.label}

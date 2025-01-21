@@ -612,6 +612,7 @@ export default function ChatContainer({
                             id: msg.id || `msg-${Date.now()}-${Math.random()}`,
                             role: msg.role,
                             content: msg.content,
+                            data: msg.data,
                             ...(msg.toolInvocations && { toolInvocations: msg.toolInvocations })
                         }))
                         setMessages(formattedMessages)
@@ -622,6 +623,7 @@ export default function ChatContainer({
                         id: msg.id || `msg-${Date.now()}-${Math.random()}`,
                         role: msg.role,
                         content: msg.content,
+                        data: msg.data,
                         ...(msg.toolInvocations && { toolInvocations: msg.toolInvocations })
                     }))
                     setMessages(formattedMessages)
