@@ -3,11 +3,15 @@ import {
     GetObjectCommand,
     PutObjectCommand,
     S3Client,
+    CreateMultipartUploadCommand,
+    UploadPartCommand,
+    CompleteMultipartUploadCommand,
+    AbortMultipartUploadCommand
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import Sandbox from 'e2b'
+import Sandbox, { Process, ProcessMessage } from 'e2b'
 
-const s3Client = new S3Client({
+export const s3Client = new S3Client({
     region: process.env.AWS_REGION!,
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -15,7 +19,8 @@ const s3Client = new S3Client({
     },
 })
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET!
+export const BUCKET_NAME = process.env.AWS_S3_BUCKET!
+export const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks for multipart upload
 
 export async function uploadToS3(
     file: Buffer,
@@ -121,4 +126,64 @@ export async function setupS3Mount(sandbox: Sandbox, userId: string) {
     if (verifyMount.text?.includes('not mounted')) {
         throw new Error('Failed to verify S3 mount')
     }
+}
+
+export async function initiateMultipartUpload(key: string, contentType: string) {
+    const command = new CreateMultipartUploadCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        ContentType: contentType,
+    })
+
+    const { UploadId } = await s3Client.send(command)
+    return UploadId
+}
+
+export async function uploadPart(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    body: Buffer
+) {
+    const command = new UploadPartCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+        Body: body,
+    })
+
+    const response = await s3Client.send(command)
+    return {
+        PartNumber: partNumber,
+        ETag: response.ETag,
+    }
+}
+
+export async function completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: { PartNumber: number; ETag: string }[]
+) {
+    const command = new CompleteMultipartUploadCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+            Parts: parts,
+        },
+    })
+
+    await s3Client.send(command)
+    return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+}
+
+export async function abortMultipartUpload(key: string, uploadId: string) {
+    const command = new AbortMultipartUploadCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+    })
+
+    await s3Client.send(command)
 }

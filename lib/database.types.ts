@@ -22,6 +22,10 @@ export interface Database {
                     created_at: string
                     updated_at: string
                     last_accessed: string
+                    upload_id: string | null
+                    upload_status: 'pending' | 'uploading' | 'completed' | 'failed'
+                    uploaded_chunks: number | null
+                    total_chunks: number | null
                 }
                 Insert: {
                     id?: string
@@ -35,6 +39,10 @@ export interface Database {
                     created_at?: string
                     updated_at?: string
                     last_accessed?: string
+                    upload_id?: string | null
+                    upload_status?: 'pending' | 'uploading' | 'completed' | 'failed'
+                    uploaded_chunks?: number | null
+                    total_chunks?: number | null
                 }
                 Update: {
                     id?: string
@@ -48,6 +56,10 @@ export interface Database {
                     created_at?: string
                     updated_at?: string
                     last_accessed?: string
+                    upload_id?: string | null
+                    upload_status?: 'pending' | 'uploading' | 'completed' | 'failed'
+                    uploaded_chunks?: number | null
+                    total_chunks?: number | null
                 }
                 Relationships: [
                     {

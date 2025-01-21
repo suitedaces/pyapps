@@ -364,6 +364,15 @@ export default function ChatContainer({
                 // Set loading states
                 setHasFirstMessage(true)
 
+                // If we have an existing file with same name, we need to update all chat references
+                const response = await fetch('/api/files', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                const files = await response.json()
+                const existingFile = files.find((f: any) => f.file_name === file.name)
+
+                // First append to UI
                 const assistantMessage = "What would you like to do with this data?"
                 const messageData = {
                     type: 'action_buttons',
@@ -386,7 +395,6 @@ export default function ChatContainer({
                     ]
                 }
 
-                // First append to UI
                 await append({
                     id: `file-upload-${Date.now()}`,
                     role: 'assistant',
@@ -395,17 +403,32 @@ export default function ChatContainer({
                     data: messageData as JSONValue
                 })
 
-                // Link file to chat
-                if (currentChatId && fileId) {
-                    await fetch(`/api/chats/${currentChatId}/files`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            fileIds: [fileId]
+                // If we're in a chat, update file associations
+                if (currentChatId) {
+                    // If we have an existing file, update all chat associations
+                    if (existingFile) {
+                        await fetch(`/api/files`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                oldFileId: existingFile.id,
+                                newFileId: fileId
+                            })
                         })
-                    })
+                    } else {
+                        // Just link the new file to current chat
+                        await fetch(`/api/chats/${currentChatId}/files`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                fileIds: [fileId]
+                            })
+                        })
+                    }
                 }
 
                 // If we were on home page, route to new chat
@@ -418,7 +441,7 @@ export default function ChatContainer({
                 setErrorState(error as Error)
             }
         },
-        [append, currentChatId, isNewChat, updateChatState]
+        [append, currentChatId, isNewChat, updateChatState, router]
     )
 
     // Add handleSubmit to wrap the originalHandleSubmit
