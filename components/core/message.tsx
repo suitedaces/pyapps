@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { assistantMarkdownStyles, userMarkdownStyles, markdownToHtml } from './markdown'
+import { Logo } from '@/components/core/Logo'
 
 interface ActionButton {
     label: string
@@ -132,12 +133,12 @@ export function Message({
             >
                 {!isUser ? (
                     <div className="flex flex-row items-start w-full overflow-hidden">
-                        <Avatar className={cn(
-                            "w-8 h-8 bg-[#FFD700] border-2 mt-5 border-border flex-shrink-0",
+                        <div className={cn(
+                            "w-8 h-8 mt-5 flex-shrink-0 flex items-center justify-center",
                             !showAvatar && "opacity-0"
                         )}>
-                            <AvatarFallback>A</AvatarFallback>
-                        </Avatar>
+                            <Logo collapsed inverted className="scale-75" />
+                        </div>
                         <div className={cn(
                             "mx-2 break-words w-full dark:text-dark-text overflow-hidden",
                             showAvatar ? "p-4" : "p-1",
