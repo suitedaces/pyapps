@@ -1,4 +1,4 @@
-import { Sandbox } from 'e2b'
+import Sandbox from '@e2b/code-interpreter'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { setupS3Mount } from '@/lib/s3'
@@ -41,19 +41,15 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
                 throw new Error('User not authenticated')
             }
 
-            const sandbox = await Sandbox.create({
-                template: 'streamlit-sandbox-s3'
-            })
+            const sandbox = await Sandbox.create('streamlit-sandbox-s3')
             
             await setupS3Mount(sandbox, user.id)
             
-            await sandbox.filesystem.makeDir('/app')
-            await sandbox.filesystem.write('/app/test.py', code)
+            await sandbox.files.makeDir('/app')
+            await sandbox.files.write('/app/app.py', code)
 
             // Run with streamlit in headless mode to check for errors
-            const execution = await sandbox.process.startAndWait({
-                cmd: 'python /app/test.py',
-            })
+            const execution = await sandbox.commands.run('python /app/app.py')
 
             // Get all output
             const fullOutput = execution.stdout + execution.stderr
@@ -62,7 +58,7 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
             const tracebackMatch = fullOutput.match(/Traceback \(most recent call last\):[\s\S]*$/m)
             const errors = tracebackMatch ? tracebackMatch[0] : 'No errors found!'
 
-            await sandbox.close()
+            await sandbox.kill()
 
             return { errors }
         } catch (error) {

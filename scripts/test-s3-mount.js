@@ -1,4 +1,4 @@
-import { Sandbox } from 'e2b'
+import { Sandbox } from '@e2b/code-interpeter'
 import { promises as fs } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'

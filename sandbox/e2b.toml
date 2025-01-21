@@ -7,7 +7,7 @@
 # sandbox = await AsyncSandbox.create("streamlit-sandbox-s3") # Async sandbox
 
 # JS SDK
-# import { Sandbox } from 'e2b'
+# import { Sandbox } from '@e2b/code-interpeter'
 # const sandbox = await Sandbox.create('streamlit-sandbox-s3')
 
 team_id = "66f03438-ea40-419a-b50f-37834062a46f"

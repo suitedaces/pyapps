@@ -84,7 +84,9 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
                         'X-Session-Id': sessionId || '',
                         ...(appId && { 'X-App-Id': appId }),
                     },
-                    body: JSON.stringify({ code }),
+                    body: JSON.stringify({ 
+                        code: typeof code === 'string' ? code : JSON.stringify(code)
+                    }),
                 }
             )
 

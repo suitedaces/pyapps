@@ -3,6 +3,7 @@ import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
 import { Message, streamText } from 'ai'
+import { dataAnalysisTool } from '@/lib/tools/data-analysis'
 
 export const maxDuration = 150
 
@@ -327,7 +328,7 @@ export async function POST(req: Request) {
         const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [{ role: 'system', content: systemPrompt }, ...messages],
-            tools: { streamlitTool },
+            tools: { streamlitTool, dataAnalysisTool },
             maxSteps: 5,
             experimental_toolCallStreaming: true,
             onFinish: async (event) => {

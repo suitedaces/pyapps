@@ -15,8 +15,43 @@ interface FileUploadState {
     error: string | null
 }
 
+interface ToolInvocation {
+    toolName: string
+    args?: {
+        code?: string
+        dataDescription?: string
+        [key: string]: any
+    }
+    result?: {
+        results: Array<{
+            type: 'stdout' | 'stderr' | 'image' | 'error'
+            content: string
+            mimeType?: string
+        }>
+        error?: {
+            name: string
+            value: string
+            traceback: string
+        }
+    }
+    state: 'call' | 'partial-call' | 'result'
+}
+
+interface DataAnalysisResult {
+    results: Array<{
+        type: 'stdout' | 'stderr' | 'image' | 'error'
+        content: string
+        mimeType?: string
+    }>
+    error?: {
+        name: string
+        value: string
+        traceback: string
+    }
+}
+
 interface ChatProps {
-    messages: Message[]
+    messages: Array<Message & { toolInvocations?: ToolInvocation[] }>
     isLoading: boolean
     input: string
     onInputChange: (value: string) => void
@@ -37,6 +72,7 @@ interface ChatProps {
     chatId?: string
     selectedFileIds?: string[]
     onFileSelect?: (fileIds: string[]) => void
+    onDataAnalysis?: (code: string) => void
 }
 
 function Chat({
@@ -56,6 +92,7 @@ function Chat({
     chatId,
     selectedFileIds = [],
     onFileSelect,
+    onDataAnalysis,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
@@ -143,6 +180,20 @@ function Chat({
                         const showAvatar = message.role === 'assistant' && 
                             (!prevMessage || prevMessage.role === 'user' || prevMessage.role === 'system');
 
+                        // Extract data analysis information from tool calls
+                        let dataAnalysis;
+                        if (message.toolInvocations) {
+                            const analysisCall = message.toolInvocations.find(
+                                (invocation: ToolInvocation) => invocation.toolName === 'dataAnalysisTool'
+                            );
+                            if (analysisCall?.args?.code) {
+                                dataAnalysis = {
+                                    code: analysisCall.args.code,
+                                    result: analysisCall.result
+                                };
+                            }
+                        }
+
                         return (
                             <AIMessage
                                 key={`${message.id}-${index}`}
@@ -154,6 +205,7 @@ function Chat({
                                 onTogglePanel={() => onTogglePanel('right')}
                                 onInputChange={onInputChange}
                                 showAvatar={showAvatar}
+                                dataAnalysis={dataAnalysis}
                             />
                         );
                     })}

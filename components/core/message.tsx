@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { assistantMarkdownStyles, userMarkdownStyles, markdownToHtml } from './markdown'
 import { Logo } from '@/components/core/Logo'
+import { AnalysisResult } from './AnalysisResult'
 
 interface ActionButton {
     label: string
@@ -23,6 +24,19 @@ interface MessageContent {
     toolName?: string
     toolCallId?: string
     result?: any
+}
+
+interface DataAnalysisResult {
+    results: Array<{
+        type: 'stdout' | 'stderr' | 'image' | 'error'
+        content: string
+        mimeType?: string
+    }>
+    error?: {
+        name: string
+        value: string
+        traceback: string
+    }
 }
 
 interface MessageProps {
@@ -48,6 +62,10 @@ interface MessageProps {
     }
     onInputChange?: (value: string) => void
     toolInvocations?: any[]
+    dataAnalysis?: {
+        code: string
+        result?: DataAnalysisResult
+    }
 }
 
 export function Message({
@@ -62,6 +80,7 @@ export function Message({
     data,
     onInputChange,
     showAvatar = true,
+    dataAnalysis,
 }: MessageProps) {
     // Skip rendering for tool messages
     if (role === 'tool') return null;
@@ -147,6 +166,17 @@ export function Message({
                                 ref={contentRef}
                                 className={cn("max-w-[calc(100%-2rem)] overflow-x-auto", assistantMarkdownStyles)}
                             />
+
+                            {dataAnalysis && (
+                                <div className="mt-4">
+                                    <AnalysisResult
+                                        code={dataAnalysis.code}
+                                        results={dataAnalysis.result?.results || []}
+                                        error={dataAnalysis.result?.error}
+                                        isLoading={isLoading}
+                                    />
+                                </div>
+                            )}
 
                             {data?.type === 'action_buttons' && data.actions && (
                                 <motion.div 

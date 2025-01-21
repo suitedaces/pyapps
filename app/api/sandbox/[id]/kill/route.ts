@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const user = await getUser()
 
     try {
-        const sandbox = await Sandbox.reconnect(sandboxId)
+        const sandbox = await Sandbox.connect(sandboxId)
 
         // Verify ownership
         if (!user && !sessionId) {
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
         }
 
         const metadata = (await Sandbox.list()).find(
-            (s) => s.sandboxID === sandboxId
+            (s) => s.sandboxId === sandboxId
         )?.metadata as any
         if (
             (!user && metadata.sessionId !== sessionId) ||
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        await sandbox.close()
+        await sandbox.kill()
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('Error killing sandbox:', error)

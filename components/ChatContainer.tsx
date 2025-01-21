@@ -25,6 +25,7 @@ import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
 import LoadingAnimation from './LoadingAnimation'
 import AppSidebar from './Sidebar'
+import { dataAnalysisTool } from '@/lib/tools/data-analysis'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -48,6 +49,12 @@ interface FileUploadState {
     isUploading: boolean
     progress: number
     error: string | null
+}
+
+interface ToolCall {
+    name: string
+    state: 'call' | 'partial-call' | 'result'
+    input: any
 }
 
 interface StreamlitToolCall {
@@ -244,7 +251,7 @@ export default function ChatContainer({
                     newChatIdRef.current = null
 
                     // Set navigating state before pushing route
-                    if (currentChatId === undefined) {
+                    if (!currentChatId) {
                         router.push(`/chat/${chatId}`)
 
                         // Handle other operations
