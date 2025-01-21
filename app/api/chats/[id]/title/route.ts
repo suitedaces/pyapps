@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export async function POST(
     req: NextRequest,
-    context: { params: { id: string } }
+    context: { params: Promise<{ id: string }> }
 ) {
     const { id } = await context.params
     const supabase = await createClient()
