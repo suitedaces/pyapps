@@ -79,8 +79,7 @@ export async function DELETE(request: Request, context: RouteContext) {
             if (chatUpdateError) throw chatUpdateError
         }
 
-        // 3. Delete all related data in sequence
-        // Delete messages
+        // Delete messages associated with the chat
         const { error: messagesError } = await supabase
             .from('messages')
             .delete()

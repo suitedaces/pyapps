@@ -1,62 +1,79 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { anthropic } from '@ai-sdk/anthropic'
 import { generateObject } from 'ai'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
-interface RouteContext {
-    params: Promise<{ id: string }>
-}
+export async function POST(
+    req: NextRequest,
+    context: { params: Promise<{ id: string }> }
+) {
+    const { id } = await context.params
+    const supabase = await createClient()
+    const user = await getUser()
 
-export async function POST(req: NextRequest, context: RouteContext) {
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
-        const supabase = await createClient()
-        const { id } = await context.params
-
-        // Get the first message for this chat
-        const { data: message, error: messageError } = await supabase
-            .from('messages')
-            .select('user_message, assistant_message')
-            .eq('chat_id', id)
-            .order('created_at', { ascending: true })
-            .limit(1)
+        // Get chat messages directly from chats table
+        const { data: chat, error } = await supabase
+            .from('chats')
+            .select('messages')
+            .eq('id', id)
+            .eq('user_id', user.id)
             .single()
 
-        if (messageError) throw messageError
+        if (error) throw error
+        if (!chat?.messages?.length) {
+            return NextResponse.json(
+                { title: 'New Chat' },
+                { status: 200 }
+            )
+        }
 
+        // Get the first user message
+        const firstUserMessage = chat.messages.find(m => m.role === 'user')
+        if (!firstUserMessage) {
+            return NextResponse.json(
+                { title: 'New Chat' },
+                { status: 200 }
+            )
+        }
+
+        // Generate title using AI with schema validation
         const { object } = await generateObject({
-            model: anthropic('claude-3-haiku-20240307'),
+            model: anthropic('claude-3-5-sonnet-20241022'),
             messages: [
                 {
                     role: 'system',
-                    content:
-                        'You are a project title generator for a conversational streamlit app builder web app.',
+                    content: 'You are a project title generator. Generate concise, descriptive titles based on conversation content.'
                 },
                 {
                     role: 'user',
-                    content: `User message: "${message.user_message}"\nAssistant response: "${message.assistant_message}"`,
-                },
+                    content: firstUserMessage.content
+                }
             ],
             schema: z.object({
                 title: z
                     .string()
-                    .max(100)
-                    .describe(
-                        'Generate an 8-word title. Do not include quotes or the words "conversation", "streamlit", "app"'
-                    ),
+                    .max(50)
+                    .describe('Generate a 6-word title that captures the essence of the conversation')
             }),
-            temperature: 0.7,
+            temperature: 0.7
         })
 
-        // Update chat title in database
+        // Update chat title
         const { error: updateError } = await supabase
             .from('chats')
-            .update({ name: object.title })
+            .update({ name: object.title || 'New Chat' })
             .eq('id', id)
+            .eq('user_id', user.id)
 
         if (updateError) throw updateError
 
-        return NextResponse.json({ title: object.title })
+        return NextResponse.json({ title: object.title || 'New Chat' })
     } catch (error) {
         console.error('Error generating title:', error)
         return NextResponse.json(

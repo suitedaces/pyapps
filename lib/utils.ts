@@ -172,17 +172,17 @@ export function formatDatabaseMessages(
         .map((msg) => {
             const messages: Message[] = []
 
-            // Add user message
+            // Add user message if exists
             if (msg.user_message) {
                 messages.push({
                     id: `${msg.id}-user`,
-                    role: 'user' as const,
+                    role: 'user',
                     content: msg.user_message,
                     createdAt: new Date(msg.created_at),
                 })
             }
 
-            // Add assistant message with tool results
+            // Add assistant message if exists
             if (msg.assistant_message) {
                 const toolInvocations: ToolInvocation[] = []
 
@@ -230,12 +230,15 @@ export function formatDatabaseMessages(
 
                 messages.push({
                     id: `${msg.id}-assistant`,
-                    role: 'assistant' as const,
+                    role: 'assistant',
                     content: msg.assistant_message,
                     createdAt: new Date(msg.created_at),
-                    toolInvocations: toolInvocations,
+                    toolInvocations: toolInvocations.length > 0 ? toolInvocations : undefined,
+                    data: msg.data ? {
+                        type: (msg.data as any).type,
+                        actions: (msg.data as any).actions
+                    } : undefined,
                 })
-                console.log('Formatted messages: ', messages)
             }
 
             return messages

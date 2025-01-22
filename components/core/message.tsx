@@ -4,14 +4,33 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
 import { App, ExecutionResult } from '@/lib/schema'
 import { cn } from '@/lib/utils'
-import { Message as AIMessage } from 'ai'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { assistantMarkdownStyles, userMarkdownStyles, markdownToHtml } from './markdown'
+import { Logo } from '@/components/core/Logo'
 
-interface MessageProps extends AIMessage {
+interface ActionButton {
+    label: string
+    value: string
+    [key: string]: string
+}
+
+interface MessageContent {
+    text?: string
+    type?: string
+    args?: any
+    toolName?: string
+    toolCallId?: string
+    result?: any
+}
+
+interface MessageProps {
+    id: string
+    role: 'system' | 'user' | 'assistant' | 'tool' | 'data'
+    content: string | MessageContent[] | any
     isLastMessage?: boolean
+    showAvatar?: boolean
     isLoading?: boolean
     object?: App
     result?: ExecutionResult
@@ -23,6 +42,12 @@ interface MessageProps extends AIMessage {
     onCodeClick?: (messageId: string) => void
     isCreatingChat?: boolean
     onTogglePanel?: () => void
+    data?: {
+        type: string
+        actions?: ActionButton[]
+    }
+    onInputChange?: (value: string) => void
+    toolInvocations?: any[]
 }
 
 export function Message({
@@ -34,7 +59,13 @@ export function Message({
     isLoading,
     isCreatingChat = false,
     onTogglePanel,
+    data,
+    onInputChange,
+    showAvatar = true,
 }: MessageProps) {
+    // Skip rendering for tool messages
+    if (role === 'tool') return null;
+    
     const isUser = role === 'user'
     const { session } = useAuth()
     const user = session?.user
@@ -42,13 +73,32 @@ export function Message({
     const contentRef = useRef<HTMLDivElement>(null)
     
     useEffect(() => {
-        if (contentRef.current) {
-            markdownToHtml(content).then(html => {
+        const renderMarkdown = async () => {
+            if (!contentRef.current) return
+            
+            let textContent = ''
+            if (typeof content === 'string') {
+                textContent = content
+            } else if (Array.isArray(content)) {
+                // Extract text content from array of content objects
+                textContent = content
+                    .filter(item => item.type === 'text')
+                    .map(item => item.text)
+                    .join('\n\n')
+            }
+            
+            if (!textContent) return
+            
+            try {
+                const html = await markdownToHtml(textContent)
                 if (contentRef.current) {
                     contentRef.current.innerHTML = html
                 }
-            })
+            } catch (error) {
+                console.error('Error rendering markdown:', error)
+            }
         }
+        renderMarkdown()
     }, [content])
 
     useEffect(() => {
@@ -56,6 +106,15 @@ export function Message({
             messageEndRef.current.scrollIntoView({ behavior: 'smooth' })
         }
     }, [isLastMessage, content])
+
+    // Extract tool calls from content if it's an array
+    const extractedToolCalls = Array.isArray(content) 
+        ? content.filter(item => item.type === 'tool-call').map(item => ({
+            toolName: item.toolName,
+            toolCallId: item.toolCallId,
+            args: item.args
+        }))
+        : undefined
 
     return (
         <AnimatePresence mode="wait">
@@ -68,21 +127,59 @@ export function Message({
                 className={cn(
                     'flex w-full',
                     isUser ? 'justify-end' : 'justify-start',
-                    'mb-4'
+                    'mb-0'
                 )}
             >
                 {!isUser ? (
                     <div className="flex flex-row items-start w-full overflow-hidden">
-                        <Avatar className="w-8 h-8 bg-[#FFD700] border-2 mt-5 border-border flex-shrink-0">
-                            <AvatarFallback>A</AvatarFallback>
-                        </Avatar>
-                        <div className="mx-2 p-4 break-words w-full dark:text-dark-text overflow-hidden">
+                        <div className={cn(
+                            "w-8 h-8 mt-5 flex-shrink-0 flex items-center justify-center",
+                            !showAvatar && "opacity-0"
+                        )}>
+                            <Logo collapsed inverted className="scale-75" />
+                        </div>
+                        <div className={cn(
+                            "mx-2 break-words w-full dark:text-dark-text overflow-hidden",
+                            showAvatar ? "p-4" : "p-1",
+                            showAvatar ? "mt-0" : "-mt-2"
+                        )}>
                             <div 
                                 ref={contentRef}
                                 className={cn("max-w-[calc(100%-2rem)] overflow-x-auto", assistantMarkdownStyles)}
                             />
 
-                            {Boolean(toolInvocations?.length) && (
+                            {data?.type === 'action_buttons' && data.actions && (
+                                <motion.div 
+                                    className="flex flex-wrap gap-2 mt-4"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                >
+                                    {data.actions.map((action, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => {
+                                                if (onInputChange) {
+                                                    onInputChange(action.value)
+                                                }
+                                            }}
+                                            className={cn(
+                                                "px-4 py-2 text-sm font-medium",
+                                                "bg-black dark:bg-dark-background",
+                                                "text-white",
+                                                "border-2 border-black dark:border-white",
+                                                "shadow-[2px_2px_0px_0px_rgba(0,0,0)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255)]",
+                                                "hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
+                                                "transition-all"
+                                            )}
+                                        >
+                                            {action.label}
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            )}
+
+                            {(Boolean(toolInvocations?.length) || Boolean(extractedToolCalls?.length)) && (
                                 <ActionPanel
                                     isLoading={isLoading}
                                     isLastMessage={isLastMessage}
@@ -90,7 +187,7 @@ export function Message({
                                 />
                             )}
 
-                            {isLastMessage && isLoading && !toolInvocations?.length && (
+                            {isLastMessage && isLoading && !toolInvocations?.length && !extractedToolCalls?.length && (
                                 <motion.div
                                     className="w-2 h-4 bg-black/40 dark:bg-white/40 mt-1"
                                     animate={{ opacity: [0, 1, 0] }}
@@ -104,7 +201,7 @@ export function Message({
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-row items-start gap-2 max-w-[85%]">
+                    <div className="flex flex-row items-start gap-2 max-w-[85%] mb-4">
                         <div className="grow-0 mx-2 py-2 px-3 rounded-lg bg-background border border-border text-foreground overflow-auto">
                             <div 
                                 ref={contentRef}

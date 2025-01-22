@@ -22,6 +22,10 @@ export interface Database {
                     created_at: string
                     updated_at: string
                     last_accessed: string
+                    upload_id: string | null
+                    upload_status: 'pending' | 'uploading' | 'completed' | 'failed'
+                    uploaded_chunks: number | null
+                    total_chunks: number | null
                 }
                 Insert: {
                     id?: string
@@ -35,6 +39,10 @@ export interface Database {
                     created_at?: string
                     updated_at?: string
                     last_accessed?: string
+                    upload_id?: string | null
+                    upload_status?: 'pending' | 'uploading' | 'completed' | 'failed'
+                    uploaded_chunks?: number | null
+                    total_chunks?: number | null
                 }
                 Update: {
                     id?: string
@@ -48,6 +56,10 @@ export interface Database {
                     created_at?: string
                     updated_at?: string
                     last_accessed?: string
+                    upload_id?: string | null
+                    upload_status?: 'pending' | 'uploading' | 'completed' | 'failed'
+                    uploaded_chunks?: number | null
+                    total_chunks?: number | null
                 }
                 Relationships: [
                     {
@@ -150,6 +162,23 @@ export interface Database {
                     user_id: string
                     app_id: string | null
                     name: string | null
+                    messages: {
+                        id: string
+                        role: 'system' | 'user' | 'assistant' | 'data'
+                        content: string
+                        createdAt?: string
+                        name?: string
+                        data?: Json
+                        annotations?: Json[]
+                        toolInvocations?: {
+                            state: 'call' | 'partial-call' | 'result'
+                            toolCallId: string
+                            toolName: string
+                            args?: Json
+                            result?: Json
+                        }[]
+                        experimental_attachments?: Json[]
+                    }[] | null
                     created_at: string
                     updated_at: string
                 }
@@ -158,6 +187,23 @@ export interface Database {
                     user_id: string
                     app_id?: string | null
                     name?: string | null
+                    messages?: {
+                        id: string
+                        role: 'system' | 'user' | 'assistant' | 'data'
+                        content: string
+                        createdAt?: string
+                        name?: string
+                        data?: Json
+                        annotations?: Json[]
+                        toolInvocations?: {
+                            state: 'call' | 'partial-call' | 'result'
+                            toolCallId: string
+                            toolName: string
+                            args?: Json
+                            result?: Json
+                        }[]
+                        experimental_attachments?: Json[]
+                    }[] | null
                     created_at?: string
                     updated_at?: string
                 }
@@ -166,6 +212,23 @@ export interface Database {
                     user_id?: string
                     app_id?: string | null
                     name?: string | null
+                    messages?: {
+                        id: string
+                        role: 'system' | 'user' | 'assistant' | 'data'
+                        content: string
+                        createdAt?: string
+                        name?: string
+                        data?: Json
+                        annotations?: Json[]
+                        toolInvocations?: {
+                            state: 'call' | 'partial-call' | 'result'
+                            toolCallId: string
+                            toolName: string
+                            args?: Json
+                            result?: Json
+                        }[]
+                        experimental_attachments?: Json[]
+                    }[] | null
                     created_at?: string
                     updated_at?: string
                 }
@@ -194,6 +257,7 @@ export interface Database {
                     tool_calls: Json | null
                     tool_results: Json | null
                     token_count: number
+                    data: Json | null
                     created_at: string
                 }
                 Insert: {
@@ -205,6 +269,7 @@ export interface Database {
                     tool_calls?: Json | null
                     tool_results?: Json | null
                     token_count: number
+                    data?: Json | null
                     created_at?: string
                 }
                 Update: {
@@ -216,6 +281,7 @@ export interface Database {
                     tool_calls?: Json | null
                     tool_results?: Json | null
                     token_count?: number
+                    data?: Json | null
                     created_at?: string
                 }
                 Relationships: [

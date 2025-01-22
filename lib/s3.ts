@@ -3,10 +3,15 @@ import {
     GetObjectCommand,
     PutObjectCommand,
     S3Client,
+    CreateMultipartUploadCommand,
+    UploadPartCommand,
+    CompleteMultipartUploadCommand,
+    AbortMultipartUploadCommand
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import Sandbox, { Process, ProcessMessage } from 'e2b'
 
-const s3Client = new S3Client({
+export const s3Client = new S3Client({
     region: process.env.AWS_REGION!,
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -14,7 +19,8 @@ const s3Client = new S3Client({
     },
 })
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET!
+export const BUCKET_NAME = process.env.AWS_S3_BUCKET!
+export const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks for multipart upload
 
 export async function uploadToS3(
     file: Buffer,
@@ -79,4 +85,105 @@ export async function getFileFromS3(key: string): Promise<Buffer> {
 
 export const getS3Key = (userId: string, fileName: string): string => {
     return `${userId}/data/${fileName}`
+}
+
+export async function setupS3Mount(sandbox: Sandbox, userId: string) {
+    // Ensure directory exists
+    await sandbox.process.start({
+        cmd: 'sudo mkdir -p /app/s3',
+    })
+
+    // Write credentials file
+    await sandbox.process.start({
+        cmd: `echo "${process.env.AWS_ACCESS_KEY_ID}:${process.env.AWS_SECRET_ACCESS_KEY}" | sudo tee /etc/passwd-s3fs > /dev/null && sudo chmod 600 /etc/passwd-s3fs`,
+    })
+
+    // Mount S3 with debug output
+    await sandbox.process.start({
+        cmd: `sudo s3fs "pyapps:/${userId}" /app/s3 \
+            -o passwd_file=/etc/passwd-s3fs \
+            -o url="https://s3.amazonaws.com" \
+            -o endpoint=${process.env.AWS_REGION} \
+            -o allow_other \
+            -o umask=0000 \
+            -o dbglevel=info \
+            -o use_path_request_style \
+            -o default_acl=private \
+            -o use_cache=/tmp`,
+        onStdout: (output: ProcessMessage) => {
+            console.log('Mount stdout:', output.line)
+        },
+        onStderr: (output: ProcessMessage) => {
+            console.error('Mount stderr:', output.line)
+        },
+    })
+
+    // Verify mount
+    const verifyMount = (await sandbox.process.start({
+        cmd: 'df -h | grep s3fs || echo "not mounted"',
+    })) as Process & { text: string }
+
+    if (verifyMount.text?.includes('not mounted')) {
+        throw new Error('Failed to verify S3 mount')
+    }
+}
+
+export async function initiateMultipartUpload(key: string, contentType: string) {
+    const command = new CreateMultipartUploadCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        ContentType: contentType,
+    })
+
+    const { UploadId } = await s3Client.send(command)
+    return UploadId
+}
+
+export async function uploadPart(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    body: Buffer
+) {
+    const command = new UploadPartCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+        Body: body,
+    })
+
+    const response = await s3Client.send(command)
+    return {
+        PartNumber: partNumber,
+        ETag: response.ETag,
+    }
+}
+
+export async function completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: { PartNumber: number; ETag: string }[]
+) {
+    const command = new CompleteMultipartUploadCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+            Parts: parts,
+        },
+    })
+
+    await s3Client.send(command)
+    return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+}
+
+export async function abortMultipartUpload(key: string, uploadId: string) {
+    const command = new AbortMultipartUploadCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+    })
+
+    await s3Client.send(command)
 }

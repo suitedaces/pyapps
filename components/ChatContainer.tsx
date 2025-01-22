@@ -16,6 +16,7 @@ import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn, formatDatabaseMessages } from '@/lib/utils'
 import { useChat } from 'ai/react'
+import { JSONValue } from 'ai'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -40,6 +41,7 @@ interface ChatContainerProps {
     isInChatPage?: boolean
     initialAppId?: string | null
     onChatDeleted?: () => void
+    onChatFinish?: () => void
 }
 
 interface FileUploadState {
@@ -49,16 +51,11 @@ interface FileUploadState {
 }
 
 interface StreamlitToolCall {
-    toolName: string
     toolCallId: string
-    state: 'call' | 'partial-call' | 'result'
-    args?: {
-        dataDescription?: string
-        query: string
-        fileDirectory?: string
-    }
-    result?: {
+    toolName: 'streamlitTool'
+    args: {
         code: string
+        requiredLibraries: string[]
         appName: string
         appDescription: string
     }
@@ -75,17 +72,14 @@ interface ChatState {
 }
 
 export default function ChatContainer({
-    initialChat,
     initialMessages = [],
     initialVersion = null,
     isNewChat = false,
     isInChatPage = false,
-    initialFiles = [],
     initialAppId = null,
-    onChatDeleted,
 }: ChatContainerProps) {
     const router = useRouter()
-    const { session, isLoading, isPreviewMode, shouldShowAuthPrompt } =
+    const { session, isLoading, shouldShowAuthPrompt } =
         useAuth()
     const { collapsed: sidebarCollapsed } = useSidebar()
     const {
@@ -177,17 +171,17 @@ export default function ChatContainer({
     } = useChat({
         api: '/api/chats/stream',
         id: currentChatId || undefined,
-        initialMessages: formatDatabaseMessages(initialMessages || []),
+        initialMessages: initialMessages || [],
         body: {
             chatId: currentChatId,
             model: currentModel,
             config: languageModel,
             experimental_streamData: true,
+            fileIds: persistedFileIds
         },
         onResponse: async (response) => {
             const newChatId = response.headers.get('x-chat-id')
             const newAppId = response.headers.get('x-app-id')
-            console.log('🔄 New App ID:', newAppId)
             if (newChatId && !currentChatId) {
                 newChatIdRef.current = newChatId
             }
@@ -213,65 +207,56 @@ export default function ChatContainer({
             }
         },
         onToolCall: async ({ toolCall }) => {
-            console.log('🔧 Tool Call Received:', toolCall) // Debug log
+            console.log('🔧 onToolCall:', toolCall)
 
-            const streamlitToolCall = toolCall as unknown as StreamlitToolCall
-            if (streamlitToolCall.toolName === 'streamlitTool') {
-                try {
-                    React.startTransition(() => {
-                        setRightPanel((prev) => ({
-                            ...prev,
-                            isVisible: true,
-                        }))
-                        setGeneratingCode(true)
-                    })
-                } catch (error) {
-                    console.error('Failed to update sandbox:', error)
-                    setErrorState(error as Error)
-                } finally {
-                    if (streamlitToolCall.state === 'result') {
-                        console.log('✅ Finished Processing Tool Call') // Debug log
-                        setGeneratingCode(false)
-                    }
-                }
-            } else {
-                console.log('⚠️ Unknown Tool Call:', streamlitToolCall.toolName) // Debug log
+            const streamlitToolCall = toolCall as StreamlitToolCall
+            if (streamlitToolCall.toolName === 'streamlitTool' && streamlitToolCall.args?.code) {
+                React.startTransition(() => {
+                    setRightPanel((prev) => ({
+                        ...prev,
+                        isVisible: true,
+                    }))
+                    setGeneratingCode(true)
+                })
+                
+                // Update the app with code immediately
+                console.log('🚀 Updating Streamlit app with code from toolCall')
+                setGeneratedCode(streamlitToolCall.args.code)
+                await updateStreamlitApp(streamlitToolCall.args.code, true)
             }
         },
         onFinish: async (message) => {
+            console.log('✨ onFinish:', {
+                message,
+                toolInvocations: message.toolInvocations,
+                messages: messages,
+                content: message.content
+            })
+
             try {
                 if (message.content && newChatIdRef.current && !currentChatId) {
                     const chatId = newChatIdRef.current
                     newChatIdRef.current = null
-
-                    // Set navigating state before pushing route
-                    if (currentChatId === undefined) {
-                        router.push(`/chat/${chatId}`)
-
-                        // Handle other operations
-                        Promise.all([
-                            generateTitle(chatId),
-                            message.toolInvocations &&
-                            message.toolInvocations.length > 0
-                                ? handleToolInvocations(message.toolInvocations)
-                                : Promise.resolve(),
-                        ]).catch(console.error)
-
-                        return
-                    }
+                    router.push(`/chat/${chatId}`)
+                    Promise.all([
+                        generateTitle(chatId),
+                        message.toolInvocations && message.toolInvocations.length > 0
+                            ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
+                            : Promise.resolve(),
+                    ]).catch(console.error)
+                    return
                 }
 
-                // Only handle tool invocations if they exist and have length
-                if (
-                    message.toolInvocations &&
-                    message.toolInvocations.length > 0
-                ) {
-                    await handleToolInvocations(message.toolInvocations)
-                }
+                // Find the most recent tool invocation with code
+                const streamlitCall = message.toolInvocations?.find(
+                    invocation => invocation.toolName === 'streamlitTool' && 
+                    invocation.args?.code
+                ) as StreamlitToolCall | undefined
 
-                // Always refresh version selector if it exists
-                if (versionSelectorRef.current) {
-                    versionSelectorRef.current.refreshVersions()
+                if (streamlitCall?.args?.code && streamlitCall.args.code !== generatedCode) {
+                    console.log('🚀 Updating Streamlit app with code from onFinish')
+                    setGeneratedCode(streamlitCall.args.code)
+                    await updateStreamlitApp(streamlitCall.args.code, true)
                 }
             } catch (error) {
                 console.error('Failed in onFinish:', error)
@@ -337,22 +322,21 @@ export default function ChatContainer({
     )
 
     const handleToolInvocations = useCallback(
-        async (toolInvocations: any[]) => {
-            if (!toolInvocations || toolInvocations.length === 0) return
+        async (toolInvocations: StreamlitToolCall[]) => {
+            console.log('🛠️ Processing tool invocations:', toolInvocations)
 
+            // Just in case onToolCall didn't catch it
             const streamlitCall = toolInvocations.find(
-                (invocation) =>
-                    invocation?.toolName === 'streamlitTool' &&
-                    invocation?.state === 'result' &&
-                    invocation?.result?.code
-            ) as StreamlitToolCall | undefined
+                call => call.toolName === 'streamlitTool' && call.args?.code
+            )
 
-            if (streamlitCall?.result?.code) {
-                setGeneratedCode(streamlitCall.result.code)
-                await updateStreamlitApp(streamlitCall.result.code)
+            if (streamlitCall?.args?.code && streamlitCall.args.code !== generatedCode) {
+                console.log('🚀 Updating Streamlit app with code from toolInvocations')
+                setGeneratedCode(streamlitCall.args.code)
+                await updateStreamlitApp(streamlitCall.args.code, true)
             }
         },
-        []
+        [setGeneratedCode, updateStreamlitApp, generatedCode]
     )
 
     // Improved file upload with abort controller
@@ -402,6 +386,7 @@ export default function ChatContainer({
             e.preventDefault()
             setHasFirstMessage(true)
 
+            // Validate message content
             if (file && fileId) {
                 // Handle file upload case
                 await handleFileUpload(file, fileId)
@@ -409,7 +394,6 @@ export default function ChatContainer({
                 // Handle normal message case
                 await originalHandleSubmit(e, {
                     body: {
-                        message,
                         fileIds: persistedFileIds,
                     },
                 })
@@ -514,14 +498,6 @@ export default function ChatContainer({
         }))
     }, [])
 
-    // Effects
-    // useEffect(() => {
-    //     if (chatLoading) {
-    //         setGeneratingCode(true)
-    //         setGeneratedCode('')
-    //     }
-    // }, [chatLoading, setGeneratingCode, setGeneratedCode])
-
     useEffect(() => {
         const loadChats = async () => {
             if (!session?.user?.id) return
@@ -540,73 +516,50 @@ export default function ChatContainer({
 
     useEffect(() => {
         const initializeChat = async () => {
-            if (
-                !currentChatId ||
-                isVersionSwitching.current ||
-                hasInitialized.current
-            )
-                return
-
+            if (!currentChatId || isVersionSwitching.current || hasInitialized.current) return
+            
             hasInitialized.current = true
 
             try {
-                if (initialMessages?.length) {
-                    setMessages(initialMessages)
-                }
-
-                if (!initialAppId && !currentAppId) {
-                    const chatResponse = await fetch(
-                        `/api/chats/${currentChatId}`
-                    )
-                    const chatData = await chatResponse.json()
-                    setCurrentAppId(chatData.app_id)
-                }
-
-                const versionData = Array.isArray(initialVersion)
-                    ? initialVersion[0]
-                    : initialVersion
-
+                // Handle initial version if available
+                const versionData = Array.isArray(initialVersion) ? initialVersion[0] : initialVersion
                 if (versionData?.code) {
                     setRightPanel((prev) => ({
                         ...prev,
                         isVisible: true,
                     }))
+                    setGeneratingCode(true)
                     setGeneratedCode(versionData.code)
                     await updateStreamlitApp(versionData.code, true)
                 }
 
+                // Load and set messages
                 if (!initialMessages?.length) {
-                    const messagesResponse = await fetch(
-                        `/api/chats/messages?chatId=${currentChatId}`
-                    )
-                    if (!messagesResponse.ok)
-                        throw new Error('Failed to fetch messages')
+                    const messagesResponse = await fetch(`/api/chats/messages?chatId=${currentChatId}`)
+                    if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
                     const data = await messagesResponse.json()
-
+                    
                     if (data.messages?.length) {
-                        setMessages(formatDatabaseMessages(data.messages))
-
-                        const lastStreamlitCode = data.messages
-                            .filter((msg: any) => msg.tool_results?.length)
-                            .map((msg: any) => {
-                                const toolResult = msg.tool_results.find(
-                                    (t: any) => t.name === 'streamlitTool'
-                                )
-                                return toolResult?.result
-                            })
-                            .filter(Boolean)
-                            .pop()
-
-                        if (lastStreamlitCode) {
-                            setRightPanel((prev) => ({
-                                ...prev,
-                                isVisible: true,
-                            }))
-                            setGeneratingCode(true)
-                            setGeneratedCode(lastStreamlitCode)
-                            await updateStreamlitApp(lastStreamlitCode, true)
-                        }
+                        // Convert messages to Vercel AI SDK format
+                        const formattedMessages = data.messages.map((msg: any) => ({
+                            id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                            role: msg.role,
+                            content: msg.content,
+                            data: msg.data,
+                            ...(msg.toolInvocations && { toolInvocations: msg.toolInvocations })
+                        }))
+                        setMessages(formattedMessages)
                     }
+                } else {
+                    // Format initial messages if provided
+                    const formattedMessages = initialMessages.map((msg: any) => ({
+                        id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                        role: msg.role,
+                        content: msg.content,
+                        data: msg.data,
+                        ...(msg.toolInvocations && { toolInvocations: msg.toolInvocations })
+                    }))
+                    setMessages(formattedMessages)
                 }
             } catch (error) {
                 console.error('Error initializing chat:', error)

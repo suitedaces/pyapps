@@ -64,17 +64,16 @@ export const useSandboxStore = create<SandboxState>((set, get) => ({
         const sessionId = getSessionId()
 
         if (!forceExecute && code === lastExecutedCode) {
-            set({ isLoadingSandbox: false, isGeneratingCode: false })
             return get().streamlitUrl
         }
 
-        try {
-            set({
-                isInitializing: true,
-                error: null,
-                isLoadingSandbox: true,
-            })
+        set({
+            isInitializing: true,
+            error: null,
+            isLoadingSandbox: true,
+        })
 
+        try {
             const response = await fetch(
                 `/api/sandbox/${sandboxId || 'new'}/execute`,
                 {

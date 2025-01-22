@@ -27,8 +27,8 @@ const FileValidationSchema = z.object({
                     'Invalid file type. Please upload a CSV, JSON, or TXT file.',
             }
         )
-        .refine((file) => file.size <= 50 * 1024 * 1024, {
-            message: 'File size must be less than 50MB.',
+        .refine((file) => file.size <= 100 * 1024 * 1024, {
+            message: 'File size must be less than 100MB.',
         }),
 })
 

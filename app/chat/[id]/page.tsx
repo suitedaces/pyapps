@@ -2,7 +2,6 @@ import ChatContainer from '@/components/ChatContainer'
 import LoadingAnimation from '@/components/LoadingAnimation'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { AppVersion } from '@/lib/types'
-import { formatDatabaseMessages } from '@/lib/utils'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -10,7 +9,6 @@ interface PageParams {
     params: Promise<{ id: string }>
 }
 
-// Add a loading component
 function ChatLoading() {
     return (
         <div className="h-screen w-full flex items-center justify-center">
@@ -29,15 +27,14 @@ export default async function ChatPage({ params }: PageParams) {
 
     const supabase = await createClient()
 
-    // Parallel fetch of chat, messages, versions, and associated files
-    const [chatResponse, messagesResponse, versionResponse, filesResponse] =
+    // Parallel fetch of chat and associated data
+    const [chatResponse, versionResponse, filesResponse] =
         await Promise.all([
-            supabase.from('chats').select('*').eq('id', id).single(),
             supabase
-                .from('messages')
-                .select('*')
-                .eq('chat_id', id)
-                .order('created_at', { ascending: true }),
+                .from('chats')
+                .select('*, messages')
+                .eq('id', id)
+                .single(),
             supabase
                 .rpc('get_chat_current_app_version', { p_chat_id: id })
                 .single() as unknown as Promise<{
@@ -65,11 +62,6 @@ export default async function ChatPage({ params }: PageParams) {
         notFound()
     }
 
-    if (messagesResponse.error) {
-        console.error('Error fetching messages:', messagesResponse.error)
-        notFound()
-    }
-
     const files =
         filesResponse.data
             ?.map((row) => row.files)
@@ -79,9 +71,11 @@ export default async function ChatPage({ params }: PageParams) {
                 analysis: file.analysis as string | null,
             })) ?? []
 
-    const messages = formatDatabaseMessages(messagesResponse.data ?? [])
+    // Messages are now directly in the chat object
+    const messages = chatResponse.data.messages || []
 
-    // Add a key prop to force remount of ChatContainer
+    console.log('🔄 Messages:', messages)
+
     return (
         <Suspense fallback={<ChatLoading />}>
             <ChatContainer
