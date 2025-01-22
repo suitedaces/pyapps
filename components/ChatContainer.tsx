@@ -51,16 +51,11 @@ interface FileUploadState {
 }
 
 interface StreamlitToolCall {
-    toolName: string
     toolCallId: string
-    state: 'call' | 'partial-call' | 'result'
-    args?: {
-        dataDescription?: string
-        query: string
-        fileDirectory?: string
-    }
-    result?: {
+    toolName: 'streamlitTool'
+    args: {
         code: string
+        requiredLibraries: string[]
         appName: string
         appDescription: string
     }
@@ -212,63 +207,57 @@ export default function ChatContainer({
             }
         },
         onToolCall: async ({ toolCall }) => {
-            console.log('🔧 Tool Call Received:', toolCall) // Debug log
+            console.log('🔧 onToolCall:', toolCall)
 
-            const streamlitToolCall = toolCall as unknown as StreamlitToolCall
-            if (streamlitToolCall.toolName === 'streamlitTool') {
-                try {
-                    React.startTransition(() => {
-                        setRightPanel((prev) => ({
-                            ...prev,
-                            isVisible: true,
-                        }))
-                        setGeneratingCode(true)
-                    })
-                } catch (error) {
-                    console.error('Failed to update sandbox:', error)
-                    setErrorState(error as Error)
-                } finally {
-                    if (streamlitToolCall.state === 'result') {
-                        console.log('✅ Finished Processing Tool Call') // Debug log
-                        setGeneratingCode(false)
-                    }
-                }
-            } else {
-                console.log('⚠️ Unknown Tool Call:', streamlitToolCall.toolName) // Debug log
+            const streamlitToolCall = toolCall as StreamlitToolCall
+            if (streamlitToolCall.toolName === 'streamlitTool' && streamlitToolCall.args?.code) {
+                React.startTransition(() => {
+                    setRightPanel((prev) => ({
+                        ...prev,
+                        isVisible: true,
+                    }))
+                    setGeneratingCode(true)
+                })
+                
+                // Update the app with code immediately
+                console.log('🚀 Updating Streamlit app with code from toolCall')
+                setGeneratedCode(streamlitToolCall.args.code)
+                await updateStreamlitApp(streamlitToolCall.args.code, true)
             }
         },
         onFinish: async (message) => {
+            console.log('✨ onFinish:', {
+                message,
+                toolInvocations: message.toolInvocations,
+                messages: messages,
+                content: message.content
+            })
+
             try {
                 if (message.content && newChatIdRef.current && !currentChatId) {
                     const chatId = newChatIdRef.current
                     newChatIdRef.current = null
-
-                    // Set navigating state before pushing route
-                    if (currentChatId === undefined) {
-                        router.push(`/chat/${chatId}`)
-
-                        // Handle other operations
-                        Promise.all([
-                            generateTitle(chatId),
-                            message.toolInvocations &&
-                            message.toolInvocations.length > 0
-                                ? handleToolInvocations(message.toolInvocations)
-                                : Promise.resolve(),
-                        ]).catch(console.error)
-
-                        return
-                    }
+                    router.push(`/chat/${chatId}`)
+                    Promise.all([
+                        generateTitle(chatId),
+                        message.toolInvocations && message.toolInvocations.length > 0
+                            ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
+                            : Promise.resolve(),
+                    ]).catch(console.error)
+                    return
                 }
 
-                // Only handle tool invocations if they exist and have length
-                if (
-                    message.toolInvocations &&
-                    message.toolInvocations.length > 0
-                ) {
-                    await handleToolInvocations(message.toolInvocations)
-                }
+                // Find the most recent tool invocation with code
+                const streamlitCall = message.toolInvocations?.find(
+                    invocation => invocation.toolName === 'streamlitTool' && 
+                    invocation.args?.code
+                ) as StreamlitToolCall | undefined
 
-                // Always refresh version selector if it exist
+                if (streamlitCall?.args?.code && streamlitCall.args.code !== generatedCode) {
+                    console.log('🚀 Updating Streamlit app with code from onFinish')
+                    setGeneratedCode(streamlitCall.args.code)
+                    await updateStreamlitApp(streamlitCall.args.code, true)
+                }
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
@@ -333,22 +322,21 @@ export default function ChatContainer({
     )
 
     const handleToolInvocations = useCallback(
-        async (toolInvocations: any[]) => {
-            if (!toolInvocations || toolInvocations.length === 0) return
+        async (toolInvocations: StreamlitToolCall[]) => {
+            console.log('🛠️ Processing tool invocations:', toolInvocations)
 
+            // Just in case onToolCall didn't catch it
             const streamlitCall = toolInvocations.find(
-                (invocation) =>
-                    invocation?.toolName === 'streamlitTool' &&
-                    invocation?.state === 'result' &&
-                    invocation?.result?.code
+                call => call.toolName === 'streamlitTool' && call.args?.code
             )
 
-            if (streamlitCall?.result?.code) {
-                setGeneratedCode(streamlitCall.result.code)
-                await updateStreamlitApp(streamlitCall.result.code, true)
+            if (streamlitCall?.args?.code && streamlitCall.args.code !== generatedCode) {
+                console.log('🚀 Updating Streamlit app with code from toolInvocations')
+                setGeneratedCode(streamlitCall.args.code)
+                await updateStreamlitApp(streamlitCall.args.code, true)
             }
         },
-        [setGeneratedCode, updateStreamlitApp]
+        [setGeneratedCode, updateStreamlitApp, generatedCode]
     )
 
     // Improved file upload with abort controller
@@ -358,90 +346,33 @@ export default function ChatContainer({
                 // Clear UI states first
                 if (isNewChat) {
                     pendingFileLinkId.current = fileId
-                    updateChatState({ status: 'active' })
+                    updateChatState({ status: 'active' }) // This will clear typing text
                 }
 
                 // Set loading states
                 setHasFirstMessage(true)
 
-                // If we have an existing file with same name, we need to update all chat references
-                const response = await fetch('/api/files', {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                const files = await response.json()
-                const existingFile = files.find((f: any) => f.file_name === file.name)
-
-                // First append to UI
-                const assistantMessage = "What would you like to do with this data?"
-                const messageData = {
-                    type: 'action_buttons',
-                    actions: [
-                        {
-                            label: "Write a Query",
-                            action: "populate_input",
-                            value: "Can you help me write a query to analyze this data?"
+                // Now append the message
+                await append(
+                    {
+                        content: `Create a Streamlit app to visualize this data.`,
+                        role: 'user',
+                        createdAt: new Date(),
+                    },
+                    {
+                        body: {
+                            chatId: currentChatId,
+                            fileId: fileId,
+                            fileName: file.name,
                         },
-                        {
-                            label: "Suggest Metrics",
-                            action: "populate_input",
-                            value: "What are some interesting metrics or questions we can explore with this data?"
-                        },
-                        {
-                            label: "Create App!",
-                            action: "populate_input",
-                            value: "Create a Streamlit app to visualize key insights from this data"
-                        }
-                    ]
-                }
-
-                await append({
-                    id: `file-upload-${Date.now()}`,
-                    role: 'assistant',
-                    content: assistantMessage,
-                    createdAt: new Date(),
-                    data: messageData as JSONValue
-                })
-
-                // If we're in a chat, update file associations
-                if (currentChatId) {
-                    // If we have an existing file, update all chat associations
-                    if (existingFile) {
-                        await fetch(`/api/files`, {
-                            method: 'PUT',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                oldFileId: existingFile.id,
-                                newFileId: fileId
-                            })
-                        })
-                    } else {
-                        // Just link the new file to current chat
-                        await fetch(`/api/chats/${currentChatId}/files`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                fileIds: [fileId]
-                            })
-                        })
                     }
-                }
-
-                // If we were on home page, route to new chat
-                if (!currentChatId) {
-                    router.push(`/chat/${currentChatId}`)
-                }
-
+                )
             } catch (error) {
                 console.error('Error processing file:', error)
                 setErrorState(error as Error)
             }
         },
-        [append, currentChatId, isNewChat, updateChatState, router]
+        [append, currentChatId, isNewChat, updateChatState]
     )
 
     // Add handleSubmit to wrap the originalHandleSubmit
@@ -455,6 +386,7 @@ export default function ChatContainer({
             e.preventDefault()
             setHasFirstMessage(true)
 
+            // Validate message content
             if (file && fileId) {
                 // Handle file upload case
                 await handleFileUpload(file, fileId)
@@ -585,6 +517,7 @@ export default function ChatContainer({
     useEffect(() => {
         const initializeChat = async () => {
             if (!currentChatId || isVersionSwitching.current || hasInitialized.current) return
+            
             hasInitialized.current = true
 
             try {
@@ -637,7 +570,7 @@ export default function ChatContainer({
         }
 
         initializeChat()
-    }, [currentChatId, initialMessages, initialVersion, setGeneratedCode, setGeneratingCode, updateStreamlitApp])
+    }, [currentChatId])
 
     // Cleanup effect
     useEffect(() => {

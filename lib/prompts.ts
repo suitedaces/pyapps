@@ -8,6 +8,7 @@ export const CHAT_SYSTEM_PROMPT = `You assist users in developing complex, aesth
 7. Use streamlit-extras in your code wherever applicable. Do not use metric cards from extras as they are not compatible with dark mode.
 8. st.experimental_rerun() wil throw an error. Use st.rerun() instead.
 9. When the user pastes an error message, fix the error and rewrite the code, but PLEASE keep other functionality intact.
+10. If while running coding you get a module not found error, inform the user and ask if ok to move ahead without the module and offer alternative.
 `
 
 export const CHAT_TITLE_PROMPT = `You are an AI assistant responsible for generating concise and relevant chat titles based on conversations. Follow these guidelines:

@@ -9,7 +9,7 @@ import {
 import { createClient, getUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { GetObjectCommand } from '@aws-sdk/client-s3'
+import { GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { s3Client } from '@/lib/s3'
 
 // File metadata validation schema
@@ -100,7 +100,9 @@ export async function POST(req: NextRequest) {
                 .eq('file_name', fileName)
                 .single()
 
-            // If file exists, clean up old file and its associations
+            let fileId;
+            
+            // If file exists, update its details
             if (existingFile) {
                 // Abort any existing upload
                 if (existingFile.upload_id) {
@@ -111,51 +113,61 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                // Get all chats that reference this file
-                const { data: chatFiles } = await supabase
-                    .from('chat_files')
-                    .select('chat_id')
-                    .eq('file_id', existingFile.id)
+                fileId = existingFile.id;
 
-                // Delete file record and let cascade handle chat_files
-                await supabase
+                // Update existing file record
+                const { error: updateError } = await supabase
                     .from('files')
-                    .delete()
+                    .update({
+                        file_type: fileType,
+                        file_size: fileSize,
+                        s3_key: s3Key,
+                        upload_status: 'pending',
+                        updated_at: new Date().toISOString(),
+                    })
                     .eq('id', existingFile.id)
+
+                if (updateError) throw updateError
+            } else {
+                // Create new file record if doesn't exist
+                const { data: fileData, error: dbError } = await supabase
+                    .from('files')
+                    .insert({
+                        user_id: user.id,
+                        file_name: fileName,
+                        file_type: fileType,
+                        file_size: fileSize,
+                        s3_key: s3Key,
+                        upload_status: 'pending'
+                    })
+                    .select()
+                    .single()
+
+                if (dbError) throw dbError
+                fileId = fileData.id
             }
 
             // Initiate new multipart upload
             const uploadId = await initiateMultipartUpload(s3Key, `text/${fileType}`)
 
-            // Create new file record
-            const { data: fileData, error: dbError } = await supabase
+            // Update the upload_id
+            await supabase
                 .from('files')
-                .insert({
-                    user_id: user.id,
-                    file_name: fileName,
-                    file_type: fileType,
-                    file_size: fileSize,
-                    s3_key: s3Key,
-                    upload_id: uploadId,
-                    upload_status: 'pending'
-                })
-                .select()
-                .single()
+                .update({ upload_id: uploadId })
+                .eq('id', fileId)
 
-            if (dbError) throw dbError
-
-            // If chatId provided, create association
-            if (chatId) {
+            // If chatId provided and file is new, create association
+            if (chatId && !existingFile) {
                 await supabase.from('chat_files').insert({
                     chat_id: chatId,
-                    file_id: fileData.id,
+                    file_id: fileId,
                 })
             }
 
             return NextResponse.json({
                 uploadId,
                 key: s3Key,
-                fileId: fileData.id,
+                fileId: fileId,
                 existingFileId: existingFile?.id
             })
         } catch (error) {

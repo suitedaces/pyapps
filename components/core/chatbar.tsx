@@ -248,7 +248,13 @@ export default function Chatbar({
 
                 if (!completeResponse.ok) throw new Error('Failed to complete upload')
                 setUploadedFileId(fileId)
+                // Clear the upload message and state
                 onChange('')
+                if (fileUploadState) {
+                    fileUploadState.isUploading = false
+                    fileUploadState.progress = 0
+                }
+                setIsUploading(false)
 
                 // Update file selection - replace old file ID with new one if it existed
                 if (onFileSelect) {
@@ -326,6 +332,12 @@ export default function Chatbar({
                 await onSubmit(e, '', file, uploadedFileId)
                 handleRemoveFile()
                 setUploadedFileId(null)
+                // Clear upload state
+                if (fileUploadState) {
+                    fileUploadState.isUploading = false
+                    fileUploadState.progress = 0
+                }
+                setIsUploading(false)
             } else if (value.trim()) {
                 // Normal message submission
                 await onSubmit(e, value)

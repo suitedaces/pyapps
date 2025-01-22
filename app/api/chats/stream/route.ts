@@ -22,17 +22,6 @@ interface FileContext {
     analysis: string
 }
 
-interface FileData {
-    file_name: string
-    file_type: string
-    analysis: string | null
-    user_id: string
-}
-
-interface ChatFile {
-    files: FileData | null
-}
-
 // Chat Management
 async function createNewChat(supabase: any, userId: string, chatName: string) {
     const { data: chat, error } = await supabase
@@ -339,8 +328,17 @@ export async function POST(req: Request) {
                     const allMessages = [...messages, ...response.messages]
                     console.log('💾 Processing messages:', JSON.stringify(allMessages, null, 2))
 
+                    // Validate messages
+                    const validMessages = allMessages.filter(msg => {
+                        if (msg.role !== 'assistant' && msg.role !== 'user') return true;
+                        if (Array.isArray(msg.content)) {
+                            return msg.content.length > 0;
+                        }
+                        return typeof msg.content === 'string' && msg.content.trim().length > 0;
+                    });
+
                     // Find all assistant messages with tool calls
-                    const streamlitCalls = allMessages
+                    const streamlitCalls = validMessages
                         .filter(msg => msg.role === 'assistant' && Array.isArray(msg.content))
                         .flatMap(msg => msg.content)
                         .filter((content: any) => 
@@ -376,7 +374,7 @@ export async function POST(req: Request) {
                         .from('chats')
                         .update({
                             updated_at: new Date().toISOString(),
-                            messages: allMessages,
+                            messages: validMessages,
                         })
                         .eq('id', newChatId)
                         .eq('user_id', user.id)

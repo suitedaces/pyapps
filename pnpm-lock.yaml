@@ -20,9 +20,6 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.515.0
         version: 3.705.0
-      '@e2b/code-interpreter':
-        specifier: ^0.0.8
-        version: 0.0.8(bufferutil@4.0.8)(utf-8-validate@6.0.5)
       '@opentelemetry/api':
         specifier: 1.7.0
         version: 1.7.0
@@ -501,10 +498,6 @@ packages:
   '@babel/runtime@7.26.0':
     resolution: {integrity: sha512-FDSOghenHTiToteC/QRlv2q3DhPZ/oOXTBoirfWNx1Cx3TMVcGWQtMMmQcSvb/JjpNeGzx8Pq/b4fKEJuWm1sw==}
     engines: {node: '>=6.9.0'}
-
-  '@e2b/code-interpreter@0.0.8':
-    resolution: {integrity: sha512-cKDFY9js9l3MfL71x0IDvaz0mAhvHIurVFnimtFRXNzuV0TxhuFqsauKabet0TMOrcDF3H3trC7pct6mNgRYTA==}
-    engines: {node: '>=18'}
 
   '@emnapi/runtime@1.3.1':
     resolution: {integrity: sha512-kEBmG8KyqtxJZv+ygbEim+KCGtIq1fC22Ms3S4ziXmYKm8uyoLX0MHONVKwp+9opg390VaKRNt4a7A9NwmpNhw==}
@@ -4794,15 +4787,6 @@ snapshots:
   '@babel/runtime@7.26.0':
     dependencies:
       regenerator-runtime: 0.14.1
-
-  '@e2b/code-interpreter@0.0.8(bufferutil@4.0.8)(utf-8-validate@6.0.5)':
-    dependencies:
-      e2b: 0.16.2
-      isomorphic-ws: 5.0.0(ws@8.18.0(bufferutil@4.0.8)(utf-8-validate@6.0.5))
-      ws: 8.18.0(bufferutil@4.0.8)(utf-8-validate@6.0.5)
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
 
   '@emnapi/runtime@1.3.1':
     dependencies:

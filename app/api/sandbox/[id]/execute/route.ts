@@ -1,5 +1,5 @@
 import { createClient, getUser } from '@/lib/supabase/server'
-import { Process, ProcessMessage, Sandbox } from '@e2b/code-interpreter'
+import { Process, ProcessMessage, Sandbox } from 'e2b'
 import { NextRequest, NextResponse } from 'next/server'
 import { setupS3Mount } from '@/lib/s3'
 interface RouteContext {
