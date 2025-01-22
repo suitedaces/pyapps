@@ -192,7 +192,7 @@ export default function Chatbar({
                 const { uploadId, key, fileId, existingFileId } = await initResponse.json()
 
                 // Step 2: Upload file in chunks
-                const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks
+                const CHUNK_SIZE = 4 * 1024 * 1024 // 5MB chunks
                 const chunks = Math.ceil(selectedFile.size / CHUNK_SIZE)
                 const parts = []
 
