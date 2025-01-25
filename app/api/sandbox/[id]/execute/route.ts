@@ -1,10 +1,8 @@
 import { createClient, getUser } from '@/lib/supabase/server'
-import { Process, ProcessMessage, Sandbox } from 'e2b'
+import { ProcessMessage, Sandbox } from 'e2b'
 import { NextRequest, NextResponse } from 'next/server'
 import { setupS3Mount } from '@/lib/s3'
-interface RouteContext {
-    params: Promise<{ id: string }>
-}   
+
 
 export const maxDuration = 30
 
@@ -87,9 +85,9 @@ async function listSessionSandboxes(sessionId: string): Promise<Sandbox[]> {
     }
 }
 
-export async function POST(req: NextRequest, context: RouteContext) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const user = await getUser()
-    const { id } = await context.params
+    const { id } = await params
     const sessionId = req.headers.get('x-session-id')
     const appId = req.headers.get('x-app-id')
 

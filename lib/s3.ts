@@ -20,7 +20,7 @@ export const s3Client = new S3Client({
 })
 
 export const BUCKET_NAME = process.env.AWS_S3_BUCKET!
-export const CHUNK_SIZE = 4 * 1024 * 1024 // 5MB chunks for multipart upload
+export const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks for multipart upload (minimum size required by S3)
 
 export async function uploadToS3(
     file: Buffer,

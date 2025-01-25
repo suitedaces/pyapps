@@ -1,68 +1,88 @@
 import { createClient, getUser } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-// Validation schema
-const FileAssociationSchema = z.object({
-    fileIds: z.array(z.string()),
-})
 
-export async function POST(
-    req: NextRequest,
-    context: { params: Promise<{ id: string }> }
-) {
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const supabase = await createClient()
-    const user = await getUser()
-    const { id } = await context.params
-
-    if (!user) {
-        return NextResponse.json(
-            { error: 'Not authenticated' },
-            { status: 401 }
-        )
-    }
+    const { fileId, fileIds } = await request.json()
+    const { id } = await params
 
     try {
-        const body = await req.json()
-        const { fileIds } = await FileAssociationSchema.parseAsync(body)
-
-        // Verify chat ownership
-        const { data: chat, error: chatError } = await supabase
-            .from('chats')
-            .select('id')
-            .eq('id', id)
-            .eq('user_id', user.id)
-            .single()
-
-        if (chatError || !chat) {
-            return NextResponse.json(
-                { error: 'Chat not found or unauthorized' },
-                { status: 404 }
-            )
+        if (fileId) {
+            // Single file association
+            const { error } = await supabase
+                .from('chat_files')
+                .insert({ chat_id: id, file_id: fileId })
+            if (error) throw error
+        } else if (fileIds) {
+            // Multiple file associations
+            const { error } = await supabase
+                .from('chat_files')
+                .insert(fileIds.map((id: string) => ({ 
+                    chat_id: id, 
+                    file_id: id 
+                })))
+            if (error) throw error
         }
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error('Error linking file:', error)
+        return NextResponse.json({ error: 'Failed to link file' }, { status: 500 })
+    }
+}
 
-        // Delete existing associations
-        await supabase
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    const supabase = await createClient()
+    const { fileIds } = await request.json()
+    const { id } = await params
+
+    try {
+        // First delete existing associations
+        const { error: deleteError } = await supabase
             .from('chat_files')
             .delete()
             .eq('chat_id', id)
+        
+        if (deleteError) throw deleteError
 
-        // Create new associations
-        if (fileIds.length > 0) {
-            const { error } = await supabase.from('chat_files').insert(
-                fileIds.map((fileId) => ({
+        // Then create new associations if fileIds is not empty
+        if (fileIds && fileIds.length > 0) {
+            const { error: insertError } = await supabase
+                .from('chat_files')
+                .insert(fileIds.map((fileId: string) => ({ 
                     chat_id: id,
                     file_id: fileId,
-                }))
-            )
-
-            if (error) throw error
+                    created_at: new Date().toISOString()
+                })))
+            if (insertError) throw insertError
         }
 
         return NextResponse.json({ success: true })
     } catch (error) {
-        console.error('Failed to update file associations:', error)
+        console.error('Error updating file associations:', error)
         return NextResponse.json(
-            { error: 'Failed to update file associations' },
+            { error: 'Failed to update file associations' }, 
+            { status: 500 }
+        )
+    }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    const supabase = await createClient()
+    const { id } = await params
+
+    try {
+        const { error } = await supabase
+            .from('chat_files')
+            .delete()
+            .eq('chat_id', id)
+        
+        if (error) throw error
+        return NextResponse.json({ success: true })
+    } catch (error) {
+        console.error('Error deleting file associations:', error)
+        return NextResponse.json(
+            { error: 'Failed to delete file associations' }, 
             { status: 500 }
         )
     }
@@ -70,11 +90,11 @@ export async function POST(
 
 export async function GET(
     req: NextRequest,
-    context: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const supabase = await createClient()
     const user = await getUser()
-    const { id } = await context.params
+    const { id } = await params
 
     if (!user) {
         return NextResponse.json(

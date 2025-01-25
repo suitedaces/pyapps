@@ -16,7 +16,7 @@ import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
 import { cn, formatDatabaseMessages } from '@/lib/utils'
 import { useChat } from 'ai/react'
-import { JSONValue } from 'ai'
+import { convertToCoreMessages, JSONValue } from 'ai'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -25,6 +25,7 @@ import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
 import LoadingAnimation from './LoadingAnimation'
 import AppSidebar from './Sidebar'
+import { useFileUpload } from '@/lib/hooks/useFileUpload'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -94,6 +95,7 @@ export default function ChatContainer({
         setGeneratedCode,
         setIsLoadingSandbox,
     } = useSandboxStore()
+    const { uploadFile } = useFileUpload()
 
     // Refs for preventing race conditions
     const abortControllerRef = useRef<AbortController | null>(null)
@@ -189,21 +191,10 @@ export default function ChatContainer({
                 setCurrentAppId(newAppId)
             }
 
-            if (pendingFileLinkId.current && newChatId) {
-                try {
-                    await fetch('/api/chats/files', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chatId: newChatId,
-                            fileId: pendingFileLinkId.current,
-                        }),
-                    })
-                    pendingFileLinkId.current = null
-                } catch (error) {
-                    console.error('Failed to link file:', error)
-                    setErrorState(error as Error)
-                }
+            // Remove file linking from here since it's handled by handleFileSelection
+            if (pendingFileLinkId.current) {
+                setPersistedFileIds([pendingFileLinkId.current])
+                pendingFileLinkId.current = null
             }
         },
         onToolCall: async ({ toolCall }) => {
@@ -258,6 +249,8 @@ export default function ChatContainer({
                     setGeneratedCode(streamlitCall.args.code)
                     await updateStreamlitApp(streamlitCall.args.code, true)
                 }
+
+                setVersionKey(prev => prev + 1)
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
@@ -633,22 +626,19 @@ export default function ChatContainer({
         [setSidebarChats]
     )
 
-    const handleFileSelection = useCallback((fileIds: string[]) => {
+    const handleFileSelection = useCallback(async (fileIds: string[]) => {
         setPersistedFileIds(fileIds)
         if (currentChatId) {
-            // First remove any existing chat_files associations
-            fetch(`/api/chats/${currentChatId}/files`, {
-                method: 'DELETE',
-            })
-            .then(() => {
-                // Then create new associations for all selected files
-                fetch(`/api/chats/${currentChatId}/files`, {
-                    method: 'POST',
+            try {
+                // Single API call to update associations
+                await fetch(`/api/chats/${currentChatId}/files`, {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ fileIds }),
                 })
-            })
-            .catch(console.error)
+            } catch (error) {
+                console.error('Error updating file associations:', error)
+            }
         }
     }, [currentChatId])
 
