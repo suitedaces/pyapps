@@ -10,6 +10,7 @@ import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { FileSelector } from '@/components/FileSelector'
 import { useAuth } from '@/contexts/AuthContext'
+import { useFileUpload } from '@/lib/hooks/useFileUpload'
 
 interface ChatbarProps {
     value: string
@@ -50,6 +51,7 @@ export default function Chatbar({
     onFileSelect,
 }: ChatbarProps): JSX.Element {
     const { session, showAuthPrompt } = useAuth()
+    const { uploadFile } = useFileUpload()
     // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -164,156 +166,90 @@ export default function Chatbar({
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0]
-        if (selectedFile) {
-            setFile(selectedFile)
-            setIsUploading(true)
-            if (fileUploadState) {
-                fileUploadState.isUploading = true
-                fileUploadState.progress = 0
+        if (!selectedFile) return
+
+        setIsUploading(true)
+        if (fileUploadState) {
+            fileUploadState.isUploading = true
+            fileUploadState.progress = 0
+        }
+
+        try {
+            // Check file size (500MB limit)
+            if (selectedFile.size > 500 * 1024 * 1024) {
+                throw new Error('File size exceeds 500MB limit')
             }
 
-            try {
-                // Step 1: Check for existing file and initialize upload
-                const initResponse = await fetch('/api/files', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        fileName: selectedFile.name,
-                        fileType: selectedFile.name.split('.').pop() || 'txt',
-                        fileSize: selectedFile.size,
-                        chatId: chatId,
-                        overwrite: true // Signal that we want to overwrite
-                    }),
-                })
+            // Check file type
+            const fileType = selectedFile.type.split('/')[1] || 'txt'
+            if (!['csv', 'json', 'txt'].includes(fileType)) {
+                throw new Error('Unsupported file type. Please upload CSV, JSON, or TXT files only.')
+            }
 
-                if (!initResponse.ok) throw new Error('Failed to initialize upload')
-                const { uploadId, key, fileId, existingFileId } = await initResponse.json()
-
-                // Step 2: Upload file in chunks
-                const CHUNK_SIZE = 4 * 1024 * 1024 // 5MB chunks
-                const chunks = Math.ceil(selectedFile.size / CHUNK_SIZE)
-                const parts = []
-
-                for (let partNumber = 1; partNumber <= chunks; partNumber++) {
-                    const start = (partNumber - 1) * CHUNK_SIZE
-                    const end = Math.min(start + CHUNK_SIZE, selectedFile.size)
-                    const chunk = selectedFile.slice(start, end)
-
-                    const formData = new FormData()
-                    formData.append('uploadId', uploadId)
-                    formData.append('partNumber', partNumber.toString())
-                    formData.append('key', key)
-                    formData.append('file', chunk)
-
-                    const partResponse = await fetch('/api/files', {
-                        method: 'POST',
-                        body: formData,
-                    })
-
-                    if (!partResponse.ok) throw new Error('Failed to upload part')
-                    const { ETag } = await partResponse.json()
-                    parts.push({ PartNumber: partNumber, ETag })
-
-                    // Update progress
-                    const progress = (partNumber / chunks) * 100
+            const { fileId } = await uploadFile({
+                file: selectedFile,
+                chatId,
+                onProgress: (progress) => {
                     if (fileUploadState) {
                         fileUploadState.progress = progress
-                        fileUploadState.isUploading = true
+                        fileUploadState.isUploading = progress < 100
                     }
-                    onChange(`Uploading ${selectedFile.name} (${Math.round(progress)}%)`)
-                }
-
-                // Show metadata generation message
-                if (fileUploadState) {
-                    fileUploadState.progress = 100
-                }
-                onChange('Generating file metadata...')
-
-                // Step 3: Complete upload
-                const completeResponse = await fetch('/api/files', {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        uploadId,
-                        key,
-                        parts,
-                        fileId,
-                        existingFileId
-                    }),
-                })
-
-                if (!completeResponse.ok) throw new Error('Failed to complete upload')
-                setUploadedFileId(fileId)
-                // Clear the upload message and state
-                onChange('')
-                if (fileUploadState) {
-                    fileUploadState.isUploading = false
-                    fileUploadState.progress = 0
-                }
-                setIsUploading(false)
-
-                // Update file selection - replace old file ID with new one if it existed
-                if (onFileSelect) {
-                    const newFileIds = [...selectedFileIds]
-                    if (existingFileId) {
-                        const index = newFileIds.indexOf(existingFileId)
-                        if (index !== -1) {
-                            newFileIds[index] = fileId
-                        } else {
-                            newFileIds.push(fileId)
-                        }
+                    if (progress < 100) {
+                        onChange(`Uploading ${selectedFile.name} (${Math.round(progress)}%)`)
                     } else {
-                        newFileIds.push(fileId)
+                        onChange('')
                     }
-                    onFileSelect(newFileIds)
                 }
+            })
 
-                // Update chat associations if needed
-                if (chatId) {
-                    await fetch(`/api/chats/${chatId}/files`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            oldFileId: existingFileId,
-                            newFileId: fileId
-                        }),
-                    })
-                }
+            setFile(selectedFile)
+            setUploadedFileId(fileId)
 
-                // Automatically trigger file upload completion
-                await onSubmit(new Event('submit') as any, '', selectedFile, fileId)
-                handleRemoveFile()
-                setUploadedFileId(null)
+            // Update file selection
+            if (onFileSelect) {
+                const newFileIds = [...selectedFileIds]
+                newFileIds.push(fileId)
+                onFileSelect(newFileIds)
+            }
 
-                if (textareaRef.current) {
-                    const currentHeight = textareaRef.current.offsetHeight
-                    textareaRef.current.style.height = `${MAX_HEIGHT}px`
-                    setTextareaHeight(MAX_HEIGHT)
-                    setIsTextareaMinHeight(currentHeight === MIN_HEIGHT)
-                    previousHeightRef.current = MAX_HEIGHT
-                }
-            } catch (error) {
-                console.error('Upload failed:', error)
-                handleRemoveFile()
-                onChange('')
-                if (handleFileError) {
-                    handleFileError('Failed to upload file. Please try again.')
-                }
-                if (fileUploadState) {
-                    fileUploadState.error = 'Upload failed'
-                }
-            } finally {
-                setIsUploading(false)
-                if (fileUploadState) {
-                    fileUploadState.isUploading = false
-                    fileUploadState.progress = 0
-                }
+            // Automatically trigger file upload completion
+            await onSubmit(new Event('submit') as any, '', selectedFile, fileId)
+            handleRemoveFile()
+            setUploadedFileId(null)
+
+            if (textareaRef.current) {
+                const currentHeight = textareaRef.current.offsetHeight
+                textareaRef.current.style.height = `${MAX_HEIGHT}px`
+                setTextareaHeight(MAX_HEIGHT)
+                setIsTextareaMinHeight(currentHeight === MIN_HEIGHT)
+                previousHeightRef.current = MAX_HEIGHT
+            }
+        } catch (error) {
+            console.error('Upload failed:', error)
+            handleRemoveFile()
+            onChange('')
+            
+            // Improved error handling
+            let errorMessage = 'Failed to upload file. Please try again.'
+            if (error instanceof Error) {
+                errorMessage = error.message
+            } else if (typeof error === 'string') {
+                errorMessage = error
+            }
+            
+            if (fileUploadState) {
+                fileUploadState.error = errorMessage
+            }
+            
+            // Check if handleFileError exists before calling
+            if (typeof handleFileError === 'function') {
+                handleFileError(errorMessage)
+            }
+        } finally {
+            setIsUploading(false)
+            if (fileUploadState) {
+                fileUploadState.isUploading = false
+                fileUploadState.progress = 0
             }
         }
     }
@@ -429,7 +365,7 @@ export default function Chatbar({
                 className="flex relative flex-col gap-4 max-w-[800px] mx-auto"
             >
                 <div className="relative flex items-center">
-                    {isUploading && (
+                    {isUploading && fileUploadState && fileUploadState.progress < 100 && (
                         <div className="absolute inset-x-0 -top-1">
                             <div className="relative h-1 bg-gray-100 dark:bg-gray-800 rounded-t-lg overflow-hidden">
                                 <div 
@@ -446,7 +382,7 @@ export default function Chatbar({
                         onChange={handleMessageChange}
                         onKeyDown={handleKeyDown}
                         placeholder={
-                            isUploading
+                            isUploading && fileUploadState && fileUploadState.progress < 100
                                 ? `Uploading ${file?.name || 'file'} (${Math.round(fileUploadState?.progress || 0)}%)`
                                 : file && uploadedFileId
                                     ? 'Press Enter to start project with file!'

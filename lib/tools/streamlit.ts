@@ -50,9 +50,9 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
             await sandbox.filesystem.makeDir('/app')
             await sandbox.filesystem.write('/app/test.py', code)
 
-            // Run with streamlit in headless mode to check for errors
             const execution = await sandbox.process.startAndWait({
                 cmd: 'python /app/test.py',
+                timeout: 10000,
             })
 
             // Get all output
