@@ -2,7 +2,9 @@ import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
 import { anthropic } from '@ai-sdk/anthropic'
-import { Message, streamText } from 'ai'
+import { CoreAssistantMessage, CoreSystemMessage, CoreToolMessage, CoreUserMessage, TextPart, ToolCallPart, ToolResultPart, streamText } from 'ai'
+
+type Message = CoreSystemMessage | CoreUserMessage | CoreAssistantMessage | CoreToolMessage;
 
 export const maxDuration = 150
 
@@ -401,25 +403,33 @@ export async function POST(req: Request) {
                 if (!response?.messages?.length) return
 
                 try {
-                    // Combine existing and new messages
-                    const allMessages = updatedMessages
+                    // Combine messages with correct types
+                    const allMessages = [
+                        ...updatedMessages, 
+                        ...response.messages.map(msg => ({
+                            ...msg,
+                            content: Array.isArray(msg.content) 
+                                ? msg.content as Array<TextPart | ToolCallPart | ToolResultPart>
+                                : msg.content
+                        }))
+                    ] as Message[];
 
-                    // Validate messages
-                    const validMessages = allMessages.filter(msg => {
-                        if (msg.role !== 'assistant' && msg.role !== 'user') return true;
-                        if (Array.isArray(msg.content)) {
-                            return msg.content.length > 0;
-                        }
-                        return typeof msg.content === 'string' && msg.content.trim().length > 0;
-                    });
+                    // Validate and add tool results for new messages if needed
+                    const { updatedMessages: finalMessages } = validateToolCallsAndResults(allMessages);
+
                     // Find all assistant messages with tool calls
-                    const streamlitCalls = validMessages
+                    const streamlitCalls = finalMessages
                         .filter(msg => msg.role === 'assistant' && Array.isArray(msg.content))
-                        .flatMap(msg => msg.content)
-                        .filter((content: any) => 
+                        .flatMap(msg => msg.content as Array<TextPart | ToolCallPart>)
+                        .filter((content): content is ToolCallPart & { args: { code: string } } => 
                             content.type === 'tool-call' && 
+                            'toolName' in content &&
                             content.toolName === 'streamlitTool' &&
-                            content.args?.code
+                            'args' in content &&
+                            typeof content.args === 'object' &&
+                            content.args !== null &&
+                            'code' in content.args &&
+                            typeof content.args.code === 'string'
                         )
 
                     // Get the latest Streamlit call
@@ -450,7 +460,7 @@ export async function POST(req: Request) {
                         .update({
                             updated_at: new Date().toISOString(),
                             // @ts-ignore - Message type mismatch is expected
-                            messages: validMessages,
+                            messages: finalMessages,
                         })
                         .eq('id', newChatId)
                         .eq('user_id', user.id)

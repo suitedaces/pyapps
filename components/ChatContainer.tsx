@@ -14,9 +14,8 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
-import { cn, formatDatabaseMessages } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useChat } from 'ai/react'
-import { convertToCoreMessages, JSONValue } from 'ai'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -394,7 +393,7 @@ export default function ChatContainer({
 
             updateChatState({ status: 'active' })
         },
-        [originalHandleSubmit, handleFileUpload, updateChatState, persistedFileIds]
+        [originalHandleSubmit, handleFileUpload, persistedFileIds]
     )
 
     const handleInputChange = useCallback(
