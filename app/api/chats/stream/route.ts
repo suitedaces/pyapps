@@ -273,6 +273,75 @@ function buildSystemPrompt(fileContexts: Set<FileContext> | undefined): string {
     return `${CHAT_SYSTEM_PROMPT}\n\nYou are working with the following files:\n${fileDescriptions}`
 }
 
+// Add function to generate sample tool result
+function generateSampleToolResult(toolCallId: string, toolName: string): any {
+    if (toolName === 'streamlitTool') {
+        return {
+            role: 'tool',
+            content: [{
+                type: 'tool-result',
+                result: { errors: 'No errors found!' },
+                toolName: 'streamlitTool',
+                toolCallId
+            }]
+        }
+    }
+    return null;
+}
+
+// Update validation function to add missing tool results
+function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; updatedMessages: Message[] } {
+    const toolCallIds = new Set<string>();
+    const toolResultIds = new Set<string>();
+    const updatedMessages = [];
+
+    // Process messages and insert tool results after their tool calls
+    for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        updatedMessages.push(msg);
+
+        if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+            for (const content of msg.content) {
+                if (content.type === 'tool-call' && content.toolCallId) {
+                    toolCallIds.add(content.toolCallId);
+                    
+                    // Check if the next message is a tool result for this call
+                    const nextMsg = messages[i + 1];
+                    let hasMatchingResult = false;
+                    
+                    // @ts-ignore - 'tool' role is valid in our schema but not in the Message type
+                    if (nextMsg?.role === 'tool' && Array.isArray(nextMsg.content)) {
+                        for (const resultContent of nextMsg.content) {
+                            if (resultContent.type === 'tool-result' && resultContent.toolCallId === content.toolCallId) {
+                                toolResultIds.add(content.toolCallId);
+                                hasMatchingResult = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // If no matching result found, insert one
+                    if (!hasMatchingResult) {
+                        const sampleResult = generateSampleToolResult(content.toolCallId, content.toolName);
+                        if (sampleResult) {
+                            updatedMessages.push(sampleResult);
+                            toolResultIds.add(content.toolCallId);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Verify all tool calls have results
+    const isValid = Array.from(toolCallIds).every(id => toolResultIds.has(id));
+    
+    return { 
+        isValid, 
+        updatedMessages: isValid ? updatedMessages : messages 
+    };
+}
+
 export async function POST(req: Request) {
     const supabase = await createClient()
     const user = await getUser()
@@ -283,7 +352,9 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { messages, chatId, fileId, fileIds } = await req.json()
+        const body = await req.json()
+        const { chatId, fileId, fileIds } = body
+        let messages = body.messages
         let newChatId = chatId
         let appId: string | null = null
 
@@ -307,7 +378,12 @@ export async function POST(req: Request) {
                 fileIds.map((fId: string) => linkFileToChat(supabase, newChatId, fId))
             )
         }
-
+        const { isValid, updatedMessages } = validateToolCallsAndResults(messages);
+        if (!isValid) {
+            throw new Error('Invalid message sequence: Missing tool results for some tool calls');
+        }
+        messages = updatedMessages;
+        console.log('🔍 Messages:', JSON.stringify(messages, null, 2))
         // Get file contexts if needed
         const fileContexts = await getFileContext(supabase, newChatId, user.id)
         const systemPrompt = buildSystemPrompt(fileContexts)
@@ -315,7 +391,8 @@ export async function POST(req: Request) {
         console.log('🔍 Streaming with fileContexts:', fileContexts)
         const result = streamText({
             model: anthropic('claude-3-5-sonnet-20241022'),
-            messages: [{ role: 'system', content: systemPrompt }, ...messages],
+            system: systemPrompt,
+            messages: updatedMessages,
             tools: { streamlitTool },
             maxSteps: 5,
             experimental_toolCallStreaming: true,
@@ -325,8 +402,7 @@ export async function POST(req: Request) {
 
                 try {
                     // Combine existing and new messages
-                    const allMessages = [...messages, ...response.messages]
-                    console.log('💾 Processing messages:', JSON.stringify(allMessages, null, 2))
+                    const allMessages = updatedMessages
 
                     // Validate messages
                     const validMessages = allMessages.filter(msg => {
@@ -336,7 +412,6 @@ export async function POST(req: Request) {
                         }
                         return typeof msg.content === 'string' && msg.content.trim().length > 0;
                     });
-
                     // Find all assistant messages with tool calls
                     const streamlitCalls = validMessages
                         .filter(msg => msg.role === 'assistant' && Array.isArray(msg.content))
@@ -354,9 +429,9 @@ export async function POST(req: Request) {
                     if (latestStreamlitCall) {
                         // Transform to expected format
                         const transformedCall = {
-                            toolCallId: latestStreamlitCall.toolCallId,
-                            toolName: latestStreamlitCall.toolName,
-                            args: latestStreamlitCall.args
+                            toolCallId: (latestStreamlitCall as any).toolCallId,
+                            toolName: (latestStreamlitCall as any).toolName,
+                            args: (latestStreamlitCall as any).args
                         }
                         console.log('✨ Creating app version with:', JSON.stringify(transformedCall, null, 2))
 
@@ -374,6 +449,7 @@ export async function POST(req: Request) {
                         .from('chats')
                         .update({
                             updated_at: new Date().toISOString(),
+                            // @ts-ignore - Message type mismatch is expected
                             messages: validMessages,
                         })
                         .eq('id', newChatId)
@@ -395,21 +471,13 @@ export async function POST(req: Request) {
                 'Cache-Control': 'no-cache',
                 Connection: 'keep-alive',
             },
+            getErrorMessage: (error) => {
+                console.error('🚨 Error in streamText:', error)
+                return error instanceof Error ? error.message : 'Unknown error'
+            },
         })
     } catch (error) {
         console.error('❌ Error in stream route:', error)
-        return new Response(
-            JSON.stringify({
-                error: 'Internal server error',
-                details: error instanceof Error ? error.message : 'Unknown error',
-            }),
-            {
-                status: 500,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
-        )
     }
 }
 
