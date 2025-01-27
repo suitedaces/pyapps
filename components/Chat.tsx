@@ -26,7 +26,6 @@ interface ChatProps {
         file?: File,
         fileId?: string
     ) => Promise<void>
-    fileUploadState: FileUploadState
     errorState: Error | null
     onErrorDismiss: () => void
     onChatFinish: () => void
@@ -45,7 +44,6 @@ function Chat({
     input = '',
     onInputChange,
     onSubmit,
-    fileUploadState = { isUploading: false, progress: 0, error: null },
     errorState = null,
     onErrorDismiss,
     onChatFinish,
@@ -124,16 +122,6 @@ function Chat({
                 </Alert>
             )}
 
-            {fileUploadState.error && (
-                <Alert
-                    variant="destructive"
-                    className="mb-4 absolute top-0 left-0 right-0 z-50"
-                >
-                    <XCircle className="h-4 w-4" />
-                    <AlertDescription>{fileUploadState.error}</AlertDescription>
-                </Alert>
-            )}
-
             {/* Messages */}
             <ScrollArea className="flex-1 p-4 space-y-4 w-full max-w-[800px] m-auto pb-[120px]">
                 {Array.isArray(messages) &&
@@ -167,7 +155,6 @@ function Chat({
                     onChange={onInputChange}
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
-                    fileUploadState={fileUploadState}
                     isInChatPage={isInChatPage}
                     chatId={chatId}
                     selectedFileIds={selectedFileIds}

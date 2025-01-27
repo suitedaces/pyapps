@@ -399,7 +399,6 @@ export async function POST(req: Request) {
             throw new Error('Invalid message sequence: Missing tool results for some tool calls');
         }
         messages = updatedMessages;
-        console.log('🔍 Messages:', JSON.stringify(messages, null, 2))
         // Get file contexts if needed
         const fileContexts = await getFileContext(supabase, newChatId, user.id)
         const systemPrompt = buildSystemPrompt(fileContexts)
@@ -448,7 +447,6 @@ export async function POST(req: Request) {
 
                     // Get the latest Streamlit call
                     const latestStreamlitCall = streamlitCalls[streamlitCalls.length - 1]
-                    console.log('🔍 Latest Streamlit call:', JSON.stringify(latestStreamlitCall, null, 2))
 
                     if (latestStreamlitCall) {
                         // Transform to expected format

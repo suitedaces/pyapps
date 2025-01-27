@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react'
 import { FileSelector } from '@/components/FileSelector'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFileUpload } from '@/lib/hooks/useFileUpload'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { XCircle } from 'lucide-react'
 
 interface ChatbarProps {
     value: string
@@ -22,11 +24,6 @@ interface ChatbarProps {
         fileId?: string
     ) => Promise<void>
     isLoading?: boolean
-    fileUploadState?: {
-        isUploading: boolean
-        progress: number
-        error: string | null
-    }
     isInChatPage?: boolean
     isCentered?: boolean
     chatId?: string
@@ -43,7 +40,6 @@ export default function Chatbar({
     onChange,
     onSubmit,
     isLoading = false,
-    fileUploadState,
     isInChatPage = false,
     isCentered = false,
     chatId,
@@ -59,6 +55,8 @@ export default function Chatbar({
     const [isAnimating, setIsAnimating] = React.useState(false)
     const [uploadedFileId, setUploadedFileId] = useState<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState(0)
+    const [uploadError, setUploadError] = useState<string | null>(null)
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
@@ -169,10 +167,8 @@ export default function Chatbar({
         if (!selectedFile) return
 
         setIsUploading(true)
-        if (fileUploadState) {
-            fileUploadState.isUploading = true
-            fileUploadState.progress = 0
-        }
+        setUploadProgress(0)
+        setUploadError(null)
 
         try {
             // Check file size (500MB limit)
@@ -190,10 +186,7 @@ export default function Chatbar({
                 file: selectedFile,
                 chatId,
                 onProgress: (progress) => {
-                    if (fileUploadState) {
-                        fileUploadState.progress = progress
-                        fileUploadState.isUploading = progress < 100
-                    }
+                    setUploadProgress(progress)
                     if (progress < 100) {
                         onChange(`Uploading ${selectedFile.name} (${Math.round(progress)}%)`)
                     } else {
@@ -237,9 +230,7 @@ export default function Chatbar({
                 errorMessage = error
             }
             
-            if (fileUploadState) {
-                fileUploadState.error = errorMessage
-            }
+            setUploadError(errorMessage)
             
             // Check if handleFileError exists before calling
             if (typeof handleFileError === 'function') {
@@ -247,10 +238,7 @@ export default function Chatbar({
             }
         } finally {
             setIsUploading(false)
-            if (fileUploadState) {
-                fileUploadState.isUploading = false
-                fileUploadState.progress = 0
-            }
+            setUploadProgress(0)
         }
     }
 
@@ -268,12 +256,6 @@ export default function Chatbar({
                 await onSubmit(e, '', file, uploadedFileId)
                 handleRemoveFile()
                 setUploadedFileId(null)
-                // Clear upload state
-                if (fileUploadState) {
-                    fileUploadState.isUploading = false
-                    fileUploadState.progress = 0
-                }
-                setIsUploading(false)
             } else if (value.trim()) {
                 // Normal message submission
                 await onSubmit(e, value)
@@ -365,15 +347,25 @@ export default function Chatbar({
                 className="flex relative flex-col gap-4 max-w-[800px] mx-auto"
             >
                 <div className="relative flex items-center">
-                    {isUploading && fileUploadState && fileUploadState.progress < 100 && (
+                    {isUploading && uploadProgress < 100 && (
                         <div className="absolute inset-x-0 -top-1">
                             <div className="relative h-1 bg-gray-100 dark:bg-gray-800 rounded-t-lg overflow-hidden">
                                 <div 
                                     className="absolute inset-y-0 left-0 bg-green-400 dark:bg-green-500 transition-all duration-300 ease-out"
-                                    style={{ width: `${fileUploadState?.progress || 0}%` }}
+                                    style={{ width: `${uploadProgress}%` }}
                                 />
                             </div>
                         </div>
+                    )}
+
+                    {uploadError && (
+                        <Alert
+                            variant="destructive"
+                            className="mb-4 absolute -top-16 left-0 right-0 z-50"
+                        >
+                            <XCircle className="h-4 w-4" />
+                            <AlertDescription>{uploadError}</AlertDescription>
+                        </Alert>
                     )}
 
                     <Textarea
@@ -382,8 +374,8 @@ export default function Chatbar({
                         onChange={handleMessageChange}
                         onKeyDown={handleKeyDown}
                         placeholder={
-                            isUploading && fileUploadState && fileUploadState.progress < 100
-                                ? `Uploading ${file?.name || 'file'} (${Math.round(fileUploadState?.progress || 0)}%)`
+                            isUploading && uploadProgress < 100
+                                ? `Uploading ${file?.name || 'file'} (${Math.round(uploadProgress)}%)`
                                 : file && uploadedFileId
                                     ? 'Press Enter to start project with file!'
                                     : 'Type your message...'
