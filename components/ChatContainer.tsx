@@ -227,7 +227,7 @@ export default function ChatContainer({
                 if (message.content && newChatIdRef.current && !currentChatId) {
                     const chatId = newChatIdRef.current
                     newChatIdRef.current = null
-                    router.push(`/chat/${chatId}`)
+                    router.push(`/projects/${chatId}`)
                     Promise.all([
                         generateTitle(chatId),
                         message.toolInvocations && message.toolInvocations.length > 0
@@ -447,7 +447,7 @@ export default function ChatContainer({
                     return
                 }
 
-                router.push(`/chat/${chatId}`)
+                router.push(`/projects/${chatId}`)
             } catch (error) {
                 console.error('Error selecting chat:', error)
                 router.push('/')
@@ -583,7 +583,7 @@ export default function ChatContainer({
     useEffect(() => {
         // This will only run on the client side
         const pathname = window.location.pathname
-        const chatId = pathname.startsWith('/chat/')
+        const chatId = pathname.startsWith('/projects/')
             ? pathname.split('/').pop()
             : undefined
         setCurrentChatId(chatId)
