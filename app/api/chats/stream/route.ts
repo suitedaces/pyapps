@@ -314,6 +314,27 @@ function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; u
     // Process messages and insert tool results after their tool calls
     for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
+        
+        // Ensure assistant messages are never empty
+        if (msg.role === 'assistant') {
+            if (!msg.content) {
+                msg.content = '👍';  // Add thumbs up emoji if content is empty
+            } else if (Array.isArray(msg.content)) {
+                // Handle array content
+                if (msg.content.length === 0) {
+                    msg.content = [{ type: 'text', text: '👍' }];
+                } else {
+                    // Check each text part in the array
+                    msg.content = msg.content.map(part => {
+                        if (part.type === 'text' && (!part.text || part.text.trim() === '')) {
+                            return { ...part, text: '👍' };
+                        }
+                        return part;
+                    });
+                }
+            }
+        }
+        
         updatedMessages.push(msg);
 
         if (msg.role === 'assistant' && Array.isArray(msg.content)) {
@@ -394,11 +415,14 @@ export async function POST(req: Request) {
                 fileIds.map((fId: string) => linkFileToChat(supabase, newChatId, fId))
             )
         }
+
+        // Validate and fix empty messages before processing
         const { isValid, updatedMessages } = validateToolCallsAndResults(messages);
         if (!isValid) {
             throw new Error('Invalid message sequence: Missing tool results for some tool calls');
         }
         messages = updatedMessages;
+        console.log('🔍 Streaming with messages:', JSON.stringify(messages, null, 2))
         // Get file contexts if needed
         const fileContexts = await getFileContext(supabase, newChatId, user.id)
         const systemPrompt = buildSystemPrompt(fileContexts)
@@ -427,7 +451,7 @@ export async function POST(req: Request) {
                         }))
                     ] as Message[];
 
-                    // Validate and add tool results for new messages if needed
+                    // Validate tool calls and handle empty messages
                     const { updatedMessages: finalMessages } = validateToolCallsAndResults(allMessages);
 
                     // Find all assistant messages with tool calls

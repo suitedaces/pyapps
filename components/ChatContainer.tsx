@@ -40,13 +40,6 @@ interface ChatContainerProps {
     isInChatPage?: boolean
     initialAppId?: string | null
     onChatDeleted?: () => void
-    onChatFinish?: () => void
-}
-
-interface FileUploadState {
-    isUploading: boolean
-    progress: number
-    error: string | null
 }
 
 interface StreamlitToolCall {
@@ -211,20 +204,26 @@ export default function ChatContainer({
             })
 
             try {
-                if (message.content && newChatIdRef.current && !currentChatId) {
-                    const chatId = newChatIdRef.current
-                    newChatIdRef.current = null
-                    router.push(`/projects/${chatId}`)
-                    Promise.all([
-                        generateTitle(chatId),
-                        message.toolInvocations && message.toolInvocations.length > 0
-                            ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
-                            : Promise.resolve(),
-                    ]).catch(console.error)
+                if (!message.content || !newChatIdRef.current || currentChatId) {
                     return
                 }
 
-                setVersionKey(prev => prev + 1)
+                const chatId = newChatIdRef.current
+                newChatIdRef.current = null
+                router.push(`/projects/${chatId}`)
+
+                const hasToolInvocations = message.toolInvocations && message.toolInvocations.length > 0
+
+                const tasks = [
+                    generateTitle(chatId),
+                    hasToolInvocations 
+                        ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
+                        : Promise.resolve(),
+                ]
+
+                Promise.all(tasks).catch(console.error)
+                
+                return
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
@@ -451,12 +450,6 @@ export default function ChatContainer({
         },
         [updateStreamlitApp, setGeneratingCode, setGeneratedCode]
     )
-
-    const handleChatFinish = useCallback(() => {
-        if (versionSelectorRef.current) {
-            versionSelectorRef.current.refreshVersions()
-        }
-    }, [])
 
     const toggleRightContent = useCallback(() => {
         setRightPanel((prev) => ({
@@ -727,7 +720,6 @@ export default function ChatContainer({
                                         onErrorDismiss={() =>
                                             setErrorState(null)
                                         }
-                                        onChatFinish={handleChatFinish}
                                         onUpdateStreamlit={updateStreamlitApp}
                                         onCodeClick={() => {
                                             setRightPanel((prev) => ({

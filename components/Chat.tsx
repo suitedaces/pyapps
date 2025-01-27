@@ -28,7 +28,6 @@ interface ChatProps {
     ) => Promise<void>
     errorState: Error | null
     onErrorDismiss: () => void
-    onChatFinish: () => void
     onUpdateStreamlit: (code: string) => void
     onCodeClick: (code: string) => void
     isInChatPage: boolean
@@ -46,7 +45,6 @@ function Chat({
     onSubmit,
     errorState = null,
     onErrorDismiss,
-    onChatFinish,
     onUpdateStreamlit,
     onCodeClick,
     isInChatPage = false,
@@ -96,7 +94,6 @@ function Chat({
 
         try {
             await onSubmit(e, message, file, fileId)
-            onChatFinish?.()
         } catch (error) {
             console.error('Error submitting message:', error)
         }
