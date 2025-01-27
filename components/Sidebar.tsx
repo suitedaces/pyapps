@@ -548,6 +548,7 @@ export default function AppSidebar({
                                                 <SidebarMenuButton
                                                     className="w-full flex items-center jusitfy-between"
                                                     tooltip="Your previous chats"
+                                                    onClick={() => router.push('/projects')}
                                                 >
                                                     <MessageSquare className="h-4 w-4" />
                                                     {open && (
@@ -674,8 +675,7 @@ export default function AppSidebar({
                                                         src={
                                                             session?.user
                                                                 ?.user_metadata
-                                                                ?.avatar_url ||
-                                                            '/default-avatar.png'
+                                                                ?.avatar_url
                                                         }
                                                         alt={
                                                             session?.user
@@ -723,8 +723,7 @@ export default function AppSidebar({
                                                             src={
                                                                 session?.user
                                                                     ?.user_metadata
-                                                                    ?.avatar_url ||
-                                                                '/default-avatar.png'
+                                                                    ?.avatar_url
                                                             }
                                                             alt={
                                                                 session?.user
@@ -858,8 +857,7 @@ export default function AppSidebar({
                         <Avatar className="h-8 w-8 rounded-lg">
                             <AvatarImage
                                 src={
-                                    session?.user?.user_metadata?.avatar_url ||
-                                    '/default-avatar.png'
+                                    session?.user?.user_metadata?.avatar_url
                                 }
                                 alt={
                                     session?.user?.user_metadata?.full_name ||
@@ -895,8 +893,7 @@ export default function AppSidebar({
                                 <AvatarImage
                                     src={
                                         session?.user?.user_metadata
-                                            ?.avatar_url ||
-                                        '/default-avatar.png'
+                                            ?.avatar_url
                                     }
                                     alt={
                                         session?.user?.user_metadata
@@ -1007,6 +1004,7 @@ export default function AppSidebar({
                                             <SidebarMenuButton
                                                 className="w-full flex items-center jusitfy-between"
                                                 tooltip="Your previous chats"
+                                                onClick={() => router.push('/projects')}
                                             >
                                                 <MessageSquare className="h-4 w-4" />
                                                 {open && (

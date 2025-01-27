@@ -37,6 +37,20 @@ async function createNewChat(supabase: any, userId: string, chatName: string) {
 }
 
 async function linkFileToChat(supabase: any, chatId: string, fileId: string) {
+    // First check if the association already exists
+    const { data: existingLink } = await supabase
+        .from('chat_files')
+        .select('id')
+        .eq('chat_id', chatId)
+        .eq('file_id', fileId)
+        .single()
+
+    // If the association already exists, return true without inserting
+    if (existingLink) {
+        return true
+    }
+
+    // If no existing association, create a new one
     const { error } = await supabase
         .from('chat_files')
         .insert([{ chat_id: chatId, file_id: fileId }])

@@ -4,7 +4,6 @@ import { Suspense } from 'react'
 import { Search, Plus, MessageSquare, Trash2 } from "lucide-react"
 import { useEffect, useState, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { useInView } from "react-intersection-observer"
 import debounce from 'lodash/debounce'
 import { useAuth } from '@/contexts/AuthContext'
@@ -13,6 +12,7 @@ import { AuthPrompt } from '@/components/ui/auth-prompt'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AppLayout } from "@/components/AppLayout"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
     Table,
     TableBody,
@@ -70,6 +70,52 @@ interface ProjectData {
     }>
 }
 
+function ProjectsTableSkeleton() {
+    return (
+        <div className="h-[calc(100vh-3.5rem)] w-full relative">
+            <div className="max-w-7xl mx-auto px-4 relative z-50">
+                <div className="flex items-center gap-4 py-4">
+                    <div className="relative flex-1">
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                    <Skeleton className="h-6 w-24" />
+                    <Skeleton className="h-6 w-28" />
+                </div>
+
+                <div className="overflow-y-auto h-[calc(100vh-7.5rem)] rounded-md border border-border bg-background">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="border-border hover:bg-muted/50">
+                                <TableHead className="w-[300px]">Name</TableHead>
+                                <TableHead className="w-[250px]">App</TableHead>
+                                <TableHead className="w-[150px]">Files</TableHead>
+                                <TableHead className="w-[150px]">Last Updated</TableHead>
+                                <TableHead className="w-[100px]">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i} className="border-border">
+                                    <TableCell><Skeleton className="h-6 w-48" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-40" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-8 w-8" />
+                                            <Skeleton className="h-8 w-8" />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
     const [projects, setProjects] = useState<ProjectData[]>([])
     const [loading, setLoading] = useState(false)
@@ -104,29 +150,34 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
                     )
                 `, { count: 'exact' })
                 .eq('user_id', session.user.id)
-                .order('updated_at', { ascending: false })
-                .range(pageIndex * ITEMS_PER_PAGE, (pageIndex + 1) * ITEMS_PER_PAGE - 1)
 
             if (search) {
-                query = query.or(`
-                    name.ilike.%${search}%,
-                    messages->0->>'content'.ilike.%${search}%,
-                    apps.name.ilike.%${search}%,
-                    apps.description.ilike.%${search}%,
-                    chat_files.files.file_name.ilike.%${search}%,
-                    chat_files.files.file_type.ilike.%${search}%
-                `)
+                query = query.ilike('name', `%${search}%`)
             }
+
+            query = query.order('updated_at', { ascending: false })
+                .range(pageIndex * ITEMS_PER_PAGE, (pageIndex + 1) * ITEMS_PER_PAGE - 1)
 
             const { data, error, count } = await query
 
             if (error) {
-                console.error('Error fetching projects:', error)
+                console.error('Error fetching projects:', error.message)
+                console.error('Error details:', {
+                    message: error.message,
+                    hint: error.hint,
+                    details: error.details,
+                    code: error.code
+                })
+                setProjects([])
+                setHasMore(false)
+                setTotalCount(0)
                 return
             }
 
             if (!data) {
-                console.error('No data returned')
+                setProjects([])
+                setHasMore(false)
+                setTotalCount(0)
                 return
             }
 
@@ -161,11 +212,15 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
             if (count !== null) {
                 setTotalCount(count)
                 setHasMore((pageIndex + 1) * ITEMS_PER_PAGE < count)
+            } else {
+                setTotalCount(0)
+                setHasMore(false)
             }
         } catch (error) {
             console.error('Error in fetchProjects:', error)
             setProjects([])
             setHasMore(false)
+            setTotalCount(0)
         } finally {
             loadingRef.current = false
             setLoading(false)
@@ -207,7 +262,7 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
     }
 
     if (isLoading || initialLoad) {
-        return <LoadingSpinner />
+        return <ProjectsTableSkeleton />
     }
 
     if (!session?.user) {
@@ -373,7 +428,7 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
 
                     {loading && !initialLoad && (
                         <div className="flex justify-center py-4">
-                            <LoadingSpinner size="sm" />
+                            <Skeleton className="h-8 w-8 rounded-full" />
                         </div>
                     )}
                     
@@ -416,7 +471,7 @@ export default function ProjectsPage() {
             onGenerateTitle={async () => null}
             onChatDeleted={handleChatDeleted}
         >
-            <Suspense fallback={<LoadingSpinner />}>
+            <Suspense fallback={<ProjectsTableSkeleton />}>
                 <ProjectsContent onChatDeleted={handleChatDeleted} />
             </Suspense>
         </AppLayout>
