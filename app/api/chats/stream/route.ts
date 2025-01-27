@@ -24,6 +24,20 @@ interface FileContext {
     analysis: string
 }
 
+interface ToolInvocation {
+    state: 'result';
+    toolCallId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+}
+
+interface MessageWithToolInvocations {
+    role: 'assistant';
+    content: string;
+    toolInvocations: ToolInvocation[];
+}
+
 // Chat Management
 async function createNewChat(supabase: any, userId: string, chatName: string) {
     const { data: chat, error } = await supabase
@@ -201,6 +215,27 @@ async function updateAppCurrentVersion(
         .eq('id', appId)
 }
 
+// Add screenshot function
+async function takeAppScreenshot(userId: string, appId: string, versionNumber: number) {
+    console.log('🔍 Taking screenshot for appId:', appId, 'versionNumber:', versionNumber)
+    // Fire and forget - don't wait for or handle the result
+    fetch('https://suitedaces--py-apps-screenshot-fastapi-app.modal.run/screenshot', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            app_id: appId,
+            version_number: versionNumber,
+            url: `https://pyapps.co/apps/${appId}`
+        })
+    }).catch(error => {
+        // Just log the error and continue
+        console.error('❌ Screenshot failed:', error)
+    })
+}
+
 async function handleStreamlitAppVersioning(
     supabase: any,
     userId: string,
@@ -241,8 +276,11 @@ async function handleStreamlitAppVersioning(
 
         await Promise.all([
             updateAppCurrentVersion(supabase, appId, version.id),
-            linkChatToApp(supabase, chatId, appId),
+            linkChatToApp(supabase, chatId, appId)
         ])
+        
+        // Fire and forget screenshot
+        takeAppScreenshot(userId, appId, 1)
     } else {
         // Update existing app flow
         const currentVersion = await getCurrentAppVersion(supabase, appId)
@@ -260,6 +298,9 @@ async function handleStreamlitAppVersioning(
             )
 
             await updateAppCurrentVersion(supabase, appId, version.id)
+            
+            // Fire and forget screenshot
+            takeAppScreenshot(userId, appId, nextVersion)
         }
     }
 
@@ -305,77 +346,115 @@ function generateSampleToolResult(toolCallId: string, toolName: string): any {
     return null;
 }
 
-// Update validation function to add missing tool results
-function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; updatedMessages: Message[] } {
-    const toolCallIds = new Set<string>();
-    const toolResultIds = new Set<string>();
-    const updatedMessages = [];
+// Type guards for message content
+function isToolCall(content: TextPart | ToolCallPart): content is ToolCallPart {
+    return content.type === 'tool-call';
+}
 
-    // Process messages and insert tool results after their tool calls
+function isToolResult(content: ToolResultPart): content is ToolResultPart {
+    return content.type === 'tool-result';
+}
+
+function isTextContent(content: TextPart | ToolCallPart): content is TextPart {
+    return content.type === 'text';
+}
+
+function isMessageWithToolInvocations(msg: Message): msg is MessageWithToolInvocations {
+    return (
+        msg.role === 'assistant' &&
+        typeof msg.content === 'string' &&
+        'toolInvocations' in msg &&
+        Array.isArray((msg as any).toolInvocations)
+    );
+}
+
+// Update validation function to match Vercel AI SDK format
+function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; updatedMessages: Message[] } {
+    const updatedMessages: Message[] = [];
+
     for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
         
-        // Ensure assistant messages are never empty
         if (msg.role === 'assistant') {
-            if (!msg.content) {
-                msg.content = '👍';  // Add thumbs up emoji if content is empty
-            } else if (Array.isArray(msg.content)) {
-                // Handle array content
-                if (msg.content.length === 0) {
-                    msg.content = [{ type: 'text', text: '👍' }];
-                } else {
-                    // Check each text part in the array
-                    msg.content = msg.content.map(part => {
-                        if (part.type === 'text' && (!part.text || part.text.trim() === '')) {
-                            return { ...part, text: '👍' };
-                        }
-                        return part;
-                    });
-                }
-            }
-        }
-        
-        updatedMessages.push(msg);
+            // Convert toolInvocations format to proper format
+            if (isMessageWithToolInvocations(msg)) {
+                // Create assistant message with text and tool calls
+                const assistantMessage: CoreAssistantMessage = {
+                    role: 'assistant',
+                    content: [
+                        { type: 'text', text: msg.content },
+                        ...msg.toolInvocations.map(invocation => ({
+                            type: 'tool-call' as const,
+                            toolCallId: invocation.toolCallId,
+                            toolName: invocation.toolName,
+                            args: invocation.args
+                        }))
+                    ]
+                };
+                updatedMessages.push(assistantMessage);
 
-        if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-            for (const content of msg.content) {
-                if (content.type === 'tool-call' && content.toolCallId) {
-                    toolCallIds.add(content.toolCallId);
-                    
-                    // Check if the next message is a tool result for this call
+                // Create separate tool message for results
+                const toolMessage: CoreToolMessage = {
+                    role: 'tool',
+                    content: msg.toolInvocations.map(invocation => ({
+                        type: 'tool-result' as const,
+                        toolCallId: invocation.toolCallId,
+                        toolName: invocation.toolName,
+                        result: invocation.result
+                    }))
+                };
+                updatedMessages.push(toolMessage);
+                continue;
+            }
+
+            // Handle array content
+            if (Array.isArray(msg.content)) {
+                const toolCalls = msg.content.filter(isToolCall);
+                
+                // If there are tool calls, look for corresponding results
+                if (toolCalls.length > 0) {
+                    // Add the assistant message as is
+                    updatedMessages.push(msg);
+
+                    // Look for tool results in the next message
                     const nextMsg = messages[i + 1];
-                    let hasMatchingResult = false;
-                    
-                    // @ts-ignore - 'tool' role is valid in our schema but not in the Message type
-                    if (nextMsg?.role === 'tool' && Array.isArray(nextMsg.content)) {
-                        for (const resultContent of nextMsg.content) {
-                            if (resultContent.type === 'tool-result' && resultContent.toolCallId === content.toolCallId) {
-                                toolResultIds.add(content.toolCallId);
-                                hasMatchingResult = true;
-                                break;
-                            }
-                        }
+                    if (nextMsg?.role === 'tool') {
+                        updatedMessages.push(nextMsg);
+                        i++; // Skip the next message since we've handled it
+                    } else {
+                        // Create a tool message with default results if none exist
+                        const toolMessage: CoreToolMessage = {
+                            role: 'tool',
+                            content: toolCalls.map(toolCall => ({
+                                type: 'tool-result',
+                                toolCallId: toolCall.toolCallId,
+                                toolName: toolCall.toolName,
+                                result: { errors: 'No errors found!' }
+                            }))
+                        };
+                        updatedMessages.push(toolMessage);
                     }
-
-                    // If no matching result found, insert one
-                    if (!hasMatchingResult) {
-                        const sampleResult = generateSampleToolResult(content.toolCallId, content.toolName);
-                        if (sampleResult) {
-                            updatedMessages.push(sampleResult);
-                            toolResultIds.add(content.toolCallId);
-                        }
-                    }
+                } else {
+                    // No tool calls, just add the message
+                    updatedMessages.push(msg);
                 }
+            } else {
+                // Handle string content
+                updatedMessages.push({
+                    role: 'assistant',
+                    content: [{ type: 'text', text: msg.content || '👍' }]
+                });
             }
+        } else if (msg.role === 'user' || msg.role === 'system') {
+            // Pass through user and system messages
+            updatedMessages.push(msg);
         }
+        // Skip standalone tool messages as they're handled with their assistant messages
     }
 
-    // Verify all tool calls have results
-    const isValid = Array.from(toolCallIds).every(id => toolResultIds.has(id));
-    
-    return { 
-        isValid, 
-        updatedMessages: isValid ? updatedMessages : messages 
+    return {
+        isValid: true,
+        updatedMessages
     };
 }
 
@@ -421,8 +500,9 @@ export async function POST(req: Request) {
         if (!isValid) {
             throw new Error('Invalid message sequence: Missing tool results for some tool calls');
         }
-        messages = updatedMessages;
         console.log('🔍 Streaming with messages:', JSON.stringify(messages, null, 2))
+        messages = updatedMessages;
+        console.log('🔍 Streaming with updated messages:', JSON.stringify(messages, null, 2))
         // Get file contexts if needed
         const fileContexts = await getFileContext(supabase, newChatId, user.id)
         const systemPrompt = buildSystemPrompt(fileContexts)
