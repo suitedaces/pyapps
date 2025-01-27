@@ -235,7 +235,7 @@ export default function AppsPage() {
       chatTitles={chatTitles}
       currentChatId={null}
       isCreatingChat={isCreatingChat}
-      onChatSelect={(id) => router.push(`/chat/${id}`)}
+      onChatSelect={(id) => router.push(`/projects/${id}`)}
       onGenerateTitle={async () => null}
       onChatDeleted={() => {
         const fetchChats = async () => {

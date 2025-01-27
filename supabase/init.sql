@@ -295,3 +295,5 @@ $$ LANGUAGE plpgsql;
 
 
 DROP TABLE IF EXISTS app_files;
+
+ALTER TABLE chat_files ADD CONSTRAINT unique_chat_file_association UNIQUE (chat_id, file_id);

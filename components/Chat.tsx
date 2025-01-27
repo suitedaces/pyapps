@@ -26,10 +26,8 @@ interface ChatProps {
         file?: File,
         fileId?: string
     ) => Promise<void>
-    fileUploadState: FileUploadState
     errorState: Error | null
     onErrorDismiss: () => void
-    onChatFinish: () => void
     onUpdateStreamlit: (code: string) => void
     onCodeClick: (code: string) => void
     isInChatPage: boolean
@@ -45,10 +43,8 @@ function Chat({
     input = '',
     onInputChange,
     onSubmit,
-    fileUploadState = { isUploading: false, progress: 0, error: null },
     errorState = null,
     onErrorDismiss,
-    onChatFinish,
     onUpdateStreamlit,
     onCodeClick,
     isInChatPage = false,
@@ -98,7 +94,6 @@ function Chat({
 
         try {
             await onSubmit(e, message, file, fileId)
-            onChatFinish?.()
         } catch (error) {
             console.error('Error submitting message:', error)
         }
@@ -121,16 +116,6 @@ function Chat({
                 >
                     <XCircle className="h-4 w-4" />
                     <AlertDescription>{errorState.message}</AlertDescription>
-                </Alert>
-            )}
-
-            {fileUploadState.error && (
-                <Alert
-                    variant="destructive"
-                    className="mb-4 absolute top-0 left-0 right-0 z-50"
-                >
-                    <XCircle className="h-4 w-4" />
-                    <AlertDescription>{fileUploadState.error}</AlertDescription>
                 </Alert>
             )}
 
@@ -167,7 +152,6 @@ function Chat({
                     onChange={onInputChange}
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
-                    fileUploadState={fileUploadState}
                     isInChatPage={isInChatPage}
                     chatId={chatId}
                     selectedFileIds={selectedFileIds}

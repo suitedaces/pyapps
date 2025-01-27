@@ -14,9 +14,8 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import modelsList from '@/lib/models.json'
 import { useSandboxStore } from '@/lib/stores/sandbox-store'
 import { AppVersion, LLMModelConfig } from '@/lib/types'
-import { cn, formatDatabaseMessages } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useChat } from 'ai/react'
-import { convertToCoreMessages, JSONValue } from 'ai'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -25,7 +24,6 @@ import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
 import LoadingAnimation from './LoadingAnimation'
 import AppSidebar from './Sidebar'
-import { useFileUpload } from '@/lib/hooks/useFileUpload'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -42,13 +40,6 @@ interface ChatContainerProps {
     isInChatPage?: boolean
     initialAppId?: string | null
     onChatDeleted?: () => void
-    onChatFinish?: () => void
-}
-
-interface FileUploadState {
-    isUploading: boolean
-    progress: number
-    error: string | null
 }
 
 interface StreamlitToolCall {
@@ -95,13 +86,11 @@ export default function ChatContainer({
         setGeneratedCode,
         setIsLoadingSandbox,
     } = useSandboxStore()
-    const { uploadFile } = useFileUpload()
 
     // Refs for preventing race conditions
     const abortControllerRef = useRef<AbortController | null>(null)
     const pendingFileLinkId = useRef<string | null>(null)
     const newChatIdRef = useRef<string | null>(null)
-    const hasNavigated = useRef(false)
     const isVersionSwitching = useRef(false)
     const versionSelectorRef = useRef<{ refreshVersions: () => void } | null>(
         null
@@ -127,15 +116,8 @@ export default function ChatContainer({
         status: 'initial',
         hasMessages: initialMessages?.length > 0,
     })
-    const [sandboxId, setSandboxId] = useState<string | null>(null)
     const [errorState, setErrorState] = useState<Error | null>(null)
-    const [fileUploadState, setFileUploadState] = useState<FileUploadState>({
-        isUploading: false,
-        progress: 0,
-        error: null,
-    })
     const [hasFirstMessage, setHasFirstMessage] = useState(false)
-    const [isCreatingChat, setIsCreatingChat] = useState(false)
     const [currentAppId, setCurrentAppId] = useState<string | null>(
         initialAppId || null
     )
@@ -150,12 +132,9 @@ export default function ChatContainer({
         (model) => model.id === languageModel.model
     )
 
-    // Add a new state for remount keys
-    const [previewKey, setPreviewKey] = useState<number>(0)
-    const [versionKey, setVersionKey] = useState<number>(0)
-
     // Add this state to track navigation
     const [isNavigating, setIsNavigating] = useState(false)
+    const [versionKey, setVersionKey] = useState<number>(0)
 
     // Move updateChatState before handleChatCreated
     const updateChatState = useCallback((updates: Partial<ChatState>) => {
@@ -225,32 +204,26 @@ export default function ChatContainer({
             })
 
             try {
-                if (message.content && newChatIdRef.current && !currentChatId) {
-                    const chatId = newChatIdRef.current
-                    newChatIdRef.current = null
-                    router.push(`/chat/${chatId}`)
-                    Promise.all([
-                        generateTitle(chatId),
-                        message.toolInvocations && message.toolInvocations.length > 0
-                            ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
-                            : Promise.resolve(),
-                    ]).catch(console.error)
+                if (!message.content || !newChatIdRef.current || currentChatId) {
                     return
                 }
 
-                // Find the most recent tool invocation with code
-                const streamlitCall = message.toolInvocations?.find(
-                    invocation => invocation.toolName === 'streamlitTool' && 
-                    invocation.args?.code
-                ) as StreamlitToolCall | undefined
+                const chatId = newChatIdRef.current
+                newChatIdRef.current = null
+                router.push(`/projects/${chatId}`)
 
-                if (streamlitCall?.args?.code && streamlitCall.args.code !== generatedCode) {
-                    console.log('🚀 Updating Streamlit app with code from onFinish')
-                    setGeneratedCode(streamlitCall.args.code)
-                    await updateStreamlitApp(streamlitCall.args.code, true)
-                }
+                const hasToolInvocations = message.toolInvocations && message.toolInvocations.length > 0
 
-                setVersionKey(prev => prev + 1)
+                const tasks = [
+                    generateTitle(chatId),
+                    hasToolInvocations 
+                        ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
+                        : Promise.resolve(),
+                ]
+
+                Promise.all(tasks).catch(console.error)
+                
+                return
             } catch (error) {
                 console.error('Failed in onFinish:', error)
                 setErrorState(error as Error)
@@ -310,7 +283,7 @@ export default function ChatContainer({
             setStreamlitUrl,
             setGeneratingCode,
             setIsLoadingSandbox,
-            currentChatId,
+            currentChatId
         ]
     )
 
@@ -394,7 +367,7 @@ export default function ChatContainer({
 
             updateChatState({ status: 'active' })
         },
-        [originalHandleSubmit, handleFileUpload, updateChatState, persistedFileIds]
+        [originalHandleSubmit, handleFileUpload, persistedFileIds]
     )
 
     const handleInputChange = useCallback(
@@ -407,7 +380,7 @@ export default function ChatContainer({
     )
 
     const handleRefresh = useCallback(async () => {
-        if (sandboxId && session?.user?.id) {
+        if (currentChatId && session?.user?.id) {
             try {
                 setGeneratingCode(true)
                 await updateStreamlitApp(generatedCode, true)
@@ -418,7 +391,7 @@ export default function ChatContainer({
             }
         }
     }, [
-        sandboxId,
+        currentChatId,
         session?.user?.id,
         generatedCode,
         updateStreamlitApp,
@@ -448,7 +421,7 @@ export default function ChatContainer({
                     return
                 }
 
-                router.push(`/chat/${chatId}`)
+                router.push(`/projects/${chatId}`)
             } catch (error) {
                 console.error('Error selecting chat:', error)
                 router.push('/')
@@ -477,12 +450,6 @@ export default function ChatContainer({
         },
         [updateStreamlitApp, setGeneratingCode, setGeneratedCode]
     )
-
-    const handleChatFinish = useCallback(() => {
-        if (versionSelectorRef.current) {
-            versionSelectorRef.current.refreshVersions()
-        }
-    }, [])
 
     const toggleRightContent = useCallback(() => {
         setRightPanel((prev) => ({
@@ -571,20 +538,20 @@ export default function ChatContainer({
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort()
             }
-            if (sandboxId) {
+            if (currentChatId) {
                 killSandbox().catch(console.error)
             }
             isExecutingRef.current = false
             setStreamlitUrl(null)
             setGeneratedCode('')
         }
-    }, [sandboxId, killSandbox, setStreamlitUrl, setGeneratedCode])
+    }, [currentChatId, killSandbox, setStreamlitUrl, setGeneratedCode])
 
     // Add useEffect to handle window-dependent logic
     useEffect(() => {
         // This will only run on the client side
         const pathname = window.location.pathname
-        const chatId = pathname.startsWith('/chat/')
+        const chatId = pathname.startsWith('/projects/')
             ? pathname.split('/').pop()
             : undefined
         setCurrentChatId(chatId)
@@ -680,7 +647,7 @@ export default function ChatContainer({
                 onChatSelect={handleChatSelect}
                 currentChatId={currentChatId || null}
                 chats={sidebarChats}
-                isCreatingChat={isCreatingChat}
+                isCreatingChat={false}
                 chatTitles={chatTitles}
                 onGenerateTitle={generateTitle}
                 onChatDeleted={() => {
@@ -749,12 +716,10 @@ export default function ChatContainer({
                                         input={input}
                                         onInputChange={handleInputChange}
                                         onSubmit={handleSubmit}
-                                        fileUploadState={fileUploadState}
                                         errorState={errorState}
                                         onErrorDismiss={() =>
                                             setErrorState(null)
                                         }
-                                        onChatFinish={handleChatFinish}
                                         onUpdateStreamlit={updateStreamlitApp}
                                         onCodeClick={() => {
                                             setRightPanel((prev) => ({
@@ -783,7 +748,6 @@ export default function ChatContainer({
                                     className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
                                 >
                                     <PreviewPanel
-                                        key={`preview-${previewKey}`}
                                         ref={streamlitPreviewRef}
                                         appId={currentAppId || undefined}
                                         streamlitUrl={streamlitUrl}
