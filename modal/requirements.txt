@@ -1,0 +1,9 @@
+modal
+playwright
+fastapi
+python-multipart
+pydantic
+uvicorn
+boto3
+python-dotenv
+jwt
