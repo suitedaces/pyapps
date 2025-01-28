@@ -202,6 +202,7 @@ export interface FileData {
 
 export interface AppData {
     id: string
+    user_id: string
     name: string
     description: string | null
     updated_at: string
@@ -209,4 +210,8 @@ export interface AppData {
     public_id: string | null
     current_version_id: string | null
     created_at: string
+    created_by?: string
+    current_version?: {
+        version_number: number
+    }
 }

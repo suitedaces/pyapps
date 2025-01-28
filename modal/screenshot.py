@@ -38,7 +38,7 @@ async def handle_screenshot(request: ScreenshotRequest):
             print(f"📸 Taking screenshot of {request.url}")
             await page.goto(request.url)
             await page.wait_for_load_state("networkidle")
-            await asyncio.sleep(20)  # Wait for animations
+            await asyncio.sleep(25)  # Wait for animations
             
             # Save screenshot temporarily
             temp_path = "/tmp/preview.png"
