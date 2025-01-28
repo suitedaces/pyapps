@@ -34,6 +34,13 @@ export function AppCard({ name, description, updatedAt, onClick, id, userId, cur
         fetchPresignedUrl();
     }, [id, currentVersionNumber, userId]);
 
+    const getDaysAgo = (date: string) => {
+        const days = Math.floor((new Date().getTime() - new Date(date).getTime()) / (1000 * 3600 * 24));
+        if (days === 0) return 'Today';
+        if (days === 1) return 'Yesterday';
+        return `${days} days ago`;
+    };
+
     return (
         <Card 
             className="cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:bg-accent/50 overflow-hidden"
@@ -57,7 +64,7 @@ export function AppCard({ name, description, updatedAt, onClick, id, userId, cur
             <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                     <h3 className="font-semibold leading-none tracking-tight">{name}</h3>
-                    <p className="text-sm text-muted-foreground">{updatedAt}</p>
+                    <p className="text-xs text-muted-foreground">{getDaysAgo(updatedAt)}</p>
                 </div>
             </CardHeader>
             <CardContent>

@@ -127,7 +127,7 @@ export function Message({
                 className={cn(
                     'flex w-full',
                     isUser ? 'justify-end' : 'justify-start',
-                    'mb-0'
+                    isUser ? 'mb-6 mt-6' : 'mb-2'
                 )}
             >
                 {!isUser ? (
@@ -201,8 +201,8 @@ export function Message({
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-row items-start gap-2 max-w-[85%] mb-4">
-                        <div className="grow-0 mx-2 py-2 px-3 rounded-lg bg-background border border-border text-foreground overflow-auto">
+                    <div className="flex flex-row items-start gap-2 max-w-[85%]">
+                        <div className="grow-0 mx-2 py-3 px-4 rounded-lg bg-background border border-border text-foreground overflow-auto">
                             <div 
                                 ref={contentRef}
                                 className={userMarkdownStyles}

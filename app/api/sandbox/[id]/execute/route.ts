@@ -155,7 +155,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             }
 
             // Keep sandbox alive
-            await sandbox.keepAlive(2 * 60 * 1000) // 2 minutes
+            await sandbox.keepAlive(3 * 60 * 1000) // 3 minutes
         } else {
             // Require session ID for unauthenticated users
             if (!sessionId) {
