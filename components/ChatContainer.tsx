@@ -339,22 +339,9 @@ export default function ChatContainer({
                 // Now append the message with action buttons
                 await append(
                     {
-                        content: `I've loaded your data from ${file.name}. What would you like to do with it?`,
-                        role: 'assistant',
+                        content: `I've uploaded a dataset named ${file.name}`,
+                        role: 'user',
                         createdAt: new Date(),
-                        data: {
-                            type: 'action_buttons',
-                            actions: [
-                                {
-                                    label: 'Create a visualization app',
-                                    value: 'Create a Streamlit app to visualize this data.'
-                                },
-                                {
-                                    label: 'Suggest insights & metrics',
-                                    value: 'Suggest interesting insights and metrics I could explore.'
-                                }
-                            ]
-                        }
                     },
                     {
                         body: {
