@@ -53,6 +53,20 @@ interface StreamlitToolCall {
     }
 }
 
+interface SuggestionsToolCall {
+    toolCallId: string
+    toolName: 'suggestionsTool'
+    args: {
+        keyMetrics: string[]
+        keyQuestions: string[]
+        userInteractions: {
+            filters: string[]
+            drilldowns: string[]
+            search: string[]
+        }
+    }
+}
+
 interface RightPanelState {
     isVisible: boolean
     view: 'code' | 'preview'
@@ -179,8 +193,8 @@ export default function ChatContainer({
         onToolCall: async ({ toolCall }) => {
             console.log('🔧 onToolCall:', toolCall)
 
-            const streamlitToolCall = toolCall as StreamlitToolCall
-            if (streamlitToolCall.toolName === 'streamlitTool' && streamlitToolCall.args?.code) {
+            if ((toolCall as StreamlitToolCall).toolName === 'streamlitTool' && (toolCall as StreamlitToolCall).args?.code) {
+                const streamlitToolCall = toolCall as StreamlitToolCall;
                 React.startTransition(() => {
                     setRightPanel((prev) => ({
                         ...prev,
@@ -193,6 +207,10 @@ export default function ChatContainer({
                 console.log('🚀 Updating Streamlit app with code from toolCall')
                 setGeneratedCode(streamlitToolCall.args.code)
                 await updateStreamlitApp(streamlitToolCall.args.code, true)
+            } else if ((toolCall as SuggestionsToolCall).toolName === 'suggestionsTool') {
+                const suggestionsToolCall = toolCall as SuggestionsToolCall;
+                console.log('💡 Processing suggestions:', suggestionsToolCall.args)
+                // No special handling needed as suggestions are rendered directly in the Message component
             }
         },
         onFinish: async (message) => {
@@ -318,12 +336,25 @@ export default function ChatContainer({
                 // Set loading states
                 setHasFirstMessage(true)
 
-                // Now append the message
+                // Now append the message with action buttons
                 await append(
                     {
-                        content: `Create a Streamlit app to visualize this data.`,
-                        role: 'user',
+                        content: `I've loaded your data from ${file.name}. What would you like to do with it?`,
+                        role: 'assistant',
                         createdAt: new Date(),
+                        data: {
+                            type: 'action_buttons',
+                            actions: [
+                                {
+                                    label: 'Create a visualization app',
+                                    value: 'Create a Streamlit app to visualize this data.'
+                                },
+                                {
+                                    label: 'Suggest insights & metrics',
+                                    value: 'Suggest interesting insights and metrics I could explore.'
+                                }
+                            ]
+                        }
                     },
                     {
                         body: {
