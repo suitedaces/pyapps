@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import './rubrik-cube/rubrik.css'
+import './rubik-cube/rubik.css'
 
 interface LoadingAnimationProps {
     message: string

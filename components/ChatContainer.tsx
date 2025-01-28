@@ -212,13 +212,13 @@ export default function ChatContainer({
                 newChatIdRef.current = null
                 router.push(`/projects/${chatId}`)
 
-                const hasToolInvocations = message.toolInvocations && message.toolInvocations.length > 0
+                // const hasToolInvocations = message.toolInvocations && message.toolInvocations.length > 0
 
                 const tasks = [
                     generateTitle(chatId),
-                    hasToolInvocations 
-                        ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
-                        : Promise.resolve(),
+                    // hasToolInvocations 
+                    //     ? handleToolInvocations(message.toolInvocations as StreamlitToolCall[])
+                    //     : Promise.resolve(),
                 ]
 
                 Promise.all(tasks).catch(console.error)

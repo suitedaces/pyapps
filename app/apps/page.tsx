@@ -38,7 +38,17 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
       
       let query = supabase
         .from('apps')
-        .select('*', { count: 'exact' })
+        .select(`
+          id,
+          user_id,
+          name,
+          description,
+          updated_at,
+          current_version_id,
+          current_version:app_versions!fk_current_version!inner(
+            version_number
+          )
+        `)
         .eq('user_id', session.user.id)
         .order('updated_at', { ascending: false })
         .range(pageIndex * ITEMS_PER_PAGE, (pageIndex + 1) * ITEMS_PER_PAGE - 1);
@@ -47,17 +57,26 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
         query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
       }
 
-      const { data, error, count } = await query;
-
+      const { data, error } = await query;
       if (error) throw error;
 
+      console.log('Fetched apps data:', JSON.stringify(data, null, 2));
+      const apps = data?.map(app => ({
+        id: app.id,
+        user_id: app.user_id,
+        name: app.name,
+        description: app.description,
+        updated_at: app.updated_at,
+        currentVersionNumber: (app.current_version as any)?.version_number
+      }));
+
       if (pageIndex === 0) {
-        setApps(data || []);
+        setApps(apps as any[]);
       } else {
-        setApps(prev => [...prev, ...(data || [])]);
+        setApps(prev => [...prev, ...apps] as any[]);
       }
 
-      setHasMore(count ? (pageIndex + 1) * ITEMS_PER_PAGE < count : false);
+      setHasMore(data?.length === ITEMS_PER_PAGE);
     } catch (error) {
       console.error('Error fetching apps:', error);
     } finally {
@@ -65,7 +84,7 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
       setLoading(false);
       setInitialLoad(false);
     }
-  }, [supabase, session?.user?.id]);
+  }, [session?.user?.id]);
 
   const debouncedSearch = useCallback(
     debounce((search: string) => {
@@ -156,12 +175,15 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
 
         <div className="overflow-y-auto h-[calc(100vh-7.5rem)]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {apps.map((app) => (
+            {apps.map((app: any) => (
               <AppCard
                 key={app.id}
+                id={app.id}
+                userId={session?.user?.id || ''}
                 name={app.name}
                 description={app.description}
                 updatedAt={new Date(app.updated_at).toLocaleDateString()}
+                currentVersionNumber={app.currentVersionNumber}
                 onClick={() => {
                   router.push(`/apps/${app.id}`)
                   onAppSelect?.(app)
@@ -180,17 +202,10 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
 }
 
 export default function AppsPage() {
-  const [showDetails, setShowDetails] = useState(false)
-  const [selectedApp, setSelectedApp] = useState<AppData | null>(null)
   const [chats, setChats] = useState<any[]>([])
   const [chatTitles, setChatTitles] = useState<Record<string, string>>({})
   const [isCreatingChat, setIsCreatingChat] = useState(false)
   const router = useRouter()
-
-  const handleAppSelect = (app: AppData) => {
-    setSelectedApp(app)
-    setShowDetails(true)
-  }
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -203,34 +218,9 @@ export default function AppsPage() {
 
   return (
     <AppLayout
-      rightPanel={
-        selectedApp ? (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">App Details</h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Name</p>
-                <p className="text-sm">{selectedApp.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Description</p>
-                <p className="text-sm">{selectedApp.description || 'No description'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Last Updated</p>
-                <p className="text-sm">{new Date(selectedApp.updated_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">App Details</h2>
-            <p className="text-sm text-muted-foreground">Select an app to view details</p>
-          </div>
-        )
-      }
-      showRightPanel={showDetails}
-      onToggleRightPanel={() => setShowDetails(!showDetails)}
+      rightPanel={null}
+      showRightPanel={false}
+      onToggleRightPanel={() => {}}
       chats={chats}
       chatTitles={chatTitles}
       currentChatId={null}
@@ -247,8 +237,8 @@ export default function AppsPage() {
       }}
     >
       <Suspense fallback={<LoadingCards />}>
-        <AppsContent onAppSelect={handleAppSelect} />
+        <AppsContent onAppSelect={() => {}} />
       </Suspense>
     </AppLayout>
-  )
+  );
 } 
