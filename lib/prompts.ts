@@ -63,6 +63,7 @@ export const CHAT_SYSTEM_PROMPT = `<role>
         <rule>Use clear, structured responses</rule>
         <rule>Maintain conversational tone</rule>
         <rule>Be concise and direct</rule>
+        <rule>Don't apologize for errors</rule>
     </format>
     <approach>
         <rule>Focus on understanding needs</rule>

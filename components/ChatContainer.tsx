@@ -24,6 +24,7 @@ import { VersionSelector } from '../components/VersionSelector'
 import { TypingText } from './core/typing-text'
 import LoadingAnimation from './LoadingAnimation'
 import AppSidebar from './Sidebar'
+import { createClient } from '@/lib/supabase/client'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -305,24 +306,6 @@ export default function ChatContainer({
         ]
     )
 
-    const handleToolInvocations = useCallback(
-        async (toolInvocations: StreamlitToolCall[]) => {
-            console.log('🛠️ Processing tool invocations:', toolInvocations)
-
-            // Just in case onToolCall didn't catch it
-            const streamlitCall = toolInvocations.find(
-                call => call.toolName === 'streamlitTool' && call.args?.code
-            )
-
-            if (streamlitCall?.args?.code && streamlitCall.args.code !== generatedCode) {
-                console.log('🚀 Updating Streamlit app with code from toolInvocations')
-                setGeneratedCode(streamlitCall.args.code)
-                await updateStreamlitApp(streamlitCall.args.code, true)
-            }
-        },
-        [setGeneratedCode, updateStreamlitApp, generatedCode]
-    )
-
     // Improved file upload with abort controller
     const handleFileUpload = useCallback(
         async (file: File, fileId: string) => {
@@ -336,12 +319,35 @@ export default function ChatContainer({
                 // Set loading states
                 setHasFirstMessage(true)
 
-                // Now append the message with action buttons
+                // Fetch file analysis from the database
+                const supabase = createClient()
+                const { data: fileData, error } = await supabase
+                    .from('files')
+                    .select('analysis')
+                    .eq('id', fileId)
+                    .single()
+
+                if (error) {
+                    console.error('Error fetching file analysis:', error)
+                }
+
+                // Now append the message with file data and analysis
                 await append(
                     {
                         content: `I've uploaded a dataset named ${file.name}`,
                         role: 'user',
                         createdAt: new Date(),
+                        data: {
+                            type: 'file_upload',
+                            file: {
+                                id: fileId,
+                                name: file.name,
+                                size: file.size,
+                                type: file.type,
+                                lastModified: file.lastModified,
+                                analysis: fileData?.analysis as any 
+                            }
+                        }
                     },
                     {
                         body: {
@@ -734,24 +740,29 @@ export default function ChatContainer({
                                         input={input}
                                         onInputChange={handleInputChange}
                                         onSubmit={handleSubmit}
-                                        errorState={errorState}
-                                        onErrorDismiss={() =>
-                                            setErrorState(null)
-                                        }
-                                        onUpdateStreamlit={updateStreamlitApp}
-                                        onCodeClick={() => {
-                                            setRightPanel((prev) => ({
-                                                ...prev,
-                                                view: 'code',
-                                            }))
+                                        onAppend={async (message: string) => {
+                                            // Create a user message with the correct type
+                                            const userMessage = {
+                                                id: Date.now().toString(),
+                                                role: 'user' as const, // Type assertion to fix role type
+                                                content: message,
+                                                createdAt: new Date()
+                                            }
+                                            
+                                            // Append the user message and wait for the assistant's response
+                                            await append(userMessage)
                                         }}
-                                        onTogglePanel={toggleRightContent}
+                                        errorState={errorState}
+                                        onErrorDismiss={() => setErrorState(null)}
+                                        onUpdateStreamlit={updateStreamlitApp}
+                                        onCodeClick={handleCodeViewToggle}
                                         isInChatPage={
                                             isInChatPage || hasFirstMessage
                                         }
+                                        onTogglePanel={toggleRightContent}
+                                        chatId={currentChatId}
                                         selectedFileIds={persistedFileIds}
                                         onFileSelect={handleFileSelection}
-                                        chatId={currentChatId}
                                     />
                                 </div>
                             </div>
