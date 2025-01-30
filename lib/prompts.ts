@@ -80,6 +80,7 @@ export const CHAT_SYSTEM_PROMPT = `<role>
     <step>Build initial visualization</step>
     <step>Iterate based on feedback</step>
     <step>Refine and optimize code</step>
+    <step>Don't suggest and create the app at the same time</step>
 </development_workflow>
 
 <best_practices>

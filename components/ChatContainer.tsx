@@ -264,46 +264,29 @@ export default function ChatContainer({
             }
 
             isExecutingRef.current = true
+            setIsLoadingSandbox(true)
 
             try {
-                for (let attempt = 1; attempt <= 3; attempt++) {
-                    try {
-                        const url = await updateSandbox(code, forceExecute)
-                        if (url) {
-                            setStreamlitUrl(url)
-                            if (streamlitPreviewRef.current?.refreshIframe) {
-                                await new Promise((resolve) =>
-                                    setTimeout(resolve, 3000)
-                                )
-                                streamlitPreviewRef.current.refreshIframe()
-                                setIsLoadingSandbox(false)
-                            }
-                            return url
-                        }
-                    } catch (error) {
-                        if (attempt === 3) throw error
-                        await new Promise((resolve) =>
-                            setTimeout(resolve, attempt * 1000)
-                        )
+                const url = await updateSandbox(code, forceExecute)
+                if (url) {
+                    setStreamlitUrl(url)
+                    if (streamlitPreviewRef.current?.refreshIframe) {
+                        streamlitPreviewRef.current.refreshIframe()
                     }
+                    return url
                 }
                 return null
             } catch (error) {
-                console.error('Failed to update sandbox after retries:', error)
+                console.error('Failed to update sandbox:', error)
                 setErrorState(error as Error)
                 return null
             } finally {
                 isExecutingRef.current = false
                 setGeneratingCode(false)
+                setIsLoadingSandbox(false)
             }
         },
-        [
-            updateSandbox,
-            setStreamlitUrl,
-            setGeneratingCode,
-            setIsLoadingSandbox,
-            currentChatId
-        ]
+        [updateSandbox, setStreamlitUrl, setGeneratingCode, setIsLoadingSandbox, setErrorState]
     )
 
     // Improved file upload with abort controller
