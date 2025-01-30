@@ -1,6 +1,7 @@
 import { CHAT_SYSTEM_PROMPT } from '@/lib/prompts'
 import { createClient, getUser } from '@/lib/supabase/server'
 import { streamlitTool } from '@/lib/tools/streamlit'
+import { suggestionsTool } from '@/lib/tools/suggest'
 import { anthropic } from '@ai-sdk/anthropic'
 import { CoreAssistantMessage, CoreSystemMessage, CoreToolMessage, CoreUserMessage, TextPart, ToolCallPart, ToolResultPart, streamText } from 'ai'
 
@@ -330,33 +331,9 @@ function buildSystemPrompt(fileContexts: Set<FileContext> | undefined): string {
     return `${CHAT_SYSTEM_PROMPT}\n\nYou are working with the following files:\n${fileDescriptions}`
 }
 
-// Add function to generate sample tool result
-function generateSampleToolResult(toolCallId: string, toolName: string): any {
-    if (toolName === 'streamlitTool') {
-        return {
-            role: 'tool',
-            content: [{
-                type: 'tool-result',
-                result: { errors: 'No errors found!' },
-                toolName: 'streamlitTool',
-                toolCallId
-            }]
-        }
-    }
-    return null;
-}
-
 // Type guards for message content
 function isToolCall(content: TextPart | ToolCallPart): content is ToolCallPart {
     return content.type === 'tool-call';
-}
-
-function isToolResult(content: ToolResultPart): content is ToolResultPart {
-    return content.type === 'tool-result';
-}
-
-function isTextContent(content: TextPart | ToolCallPart): content is TextPart {
-    return content.type === 'text';
 }
 
 function isMessageWithToolInvocations(msg: Message): msg is MessageWithToolInvocations {
@@ -512,7 +489,7 @@ export async function POST(req: Request) {
             model: anthropic('claude-3-5-sonnet-20241022'),
             system: systemPrompt,
             messages: updatedMessages,
-            tools: { streamlitTool },
+            tools: { streamlitTool, suggestionsTool },
             maxSteps: 5,
             experimental_toolCallStreaming: true,
             onFinish: async (event) => {

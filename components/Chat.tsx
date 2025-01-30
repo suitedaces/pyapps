@@ -26,6 +26,7 @@ interface ChatProps {
         file?: File,
         fileId?: string
     ) => Promise<void>
+    onAppend?: (message: string) => void
     errorState: Error | null
     onErrorDismiss: () => void
     onUpdateStreamlit: (code: string) => void
@@ -43,6 +44,7 @@ function Chat({
     input = '',
     onInputChange,
     onSubmit,
+    onAppend,
     errorState = null,
     onErrorDismiss,
     onUpdateStreamlit,
@@ -138,6 +140,7 @@ function Chat({
                                 onCodeClick={handleCodeClick}
                                 onTogglePanel={() => onTogglePanel('right')}
                                 onInputChange={onInputChange}
+                                onAppend={onAppend}
                                 showAvatar={showAvatar}
                             />
                         );

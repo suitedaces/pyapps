@@ -9,6 +9,8 @@ import { useEffect, useRef } from 'react'
 import { ActionPanel } from './action-panel'
 import { assistantMarkdownStyles, userMarkdownStyles, markdownToHtml } from './markdown'
 import { Logo } from '@/components/core/Logo'
+import { FileUpload } from '@/components/core/FileUpload'
+import { Suggestions } from '@/components/core/Suggestions'
 
 interface ActionButton {
     label: string
@@ -45,8 +47,10 @@ interface MessageProps {
     data?: {
         type: string
         actions?: ActionButton[]
+        file?: any
     }
     onInputChange?: (value: string) => void
+    onAppend?: (message: string) => void
     toolInvocations?: any[]
 }
 
@@ -56,11 +60,12 @@ export function Message({
     id,
     isLastMessage = false,
     toolInvocations,
-    isLoading,
+    isLoading = false,
     isCreatingChat = false,
     onTogglePanel,
     data,
     onInputChange,
+    onAppend,
     showAvatar = true,
 }: MessageProps) {
     // Skip rendering for tool messages
@@ -71,7 +76,7 @@ export function Message({
     const user = session?.user
     const messageEndRef = useRef<HTMLDivElement>(null)
     const contentRef = useRef<HTMLDivElement>(null)
-    
+
     useEffect(() => {
         const renderMarkdown = async () => {
             if (!contentRef.current) return
@@ -116,6 +121,30 @@ export function Message({
         }))
         : undefined
 
+    // Extract suggestions from both toolInvocations and content
+    const getSuggestions = () => {
+        // Check toolInvocations first
+        const toolInvocationSuggestions = toolInvocations?.find(inv => inv.toolName === 'suggestionsTool');
+
+        if (toolInvocationSuggestions) {
+            return toolInvocationSuggestions.args || toolInvocationSuggestions.result;
+        }
+
+        // Check content array for tool calls
+        const contentSuggestions = extractedToolCalls?.find(call => call.toolName === 'suggestionsTool');
+
+        if (contentSuggestions) {
+            return contentSuggestions.args;
+        }
+
+        return null;
+    };
+
+    const isSuggestionsLoading = isLoading && (
+        toolInvocations?.some(inv => inv.toolName === 'suggestionsTool') ||
+        extractedToolCalls?.some(call => call.toolName === 'suggestionsTool')
+    );
+
     return (
         <AnimatePresence mode="wait">
             <motion.div
@@ -148,6 +177,15 @@ export function Message({
                                 className={cn("max-w-[calc(100%-2rem)] overflow-x-auto", assistantMarkdownStyles)}
                             />
 
+                            {/* Render suggestions if they exist */}
+                            <Suggestions 
+                                suggestions={getSuggestions()} 
+                                isLoading={isSuggestionsLoading || false}
+                                onInputChange={onInputChange}
+                                onAppend={onAppend}
+                            />
+
+                            {/* Action buttons */}
                             {data?.type === 'action_buttons' && data.actions && (
                                 <motion.div 
                                     className="flex flex-wrap gap-2 mt-4"
@@ -179,10 +217,12 @@ export function Message({
                                 </motion.div>
                             )}
 
-                            {(Boolean(toolInvocations?.length) || Boolean(extractedToolCalls?.length)) && (
+                            {/* Streamlit tool panel */}
+                            {(Boolean(toolInvocations?.some(inv => inv.toolName === 'streamlitTool')) || 
+                              Boolean(extractedToolCalls?.some(call => call.toolName === 'streamlitTool'))) && (
                                 <ActionPanel
-                                    isLoading={isLoading}
-                                    isLastMessage={isLastMessage}
+                                    isLoading={Boolean(isLoading)}
+                                    isLastMessage={Boolean(isLastMessage)}
                                     onTogglePanel={onTogglePanel}
                                 />
                             )}
@@ -207,6 +247,10 @@ export function Message({
                                 ref={contentRef}
                                 className={userMarkdownStyles}
                             />
+                            {/* Add file upload rendering */}
+                            {data?.type === 'file_upload' && (
+                                <FileUpload file={data.file} />
+                            )}
                         </div>
                         <Avatar className="w-8 h-8 bg-blue-500 border-2 border-border flex-shrink-0 mt-1">
                             {user?.user_metadata?.avatar_url ? (

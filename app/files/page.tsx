@@ -220,32 +220,7 @@ export default function FilesPage() {
 
   return (
     <AppLayout
-      rightPanel={
-        selectedFile ? (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">File Details</h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Name</p>
-                <p className="text-sm">{selectedFile.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Type</p>
-                <p className="text-sm">{selectedFile.type}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Last Updated</p>
-                <p className="text-sm">{new Date(selectedFile.updated_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">File Details</h2>
-            <p className="text-sm text-muted-foreground">Select a file to view details</p>
-          </div>
-        )
-      }
+      rightPanel={<></>}
       showRightPanel={showDetails}
       onToggleRightPanel={() => setShowDetails(!showDetails)}
       chats={chats}

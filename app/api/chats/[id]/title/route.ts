@@ -48,7 +48,7 @@ export async function POST(
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a project title generator. Generate concise, descriptive titles based on conversation content.'
+                    content: 'You are a project title generator. Generate very short, concise titles (max 50 chars). For file uploads, use format "Dataset: [brief description]". Keep titles clear but minimal.'
                 },
                 {
                     role: 'user',
@@ -59,7 +59,7 @@ export async function POST(
                 title: z
                     .string()
                     .max(50)
-                    .describe('Generate a 6-word title that captures the essence of the conversation')
+                    .describe('Generate a very short title (max 50 chars) that captures the essence of the conversation')
             }),
             temperature: 0.7
         })

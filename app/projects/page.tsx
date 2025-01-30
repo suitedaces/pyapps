@@ -36,19 +36,8 @@ import { Database } from '@/lib/database.types'
 
 const ITEMS_PER_PAGE = 20
 
-type ChatRow = Database['public']['Tables']['chats']['Row']
-type AppRow = Database['public']['Tables']['apps']['Row']
 type AppVersionRow = Database['public']['Tables']['app_versions']['Row']
 type FileRow = Database['public']['Tables']['files']['Row']
-
-type SupabaseQueryResult = ChatRow & {
-    apps: (AppRow & {
-        app_versions: AppVersionRow[]
-    }) | null
-    chat_files: {
-        files: FileRow | null
-    }[] | null
-}
 
 interface ProjectData {
     id: string
@@ -347,7 +336,7 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
                                                 size="icon"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    router.push(`/chat/${project.id}`)
+                                                    router.push(`/projects/${project.id}`)
                                                 }}
                                                 className="h-8 w-8"
                                             >
@@ -467,7 +456,7 @@ export default function ProjectsPage() {
             chatTitles={chatTitles}
             currentChatId={null}
             isCreatingChat={isCreatingChat}
-            onChatSelect={(id) => router.push(`/chat/${id}`)}
+            onChatSelect={(id) => router.push(`/projects/${id}`)}
             onGenerateTitle={async () => null}
             onChatDeleted={handleChatDeleted}
         >
