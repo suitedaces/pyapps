@@ -17,6 +17,8 @@ async function listUserSandboxes(userId: string): Promise<Sandbox[]> {
                 s.metadata.userId === userId
         )
 
+        console.log(`Found ${userSandboxes.length} sandboxes for user ${userId}`)
+        
         const fullSandboxes = await Promise.all(
             userSandboxes.map((s) => Sandbox.reconnect(s.sandboxID))
         )
@@ -31,31 +33,15 @@ async function cleanupOldSandboxes(
     sandboxes: Sandbox[],
     keepSandboxId?: string
 ) {
+    console.log(`Cleaning up ${sandboxes.length} sandboxes`)
     for (const sandbox of sandboxes) {
         if (keepSandboxId && sandbox.id === keepSandboxId) continue
         try {
             await sandbox.close()
-            console.log(`Destroyed sandbox ${sandbox.id}`)
+            console.log(`✅ Destroyed sandbox ${sandbox.id}`)
         } catch (error) {
             console.error(`Failed to destroy sandbox ${sandbox.id}:`, error)
         }
-    }
-}
-
-async function killStreamlitProcess(sandbox: Sandbox) {
-    try {
-        // Kill any running streamlit processes
-        await sandbox.process.start('pkill -f "streamlit run" || true')
-
-        // Remove existing app file
-        await sandbox.process.start('rm -f /app/app.py')
-
-        // Small delay to ensure process is fully terminated
-        await new Promise((resolve) => setTimeout(resolve, 500))
-
-        console.log('✅ Cleaned up existing Streamlit process and app file')
-    } catch (error) {
-        console.error('❌ Error during cleanup:', error)
     }
 }
 
@@ -156,11 +142,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
                 sandbox = await Sandbox.reconnect(id)
-                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
-                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, sandbox.id)
             } else {
                 sandbox = await Sandbox.create({
@@ -188,11 +172,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
                 sandbox = await Sandbox.reconnect(id)
-                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
-                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, sandbox.id)
             } else {
                 sandbox = await Sandbox.create({
@@ -210,11 +192,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         await setupS3Mount(sandbox, ownerUserId)
-        // Write and execute code (common for both flows)
-        // console.log('Writing code to sandbox: ', codeContent)
+        
+        console.log('📝 Writing code to sandbox')
         await sandbox.filesystem.write('/app/app.py', codeContent)
 
-        console.log('Starting Streamlit process')
+        console.log('🚀 Starting Streamlit process')
         await sandbox.process.start({
             cmd: 'streamlit run /app/app.py --server.headless true --server.runOnSave true --server.enableCORS false --server.enableXsrfProtection false --server.port 8501',
             onStdout: (data: string) => console.log('Streamlit stdout:', data),
@@ -224,13 +206,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const url = sandbox.getHostname(8501)
 
         const fullUrl = `https://${url}`
-
-        console.log('Sandbox URL:', fullUrl)
+        console.log('🌐 New sandbox URL:', fullUrl)
 
         // Wait for Streamlit to be ready
         const isReady = await waitForStreamlit(fullUrl)
         if (!isReady) {
             console.log('❌ Streamlit failed to start properly after retries')
+            await sandbox.close()
             return NextResponse.json(
                 { error: 'Streamlit failed to start properly' },
                 { status: 500 }

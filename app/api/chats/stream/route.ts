@@ -435,6 +435,33 @@ function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; u
     };
 }
 
+// Add token count to chat
+async function updateChatTokenCount(supabase: any, chatId: string, newTokens: number) {
+    // First get current token count
+    const { data: currentChat } = await supabase
+        .from('chats')
+        .select('tokens_used')
+        .eq('id', chatId)
+        .single()
+
+    const currentCount = currentChat?.tokens_used || 0
+    const updatedCount = currentCount + newTokens
+
+    const { error } = await supabase
+        .from('chats')
+        .update({ 
+            tokens_used: updatedCount,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', chatId)
+
+    if (error) {
+        console.error('Error updating chat token count:', error)
+    } else {
+        console.log(`✅ Updated token count from ${currentCount} to ${updatedCount} (+${newTokens})`)
+    }
+}
+
 export async function POST(req: Request) {
     const supabase = await createClient()
     const user = await getUser()
@@ -493,10 +520,15 @@ export async function POST(req: Request) {
             maxSteps: 5,
             experimental_toolCallStreaming: true,
             onFinish: async (event) => {
-                const { response } = event
+                const { response, usage } = event
                 if (!response?.messages?.length) return
 
                 try {
+                    // Update chat with token count
+                    if (usage?.totalTokens) {
+                        await updateChatTokenCount(supabase, newChatId, usage.totalTokens)
+                    }
+
                     // Combine messages with correct types
                     const allMessages = [
                         ...updatedMessages, 
@@ -547,7 +579,7 @@ export async function POST(req: Request) {
                         console.log('✅ Created app with ID:', appId)
                     }
 
-                    // Store all messages
+                    // Store messages
                     await supabase
                         .from('chats')
                         .update({
@@ -558,7 +590,7 @@ export async function POST(req: Request) {
                         .eq('id', newChatId)
                         .eq('user_id', user.id)
 
-                    console.log('✅ Successfully stored messages')
+                    console.log('✅ Successfully stored messages and updated token count:', usage?.totalTokens || 0)
                 } catch (error) {
                     console.error('❌ Error in message handling:', error)
                     throw error
