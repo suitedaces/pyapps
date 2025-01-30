@@ -1,12 +1,10 @@
 FROM python:3.9-slim
 
 # System dependencies
-RUN apt-get update && apt-get install -y \
-    s3fs \
-    fuse \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y s3fs fuse gcc && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Python data science packages
 RUN pip3 install --no-cache-dir \
