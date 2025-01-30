@@ -9,7 +9,7 @@ import {
     AbortMultipartUploadCommand
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { Sandbox } from '@e2b/code-interpreter'
+import { Sandbox } from 'e2b'
 
 export const s3Client = new S3Client({
     region: process.env.AWS_REGION!,
@@ -89,13 +89,13 @@ export const getS3Key = (userId: string, fileName: string): string => {
 
 export async function setupS3Mount(sandbox: Sandbox, userId: string) {
     // Ensure directory exists
-    await sandbox.commands.run('sudo mkdir -p /app/s3', { background: true })
+    await sandbox.process.start('sudo mkdir -p /app/s3')
 
     // Write credentials file
-    await sandbox.commands.run(`echo "${process.env.AWS_ACCESS_KEY_ID}:${process.env.AWS_SECRET_ACCESS_KEY}" | sudo tee /etc/passwd-s3fs > /dev/null && sudo chmod 600 /etc/passwd-s3fs`, { background: true })
+    await sandbox.process.start(`echo "${process.env.AWS_ACCESS_KEY_ID}:${process.env.AWS_SECRET_ACCESS_KEY}" | sudo tee /etc/passwd-s3fs > /dev/null && sudo chmod 600 /etc/passwd-s3fs`)
 
     // Mount S3 with debug output
-    await sandbox.commands.run(`sudo s3fs "pyapps:/${userId}" /app/s3 \
+    await sandbox.process.start(`sudo s3fs "pyapps:/${userId}" /app/s3 \
             -o passwd_file=/etc/passwd-s3fs \
             -o url="https://s3.amazonaws.com" \
             -o endpoint=${process.env.AWS_REGION} \
@@ -104,16 +104,8 @@ export async function setupS3Mount(sandbox: Sandbox, userId: string) {
             -o dbglevel=info \
             -o use_path_request_style \
             -o default_acl=private \
-            -o use_cache=/tmp`, {
-        onStdout: (output: string) => {
-            console.log('Mount stdout:', output)
-        },
-        onStderr: (output: string) => {
-            console.error('Mount stderr:', output)
-        },
-        background: true
-    })
-
+            -o use_cache=/tmp`)
+        
     // Verify mount
     // const verifyMount = await (await sandbox.commands.run('df -h | grep s3fs || echo "not mounted"', {background: true})).wait()
 

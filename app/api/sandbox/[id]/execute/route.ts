@@ -1,5 +1,5 @@
 import { createClient, getUser } from '@/lib/supabase/server'
-import { OutputMessage, Sandbox } from '@e2b/code-interpreter'
+import { Sandbox } from 'e2b'
 import { NextRequest, NextResponse } from 'next/server'
 import { setupS3Mount } from '@/lib/s3'
 
@@ -18,7 +18,7 @@ async function listUserSandboxes(userId: string): Promise<Sandbox[]> {
         )
 
         const fullSandboxes = await Promise.all(
-            userSandboxes.map((s) => Sandbox.connect(s.sandboxId))
+            userSandboxes.map((s) => Sandbox.reconnect(s.sandboxID))
         )
         return fullSandboxes
     } catch (error) {
@@ -32,12 +32,12 @@ async function cleanupOldSandboxes(
     keepSandboxId?: string
 ) {
     for (const sandbox of sandboxes) {
-        if (keepSandboxId && sandbox.sandboxId === keepSandboxId) continue
+        if (keepSandboxId && sandbox.id === keepSandboxId) continue
         try {
-            await sandbox.kill()
-            console.log(`Destroyed sandbox ${sandbox.sandboxId}`)
+            await sandbox.close()
+            console.log(`Destroyed sandbox ${sandbox.id}`)
         } catch (error) {
-            console.error(`Failed to destroy sandbox ${sandbox.sandboxId}:`, error)
+            console.error(`Failed to destroy sandbox ${sandbox.id}:`, error)
         }
     }
 }
@@ -45,10 +45,10 @@ async function cleanupOldSandboxes(
 async function killStreamlitProcess(sandbox: Sandbox) {
     try {
         // Kill any running streamlit processes
-        await sandbox.commands.run('pkill -f "streamlit run" || true', {background: true})
+        await sandbox.process.start('pkill -f "streamlit run" || true')
 
         // Remove existing app file
-        await sandbox.commands.run('rm -f /app/app.py', {background: true})
+        await sandbox.process.start('rm -f /app/app.py')
 
         // Small delay to ensure process is fully terminated
         await new Promise((resolve) => setTimeout(resolve, 500))
@@ -72,7 +72,7 @@ async function listSessionSandboxes(sessionId: string): Promise<Sandbox[]> {
         )
 
         const fullSandboxes = await Promise.all(
-            sessionSandboxes.map((s) => Sandbox.connect(s.sandboxId))
+            sessionSandboxes.map((s) => Sandbox.reconnect(s.sandboxID))
         )
         return fullSandboxes
     } catch (error) {
@@ -154,24 +154,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             // Authenticated user flow - keep existing functionality
             const existingSandboxes = await listUserSandboxes(user.id)
 
-            if (id !== 'new' && existingSandboxes.some((s) => s.sandboxId === id)) {
-                sandbox = await Sandbox.connect(id)
+            if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
+                sandbox = await Sandbox.reconnect(id)
                 await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
                 await killStreamlitProcess(sandbox)
-                await cleanupOldSandboxes(existingSandboxes, sandbox.sandboxId)
+                await cleanupOldSandboxes(existingSandboxes, sandbox.id)
             } else {
-                sandbox = await Sandbox.create('streamlit-sandbox-s3', {apiKey: process.env.E2B_API_KEY!,
-                    
+                sandbox = await Sandbox.create({
+                    template: 'streamlit-sandbox-s3',
+                    apiKey: process.env.E2B_API_KEY!,
                     metadata: {
                         userId: user.id,
-                    },})
+                    },
+                })
             }
 
             // Keep sandbox alive
-            await sandbox.setTimeout(3 * 60 * 1000) // 3 minutes
+            await sandbox.keepAlive(3 * 60 * 1000) // 3 minutes
         } else {
             // Require session ID for unauthenticated users
             if (!sessionId) {
@@ -184,43 +186,45 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             // Handle unauthenticated user flow
             const existingSandboxes = await listSessionSandboxes(sessionId)
 
-            if (id !== 'new' && existingSandboxes.some((s) => s.sandboxId === id)) {
-                sandbox = await Sandbox.connect(id)
+            if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
+                sandbox = await Sandbox.reconnect(id)
                 await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
                 await killStreamlitProcess(sandbox)
-                await cleanupOldSandboxes(existingSandboxes, sandbox.sandboxId)
+                await cleanupOldSandboxes(existingSandboxes, sandbox.id)
             } else {
-                sandbox = await Sandbox.create('streamlit-sandbox-s3', {apiKey: process.env.E2B_API_KEY!,
-                    
+                sandbox = await Sandbox.create({
+                    template: 'streamlit-sandbox-s3',
+                    apiKey: process.env.E2B_API_KEY!,
                     metadata: {
                         sessionId,
                         isPublic: 'true',
                         createdAt: new Date().toISOString(),
-                    },})
+                    },
+                })
                 // Keep sandbox alive
-                await sandbox.setTimeout(0.5 * 60 * 1000) // 30 seconds
+                await sandbox.keepAlive(0.5 * 60 * 1000) // 30 seconds
             }
         }
 
         await setupS3Mount(sandbox, ownerUserId)
         // Write and execute code (common for both flows)
         // console.log('Writing code to sandbox: ', codeContent)
-        await sandbox.files.write('/app/app.py', codeContent)
+        await sandbox.filesystem.write('/app/app.py', codeContent)
 
         console.log('Starting Streamlit process')
-        await sandbox.commands.run('streamlit run /app/app.py --server.headless true --server.runOnSave true --server.enableCORS false --server.enableXsrfProtection false --server.port 8501', {
-            onStdout: (data: string) =>
-                console.log('Streamlit stdout:', data),
-            onStderr: (data: string) =>
-                console.error('Streamlit stderr:', data),
-            background: true
-        })
+        await sandbox.process.start({
+            cmd: 'streamlit run /app/app.py --server.headless true --server.runOnSave true --server.enableCORS false --server.enableXsrfProtection false --server.port 8501',
+            onStdout: (data: string) => console.log('Streamlit stdout:', data),
+            onStderr: (data: string) => console.error('Streamlit stderr:', data)
+        } as any)
 
-        const url = sandbox.getHost(8501)
+        const url = sandbox.getHostname(8501)
+
         const fullUrl = `https://${url}`
+
         console.log('Sandbox URL:', fullUrl)
 
         // Wait for Streamlit to be ready
@@ -235,7 +239,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         return NextResponse.json({
             url: fullUrl,
-            sandboxId: sandbox.sandboxId,
+            sandboxId: sandbox.id,
         })
     } catch (error) {
         const errorMessage =
@@ -256,5 +260,3 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         )
     }
 }
-
-// Helper function for S3 mount setup

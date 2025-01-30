@@ -1,4 +1,4 @@
-import { Sandbox } from '@e2b/code-interpreter'
+import { Sandbox } from 'e2b'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { setupS3Mount } from '@/lib/s3'
@@ -44,7 +44,8 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
                 return { errors: 'User not authenticated' }
             }
 
-            sandbox = await Sandbox.create('streamlit-sandbox-s3', {
+            sandbox = await Sandbox.create({
+                template: 'streamlit-sandbox-s3',
                 metadata: {
                     userId: user.id,
                     appName,
@@ -52,22 +53,24 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
                     createdAt: new Date().toISOString(),
                 }
             })
-            
-            await setupS3Mount(sandbox, user.id)
-            await sandbox.files.makeDir('/app')
-            await sandbox.files.write('/app/test.py', code)
 
+            await setupS3Mount(sandbox, user.id)
+            await sandbox.filesystem.makeDir('/app')
+            await sandbox.filesystem.write('/app/test.py', code)
+
+            console.log('STATRING TOOL CALL')
             try {
-                await sandbox.commands.run('python /app/test.py', {
-                    onStderr: (data) => {
+                await sandbox.process.startAndWait({
+                    cmd: 'export STREAMLIT_RUN_BARE=true && python /app/test.py',
+                    onStderr: (data: string) => {
                         errorLogs += data
                         console.error('Script error:', data)
                     },
-                    onStdout: (data) => {
+                    onStdout: (data: string) => {
                         console.log('Script output:', data)
                     }
-                })
-            } catch (cmdError) {
+                } as any)
+            } catch (error) {
                 console.error('Command failed')
             }
 
@@ -78,6 +81,8 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
             if (!cleanedLogs) {
                 return { errors: 'No errors found!' }
             }
+
+            console.log('CLEANED LOGS: ', cleanedLogs)
 
             // Look for Python traceback - the most reliable error indicator
             const tracebackIndex = cleanedLogs.lastIndexOf('Traceback')
@@ -94,7 +99,7 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
         } finally {
             if (sandbox) {
                 try {
-                    await sandbox.kill()
+                    await sandbox.close()
                 } catch (error) {
                     console.error('Cleanup error:', error)
                 }

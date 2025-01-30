@@ -11,8 +11,8 @@
 # const sandbox = await Sandbox.create('streamlit-sandbox-s3')
 
 team_id = "66f03438-ea40-419a-b50f-37834062a46f"
-memory_mb = 4_096
-cpu_count = 4
+memory_mb = 2_048
+cpu_count = 2
 dockerfile = "e2b.Dockerfile"
 template_name = "streamlit-sandbox-s3"
 template_id = "t8lmf01jbiymqo3nttkk"
