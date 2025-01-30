@@ -2,6 +2,12 @@
 
 py_apps is a web app that enables users to create and share data apps with no coding knowledge.
 
+
+
+https://github.com/user-attachments/assets/6f209cd8-8325-476b-a2f8-16383da6aee2
+
+
+
 ## 🌟 Features
 
 - **AI-Powered App Creation**: Create Streamlit apps through natural language conversation with Claude 3
