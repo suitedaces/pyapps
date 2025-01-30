@@ -58,8 +58,8 @@ export async function POST(
             schema: z.object({
                 title: z
                     .string()
-                    .max(50)
-                    .describe('Generate a very short title (max 50 chars) that captures the essence of the conversation')
+                    .max(100)
+                    .describe('Generate a very short title (max 100 chars) that captures the essence of the conversation')
             }),
             temperature: 0.7
         })

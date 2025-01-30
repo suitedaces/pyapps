@@ -1,4 +1,4 @@
-import { Sandbox } from 'e2b'
+import { Sandbox } from '@e2b/code-interpreter'
 import { tool } from 'ai'
 import { z } from 'zod'
 import { setupS3Mount } from '@/lib/s3'
@@ -35,39 +35,70 @@ export const streamlitTool = tool<typeof streamlitToolSchema, StreamlitToolOutpu
         appName,
         appDescription,
     }: StreamlitToolInput) => {
+        let sandbox = null
+        let errorLogs = ''
+
         try {
             const user = await getUser()
             if (!user) {
-                throw new Error('User not authenticated')
+                return { errors: 'User not authenticated' }
             }
 
-            const sandbox = await Sandbox.create({
-                template: 'streamlit-sandbox-s3'
+            sandbox = await Sandbox.create('streamlit-sandbox-s3', {
+                metadata: {
+                    userId: user.id,
+                    appName,
+                    appDescription,
+                    createdAt: new Date().toISOString(),
+                }
             })
             
             await setupS3Mount(sandbox, user.id)
+            await sandbox.files.makeDir('/app')
+            await sandbox.files.write('/app/test.py', code)
+
+            try {
+                await sandbox.commands.run('python /app/test.py', {
+                    onStderr: (data) => {
+                        errorLogs += data
+                        console.error('Script error:', data)
+                    },
+                    onStdout: (data) => {
+                        console.log('Script output:', data)
+                    }
+                })
+            } catch (cmdError) {
+                console.error('Command failed')
+            }
+
+            // Clean and process the error logs
+            const cleanedLogs = errorLogs.trim()
             
-            await sandbox.filesystem.makeDir('/app')
-            await sandbox.filesystem.write('/app/test.py', code)
+            // If logs are empty, return no errors
+            if (!cleanedLogs) {
+                return { errors: 'No errors found!' }
+            }
 
-            const execution = await sandbox.process.startAndWait({
-                cmd: 'python /app/test.py',
-                timeout: 10000,
-            })
+            // Look for Python traceback - the most reliable error indicator
+            const tracebackIndex = cleanedLogs.lastIndexOf('Traceback')
+            console.log('TRACEBACK FOUND: ', cleanedLogs.substring(tracebackIndex))
+            if (tracebackIndex !== -1) {
+                return { errors: cleanedLogs.substring(tracebackIndex) }
+            }
 
-            // Get all output
-            const fullOutput = execution.stdout + execution.stderr
-            
-            // Extract only traceback and subsequent content
-            const tracebackMatch = fullOutput.match(/Traceback \(most recent call last\):[\s\S]*$/m)
-            const errors = tracebackMatch ? tracebackMatch[0] : 'No errors found!'
-
-            await sandbox.close()
-
-            return { errors }
+            // No traceback found, assume no significant errors
+            return { errors: 'No errors found!' }
         } catch (error) {
-            console.error('Sandbox execution error:', error)
-            throw error
+            console.error('Sandbox error:', error)
+            return { errors: errorLogs || 'Sandbox error occurred' }
+        } finally {
+            if (sandbox) {
+                try {
+                    await sandbox.kill()
+                } catch (error) {
+                    console.error('Cleanup error:', error)
+                }
+            }
         }
     },
 })

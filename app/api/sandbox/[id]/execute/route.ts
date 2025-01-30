@@ -1,5 +1,5 @@
 import { createClient, getUser } from '@/lib/supabase/server'
-import { ProcessMessage, Sandbox } from 'e2b'
+import { OutputMessage, Sandbox } from '@e2b/code-interpreter'
 import { NextRequest, NextResponse } from 'next/server'
 import { setupS3Mount } from '@/lib/s3'
 
@@ -18,7 +18,7 @@ async function listUserSandboxes(userId: string): Promise<Sandbox[]> {
         )
 
         const fullSandboxes = await Promise.all(
-            userSandboxes.map((s) => Sandbox.reconnect(s.sandboxID))
+            userSandboxes.map((s) => Sandbox.connect(s.sandboxId))
         )
         return fullSandboxes
     } catch (error) {
@@ -32,12 +32,12 @@ async function cleanupOldSandboxes(
     keepSandboxId?: string
 ) {
     for (const sandbox of sandboxes) {
-        if (keepSandboxId && sandbox.id === keepSandboxId) continue
+        if (keepSandboxId && sandbox.sandboxId === keepSandboxId) continue
         try {
-            await sandbox.close()
-            console.log(`Destroyed sandbox ${sandbox.id}`)
+            await sandbox.kill()
+            console.log(`Destroyed sandbox ${sandbox.sandboxId}`)
         } catch (error) {
-            console.error(`Failed to destroy sandbox ${sandbox.id}:`, error)
+            console.error(`Failed to destroy sandbox ${sandbox.sandboxId}:`, error)
         }
     }
 }
@@ -45,14 +45,10 @@ async function cleanupOldSandboxes(
 async function killStreamlitProcess(sandbox: Sandbox) {
     try {
         // Kill any running streamlit processes
-        await sandbox.process.start({
-            cmd: 'pkill -f "streamlit run" || true',
-        })
+        await sandbox.commands.run('pkill -f "streamlit run" || true', {background: true})
 
         // Remove existing app file
-        await sandbox.process.start({
-            cmd: 'rm -f /app/app.py',
-        })
+        await sandbox.commands.run('rm -f /app/app.py', {background: true})
 
         // Small delay to ensure process is fully terminated
         await new Promise((resolve) => setTimeout(resolve, 500))
@@ -76,13 +72,35 @@ async function listSessionSandboxes(sessionId: string): Promise<Sandbox[]> {
         )
 
         const fullSandboxes = await Promise.all(
-            sessionSandboxes.map((s) => Sandbox.reconnect(s.sandboxID))
+            sessionSandboxes.map((s) => Sandbox.connect(s.sandboxId))
         )
         return fullSandboxes
     } catch (error) {
         console.error('Error listing session sandboxes:', error)
         return []
     }
+}
+
+async function waitForStreamlit(url: string, maxRetries = 10): Promise<boolean> {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const response = await fetch(url)
+            const text = await response.text()
+            
+            // Check if response contains 502 error
+            if (!text.includes('502') && response.ok) {
+                console.log('✅ Streamlit is running properly')
+                return true
+            }
+            
+            console.log(`⏳ Attempt ${i + 1}/${maxRetries}: Streamlit not ready because: ${text}`)
+            await new Promise(resolve => setTimeout(resolve, 1000))
+        } catch (error) {
+            console.log(`⚠️ Attempt ${i + 1}/${maxRetries}: Error checking Streamlit:`, error)
+            await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+    }
+    return false
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -136,26 +154,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             // Authenticated user flow - keep existing functionality
             const existingSandboxes = await listUserSandboxes(user.id)
 
-            if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
-                sandbox = await Sandbox.reconnect(id)
+            if (id !== 'new' && existingSandboxes.some((s) => s.sandboxId === id)) {
+                sandbox = await Sandbox.connect(id)
                 await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
                 await killStreamlitProcess(sandbox)
-                await cleanupOldSandboxes(existingSandboxes, sandbox.id)
+                await cleanupOldSandboxes(existingSandboxes, sandbox.sandboxId)
             } else {
-                sandbox = await Sandbox.create({
-                    apiKey: process.env.E2B_API_KEY!,
-                    template: 'streamlit-sandbox-s3',
+                sandbox = await Sandbox.create('streamlit-sandbox-s3', {apiKey: process.env.E2B_API_KEY!,
+                    
                     metadata: {
                         userId: user.id,
-                    },
-                })
+                    },})
             }
 
             // Keep sandbox alive
-            await sandbox.keepAlive(3 * 60 * 1000) // 3 minutes
+            await sandbox.setTimeout(3 * 60 * 1000) // 3 minutes
         } else {
             // Require session ID for unauthenticated users
             if (!sessionId) {
@@ -168,49 +184,58 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             // Handle unauthenticated user flow
             const existingSandboxes = await listSessionSandboxes(sessionId)
 
-            if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
-                sandbox = await Sandbox.reconnect(id)
+            if (id !== 'new' && existingSandboxes.some((s) => s.sandboxId === id)) {
+                sandbox = await Sandbox.connect(id)
                 await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
                 await killStreamlitProcess(sandbox)
-                await cleanupOldSandboxes(existingSandboxes, sandbox.id)
+                await cleanupOldSandboxes(existingSandboxes, sandbox.sandboxId)
             } else {
-                sandbox = await Sandbox.create({
-                    apiKey: process.env.E2B_API_KEY!,
-                    template: 'streamlit-sandbox-s3',
+                sandbox = await Sandbox.create('streamlit-sandbox-s3', {apiKey: process.env.E2B_API_KEY!,
+                    
                     metadata: {
                         sessionId,
                         isPublic: 'true',
                         createdAt: new Date().toISOString(),
-                    },
-                })
+                    },})
                 // Keep sandbox alive
-                await sandbox.keepAlive(0.5 * 60 * 1000) // 30 seconds
+                await sandbox.setTimeout(0.5 * 60 * 1000) // 30 seconds
             }
         }
 
         await setupS3Mount(sandbox, ownerUserId)
         // Write and execute code (common for both flows)
         // console.log('Writing code to sandbox: ', codeContent)
-        await sandbox.filesystem.write('/app/app.py', codeContent)
+        await sandbox.files.write('/app/app.py', codeContent)
 
         console.log('Starting Streamlit process')
-        await sandbox.process.start({
-            cmd: 'streamlit run /app/app.py',
-            onStdout: (data: ProcessMessage) =>
+        await sandbox.commands.run('streamlit run /app/app.py --server.headless true --server.runOnSave true --server.enableCORS false --server.enableXsrfProtection false --server.port 8501', {
+            onStdout: (data: string) =>
                 console.log('Streamlit stdout:', data),
-            onStderr: (data: ProcessMessage) =>
+            onStderr: (data: string) =>
                 console.error('Streamlit stderr:', data),
+            background: true
         })
 
-        const url = sandbox.getHostname(8501)
-        console.log('Sandbox URL:', url)
+        const url = sandbox.getHost(8501)
+        const fullUrl = `https://${url}`
+        console.log('Sandbox URL:', fullUrl)
+
+        // Wait for Streamlit to be ready
+        const isReady = await waitForStreamlit(fullUrl)
+        if (!isReady) {
+            console.log('❌ Streamlit failed to start properly after retries')
+            return NextResponse.json(
+                { error: 'Streamlit failed to start properly' },
+                { status: 500 }
+            )
+        }
 
         return NextResponse.json({
-            url: `https://${url}`,
-            sandboxId: sandbox.id,
+            url: fullUrl,
+            sandboxId: sandbox.sandboxId,
         })
     } catch (error) {
         const errorMessage =

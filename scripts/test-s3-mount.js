@@ -1,4 +1,4 @@
-import { Sandbox } from 'e2b'
+import { Sandbox } from '@e2b/code-interpreter'
 import { promises as fs } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
@@ -161,16 +161,14 @@ async function getAWSCredentials() {
 }
 
 async function getResourceUsage(sandbox) {
-    const result = await sandbox.process.start({
-        cmd: `
+    const result = await sandbox.commands.run(`
             echo "Memory Usage:"
             free -h
             echo -e "\nCPU Usage:"
             top -b -n 1 | head -n 5
             echo -e "\nS3FS Process:"
             ps aux | grep s3fs | grep -v grep
-        `,
-    })
+        `, {backgrund: true})
     return result.stdout
 }
 
@@ -179,33 +177,27 @@ async function testS3Performance() {
     console.log('🚀 Starting S3 performance test...')
 
     const creds = await getAWSCredentials()
-    const sandbox = await Sandbox.create({
-        apiKey:
+    const sandbox = await Sandbox.create('streamlit-sandbox-s3', {apiKey:
             process.env.E2B_API_KEY ||
             'e2b_45ff57d2cbb35f978d452964b459efad92e97c61',
-        template: 'streamlit-sandbox-s3',
-    })
+        })
 
-    report.addLine(`Sandbox ID: ${sandbox.id}`)
+    report.addLine(`Sandbox ID: ${sandbox.sandboxId}`)
     report.addLine(`Region: ${creds.region}`)
     report.addLine()
 
     try {
         // Mount S3
-        await sandbox.process.start({
-            cmd: `
+        await sandbox.commands.run(`
                 echo "${creds.accessKeyId}:${creds.secretAccessKey}" | sudo tee /etc/passwd-s3fs > /dev/null &&
                 sudo chmod 600 /etc/passwd-s3fs &&
                 sudo s3fs pyapps /app/s3 -o passwd_file=/etc/passwd-s3fs -o url="https://s3.amazonaws.com" \
                 -o endpoint=${creds.region} -o allow_other -o umask=0000 -o use_path_request_style &
                 sleep 2
-            `,
-        })
+            `, {,backgrund: true})
 
         // Verify mount
-        const mountCheck = await sandbox.process.start({
-            cmd: 'mountpoint -q /app/s3 && echo "✅ S3 mounted" || echo "❌ S3 not mounted"',
-        })
+        const mountCheck = await sandbox.commands.run('mountpoint -q /app/s3 && echo "✅ S3 mounted" || echo "❌ S3 not mounted"', {,backgrund: true})
         report.addLine('Mount Status: ' + mountCheck.stdout)
 
         // Performance tests
@@ -223,9 +215,7 @@ async function testS3Performance() {
             {
                 name: 'Write Large Text File',
                 prepare: async () => {
-                    await sandbox.process.start({
-                        cmd: `echo '${TEST_FILE_CONTENT}' > /app/s3/test_file.txt`,
-                    })
+                    await sandbox.commands.run(`echo '${TEST_FILE_CONTENT}' > /app/s3/test_file.txt`, {backgrund: true})
                 },
             },
             {
@@ -259,10 +249,9 @@ async function testS3Performance() {
             }
 
             if (test.cmd) {
-                await sandbox.process.start({
-                    cmd: test.cmd,
+                await sandbox.commands.run(test.cmd, {
                     onStderr: console.error,
-                })
+                    backgrund: true})
             }
 
             const endUsage = await getResourceUsage(sandbox)
@@ -286,8 +275,7 @@ async function testS3Performance() {
         const start = Date.now()
         const startUsage = await getResourceUsage(sandbox)
 
-        await sandbox.process.start({
-            cmd: `
+        await sandbox.commands.run(`
                 echo "Starting memory stress test..."
                 for i in {1..50}; do
                     dd if=/dev/urandom of=/app/s3/stress_$i.bin bs=1M count=2 2>/dev/null &
@@ -295,9 +283,9 @@ async function testS3Performance() {
                 wait
                 echo "Memory stress test complete"
                 free -h
-            `,
+            `, {
             onStdout: (data) => report.addLine(data),
-        })
+            backgrund: true})
 
         const endUsage = await getResourceUsage(sandbox)
         const duration = (Date.now() - start) / 1000
@@ -312,14 +300,12 @@ async function testS3Performance() {
         )
 
         // Cleanup
-        await sandbox.process.start({
-            cmd: 'rm -rf /app/s3/test_* /app/s3/stress_*',
-        })
+        await sandbox.commands.run('rm -rf /app/s3/test_* /app/s3/stress_*', {backgrund: true})
     } catch (error) {
         report.addError(error)
         console.error('Error during tests:', error)
     } finally {
-        await sandbox.close()
+        await sandbox.kill()
         await report.write()
     }
 }

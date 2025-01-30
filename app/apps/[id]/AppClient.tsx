@@ -36,7 +36,7 @@ export function AppClient({ app, id }: AppClientProps) {
     }, []) // Empty dependency array to run only on mount, like before
 
     useEffect(() => {
-        // Show auth prompt after 10 seconds if user is not authenticated
+        // Show auth prompt after 30 seconds if user is not authenticated
         if (!session) {
             const timer = setTimeout(() => {
                 showAuthPrompt()
@@ -44,7 +44,7 @@ export function AppClient({ app, id }: AppClientProps) {
 
             return () => clearTimeout(timer)
         }
-    }, [session, showAuthPrompt])
+    }, [session, showAuthPrompt]) // Add missing dependencies
 
     const CustomHandle = ({ ...props }) => (
         <ResizableHandle
@@ -83,6 +83,7 @@ export function AppClient({ app, id }: AppClientProps) {
                                     <StreamlitFrame
                                         ref={streamlitRef}
                                         url={streamlitUrl}
+                                        isLoading={isLoadingSandbox}
                                     />
                                 )}
                             </div>

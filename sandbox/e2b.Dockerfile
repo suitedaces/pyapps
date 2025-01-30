@@ -18,4 +18,6 @@ RUN sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
     mkdir -p /app/s3 && \
     chmod -R 777 /app
 
+ENV STREAMLIT_USAGE_STATS=False
+
 WORKDIR /app
