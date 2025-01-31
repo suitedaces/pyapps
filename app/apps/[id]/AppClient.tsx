@@ -40,7 +40,7 @@ export function AppClient({ app, id }: AppClientProps) {
         if (!session) {
             const timer = setTimeout(() => {
                 showAuthPrompt()
-            }, 45000) // 45 seconds
+            }, 60000) // 60 seconds
 
             return () => clearTimeout(timer)
         }

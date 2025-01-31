@@ -48,11 +48,9 @@ async function cleanupOldSandboxes(
 async function killStreamlitProcess(sandbox: Sandbox) {
     try {
         // Kill any running streamlit processes
-        await sandbox.process.start('pkill -f "streamlit run" || true')
+        await sandbox.process.startAndWait('pkill -f "streamlit run" || true')
         // Remove existing app file
-        await sandbox.process.start('rm -f /app/app.py')
-        // Wait for 1 sec process to finish 
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        await sandbox.process.startAndWait('rm -f /app/app.py')
         console.log('✅ Cleaned up existing Streamlit process and app file')
     } catch (error) {
         console.error('❌ Error during cleanup:', error)
@@ -205,7 +203,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     },
                 })
                 // Keep sandbox alive
-                await sandbox.keepAlive(0.5 * 60 * 1000) // 30 seconds
+                await sandbox.keepAlive(1.5 * 60 * 1000) // 1.5 minutes
             }
         }
 
