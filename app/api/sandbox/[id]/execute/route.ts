@@ -45,6 +45,20 @@ async function cleanupOldSandboxes(
     }
 }
 
+async function killStreamlitProcess(sandbox: Sandbox) {
+    try {
+        // Kill any running streamlit processes
+        await sandbox.process.start('pkill -f "streamlit run" || true')
+        // Remove existing app file
+        await sandbox.process.start('rm -f /app/app.py')
+        // Wait for 1 sec process to finish 
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        console.log('✅ Cleaned up existing Streamlit process and app file')
+    } catch (error) {
+        console.error('❌ Error during cleanup:', error)
+    }
+}
+
 // Add new function to list session sandboxes
 async function listSessionSandboxes(sessionId: string): Promise<Sandbox[]> {
     try {
@@ -142,9 +156,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
                 sandbox = await Sandbox.reconnect(id)
+                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
+                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, sandbox.id)
             } else {
                 sandbox = await Sandbox.create({
@@ -172,9 +188,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             if (id !== 'new' && existingSandboxes.some((s) => s.id === id)) {
                 sandbox = await Sandbox.reconnect(id)
+                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, id)
             } else if (existingSandboxes.length > 0) {
                 sandbox = existingSandboxes[0]
+                await killStreamlitProcess(sandbox)
                 await cleanupOldSandboxes(existingSandboxes, sandbox.id)
             } else {
                 sandbox = await Sandbox.create({
@@ -198,7 +216,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         console.log('🚀 Starting Streamlit process')
         await sandbox.process.start({
-            cmd: 'streamlit run /app/app.py --server.headless true --server.runOnSave true --server.enableCORS false --server.enableXsrfProtection false --server.port 8501',
+            cmd: 'streamlit run /app/app.py',
             onStdout: (data: string) => console.log('Streamlit stdout:', data),
             onStderr: (data: string) => console.error('Streamlit stderr:', data)
         } as any)
