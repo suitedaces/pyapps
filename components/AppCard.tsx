@@ -103,15 +103,16 @@ export function AppCard({ name, description, updatedAt, id, userId, currentVersi
                     </Link>
                     <div className="flex items-center gap-2">
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                 <button className="p-1 hover:bg-accent rounded-md">
                                     <Share2 className="h-4 w-4" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent>
+                            <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenuItem 
                                     onSelect={(e) => {
                                         e.preventDefault();
+                                        e.stopPropagation();
                                         handleCopy();
                                     }} 
                                     className="gap-2"
@@ -119,7 +120,13 @@ export function AppCard({ name, description, updatedAt, id, userId, currentVersi
                                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                                     {copied ? "copied!" : "share link"}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleTwitterShare} className="gap-2">
+                                <DropdownMenuItem 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTwitterShare(e);
+                                    }} 
+                                    className="gap-2"
+                                >
                                     <XIcon className="h-4 w-4" />
                                     tweet
                                 </DropdownMenuItem>
@@ -128,7 +135,12 @@ export function AppCard({ name, description, updatedAt, id, userId, currentVersi
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <a href={`/apps/${id}`} target="_blank" className="p-1 hover:bg-accent rounded-md">
+                                    <a 
+                                        href={`/apps/${id}`} 
+                                        target="_blank" 
+                                        className="p-1 hover:bg-accent rounded-md"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
                                         <ExternalLink className="h-4 w-4" />
                                     </a>
                                 </TooltipTrigger>

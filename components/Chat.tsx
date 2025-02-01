@@ -8,12 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Message } from 'ai'
 import { XCircle } from 'lucide-react'
 import React, { useEffect, useRef } from 'react'
-
-interface FileUploadState {
-    isUploading: boolean
-    progress: number
-    error: string | null
-}
+import { cn } from '@/lib/utils'
 
 interface ChatProps {
     messages: Message[]
@@ -122,7 +117,10 @@ function Chat({
             )}
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4 space-y-4 w-full max-w-[800px] m-auto pb-[120px]">
+            <ScrollArea className={cn(
+                "flex-1 p-4 space-y-4 w-full max-w-[800px] m-auto",
+                isInChatPage ? "pb-[120px]" : "pb-4"
+            )}>
                 {Array.isArray(messages) &&
                     messages.map((message, index) => {
                         // Determine if this is the first message in a group of assistant messages
@@ -148,8 +146,11 @@ function Chat({
                 <div ref={messagesEndRef} />
             </ScrollArea>
 
-            {/* Chatbar with absolute positioning */}
-            <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-dark-app">
+            {/* Chatbar */}
+            <div className={cn(
+                "w-full bg-white dark:bg-dark-app",
+                isInChatPage ? "fixed bottom-0 left-0 right-0 max-w-[800px] mx-auto right-0" : "relative"
+            )}>
                 <Chatbar
                     value={input}
                     onChange={onInputChange}

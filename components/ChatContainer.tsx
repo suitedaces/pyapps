@@ -25,6 +25,8 @@ import { TypingText } from './core/typing-text'
 import LoadingAnimation from './LoadingAnimation'
 import AppSidebar from './Sidebar'
 import { createClient } from '@/lib/supabase/client'
+import AppCarousel, { DemoApp } from '@/components/core/AppCarousel'
+import { motion } from 'framer-motion'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -77,6 +79,9 @@ interface ChatState {
     status: 'initial' | 'typing' | 'creating' | 'active'
     hasMessages: boolean
 }
+
+// Add demo app IDs
+const DEMO_APP_IDS = ['app1', 'app2', 'app3', 'app4', 'app5', 'app6', 'app7', 'app8']
 
 export default function ChatContainer({
     initialMessages = [],
@@ -608,6 +613,13 @@ export default function ChatContainer({
         }
     }, [currentChatId])
 
+    const handleAppSelect = useCallback((app: DemoApp) => {
+        console.log('Selected app:', app)
+        if (app.id) {
+            router.push(`/apps/${app.id}`)
+        }
+    }, [router])
+
     // Loading states
     if (isLoading) {
         return (
@@ -699,46 +711,53 @@ export default function ChatContainer({
                                         : 'h-screen'
                                 )}
                             >
-                                {!isInChatPage &&
-                                    chatState.status === 'initial' && (
-                                        <TypingText
-                                            className="text-black dark:text-dark-text font-bold text-3xl"
-                                            text="The v0 for Streamlit apps is here."
-                                            speed={30}
-                                            show={true}
+                                {!isInChatPage && chatState.status === 'initial' && (
+                                    <div className="absolute inset-0 flex flex-col items-center">
+                                        <div className="flex flex-col items-center mt-[15vh] mb-32">
+                                                <TypingText
+                                                    className="text-black dark:text-dark-text font-extrabold text-6xl md:text-4xl lg:text-4xl tracking-tight mb-24"
+                                                    text="Turn data into interactive apps."
+                                                    speed={35}
+                                                    show={true}
+                                                />
+                                            {!hasFirstMessage && (
+                                                <div className="mt-40 w-full max-w-[700px] relative z-30 pointer-events-auto overflow-hidden px-8">
+                                                    <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className={cn(
+                                    "max-w-[800px] mx-auto w-full",
+                                    !isInChatPage && !hasFirstMessage ? "h-full" : ""
+                                )}>
+                                        <Chat
+                                            messages={isNavigating ? [] : messages}
+                                            isLoading={chatLoading || isNavigating}
+                                            input={input}
+                                            onInputChange={handleInputChange}
+                                            onSubmit={handleSubmit}
+                                            onAppend={async (message: string) => {
+                                                const userMessage = {
+                                                    id: Date.now().toString(),
+                                                    role: 'user' as const,
+                                                    content: message,
+                                                    createdAt: new Date()
+                                                }
+                                                await append(userMessage)
+                                            }}
+                                            errorState={errorState}
+                                            onErrorDismiss={() => setErrorState(null)}
+                                            onUpdateStreamlit={updateStreamlitApp}
+                                            onCodeClick={handleCodeViewToggle}
+                                            isInChatPage={isInChatPage || hasFirstMessage}
+                                            onTogglePanel={toggleRightContent}
+                                            chatId={currentChatId}
+                                            selectedFileIds={persistedFileIds}
+                                            onFileSelect={handleFileSelection}
                                         />
-                                    )}
-                                <div className="max-w-[800px] mx-auto w-full h-full">
-                                    <Chat
-                                        messages={isNavigating ? [] : messages}
-                                        isLoading={chatLoading || isNavigating}
-                                        input={input}
-                                        onInputChange={handleInputChange}
-                                        onSubmit={handleSubmit}
-                                        onAppend={async (message: string) => {
-                                            // Create a user message with the correct type
-                                            const userMessage = {
-                                                id: Date.now().toString(),
-                                                role: 'user' as const, // Type assertion to fix role type
-                                                content: message,
-                                                createdAt: new Date()
-                                            }
-                                            
-                                            // Append the user message and wait for the assistant's response
-                                            await append(userMessage)
-                                        }}
-                                        errorState={errorState}
-                                        onErrorDismiss={() => setErrorState(null)}
-                                        onUpdateStreamlit={updateStreamlitApp}
-                                        onCodeClick={handleCodeViewToggle}
-                                        isInChatPage={
-                                            isInChatPage || hasFirstMessage
-                                        }
-                                        onTogglePanel={toggleRightContent}
-                                        chatId={currentChatId}
-                                        selectedFileIds={persistedFileIds}
-                                        onFileSelect={handleFileSelection}
-                                    />
                                 </div>
                             </div>
                         </ResizablePanel>
