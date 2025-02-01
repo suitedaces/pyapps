@@ -111,7 +111,6 @@ export default function ChatContainer({
         null
     )
     const resizableGroupRef = useRef<any>(null)
-    const isExecutingRef = useRef(false)
     const hasInitialized = useRef(false)
     const streamlitPreviewRef = useRef<{ refreshIframe: () => void } | null>(
         null
@@ -259,11 +258,6 @@ export default function ChatContainer({
                 return null
             }
 
-            if (isExecutingRef.current) {
-                return null
-            }
-
-            isExecutingRef.current = true
             setIsLoadingSandbox(true)
 
             try {
@@ -281,7 +275,6 @@ export default function ChatContainer({
                 setErrorState(error as Error)
                 return null
             } finally {
-                isExecutingRef.current = false
                 setGeneratingCode(false)
                 setIsLoadingSandbox(false)
             }
@@ -548,7 +541,6 @@ export default function ChatContainer({
             if (currentChatId) {
                 killSandbox().catch(console.error)
             }
-            isExecutingRef.current = false
             setStreamlitUrl(null)
             setGeneratedCode('')
         }
@@ -711,7 +703,7 @@ export default function ChatContainer({
                                     chatState.status === 'initial' && (
                                         <TypingText
                                             className="text-black dark:text-dark-text font-bold text-3xl"
-                                            text="From Data to Apps, in seconds"
+                                            text="The v0 for Streamlit apps is here."
                                             speed={30}
                                             show={true}
                                         />

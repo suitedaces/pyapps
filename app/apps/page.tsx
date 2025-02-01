@@ -16,12 +16,11 @@ import { AuthPrompt } from '@/components/ui/auth-prompt'
 
 const ITEMS_PER_PAGE = 12;
 
-function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
+function AppsContent({ searchQuery, onAppSelect }: { searchQuery: string, onAppSelect: (app: AppData) => void }) {
   const [apps, setApps] = useState<AppData[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [hasMore, setHasMore] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
   const supabase = createClient();
   const { ref, inView } = useInView();
@@ -151,52 +150,24 @@ function AppsContent({ onAppSelect }: { onAppSelect: (app: AppData) => void }) {
   }
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] w-full relative">
-      <div className="max-w-7xl mx-auto px-4 relative z-50">
-        <div className="flex items-center gap-4 py-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 h-4 w-4 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search apps..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-10 bg-transparent text-foreground placeholder:text-foreground/50 outline-none"
-            />
-          </div>
-          <button
-            onClick={() => router.push('/')} 
-            className="flex items-center gap-2 text-foreground hover:text-foreground/70 transition-colors"
-          >
-            <Plus size={16} />
-            New App
-          </button>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {apps.map((app: any) => (
+        <div key={app.id} onClick={() => {
+          router.push(`/apps/${app.id}`)
+          onAppSelect?.(app)
+        }}>
+          <AppCard
+            id={app.id}
+            userId={session?.user?.id || ''}
+            name={app.name}
+            description={app.description}
+            updatedAt={new Date(app.updated_at).toLocaleDateString()}
+            currentVersionNumber={app.currentVersionNumber}
+          />
         </div>
-
-        <div className="overflow-y-auto h-[calc(100vh-7.5rem)]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {apps.map((app: any) => (
-              <AppCard
-                key={app.id}
-                id={app.id}
-                userId={session?.user?.id || ''}
-                name={app.name}
-                description={app.description}
-                updatedAt={new Date(app.updated_at).toLocaleDateString()}
-                currentVersionNumber={app.currentVersionNumber}
-                onClick={() => {
-                  router.push(`/apps/${app.id}`)
-                  onAppSelect?.(app)
-                }}
-              />
-            ))}
-          </div>
-
-          {loading && !initialLoad && <LoadingCards />}
-          
-          <div ref={ref} className="h-10" />
-        </div>
-      </div>
+      ))}
+      {loading && !initialLoad && <LoadingCards />}
+      <div ref={ref} className="h-10" />
     </div>
   );
 }
@@ -205,6 +176,7 @@ export default function AppsPage() {
   const [chats, setChats] = useState<any[]>([])
   const [chatTitles, setChatTitles] = useState<Record<string, string>>({})
   const [isCreatingChat, setIsCreatingChat] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
 
   useEffect(() => {
@@ -236,9 +208,35 @@ export default function AppsPage() {
         fetchChats()
       }}
     >
-      <Suspense fallback={<LoadingCards />}>
-        <AppsContent onAppSelect={() => {}} />
-      </Suspense>
+      <div className="h-[calc(100vh-3.5rem)] w-full relative">
+        <div className="max-w-7xl mx-auto px-4 relative z-50">
+          <div className="flex items-center gap-4 py-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 h-4 w-4 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search apps..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 bg-transparent text-foreground placeholder:text-foreground/50 outline-none"
+              />
+            </div>
+            <button
+              onClick={() => router.push('/')} 
+              className="flex items-center gap-2 text-foreground hover:text-foreground/70 transition-colors"
+            >
+              <Plus size={16} />
+              New App
+            </button>
+          </div>
+
+          <div className="overflow-y-auto h-[calc(100vh-7.5rem)]">
+            <Suspense fallback={<LoadingCards />}>
+              <AppsContent searchQuery={searchQuery} onAppSelect={() => {}} />
+            </Suspense>
+          </div>
+        </div>
+      </div>
     </AppLayout>
   );
 } 

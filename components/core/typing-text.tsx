@@ -23,10 +23,11 @@ export function TypingText({
         let currentIndex = 0
 
         const typeText = () => {
-            if (currentIndex < text.length) {
-                setDisplayText(text.slice(0, currentIndex + 1))
-                currentIndex++
-                setTimeout(typeText, speed)
+                if (currentIndex < text.length) {
+                    setDisplayText(text.slice(0, currentIndex + 1))
+                    currentIndex++
+                    setTimeout(typeText, speed)
+
             } else {
                 setIsTyping(false)
             }
@@ -52,7 +53,7 @@ export function TypingText({
                     className="absolute inset-0 flex items-center w-full justify-center pb-96 z-50 pointer-events-none"
                 >
                     <p className={`${className} flex items-center`}>
-                        <span className="animate-fade-in">{displayText}</span>
+                            <span className="animate-fade-in">{displayText}</span>
                         {isTyping && (
                             <span
                                 className="ml-[2px] w-[2px] h-[1.2em] bg-current animate-cursor-blink"
