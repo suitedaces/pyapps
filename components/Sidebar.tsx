@@ -191,7 +191,7 @@ const ChatsList = ({
                         <CustomSidebarMenuSubItem className="group/item relative bg-sidebar-accent">
                             <SidebarMenuSubButton className="w-full text-left flex items-center gap-2">
                                 <MessageSquare className="h-4 w-4 animate-pulse" />
-                                <TypewriterText text={getChatTitle(chats[0])} />
+                                    <TypewriterText text={getChatTitle(chats[0])} />
                                 <span className="ml-2 h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                             </SidebarMenuSubButton>
                         </CustomSidebarMenuSubItem>
@@ -565,23 +565,23 @@ export default function AppSidebar({
                                                                 isChatsOpen &&
                                                                     'rotate-90'
                                                             )}
-                                                        />
+                                                    />
                                                     </SidebarMenuAction>
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
                                         </SidebarMenu>
                                         <CollapsibleContent>
-                                            <ChatsList
-                                                chats={chats}
-                                                onChatSelect={onChatSelect}
-                                                currentChatId={currentChatId}
-                                                isCreatingChat={isCreatingChat}
-                                                chatTitles={chatTitles}
-                                                onGenerateTitle={
-                                                    onGenerateTitle
-                                                }
-                                                onChatDeleted={onChatDeleted}
-                                            />
+                                                <ChatsList
+                                                    chats={chats}
+                                                    onChatSelect={onChatSelect}
+                                                    currentChatId={currentChatId}
+                                                    isCreatingChat={isCreatingChat}
+                                                    chatTitles={chatTitles}
+                                                    onGenerateTitle={
+                                                        onGenerateTitle
+                                                    }
+                                                    onChatDeleted={onChatDeleted}
+                                                />
                                         </CollapsibleContent>
                                     </Collapsible>
 
@@ -613,7 +613,7 @@ export default function AppSidebar({
                                                                 isFilesOpen &&
                                                                     'rotate-90'
                                                             )}
-                                                        />
+                                                    />
                                                     </SidebarMenuAction>
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
@@ -649,7 +649,7 @@ export default function AppSidebar({
                                                                 isAppsOpen &&
                                                                     'rotate-90'
                                                             )}
-                                                        />
+                                                    />
                                                     </SidebarMenuAction>
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
@@ -978,141 +978,141 @@ export default function AppSidebar({
                     <SidebarContent>
                         <ScrollArea className="h-[calc(100vh-8rem)]">
                             <SidebarGroup>
-                                <SidebarMenu>
-                                    <SidebarMenuItem className="flex justify-center">
-                                        <SidebarMenuButton
-                                            onClick={() => router.push('/')}
-                                            className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
-                                        >
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton
+                                                onClick={() => router.push('/')}
+                                                className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
+                                            >
                                             {!open && (
                                                 <Plus className="h-4 w-4" />
                                             )}
-                                            {open && <span>New Project</span>}
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                </SidebarMenu>
-                            </SidebarGroup>
+                                                {open && <span>New Project</span>}
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                </SidebarGroup>
 
                             <SidebarGroup>
-                                <SidebarGroupLabel>Hub</SidebarGroupLabel>
-                                <Collapsible
-                                    open={isChatsOpen}
-                                    onOpenChange={setIsChatsOpen}
-                                >
-                                    <SidebarMenu>
-                                        <SidebarMenuItem className="flex justify-center">
-                                            <SidebarMenuButton
-                                                className="w-full flex items-center jusitfy-between"
-                                                tooltip="Your previous chats"
-                                                onClick={() => router.push('/projects')}
-                                            >
-                                                <MessageSquare className="h-4 w-4" />
-                                                {open && (
-                                                    <span className="ml-2">
-                                                        Projects
-                                                    </span>
-                                                )}
-                                            </SidebarMenuButton>
-                                            <CollapsibleTrigger asChild>
-                                                <SidebarMenuAction>
-                                                    <ChevronRight
-                                                        className={cn(
-                                                            'h-4 w-4 transition-transform',
-                                                            isChatsOpen &&
-                                                                'rotate-90'
-                                                        )}
+                                    <SidebarGroupLabel>Hub</SidebarGroupLabel>
+                                    <Collapsible
+                                        open={isChatsOpen}
+                                        onOpenChange={setIsChatsOpen}
+                                    >
+                                        <SidebarMenu>
+                                            <SidebarMenuItem className="flex justify-center">
+                                                <SidebarMenuButton
+                                                    className="w-full flex items-center jusitfy-between"
+                                                    tooltip="Your previous chats"
+                                                    onClick={() => router.push('/projects')}
+                                                >
+                                                    <MessageSquare className="h-4 w-4" />
+                                                    {open && (
+                                                        <span className="ml-2">
+                                                            Projects
+                                                        </span>
+                                                    )}
+                                                </SidebarMenuButton>
+                                                <CollapsibleTrigger asChild>
+                                                    <SidebarMenuAction>
+                                                        <ChevronRight
+                                                            className={cn(
+                                                                'h-4 w-4 transition-transform',
+                                                                isChatsOpen &&
+                                                                    'rotate-90'
+                                                            )}
                                                     />
-                                                </SidebarMenuAction>
-                                            </CollapsibleTrigger>
-                                        </SidebarMenuItem>
-                                    </SidebarMenu>
-                                    <CollapsibleContent>
-                                        <ChatsList
-                                            chats={chats}
-                                            onChatSelect={onChatSelect}
-                                            currentChatId={currentChatId}
-                                            isCreatingChat={isCreatingChat}
-                                            chatTitles={chatTitles}
-                                            onGenerateTitle={onGenerateTitle}
-                                            onChatDeleted={onChatDeleted}
-                                        />
-                                    </CollapsibleContent>
-                                </Collapsible>
+                                                    </SidebarMenuAction>
+                                                </CollapsibleTrigger>
+                                            </SidebarMenuItem>
+                                        </SidebarMenu>
+                                        <CollapsibleContent>
+                                            <ChatsList
+                                                chats={chats}
+                                                onChatSelect={onChatSelect}
+                                                currentChatId={currentChatId}
+                                                isCreatingChat={isCreatingChat}
+                                                chatTitles={chatTitles}
+                                                onGenerateTitle={onGenerateTitle}
+                                                onChatDeleted={onChatDeleted}
+                                            />
+                                        </CollapsibleContent>
+                                    </Collapsible>
 
-                                <SidebarSeparator className="my-2" />
+                                    <SidebarSeparator className="my-2" />
 
-                                <Collapsible
-                                    open={isFilesOpen}
-                                    onOpenChange={setIsFilesOpen}
-                                >
-                                    <SidebarMenu>
-                                        <SidebarMenuItem className="flex justify-center">
-                                            <SidebarMenuButton
-                                                className="w-full flex items-center jusitfy-between"
-                                                tooltip="Manage your files"
-                                                onClick={() => router.push('/files')}
-                                            >
-                                                <File className="h-4 w-4" />
-                                                {open && (
-                                                    <span className="ml-2">
-                                                        Files
-                                                    </span>
-                                                )}
-                                            </SidebarMenuButton>
-                                            <CollapsibleTrigger asChild>
-                                                <SidebarMenuAction>
-                                                    <ChevronRight 
-                                                        className={cn(
-                                                            'h-4 w-4 transition-transform',
-                                                            isFilesOpen &&
-                                                                'rotate-90'
-                                                        )}
+                                    <Collapsible
+                                        open={isFilesOpen}
+                                        onOpenChange={setIsFilesOpen}
+                                    >
+                                        <SidebarMenu>
+                                            <SidebarMenuItem className="flex justify-center">
+                                                <SidebarMenuButton
+                                                    className="w-full flex items-center jusitfy-between"
+                                                    tooltip="Manage your files"
+                                                    onClick={() => router.push('/files')}
+                                                >
+                                                    <File className="h-4 w-4" />
+                                                    {open && (
+                                                        <span className="ml-2">
+                                                            Files
+                                                        </span>
+                                                    )}
+                                                </SidebarMenuButton>
+                                                <CollapsibleTrigger asChild>
+                                                    <SidebarMenuAction>
+                                                        <ChevronRight 
+                                                            className={cn(
+                                                                'h-4 w-4 transition-transform',
+                                                                isFilesOpen &&
+                                                                    'rotate-90'
+                                                            )}
                                                     />
-                                                </SidebarMenuAction>
-                                            </CollapsibleTrigger>
-                                        </SidebarMenuItem>
-                                    </SidebarMenu>
-                                    <CollapsibleContent>
-                                        <FilesList />
-                                    </CollapsibleContent>
-                                </Collapsible>
+                                                    </SidebarMenuAction>
+                                                </CollapsibleTrigger>
+                                            </SidebarMenuItem>
+                                        </SidebarMenu>
+                                        <CollapsibleContent>
+                                            <FilesList />
+                                        </CollapsibleContent>
+                                    </Collapsible>
 
-                                <Collapsible
-                                    open={isAppsOpen}
-                                    onOpenChange={setIsAppsOpen}
-                                >
-                                    <SidebarMenu>
-                                        <SidebarMenuItem className="flex justify-center">
-                                            <SidebarMenuButton
-                                                className="w-full flex items-center jusitfy-between"
-                                                tooltip="Your applications"
-                                                onClick={() => router.push('/apps')}
-                                            >
-                                                <AppWindow className="h-4 w-4" />
-                                                {open && (
-                                                    <span className="ml-2">
-                                                        Apps
-                                                    </span>
-                                                )}
-                                            </SidebarMenuButton>
-                                            <CollapsibleTrigger asChild>
-                                                <SidebarMenuAction>
-                                                    <ChevronRight 
-                                                        className={cn(
-                                                            'h-4 w-4 transition-transform',
-                                                            isAppsOpen &&
-                                                                'rotate-90'
-                                                        )}
+                                    <Collapsible
+                                        open={isAppsOpen}
+                                        onOpenChange={setIsAppsOpen}
+                                    >
+                                        <SidebarMenu>
+                                            <SidebarMenuItem className="flex justify-center">
+                                                <SidebarMenuButton
+                                                    className="w-full flex items-center jusitfy-between"
+                                                    tooltip="Your applications"
+                                                    onClick={() => router.push('/apps')}
+                                                >
+                                                    <AppWindow className="h-4 w-4" />
+                                                    {open && (
+                                                        <span className="ml-2">
+                                                            Apps
+                                                        </span>
+                                                    )}
+                                                </SidebarMenuButton>
+                                                <CollapsibleTrigger asChild>
+                                                    <SidebarMenuAction>
+                                                        <ChevronRight 
+                                                            className={cn(
+                                                                'h-4 w-4 transition-transform',
+                                                                isAppsOpen &&
+                                                                    'rotate-90'
+                                                            )}
                                                     />
-                                                </SidebarMenuAction>
-                                            </CollapsibleTrigger>
-                                        </SidebarMenuItem>
-                                    </SidebarMenu>
-                                    <CollapsibleContent>
-                                        <AppsList />
-                                    </CollapsibleContent>
-                                </Collapsible>
-                            </SidebarGroup>
+                                                    </SidebarMenuAction>
+                                                </CollapsibleTrigger>
+                                            </SidebarMenuItem>
+                                        </SidebarMenu>
+                                        <CollapsibleContent>
+                                            <AppsList />
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                </SidebarGroup>
                         </ScrollArea>
                     </SidebarContent>
                     <SidebarGroup className="mt-auto">
