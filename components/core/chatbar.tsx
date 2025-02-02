@@ -62,7 +62,7 @@ export default function Chatbar({
     const [startIndex, setStartIndex] = useState(0)
 
     const SUGGESTIONS = [
-        "ML forecasting model for NVIDIA stock",
+        "ML forecasting model for NVIDIA",
         "Portfolio optimization dashboard",
         "Real-time crypto price tracker",
         "Stock sentiment analyzer",
