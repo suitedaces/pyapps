@@ -174,7 +174,7 @@ export function Message({
                         )}>
                             <div 
                                 ref={contentRef}
-                                className={cn("max-w-[calc(100%-2rem)] overflow-x-auto", assistantMarkdownStyles)}
+                                className={cn("max-w-[calc(100%-2rem)] overflow-x-auto text-neutral-900 dark:text-neutral-100", assistantMarkdownStyles)}
                             />
 
                             {/* Render suggestions if they exist */}

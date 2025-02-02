@@ -381,7 +381,7 @@ export default function Chatbar({
                 <div className="relative flex items-center w-full">
                     {isUploading && uploadProgress < 100 && (
                         <div className="absolute inset-x-0 -top-1">
-                            <div className="relative h-1 bg-gray-100 dark:bg-gray-800 rounded-t-lg overflow-hidden">
+                            <div className="relative h-1 bg-neutral-100 dark:bg-neutral-800 rounded-t-lg overflow-hidden">
                                 <div 
                                     className="absolute inset-y-0 left-0 bg-green-400 dark:bg-green-500 transition-all duration-300 ease-out"
                                     style={{ width: `${uploadProgress}%` }}
@@ -417,7 +417,8 @@ export default function Chatbar({
                             'focus-visible:ring-1 focus-visible:ring-offset-0',
                             'scrollbar-thumb-rounded scrollbar-track-rounded',
                             'scrollbar-thin scrollbar-thumb-border',
-                            'dark:bg-dark-app dark:text-dark-text dark:border-dark-border',
+                            'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100',
+                            'border-neutral-200 dark:border-neutral-700',
                             'transition-opacity duration-200',
                             isUploading && 'opacity-90'
                         )}
@@ -448,8 +449,8 @@ export default function Chatbar({
                                 'h-9 w-9',
                                 'bg-gradient-to-tr from-[#FFDE56] to-[#4989BB]',
                                 'dark:from-[#03f241] dark:via-[#d549dd] dark:to-[#03e5f2]',
-                                'disabled:bg-none disabled:bg-[#F5F5F5] disabled:border disabled:border-[#D4D4D4]',
-                                'dark:disabled:bg-dark-app dark:disabled:border-dark-border'
+                                'disabled:bg-none disabled:bg-neutral-100 disabled:border disabled:border-neutral-200',
+                                'dark:disabled:bg-neutral-800 dark:disabled:border-neutral-700'
                             )}
                             disabled={
                                 isLoading ||
@@ -461,7 +462,7 @@ export default function Chatbar({
                             {isLoading || isUploading ? (
                                 <Loader2
                                     className={cn(
-                                        'h-5 w-5 animate-spin text-black dark:text-dark-text',
+                                        'h-5 w-5 animate-spin text-neutral-900 dark:text-neutral-100',
                                         isCentered && 'h-6 w-6'
                                     )}
                                 />
@@ -469,8 +470,8 @@ export default function Chatbar({
                                 <ArrowUp
                                     className={cn(
                                         'h-5 w-5',
-                                        'text-black dark:text-dark-text',
-                                        'disabled:text-[#D4D4D4] dark:disabled:text-dark-border'
+                                        'text-neutral-900 dark:text-neutral-100',
+                                        'disabled:text-neutral-400 dark:disabled:text-neutral-600'
                                     )}
                                 />
                             )}
@@ -504,7 +505,7 @@ export default function Chatbar({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border"
+                                className="h-9 w-9 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700"
                                 onClick={handlePaperclipClick}
                                 disabled={isLoading || isUploading}
                             >
@@ -533,7 +534,7 @@ export default function Chatbar({
                         variant="ghost"
                         size="icon"
                         onClick={handlePrevSuggestions}
-                        className="h-7 w-7 shrink-0"
+                        className="h-7 w-7 shrink-0 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700"
                         disabled={startIndex === 0}
                     >
                         <ArrowLeft className="h-4 w-4" />
@@ -554,7 +555,7 @@ export default function Chatbar({
                                     "truncate",
                                     suggestion === selectedSuggestion
                                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                        : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-black/70 dark:text-white/70 border-black/10 dark:border-white/10",
+                                        : "bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 border-neutral-200 dark:border-neutral-700",
                                     "border"
                                 )}
                             >
@@ -567,7 +568,7 @@ export default function Chatbar({
                         variant="ghost"
                         size="icon"
                         onClick={handleNextSuggestions}
-                        className="h-7 w-7 shrink-0"
+                        className="h-7 w-7 shrink-0 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700"
                         disabled={startIndex >= SUGGESTIONS.length - 3}
                     >
                         <ArrowRight className="h-4 w-4" />

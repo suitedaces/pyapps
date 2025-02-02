@@ -51,7 +51,7 @@ const AppCard = ({ app }: { app: DemoApp }) => {
         <div className="relative isolate">
             <motion.div
                 className={cn(
-                    'w-[180px] overflow-hidden rounded-lg',
+                    'w-[180px] overflow-hidden rounded-xl',
                     'bg-white dark:bg-card',
                     'shadow-[0_0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]',
                     'hover:shadow-[0_0_0_1px_rgba(0,0,0,0.1),0_4px_8px_-2px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_4px_8px_-2px_rgba(0,0,0,0.1)]',

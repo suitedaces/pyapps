@@ -31,7 +31,7 @@ export function BorderTrail({
         <div className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-transparent [mask-clip:padding-box,border-box] [mask-composite:intersect] [mask-image:linear-gradient(transparent,transparent),linear-gradient(#000,#000)]">
             <motion.div
                 className={cn(
-                    'absolute aspect-square bg-zinc-500 dark:bg-gradient-to-r dark:from-[rgba(59,196,242,0.51)] dark:via-[#F5833F_30%,#7A69F9_60%,#3BC4F2] dark:to-[rgba(242,99,120,0.51)]',
+                    'absolute aspect-square bg-gradient-to-r from-[rgba(59,196,242,0.51)] via-[#F5833F_30%,#7A69F9_60%,#3BC4F2] to-[rgba(242,99,120,0.51)]',
                     className
                 )}
                 style={{
