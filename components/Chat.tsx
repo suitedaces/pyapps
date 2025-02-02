@@ -34,6 +34,7 @@ interface ChatProps {
     isRightPanelOpen?: boolean
 }
 
+
 function Chat({
     messages = [],
     isLoading = false,
