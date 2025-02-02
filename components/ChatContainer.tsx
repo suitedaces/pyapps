@@ -703,61 +703,58 @@ export default function ChatContainer({
                         ref={resizableGroupRef}
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
-                            <div
-                                className={cn(
-                                    'w-full relative flex flex-col',
-                                    hasFirstMessage || isInChatPage
-                                        ? 'h-[calc(100vh-4rem)]'
-                                        : 'h-screen'
-                                )}
-                            >
+                            <div className={cn(
+                                'w-full h-full flex flex-col overflow-hidden',
+                                hasFirstMessage || isInChatPage ? 'h-[calc(100vh-4rem)]' : 'h-screen'
+                            )}>
                                 {!isInChatPage && chatState.status === 'initial' && (
                                     <div className="absolute inset-0 flex flex-col items-center">
                                         <div className="flex flex-col items-center mt-[15vh] mb-32">
-                                                <TypingText
-                                                    className="text-black dark:text-dark-text font-extrabold text-6xl md:text-4xl lg:text-5xl tracking-tight mb-24"
-                                                    text="Turn data into interactive apps."
-                                                    speed={35}
-                                                    show={true}
-                                                />
+                                            <TypingText
+                                                className="text-black dark:text-dark-text font-extrabold text-6xl md:text-4xl lg:text-5xl tracking-tight mb-24"
+                                                text="Turn data into interactive apps."
+                                                speed={35}
+                                                show={true}
+                                            />
                                             {!hasFirstMessage && (
                                                 <div className="mt-40 w-full max-w-[700px] relative z-30 pointer-events-auto overflow-hidden px-8">
-                                                    <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
+                                                        <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                 )}
-
                                 <div className={cn(
-                                    "max-w-[800px] mx-auto w-full",
-                                    !isInChatPage && !hasFirstMessage ? "h-full" : ""
+                                    "flex-1 min-h-0 w-full",
+                                    !isInChatPage && !hasFirstMessage ? "h-full" : "",
+                                    !rightPanel.isVisible && "max-w-[800px] mx-auto"
                                 )}>
-                                        <Chat
-                                            messages={isNavigating ? [] : messages}
-                                            isLoading={chatLoading || isNavigating}
-                                            input={input}
-                                            onInputChange={handleInputChange}
-                                            onSubmit={handleSubmit}
-                                            onAppend={async (message: string) => {
-                                                const userMessage = {
-                                                    id: Date.now().toString(),
-                                                    role: 'user' as const,
-                                                    content: message,
-                                                    createdAt: new Date()
-                                                }
-                                                await append(userMessage)
-                                            }}
-                                            errorState={errorState}
-                                            onErrorDismiss={() => setErrorState(null)}
-                                            onUpdateStreamlit={updateStreamlitApp}
-                                            onCodeClick={handleCodeViewToggle}
-                                            isInChatPage={isInChatPage || hasFirstMessage}
-                                            onTogglePanel={toggleRightContent}
-                                            chatId={currentChatId}
-                                            selectedFileIds={persistedFileIds}
-                                            onFileSelect={handleFileSelection}
-                                        />
+                                    <Chat
+                                        messages={isNavigating ? [] : messages}
+                                        isLoading={chatLoading || isNavigating}
+                                        input={input}
+                                        onInputChange={handleInputChange}
+                                        onSubmit={handleSubmit}
+                                        onAppend={async (message: string) => {
+                                            const userMessage = {
+                                                id: Date.now().toString(),
+                                                role: 'user' as const,
+                                                content: message,
+                                                createdAt: new Date()
+                                            }
+                                            await append(userMessage)
+                                        }}
+                                        errorState={errorState}
+                                        onErrorDismiss={() => setErrorState(null)}
+                                        onUpdateStreamlit={updateStreamlitApp}
+                                        onCodeClick={handleCodeViewToggle}
+                                        isInChatPage={isInChatPage || hasFirstMessage}
+                                        onTogglePanel={toggleRightContent}
+                                        chatId={currentChatId}
+                                        selectedFileIds={persistedFileIds}
+                                        onFileSelect={handleFileSelection}
+                                        isRightPanelOpen={rightPanel.isVisible}
+                                    />
                                 </div>
                             </div>
                         </ResizablePanel>

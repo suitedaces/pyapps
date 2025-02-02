@@ -29,6 +29,7 @@ interface ChatbarProps {
     chatId?: string
     selectedFileIds?: string[]
     onFileSelect?: (fileIds: string[]) => void
+    isRightPanelOpen?: boolean
 }
 
 const MIN_HEIGHT = 54
@@ -45,6 +46,7 @@ export default function Chatbar({
     chatId,
     selectedFileIds = [],
     onFileSelect,
+    isRightPanelOpen = false,
 }: ChatbarProps): JSX.Element {
     const { session, showAuthPrompt } = useAuth()
     const { uploadFile } = useFileUpload()
@@ -333,9 +335,10 @@ export default function Chatbar({
 
     return (
         <motion.div
-            className="p-4 w-full absolute bg-background dark:bg-dark-app"
+            className="p-4 w-full bg-background dark:bg-dark-app"
             style={{
                 bottom: isInChatPage ? 0 : '40vh',
+                position: isInChatPage ? 'absolute' : 'relative'
             }}
             animate={{
                 bottom: isInChatPage ? 0 : isSubmitted ? 0 : '40vh',
@@ -344,9 +347,9 @@ export default function Chatbar({
         >
             <form
                 onSubmit={handleSubmit}
-                className="flex relative flex-col gap-4 max-w-[800px] mx-auto"
+                className="flex relative flex-col gap-4 w-full"
             >
-                <div className="relative flex items-center">
+                <div className="relative flex items-center w-full">
                     {isUploading && uploadProgress < 100 && (
                         <div className="absolute inset-x-0 -top-1">
                             <div className="relative h-1 bg-gray-100 dark:bg-gray-800 rounded-t-lg overflow-hidden">

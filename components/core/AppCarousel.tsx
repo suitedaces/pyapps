@@ -112,6 +112,36 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
     const [demoApps, setDemoApps] = useState<DemoApp[]>([])
     const controls = useAnimation()
 
+    // Start animation as soon as we have apps
+    useEffect(() => {
+        if (demoApps.length > 0) {
+            controls.start({
+                x: [0, -960],
+                transition: {
+                    duration: 20,
+                    ease: "linear",
+                    repeat: Infinity,
+                }
+            })
+        }
+    }, [demoApps, controls])
+
+    // Handle hover pause/resume
+    useEffect(() => {
+        if (isHovered) {
+            controls.stop()
+        } else if (demoApps.length > 0) {
+            controls.start({
+                x: [0, -960],
+                transition: {
+                    duration: 20,
+                    ease: "linear",
+                    repeat: Infinity,
+                }
+            })
+        }
+    }, [isHovered, demoApps, controls])
+
     useEffect(() => {
         const fetchDemoApps = async () => {
             const supabase = createClient()
@@ -141,50 +171,46 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
         fetchDemoApps()
     }, [])
 
-    useEffect(() => {
-        if (isHovered) {
-            controls.stop()
-        } else {
-            controls.start({
-                x: [0, -1920],
-                transition: {
-                    duration: 30,
-                    ease: "linear",
-                    repeat: Infinity,
-                }
-            })
-        }
-    }, [isHovered, controls])
-
     if (demoApps.length === 0) return null
 
     const duplicatedApps = [...demoApps, ...demoApps, ...demoApps]
 
     return (
         <div 
-            className="w-full overflow-hidden bg-transparent flex items-center relative z-30"
+            className="w-full overflow-hidden bg-transparent relative z-30"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-[5]" />
-            
-            <motion.div
-                className="flex gap-8 px-24"
-                animate={controls}
-                initial={{ x: 0 }}
-            >
-                {duplicatedApps.map((app, i) => (
-                    <div
-                        key={`${app.id}-${i}`}
-                        className="inline-flex"
-                        onClick={() => onAppSelect?.(app)}
-                    >
-                        <AppCard app={app} />
-                    </div>
-                ))}
-            </motion.div>
+            <div className="flex items-center">
+                <div className={cn(
+                    "absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-[15]",
+                    "transition-opacity duration-300",
+                    isHovered ? "opacity-0" : "opacity-100"
+                )} />
+                
+                <motion.div
+                    className="flex gap-8"
+                    animate={controls}
+                    initial={{ x: 0 }}
+                    style={{ paddingInline: "3rem" }}
+                >
+                    {duplicatedApps.map((app, i) => (
+                        <div
+                            key={`${app.id}-${i}`}
+                            className="inline-flex"
+                            onClick={() => onAppSelect?.(app)}
+                        >
+                            <AppCard app={app} />
+                        </div>
+                    ))}
+                </motion.div>
 
-            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-[5]" />
+                <div className={cn(
+                    "absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-[15]",
+                    "transition-opacity duration-300",
+                    isHovered ? "opacity-0" : "opacity-100"
+                )} />
+            </div>
         </div>
     )
 }
