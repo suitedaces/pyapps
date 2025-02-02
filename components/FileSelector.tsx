@@ -97,25 +97,25 @@ export function FileSelector({
                     variant="ghost"
                     size="icon"
                     className={cn(
-                        'h-9 w-9 bg-secondary dark:bg-dark-app dark:text-dark-text dark:hover:bg-dark-border relative',
+                        'h-9 w-9 bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700',
                         className
                     )}
                 >
                     <Files className="h-5 w-5" />
                     {session && selectedIds.size > 0 && (
-                        <div className="absolute -top-1 -right-1 bg-green-500 dark:bg-[#03f241] text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                        <div className="absolute -top-1 -right-1 bg-emerald-500 text-white dark:text-neutral-900 rounded-full w-4 h-4 text-xs flex items-center justify-center">
                             {selectedIds.size}
                         </div>
                     )}
                 </Button>
             </PopoverTrigger>
             <PopoverContent
-                className="w-80 p-0"
+                className="w-80 p-0 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700"
                 align="end"
                 sideOffset={5}
             >
-                <div className="px-4 py-2 border-b">
-                    <h4 className="font-medium">Your Data</h4>
+                <div className="px-4 py-2 border-b border-neutral-200 dark:border-neutral-700">
+                    <h4 className="font-medium text-neutral-900 dark:text-neutral-100">Your Data</h4>
                 </div>
                 <ScrollArea className="h-[300px]">
                     <div className="p-4">
@@ -124,14 +124,14 @@ export function FileSelector({
                                 <div className="mb-4">
                                     <div 
                                         onClick={showAuthPrompt}
-                                        className="w-full px-2 py-1.5 rounded-md text-sm bg-secondary/50 hover:bg-secondary cursor-pointer flex items-center gap-2"
+                                        className="w-full px-2 py-1.5 rounded-md text-sm bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer flex items-center gap-2 text-neutral-900 dark:text-neutral-100"
                                     >
-                                        <Sheet className="h-4 w-4 text-green-600" />
+                                        <Sheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                         <span>Connect Google Sheets</span>
                                     </div>
                                 </div>
                                 <div className="text-center py-4">
-                                    <p className="text-sm text-muted-foreground mb-2">
+                                    <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-2">
                                         Login to connect your data
                                     </p>
                                 </div>
@@ -142,10 +142,10 @@ export function FileSelector({
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <div className="w-full px-2 py-1.5 rounded-md text-sm opacity-60 cursor-not-allowed bg-muted/50 flex items-center gap-2">
-                                                    <Sheet className="h-4 w-4 text-green-600" />
+                                                <div className="w-full px-2 py-1.5 rounded-md text-sm opacity-60 cursor-not-allowed bg-neutral-100 dark:bg-neutral-800 flex items-center gap-2 text-neutral-900 dark:text-neutral-100">
+                                                    <Sheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                                     <span>Add Google Sheets</span>
-                                                    <span className="ml-auto text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                                    <span className="ml-auto text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">
                                                         Coming Soon!
                                                     </span>
                                                 </div>
@@ -159,14 +159,14 @@ export function FileSelector({
                                     </TooltipProvider>
                                 </div>
 
-                                <div className="text-xs font-medium text-muted-foreground mb-2">
+                                <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2">
                                     Local Files
                                 </div>
 
                                 {isLoading ? (
                                     <LoadingSkeleton />
                                 ) : files.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                    <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center py-4">
                                         No files available
                                     </p>
                                 ) : (
@@ -179,24 +179,22 @@ export function FileSelector({
                                                 }
                                                 className={cn(
                                                     'w-full text-left px-2 py-1.5 rounded-md text-sm',
-                                                    'hover:bg-secondary/50 transition-colors',
+                                                    'hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors',
                                                     'flex items-center justify-between',
                                                     selectedIds.has(file.id) &&
-                                                        'bg-green-100 dark:bg-[#03f241]/10 hover:bg-green-100 dark:hover:bg-[#03f241]/10 text-green-900 dark:text-[#03f241]'
+                                                        'bg-emerald-500/10 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                                                 )}
                                             >
-                                                <span className="truncate">
+                                                <span className="truncate text-neutral-900 dark:text-neutral-100">
                                                     {truncate(file.file_name)}
                                                 </span>
                                                 <span className={cn(
                                                     "text-xs ml-2",
                                                     selectedIds.has(file.id)
-                                                        ? 'text-green-700 dark:text-[#03f241]/70'
-                                                        : 'text-muted-foreground'
+                                                        ? 'text-emerald-500/70 dark:text-emerald-400/70'
+                                                        : 'text-neutral-500 dark:text-neutral-400'
                                                 )}>
-                                                    {new Date(
-                                                        file.created_at
-                                                    ).toLocaleDateString()}
+                                                    {new Date(file.created_at).toLocaleDateString()}
                                                 </span>
                                             </button>
                                         ))}
