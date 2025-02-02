@@ -715,7 +715,7 @@ export default function ChatContainer({
                                     <div className="absolute inset-0 flex flex-col items-center">
                                         <div className="flex flex-col items-center mt-[15vh] mb-32">
                                                 <TypingText
-                                                    className="text-black dark:text-dark-text font-extrabold text-6xl md:text-4xl lg:text-4xl tracking-tight mb-24"
+                                                    className="text-black dark:text-dark-text font-extrabold text-6xl md:text-4xl lg:text-5xl tracking-tight mb-24"
                                                     text="Turn data into interactive apps."
                                                     speed={35}
                                                     show={true}

@@ -77,7 +77,7 @@ const AppCard = ({ app }: { app: DemoApp }) => {
             </div>
             <CardHeader className="py-3 px-4">
                 <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-base leading-none tracking-tight text-gray-800 dark:text-gray-200">{app.name}</h3>
+                    <h3 className="font-medium text-xs leading-none tracking-tight text-gray-800 dark:text-gray-200">{app.name}</h3>
                 </div>
             </CardHeader>
         </motion.div>
@@ -113,26 +113,17 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
             })) || []
 
             setDemoApps(transformedApps)
-            // Start animation immediately after setting apps
-            controls.start({
-                x: -((transformedApps.length * 232) * 2),
-                transition: {
-                    duration: 30,
-                    ease: "linear",
-                    repeat: Infinity,
-                }
-            })
         }
 
         fetchDemoApps()
-    }, [controls])
+    }, [])
 
     useEffect(() => {
         if (isHovered) {
             controls.stop()
-        } else if (demoApps.length > 0) {
+        } else {
             controls.start({
-                x: -((demoApps.length * 232) * 2),
+                x: [0, -1920],
                 transition: {
                     duration: 30,
                     ease: "linear",
@@ -140,11 +131,9 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
                 }
             })
         }
-    }, [isHovered, demoApps.length, controls])
+    }, [isHovered, controls])
 
-    if (demoApps.length === 0) {
-        return null
-    }
+    if (demoApps.length === 0) return null
 
     const duplicatedApps = [...demoApps, ...demoApps, ...demoApps]
 
@@ -153,7 +142,6 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
             className="w-full overflow-hidden bg-transparent flex items-center relative z-30"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            style={{ pointerEvents: 'auto' }}
         >
             <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10" />
             
@@ -162,20 +150,18 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
                 animate={controls}
                 initial={{ x: 0 }}
             >
-                <div className="flex gap-3">
-                    {duplicatedApps.map((app, i) => (
-                        <div
-                            key={`${app.id}-${i}`}
-                            className="inline-flex"
-                            onClick={() => onAppSelect?.(app)}
-                        >
-                            <AppCard app={app} />
-                        </div>
-                    ))}
-                </div>
+                {duplicatedApps.map((app, i) => (
+                    <div
+                        key={`${app.id}-${i}`}
+                        className="inline-flex"
+                        onClick={() => onAppSelect?.(app)}
+                    >
+                        <AppCard app={app} />
+                    </div>
+                ))}
             </motion.div>
 
             <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-background to-transparent z-10" />
         </div>
     )
-} 
+}
