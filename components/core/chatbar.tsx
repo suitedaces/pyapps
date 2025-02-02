@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
-import { ArrowUp, Loader2, PaperclipIcon } from 'lucide-react'
+import { ArrowUp, Loader2, PaperclipIcon, ArrowLeft, ArrowRight } from 'lucide-react'
 import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { FileSelector } from '@/components/FileSelector'
@@ -29,6 +29,7 @@ interface ChatbarProps {
     chatId?: string
     selectedFileIds?: string[]
     onFileSelect?: (fileIds: string[]) => void
+    isRightPanelOpen?: boolean
 }
 
 const MIN_HEIGHT = 54
@@ -45,10 +46,10 @@ export default function Chatbar({
     chatId,
     selectedFileIds = [],
     onFileSelect,
+    isRightPanelOpen = false,
 }: ChatbarProps): JSX.Element {
     const { session, showAuthPrompt } = useAuth()
     const { uploadFile } = useFileUpload()
-    // Use local state to track file only, not message
     const [file, setFile] = React.useState<File | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
     const [isSubmitted, setIsSubmitted] = React.useState(false)
@@ -57,6 +58,26 @@ export default function Chatbar({
     const [isUploading, setIsUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
     const [uploadError, setUploadError] = useState<string | null>(null)
+    const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null)
+    const [startIndex, setStartIndex] = useState(0)
+
+    const SUGGESTIONS = [
+        "ML forecasting model for NVIDIA",
+        "Portfolio optimization dashboard",
+        "Real-time crypto price tracker",
+        "Stock sentiment analyzer",
+        "Options trading calculator"
+    ]
+
+    const visibleSuggestions = SUGGESTIONS.slice(startIndex, startIndex + 3)
+
+    const handlePrevSuggestions = () => {
+        setStartIndex(prev => Math.max(0, prev - 1))
+    }
+
+    const handleNextSuggestions = () => {
+        setStartIndex(prev => Math.min(SUGGESTIONS.length - 3, prev + 1))
+    }
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: MIN_HEIGHT,
@@ -271,9 +292,19 @@ export default function Chatbar({
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            if (!isLoading && (value.trim() || file)) {
+            if (!isLoading && (value.trim() || selectedSuggestion)) {
                 handleSubmit(e as any)
             }
+        } else if (e.key === 'ArrowLeft' && !value) {
+            e.preventDefault()
+            setStartIndex(prev => Math.max(prev - 1, 0))
+        } else if (e.key === 'ArrowRight' && !value) {
+            e.preventDefault()
+            setStartIndex(prev => Math.min(prev + 1, SUGGESTIONS.length - 3))
+        } else if (e.key === 'Enter' && !e.shiftKey && startIndex !== -1) {
+            e.preventDefault()
+            setSelectedSuggestion(SUGGESTIONS[startIndex])
+            onChange(SUGGESTIONS[startIndex])
         }
     }
 
@@ -333,20 +364,21 @@ export default function Chatbar({
 
     return (
         <motion.div
-            className="p-4 w-full absolute bg-background dark:bg-dark-app"
+            className="p-4 w-full bg-background dark:bg-dark-app"
             style={{
-                bottom: isInChatPage ? 0 : '40vh',
+                bottom: isInChatPage ? 0 : '35vh',
+                position: isInChatPage ? 'absolute' : 'relative'
             }}
             animate={{
-                bottom: isInChatPage ? 0 : isSubmitted ? 0 : '40vh',
+                bottom: isInChatPage ? 0 : isSubmitted ? 0 : '35vh',
             }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
         >
             <form
                 onSubmit={handleSubmit}
-                className="flex relative flex-col gap-4 max-w-[800px] mx-auto"
+                className="flex relative flex-col gap-2 w-full pb-1"
             >
-                <div className="relative flex items-center">
+                <div className="relative flex items-center w-full">
                     {isUploading && uploadProgress < 100 && (
                         <div className="absolute inset-x-0 -top-1">
                             <div className="relative h-1 bg-gray-100 dark:bg-gray-800 rounded-t-lg overflow-hidden">
@@ -493,6 +525,55 @@ export default function Chatbar({
                     </div>
                 </div>
             </form>
+
+            {/* Quick suggestions */}
+            {!isInChatPage && (
+                <div className="flex items-center gap-2 pt-2 px-4 pb-3">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handlePrevSuggestions}
+                        className="h-7 w-7 shrink-0"
+                        disabled={startIndex === 0}
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="grid grid-cols-3 gap-2 w-full">
+                        {visibleSuggestions.map((suggestion, index) => (
+                            <button
+                                key={startIndex + index}
+                                onClick={() => {
+                                    setSelectedSuggestion(suggestion === selectedSuggestion ? null : suggestion)
+                                    if (suggestion !== selectedSuggestion) {
+                                        onChange(suggestion)
+                                    }
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs rounded-full whitespace-nowrap transition-all duration-200",
+                                    "truncate",
+                                    suggestion === selectedSuggestion
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                        : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-black/70 dark:text-white/70 border-black/10 dark:border-white/10",
+                                    "border"
+                                )}
+                            >
+                                {suggestion}
+                            </button>
+                        ))}
+                    </div>
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleNextSuggestions}
+                        className="h-7 w-7 shrink-0"
+                        disabled={startIndex >= SUGGESTIONS.length - 3}
+                    >
+                        <ArrowRight className="h-4 w-4" />
+                    </Button>
+                </div>
+            )}
         </motion.div>
     )
 }

@@ -8,12 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Message } from 'ai'
 import { XCircle } from 'lucide-react'
 import React, { useEffect, useRef } from 'react'
-
-interface FileUploadState {
-    isUploading: boolean
-    progress: number
-    error: string | null
-}
+import { cn } from '@/lib/utils'
 
 interface ChatProps {
     messages: Message[]
@@ -36,7 +31,9 @@ interface ChatProps {
     chatId?: string
     selectedFileIds?: string[]
     onFileSelect?: (fileIds: string[]) => void
+    isRightPanelOpen?: boolean
 }
+
 
 function Chat({
     messages = [],
@@ -54,6 +51,7 @@ function Chat({
     chatId,
     selectedFileIds = [],
     onFileSelect,
+    isRightPanelOpen = false,
 }: ChatProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { isPreviewMode, showAuthPrompt } = useAuth()
@@ -108,7 +106,7 @@ function Chat({
     }
 
     return (
-        <div className="flex flex-col relative z-20 text-black h-full">
+        <div className="flex flex-col h-full relative z-20">
             {/* Error displays */}
             {errorState && (
                 <Alert
@@ -122,34 +120,49 @@ function Chat({
             )}
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4 space-y-4 w-full max-w-[800px] m-auto pb-[120px]">
-                {Array.isArray(messages) &&
-                    messages.map((message, index) => {
-                        // Determine if this is the first message in a group of assistant messages
-                        const prevMessage = index > 0 ? messages[index - 1] : null;
-                        const showAvatar = message.role === 'assistant' && 
-                            (!prevMessage || prevMessage.role === 'user' || prevMessage.role === 'system');
+            <div className="flex-1 min-h-0 relative z-20">
+                <ScrollArea className={cn(
+                    "h-full",
+                    !isRightPanelOpen && "max-w-[800px] m-auto"
+                )}>
+                    <div className={cn(
+                        "p-4 space-y-4",
+                        isInChatPage ? "pb-[120px]" : "pb-4"
+                    )}>
+                        {Array.isArray(messages) &&
+                            messages.map((message, index) => {
+                                // Determine if this is the first message in a group of assistant messages
+                                const prevMessage = index > 0 ? messages[index - 1] : null;
+                                const showAvatar = message.role === 'assistant' && 
+                                    (!prevMessage || prevMessage.role === 'user' || prevMessage.role === 'system');
 
-                        return (
-                            <AIMessage
-                                key={`${message.id}-${index}`}
-                                {...message}
-                                data={message.data as { type: string; actions?: any[] }}
-                                isLastMessage={index === messages.length - 1}
-                                isLoading={isLoading}
-                                onCodeClick={handleCodeClick}
-                                onTogglePanel={() => onTogglePanel('right')}
-                                onInputChange={onInputChange}
-                                onAppend={onAppend}
-                                showAvatar={showAvatar}
-                            />
-                        );
-                    })}
-                <div ref={messagesEndRef} />
-            </ScrollArea>
+                                return (
+                                    <AIMessage
+                                        key={`${message.id}-${index}`}
+                                        {...message}
+                                        data={message.data as { type: string; actions?: any[] }}
+                                        isLastMessage={index === messages.length - 1}
+                                        isLoading={isLoading}
+                                        onCodeClick={handleCodeClick}
+                                        onTogglePanel={() => onTogglePanel('right')}
+                                        onInputChange={onInputChange}
+                                        onAppend={onAppend}
+                                        showAvatar={showAvatar}
+                                    />
+                                );
+                            })}
+                        <div ref={messagesEndRef} />
+                    </div>
+                </ScrollArea>
+            </div>
 
-            {/* Chatbar with absolute positioning */}
-            <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-dark-app">
+            {/* Chatbar */}
+            <div className={cn(
+                "bg-white dark:bg-dark-app w-full z-30",
+                isInChatPage ? "fixed bottom-0" : "relative",
+                isRightPanelOpen && isInChatPage && "w-[39%]",
+                !isRightPanelOpen && isInChatPage && "left-1/2 -translate-x-1/2 max-w-[800px]"
+            )}>
                 <Chatbar
                     value={input}
                     onChange={onInputChange}
@@ -159,6 +172,7 @@ function Chat({
                     chatId={chatId}
                     selectedFileIds={selectedFileIds}
                     onFileSelect={onFileSelect}
+                    isRightPanelOpen={isRightPanelOpen}
                 />
             </div>
         </div>
