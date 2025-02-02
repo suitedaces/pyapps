@@ -27,6 +27,7 @@ import AppSidebar from './Sidebar'
 import { createClient } from '@/lib/supabase/client'
 import AppCarousel, { DemoApp } from '@/components/core/AppCarousel'
 import { motion } from 'framer-motion'
+import { Logo } from '@/components/core/Logo'
 
 interface ChatContainerProps {
     initialChat?: any
@@ -710,22 +711,25 @@ export default function ChatContainer({
                                 {!isInChatPage && chatState.status === 'initial' && (
                                     <div className="absolute inset-0 flex flex-col items-center">
                                         <div className="flex flex-col items-center mt-[15vh] mb-32">
+                                            <div className="z-10 transform scale-[1.5] md:scale-[1.5] lg:scale-[2.75]">
+                                                <Logo inverted />
+                                            </div>
                                             <TypingText
                                                 className="text-black dark:text-dark-text font-extrabold text-6xl md:text-4xl lg:text-5xl tracking-tight mb-24"
-                                                text="Turn data into interactive apps."
+                                                text="Turn data into interactive apps in seconds."
                                                 speed={35}
                                                 show={true}
                                             />
                                             {!hasFirstMessage && (
                                                 <div className="mt-40 w-full max-w-[700px] relative z-30 pointer-events-auto overflow-hidden px-8">
-                                                        <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
+                                                    <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                 )}
                                 <div className={cn(
-                                    "flex-1 min-h-0 w-full",
+                                    "flex-1 min-h-0 w-full overflow-hidden",
                                     !isInChatPage && !hasFirstMessage ? "h-full" : "",
                                     !rightPanel.isVisible && "max-w-[800px] mx-auto"
                                 )}>
