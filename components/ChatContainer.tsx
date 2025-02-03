@@ -718,7 +718,7 @@ export default function ChatContainer({
                                             </div>
                                             <TypingText
                                                 className="text-black dark:text-dark-text font-extrabold text-2xl sm:text-2xl md:text-4xl lg:text-5xl tracking-tight mb-8 sm:mb-12 md:mb-24 px-4 text-center relative z-20"
-                                                text="Turn data into interactive apps in seconds."
+                                                text="Turn data into interactive apps, in seconds."
                                                 speed={35}
                                                 show={true}
                                             />
