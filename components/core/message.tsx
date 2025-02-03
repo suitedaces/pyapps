@@ -156,25 +156,32 @@ export function Message({
                 className={cn(
                     'flex w-full',
                     isUser ? 'justify-end' : 'justify-start',
-                    isUser ? 'mb-6 mt-6' : 'mb-2'
+                    isUser ? 'mb-6 mt-6' : 'mb-2',
+                    'px-0 sm:px-2'
                 )}
             >
                 {!isUser ? (
                     <div className="flex flex-row items-start w-full overflow-hidden">
                         <div className={cn(
                             "w-8 h-8 mt-5 flex-shrink-0 flex items-center justify-center",
-                            !showAvatar && "opacity-0"
+                            !showAvatar && "opacity-0",
+                            "hidden sm:flex"
                         )}>
                             <Logo collapsed inverted className="scale-75" />
                         </div>
                         <div className={cn(
-                            "mx-2 break-words w-full dark:text-dark-text overflow-hidden",
-                            showAvatar ? "p-4" : "p-1",
-                            showAvatar ? "mt-0" : "-mt-2"
+                            "break-words w-full dark:text-dark-text overflow-hidden",
+                            showAvatar ? "p-2 sm:p-4" : "p-1",
+                            showAvatar ? "mt-0" : "-mt-2",
+                            "max-w-full sm:max-w-[calc(100%-2rem)]"
                         )}>
                             <div 
                                 ref={contentRef}
-                                className={cn("max-w-[calc(100%-2rem)] overflow-x-auto text-neutral-900 dark:text-neutral-100", assistantMarkdownStyles)}
+                                className={cn(
+                                    "overflow-x-auto text-neutral-900 dark:text-neutral-100",
+                                    assistantMarkdownStyles,
+                                    "text-sm sm:text-base"
+                                )}
                             />
 
                             {/* Render suggestions if they exist */}
@@ -241,18 +248,21 @@ export function Message({
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-row items-start gap-2 max-w-[85%]">
-                        <div className="grow-0 mx-2 py-3 px-4 rounded-lg bg-background border border-border text-foreground overflow-auto">
+                    <div className="flex flex-row items-start gap-2 max-w-[95%] sm:max-w-[85%]">
+                        <div className="grow-0 mx-1 sm:mx-2 py-2 sm:py-3 px-3 sm:px-4 rounded-lg bg-background border border-border text-foreground overflow-auto">
                             <div 
                                 ref={contentRef}
-                                className={userMarkdownStyles}
+                                className={cn(
+                                    userMarkdownStyles,
+                                    "text-sm sm:text-base"
+                                )}
                             />
                             {/* Add file upload rendering */}
                             {data?.type === 'file_upload' && (
                                 <FileUpload file={data.file} />
                             )}
                         </div>
-                        <Avatar className="w-8 h-8 bg-blue-500 border-2 border-border flex-shrink-0 mt-1">
+                        <Avatar className="w-8 h-8 bg-blue-500 border-2 border-border flex-shrink-0 mt-1 hidden sm:flex">
                             {user?.user_metadata?.avatar_url ? (
                                 <AvatarImage
                                     src={user.user_metadata.avatar_url}

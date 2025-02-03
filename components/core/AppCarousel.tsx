@@ -51,12 +51,12 @@ const AppCard = ({ app }: { app: DemoApp }) => {
         <div className="relative isolate">
             <motion.div
                 className={cn(
-                    'w-[180px] overflow-hidden rounded-xl',
+                    'w-[140px] sm:w-[180px] overflow-hidden rounded-xl',
                     'bg-white dark:bg-card',
                     'shadow-[0_0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]',
                     'hover:shadow-[0_0_0_1px_rgba(0,0,0,0.1),0_4px_8px_-2px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_4px_8px_-2px_rgba(0,0,0,0.1)]',
                     'cursor-pointer transition-all duration-300',
-                    isHovered && 'w-[240px]'
+                    isHovered && 'sm:w-[240px]'
                 )}
                 style={{
                     position: 'relative',
@@ -85,9 +85,9 @@ const AppCard = ({ app }: { app: DemoApp }) => {
                         <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800/50 dark:to-gray-900/50" />
                     )}
                 </div>
-                <CardHeader className="py-3 px-4 bg-white dark:bg-card">
+                <CardHeader className="py-2 sm:py-3 px-3 sm:px-4 bg-white dark:bg-card">
                     <div className="space-y-2">
-                        <h3 className="font-medium text-sm leading-none tracking-tight text-gray-800 dark:text-gray-200">
+                        <h3 className="font-medium text-xs sm:text-sm leading-none tracking-tight text-gray-800 dark:text-gray-200">
                             {app.name}
                         </h3>
                         <div 
@@ -96,7 +96,7 @@ const AppCard = ({ app }: { app: DemoApp }) => {
                                 isHovered ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
                             )}
                         >
-                            <p className="text-xs text-muted-foreground whitespace-pre-wrap pb-1">
+                            <p className="text-[10px] sm:text-xs text-muted-foreground whitespace-pre-wrap pb-1">
                                 {app.description || 'No description available'}
                             </p>
                         </div>
@@ -183,16 +183,16 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
         >
             <div className="flex items-center">
                 <div className={cn(
-                    "absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-[15]",
+                    "absolute left-0 top-0 bottom-0 w-8 sm:w-12 lg:w-24 bg-gradient-to-r from-background to-transparent z-[15]",
                     "transition-opacity duration-300",
                     isHovered ? "opacity-0" : "opacity-100"
                 )} />
                 
                 <motion.div
-                    className="flex gap-8"
+                    className="flex gap-3 sm:gap-4 lg:gap-8"
                     animate={controls}
                     initial={{ x: 0 }}
-                    style={{ paddingInline: "3rem" }}
+                    style={{ paddingInline: "1rem" }}
                 >
                     {duplicatedApps.map((app, i) => (
                         <div
@@ -206,7 +206,7 @@ export default function AppCarousel({ onAppSelect }: AppCarouselProps) {
                 </motion.div>
 
                 <div className={cn(
-                    "absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-[15]",
+                    "absolute right-0 top-0 bottom-0 w-8 sm:w-12 lg:w-24 bg-gradient-to-l from-background to-transparent z-[15]",
                     "transition-opacity duration-300",
                     isHovered ? "opacity-0" : "opacity-100"
                 )} />

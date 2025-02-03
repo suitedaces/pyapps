@@ -26,7 +26,7 @@ import LoadingAnimation from './LoadingAnimation'
 import AppSidebar from './Sidebar'
 import { createClient } from '@/lib/supabase/client'
 import AppCarousel, { DemoApp } from '@/components/core/AppCarousel'
-import { motion } from 'framer-motion'
+
 import { Logo } from '@/components/core/Logo'
 
 interface ChatContainerProps {
@@ -695,8 +695,9 @@ export default function ChatContainer({
                 )}
                 <main
                     className={cn(
-                        'flex-grow flex px-2 pr-9 flex-col lg:flex-row overflow-hidden justify-center relative',
-                        'h-screen pt-14'
+                        'flex-grow flex flex-col lg:flex-row overflow-hidden justify-center relative',
+                        'h-screen pt-14',
+                        'px-2 lg:pr-9 sm:px-4'
                     )}
                 >
                     <ResizablePanelGroup
@@ -706,22 +707,26 @@ export default function ChatContainer({
                         <ResizablePanel defaultSize={40} minSize={30}>
                             <div className={cn(
                                 'w-full h-full flex flex-col overflow-hidden',
-                                hasFirstMessage || isInChatPage ? 'h-[calc(100vh-4rem)]' : 'h-screen'
+                                hasFirstMessage || isInChatPage ? 'h-[calc(100vh-4rem)]' : 'h-screen',
+                                'px-0 sm:px-2'
                             )}>
                                 {!isInChatPage && chatState.status === 'initial' && (
                                     <div className="absolute inset-0 flex flex-col items-center">
-                                        <div className="flex flex-col items-center mt-[15vh] mb-32">
-                                            <div className="z-10 transform scale-[1.5] md:scale-[1.5] lg:scale-[2.75]">
+                                        <div className="flex flex-col items-center mt-[10vh] sm:mt-[15vh] mb-8 sm:mb-32">
+                                            <div className="z-10 transform scale-[1.25] sm:scale-[1.5] md:scale-[1.75] lg:scale-[2.75]">
                                                 <Logo inverted />
                                             </div>
                                             <TypingText
-                                                className="text-black dark:text-dark-text font-extrabold text-6xl md:text-4xl lg:text-5xl tracking-tight mb-24"
+                                                className="text-black dark:text-dark-text font-extrabold text-2xl sm:text-2xl md:text-4xl lg:text-5xl tracking-tight mb-8 sm:mb-12 md:mb-24 px-4 text-center relative z-20"
                                                 text="Turn data into interactive apps in seconds."
                                                 speed={35}
                                                 show={true}
                                             />
                                             {!hasFirstMessage && (
-                                                <div className="mt-40 w-full max-w-[700px] relative z-30 pointer-events-auto overflow-hidden px-8">
+                                                <div className={cn(
+                                                    "w-full max-w-[700px] relative z-30 pointer-events-auto overflow-hidden px-4 sm:px-8",
+                                                    "mt-6 sm:mt-12 md:mt-20 lg:mt-40"
+                                                )}>
                                                     <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
                                                 </div>
                                             )}
@@ -769,7 +774,11 @@ export default function ChatContainer({
                                 <ResizablePanel
                                     defaultSize={60}
                                     minSize={40}
-                                    className="w-full lg:w-1/2 p-4 flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app h-[calc(100vh-4rem)] border border-gray-200 dark:border-dark-border"
+                                    className={cn(
+                                        "flex flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-app border border-gray-200 dark:border-dark-border",
+                                        "w-full h-[calc(100vh-4rem)]",
+                                        "p-2 sm:p-4"
+                                    )}
                                 >
                                     <PreviewPanel
                                         ref={streamlitPreviewRef}
@@ -788,7 +797,7 @@ export default function ChatContainer({
                             </>
                         )}
                     </ResizablePanelGroup>
-                    <div className="absolute top-2 right-4 z-30 flex justify-between items-center gap-4">
+                    <div className="absolute top-2 right-2 sm:right-4 z-30 flex justify-between items-center gap-2 sm:gap-4">
                         {currentAppId && (
                             <VersionSelector
                                 key={`version-${versionKey}`}
