@@ -12,12 +12,12 @@ import {
     CreditCard,
     File,
     LogOut,
-    Menu,
     MessageSquare,
     MoveRight,
     Plus,
     Sparkles,
     Trash2,
+    X,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
@@ -41,7 +41,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet'
 import {
     Sidebar,
     SidebarContent,
@@ -60,6 +60,7 @@ import {
     SidebarRail,
     SidebarSeparator,
     SidebarTrigger,
+    MobileSidebar,
 } from '@/components/ui/sidebar'
 
 import {
@@ -76,6 +77,7 @@ import {
 import { ThemeSwitcherButton } from '@/components/ui/theme-button-switcher'
 import { useAuth } from '@/contexts/AuthContext'
 import { Logo } from './core/Logo'
+import { useIsMobile } from '@/components/hooks/use-mobile'
 
 interface Chat {
     id: string
@@ -234,6 +236,7 @@ const ChatsList = ({
                                         className="invisible absolute right-2 top-1/2 -translate-y-1/2 group-hover/item:visible h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive transition-colors"
                                     >
                                         <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Delete Project</span>
                                     </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent className="max-w-[400px]">
@@ -242,10 +245,7 @@ const ChatsList = ({
                                             Delete Project
                                         </AlertDialogTitle>
                                         <AlertDialogDescription className="text-muted-foreground/80 pt-2">
-                                            Are you sure you want to delete this
-                                            project? This action cannot be
-                                            undone and will permanently delete
-                                            all associated data.
+                                            Are you sure you want to delete this project? This action cannot be undone and will permanently delete all associated data.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter className="mt-4 gap-2">
@@ -255,33 +255,21 @@ const ChatsList = ({
                                         <AlertDialogAction
                                             onClick={async () => {
                                                 try {
-                                                    const response =
-                                                        await fetch(
-                                                            `/api/chats/${chat.id}`,
-                                                            {
-                                                                method: 'DELETE',
-                                                            }
-                                                        )
+                                                    const response = await fetch(`/api/chats/${chat.id}`, {
+                                                        method: 'DELETE',
+                                                    })
 
                                                     if (!response.ok) {
-                                                        throw new Error(
-                                                            'Failed to delete chat'
-                                                        )
+                                                        throw new Error('Failed to delete chat')
                                                     }
 
                                                     onChatDeleted()
 
-                                                    if (
-                                                        currentChatId ===
-                                                        chat.id
-                                                    ) {
+                                                    if (currentChatId === chat.id) {
                                                         router.push('/')
                                                     }
                                                 } catch (error) {
-                                                    console.error(
-                                                        'Failed to delete chat:',
-                                                        error
-                                                    )
+                                                    console.error('Failed to delete chat:', error)
                                                 }
                                             }}
                                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 transition-colors"
@@ -479,6 +467,8 @@ export default function AppSidebar({
     const [session, setSession] = useState<Session | null>(null)
     const supabase = createClient()
     const { isPreviewMode, showAuthPrompt } = useAuth()
+    const isMobile = useIsMobile()
+    const [openMobile, setOpenMobile] = useState(false)
 
     useEffect(() => {
         const getSession = async () => {
@@ -505,301 +495,6 @@ export default function AppSidebar({
         await supabase.auth.signOut()
         router.push('/login')
     }
-
-    // Mobile sidebar
-    const MobileSidebar = () => (
-        <Sheet>
-            <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                    <Menu className="h-5 w-5" />
-                </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0">
-                <SidebarProvider>
-                    <Sidebar>
-                        <SidebarContent>
-                            <ScrollArea className="h-[calc(100vh-8rem)]">
-                                <SidebarGroup>
-                                    <SidebarMenu>
-                                        <SidebarMenuItem className="flex justify-center">
-                                            <SidebarMenuButton
-                                                onClick={() => router.push('/')}
-                                                className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
-                                            >
-                                                {!open && (
-                                                    <Plus className="h-4 w-4" />
-                                                )}
-                                                {open && (
-                                                    <span>New Project</span>
-                                                )}
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    </SidebarMenu>
-                                </SidebarGroup>
-
-                                <SidebarGroup>
-                                    <SidebarGroupLabel>Hub</SidebarGroupLabel>
-                                    <Collapsible
-                                        open={isChatsOpen}
-                                        onOpenChange={setIsChatsOpen}
-                                    >
-                                        <SidebarMenu>
-                                            <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton
-                                                    className="w-full flex items-center jusitfy-between"
-                                                    tooltip="Your previous chats"
-                                                    onClick={() => router.push('/projects')}
-                                                >
-                                                    <MessageSquare className="h-4 w-4" />
-                                                    {open && (
-                                                        <span className="ml-2">
-                                                            Projects
-                                                        </span>
-                                                    )}
-                                                </SidebarMenuButton>
-                                                <CollapsibleTrigger asChild>
-                                                    <SidebarMenuAction>
-                                                        <ChevronRight
-                                                            className={cn(
-                                                                'h-4 w-4 transition-transform',
-                                                                isChatsOpen &&
-                                                                    'rotate-90'
-                                                            )}
-                                                    />
-                                                    </SidebarMenuAction>
-                                                </CollapsibleTrigger>
-                                            </SidebarMenuItem>
-                                        </SidebarMenu>
-                                        <CollapsibleContent>
-                                                <ChatsList
-                                                    chats={chats}
-                                                    onChatSelect={onChatSelect}
-                                                    currentChatId={currentChatId}
-                                                    isCreatingChat={isCreatingChat}
-                                                    chatTitles={chatTitles}
-                                                    onGenerateTitle={
-                                                        onGenerateTitle
-                                                    }
-                                                    onChatDeleted={onChatDeleted}
-                                                />
-                                        </CollapsibleContent>
-                                    </Collapsible>
-
-                                    <SidebarSeparator className="my-2" />
-
-                                    <Collapsible
-                                        open={isFilesOpen}
-                                        onOpenChange={setIsFilesOpen}
-                                    >
-                                        <SidebarMenu>
-                                            <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton
-                                                    className="w-full flex items-center jusitfy-between"
-                                                    tooltip="Manage your files"
-                                                    onClick={() => router.push('/files')}
-                                                >
-                                                    <File className="h-4 w-4" />
-                                                    {open && (
-                                                        <span className="ml-2">
-                                                            Files
-                                                        </span>
-                                                    )}
-                                                </SidebarMenuButton>
-                                                <CollapsibleTrigger asChild>
-                                                    <SidebarMenuAction>
-                                                        <ChevronRight 
-                                                            className={cn(
-                                                                'h-4 w-4 transition-transform',
-                                                                isFilesOpen &&
-                                                                    'rotate-90'
-                                                            )}
-                                                    />
-                                                    </SidebarMenuAction>
-                                                </CollapsibleTrigger>
-                                            </SidebarMenuItem>
-                                        </SidebarMenu>
-                                        <CollapsibleContent>
-                                            <FilesList />
-                                        </CollapsibleContent>
-                                    </Collapsible>
-
-                                    <Collapsible
-                                        open={isAppsOpen}
-                                        onOpenChange={setIsAppsOpen}
-                                    >
-                                        <SidebarMenu>
-                                            <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton
-                                                    className="w-full flex items-center jusitfy-between"
-                                                    tooltip="Your applications"
-                                                    onClick={() => router.push('/apps')}
-                                                >
-                                                    <AppWindow className="h-4 w-4" />
-                                                    {open && (
-                                                        <span className="ml-2">
-                                                            Apps
-                                                        </span>
-                                                    )}
-                                                </SidebarMenuButton>
-                                                <CollapsibleTrigger asChild>
-                                                    <SidebarMenuAction>
-                                                        <ChevronRight 
-                                                            className={cn(
-                                                                'h-4 w-4 transition-transform',
-                                                                isAppsOpen &&
-                                                                    'rotate-90'
-                                                            )}
-                                                    />
-                                                    </SidebarMenuAction>
-                                                </CollapsibleTrigger>
-                                            </SidebarMenuItem>
-                                        </SidebarMenu>
-                                        <CollapsibleContent>
-                                            <AppsList />
-                                        </CollapsibleContent>
-                                    </Collapsible>
-                                </SidebarGroup>
-                            </ScrollArea>
-                        </SidebarContent>
-                        <SidebarFooter>
-                            <SidebarMenu>
-                                <SidebarMenuItem className="flex justify-center">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <SidebarMenuButton
-                                                size="lg"
-                                                className="w-full flex items-center justify-center data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                                            >
-                                                <Avatar className="h-8 w-8 rounded-lg">
-                                                    <AvatarImage
-                                                        src={
-                                                            session?.user
-                                                                ?.user_metadata
-                                                                ?.avatar_url
-                                                        }
-                                                        alt={
-                                                            session?.user
-                                                                ?.user_metadata
-                                                                ?.full_name ||
-                                                            'User'
-                                                        }
-                                                    />
-                                                    <AvatarFallback className="rounded-lg">
-                                                        {session?.user
-                                                            ?.user_metadata
-                                                            ?.full_name?.[0] ||
-                                                            'U'}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                {open && (
-                                                    <>
-                                                        <div className="grid flex-1 text-left text-sm leading-tight ml-2">
-                                                            <span className="truncate font-semibold">
-                                                                {session?.user
-                                                                    ?.user_metadata
-                                                                    ?.full_name ||
-                                                                    'Guest User'}
-                                                            </span>
-                                                            <span className="truncate text-xs">
-                                                                {session?.user
-                                                                    ?.email ||
-                                                                    'Not signed in'}
-                                                            </span>
-                                                        </div>
-                                                        <ChevronsUpDown className="ml-auto size-4" />
-                                                    </>
-                                                )}
-                                            </SidebarMenuButton>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                            className="w-56 rounded-lg"
-                                            align="end"
-                                            sideOffset={4}
-                                        >
-                                            <DropdownMenuLabel className="font-normal">
-                                                <div className="flex items-center gap-2">
-                                                    <Avatar className="h-8 w-8 rounded-lg">
-                                                        <AvatarImage
-                                                            src={
-                                                                session?.user
-                                                                    ?.user_metadata
-                                                                    ?.avatar_url
-                                                            }
-                                                            alt={
-                                                                session?.user
-                                                                    ?.user_metadata
-                                                                    ?.full_name ||
-                                                                'User'
-                                                            }
-                                                        />
-                                                        <AvatarFallback className="rounded-lg">
-                                                            {session?.user
-                                                                ?.user_metadata
-                                                                ?.full_name?.[0] ||
-                                                                'U'}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="grid flex-1 text-left text-sm leading-tight">
-                                                        <span className="font-semibold">
-                                                            {session?.user
-                                                                ?.user_metadata
-                                                                ?.full_name ||
-                                                                'Guest User'}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {session?.user
-                                                                ?.email ||
-                                                                'Not signed in'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuGroup>
-                                                <DropdownMenuItem>
-                                                    <Sparkles className="mr-2 h-4 w-4" />
-                                                    <span>Upgrade to Pro</span>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuGroup>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuGroup>
-                                                <DropdownMenuItem>
-                                                    <BadgeCheck className="mr-2 h-4 w-4" />
-                                                    <span>Account</span>
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem>
-                                                    <CreditCard className="mr-2 h-4 w-4" />
-                                                    <span>Billing</span>
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    className="cursor-default hover:!bg-transparent"
-                                                    onSelect={(e) =>
-                                                        e.preventDefault()
-                                                    }
-                                                >
-                                                    <div className="w-full">
-                                                        <ThemeSwitcherButton />
-                                                    </div>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuGroup>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={handleSignOut}
-                                            >
-                                                <LogOut className="mr-2 h-4 w-4" />
-                                                <span>Log out</span>
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </SidebarMenuItem>
-                            </SidebarMenu>
-                        </SidebarFooter>
-                        <SidebarRail />
-                    </Sidebar>
-                </SidebarProvider>
-            </SheetContent>
-        </Sheet>
-    )
 
     const userProfile = isPreviewMode ? (
         <SidebarMenuItem className="flex justify-center">
@@ -951,9 +646,162 @@ export default function AppSidebar({
         </SidebarMenuItem>
     )
 
+    if (isMobile) {
+        return (
+            <MobileSidebar>
+                <Sidebar variant="sidebar" collapsible="none">
+                    <SidebarHeader className="border-b border-border">
+                        <SidebarMenu>
+                            <SidebarMenuItem className="w-full flex justify-between items-center px-4 py-3">
+                                <Link
+                                    href="/"
+                                    className="flex items-center gap-2"
+                                >
+                                    <Logo inverted collapsed={false} />
+                                </Link>
+                                <SheetClose asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        aria-label="Close Menu"
+                                    >
+                                        <X className="h-4 w-4" />
+                                        <span className="sr-only">Close Menu</span>
+                                    </Button>
+                                </SheetClose>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarHeader>
+                    <SidebarContent className="px-3 py-4">
+                        <ScrollArea className="h-[calc(100vh-8rem)]">
+                            <SidebarGroup>
+                                <SidebarMenu>
+                                    <SidebarMenuItem className="flex justify-center">
+                                        <SidebarMenuButton
+                                            onClick={() => router.push('/')}
+                                            className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                            <span>New Project</span>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
+                            </SidebarGroup>
+
+                            <SidebarGroup>
+                                <SidebarGroupLabel>Hub</SidebarGroupLabel>
+                                <Collapsible
+                                    open={isChatsOpen}
+                                    onOpenChange={setIsChatsOpen}
+                                >
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Your previous chats"
+                                                onClick={() => router.push('/projects')}
+                                            >
+                                                <MessageSquare className="h-4 w-4" />
+                                                <span className="ml-2">Projects</span>
+                                            </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isChatsOpen && 'rotate-90'
+                                                        )}
+                                                    />
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                    <CollapsibleContent>
+                                        <ChatsList
+                                            chats={chats}
+                                            onChatSelect={onChatSelect}
+                                            currentChatId={currentChatId}
+                                            isCreatingChat={isCreatingChat}
+                                            chatTitles={chatTitles}
+                                            onGenerateTitle={onGenerateTitle}
+                                            onChatDeleted={onChatDeleted}
+                                        />
+                                    </CollapsibleContent>
+                                </Collapsible>
+
+                                <SidebarSeparator className="my-2" />
+
+                                <Collapsible
+                                    open={isFilesOpen}
+                                    onOpenChange={setIsFilesOpen}
+                                >
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Manage your files"
+                                                onClick={() => router.push('/files')}
+                                            >
+                                                <File className="h-4 w-4" />
+                                                <span className="ml-2">Files</span>
+                                            </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight 
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isFilesOpen && 'rotate-90'
+                                                        )}
+                                                    />
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                    <CollapsibleContent>
+                                        <FilesList />
+                                    </CollapsibleContent>
+                                </Collapsible>
+
+                                <Collapsible
+                                    open={isAppsOpen}
+                                    onOpenChange={setIsAppsOpen}
+                                >
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Your applications"
+                                                onClick={() => router.push('/apps')}
+                                            >
+                                                <AppWindow className="h-4 w-4" />
+                                                <span className="ml-2">Apps</span>
+                                            </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight 
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isAppsOpen && 'rotate-90'
+                                                        )}
+                                                    />
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                    <CollapsibleContent>
+                                        <AppsList />
+                                    </CollapsibleContent>
+                                </Collapsible>
+                            </SidebarGroup>
+                        </ScrollArea>
+                    </SidebarContent>
+                </Sidebar>
+            </MobileSidebar>
+        )
+    }
+
     return (
         <div className="flex z-50">
-            <MobileSidebar />
             <SidebarProvider open={open} onOpenChange={setOpen}>
                 <Sidebar
                     variant="sidebar"
@@ -978,141 +826,125 @@ export default function AppSidebar({
                     <SidebarContent>
                         <ScrollArea className="h-[calc(100vh-8rem)]">
                             <SidebarGroup>
+                                <SidebarGroupLabel>Hub</SidebarGroupLabel>
+                                <Collapsible
+                                    open={isChatsOpen}
+                                    onOpenChange={setIsChatsOpen}
+                                >
                                     <SidebarMenu>
                                         <SidebarMenuItem className="flex justify-center">
                                             <SidebarMenuButton
-                                                onClick={() => router.push('/')}
-                                                className="w-full flex items-center justify-center bg-background border border-border hover:bg-accent"
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Your previous chats"
+                                                onClick={() => router.push('/projects')}
                                             >
-                                            {!open && (
-                                                <Plus className="h-4 w-4" />
-                                            )}
-                                                {open && <span>New Project</span>}
+                                                <MessageSquare className="h-4 w-4" />
+                                                {open && (
+                                                    <span className="ml-2">
+                                                        Projects
+                                                    </span>
+                                                )}
                                             </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isChatsOpen &&
+                                                                'rotate-90'
+                                                        )}
+                                                    />
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
                                         </SidebarMenuItem>
                                     </SidebarMenu>
-                                </SidebarGroup>
+                                    <CollapsibleContent>
+                                        <ChatsList
+                                            chats={chats}
+                                            onChatSelect={onChatSelect}
+                                            currentChatId={currentChatId}
+                                            isCreatingChat={isCreatingChat}
+                                            chatTitles={chatTitles}
+                                            onGenerateTitle={onGenerateTitle}
+                                            onChatDeleted={onChatDeleted}
+                                        />
+                                    </CollapsibleContent>
+                                </Collapsible>
 
-                            <SidebarGroup>
-                                    <SidebarGroupLabel>Hub</SidebarGroupLabel>
-                                    <Collapsible
-                                        open={isChatsOpen}
-                                        onOpenChange={setIsChatsOpen}
-                                    >
-                                        <SidebarMenu>
-                                            <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton
-                                                    className="w-full flex items-center jusitfy-between"
-                                                    tooltip="Your previous chats"
-                                                    onClick={() => router.push('/projects')}
-                                                >
-                                                    <MessageSquare className="h-4 w-4" />
-                                                    {open && (
-                                                        <span className="ml-2">
-                                                            Projects
-                                                        </span>
-                                                    )}
-                                                </SidebarMenuButton>
-                                                <CollapsibleTrigger asChild>
-                                                    <SidebarMenuAction>
-                                                        <ChevronRight
-                                                            className={cn(
-                                                                'h-4 w-4 transition-transform',
-                                                                isChatsOpen &&
-                                                                    'rotate-90'
-                                                            )}
+                                <SidebarSeparator className="my-2" />
+
+                                <Collapsible
+                                    open={isFilesOpen}
+                                    onOpenChange={setIsFilesOpen}
+                                >
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Manage your files"
+                                                onClick={() => router.push('/files')}
+                                            >
+                                                <File className="h-4 w-4" />
+                                                {open && (
+                                                    <span className="ml-2">
+                                                        Files
+                                                    </span>
+                                                )}
+                                            </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight 
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isFilesOpen &&
+                                                                'rotate-90'
+                                                        )}
                                                     />
-                                                    </SidebarMenuAction>
-                                                </CollapsibleTrigger>
-                                            </SidebarMenuItem>
-                                        </SidebarMenu>
-                                        <CollapsibleContent>
-                                            <ChatsList
-                                                chats={chats}
-                                                onChatSelect={onChatSelect}
-                                                currentChatId={currentChatId}
-                                                isCreatingChat={isCreatingChat}
-                                                chatTitles={chatTitles}
-                                                onGenerateTitle={onGenerateTitle}
-                                                onChatDeleted={onChatDeleted}
-                                            />
-                                        </CollapsibleContent>
-                                    </Collapsible>
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                    <CollapsibleContent>
+                                        <FilesList />
+                                    </CollapsibleContent>
+                                </Collapsible>
 
-                                    <SidebarSeparator className="my-2" />
-
-                                    <Collapsible
-                                        open={isFilesOpen}
-                                        onOpenChange={setIsFilesOpen}
-                                    >
-                                        <SidebarMenu>
-                                            <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton
-                                                    className="w-full flex items-center jusitfy-between"
-                                                    tooltip="Manage your files"
-                                                    onClick={() => router.push('/files')}
-                                                >
-                                                    <File className="h-4 w-4" />
-                                                    {open && (
-                                                        <span className="ml-2">
-                                                            Files
-                                                        </span>
-                                                    )}
-                                                </SidebarMenuButton>
-                                                <CollapsibleTrigger asChild>
-                                                    <SidebarMenuAction>
-                                                        <ChevronRight 
-                                                            className={cn(
-                                                                'h-4 w-4 transition-transform',
-                                                                isFilesOpen &&
-                                                                    'rotate-90'
-                                                            )}
+                                <Collapsible
+                                    open={isAppsOpen}
+                                    onOpenChange={setIsAppsOpen}
+                                >
+                                    <SidebarMenu>
+                                        <SidebarMenuItem className="flex justify-center">
+                                            <SidebarMenuButton
+                                                className="w-full flex items-center jusitfy-between"
+                                                tooltip="Your applications"
+                                                onClick={() => router.push('/apps')}
+                                            >
+                                                <AppWindow className="h-4 w-4" />
+                                                {open && (
+                                                    <span className="ml-2">
+                                                        Apps
+                                                    </span>
+                                                )}
+                                            </SidebarMenuButton>
+                                            <CollapsibleTrigger asChild>
+                                                <SidebarMenuAction>
+                                                    <ChevronRight 
+                                                        className={cn(
+                                                            'h-4 w-4 transition-transform',
+                                                            isAppsOpen &&
+                                                                'rotate-90'
+                                                        )}
                                                     />
-                                                    </SidebarMenuAction>
-                                                </CollapsibleTrigger>
-                                            </SidebarMenuItem>
-                                        </SidebarMenu>
-                                        <CollapsibleContent>
-                                            <FilesList />
-                                        </CollapsibleContent>
-                                    </Collapsible>
-
-                                    <Collapsible
-                                        open={isAppsOpen}
-                                        onOpenChange={setIsAppsOpen}
-                                    >
-                                        <SidebarMenu>
-                                            <SidebarMenuItem className="flex justify-center">
-                                                <SidebarMenuButton
-                                                    className="w-full flex items-center jusitfy-between"
-                                                    tooltip="Your applications"
-                                                    onClick={() => router.push('/apps')}
-                                                >
-                                                    <AppWindow className="h-4 w-4" />
-                                                    {open && (
-                                                        <span className="ml-2">
-                                                            Apps
-                                                        </span>
-                                                    )}
-                                                </SidebarMenuButton>
-                                                <CollapsibleTrigger asChild>
-                                                    <SidebarMenuAction>
-                                                        <ChevronRight 
-                                                            className={cn(
-                                                                'h-4 w-4 transition-transform',
-                                                                isAppsOpen &&
-                                                                    'rotate-90'
-                                                            )}
-                                                    />
-                                                    </SidebarMenuAction>
-                                                </CollapsibleTrigger>
-                                            </SidebarMenuItem>
-                                        </SidebarMenu>
-                                        <CollapsibleContent>
-                                            <AppsList />
-                                        </CollapsibleContent>
-                                    </Collapsible>
-                                </SidebarGroup>
+                                                </SidebarMenuAction>
+                                            </CollapsibleTrigger>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                    <CollapsibleContent>
+                                        <AppsList />
+                                    </CollapsibleContent>
+                                </Collapsible>
+                            </SidebarGroup>
                         </ScrollArea>
                     </SidebarContent>
                     <SidebarGroup className="mt-auto">
@@ -1130,12 +962,12 @@ export default function AppSidebar({
                     </SidebarGroup>
                     <SidebarFooter>
                         <SidebarMenu>
-                            <SidebarMenu>{userProfile}</SidebarMenu>
+                            {userProfile}
                         </SidebarMenu>
                     </SidebarFooter>
                     <SidebarRail />
                 </Sidebar>
             </SidebarProvider>
         </div>
-    )
+    );
 }

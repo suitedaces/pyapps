@@ -260,39 +260,41 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
 
     return (
         <div className="h-[calc(100vh-3.5rem)] w-full relative">
-            <div className="max-w-7xl mx-auto px-4 relative z-50">
-                <div className="flex items-center gap-4 py-4">
-                    <div className="relative flex-1">
+            <div className="max-w-7xl mx-auto px-2 sm:px-4 relative z-50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 py-4">
+                    <div className="relative flex-1 w-full">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/50 h-4 w-4 pointer-events-none" />
                         <input
                             type="text"
                             placeholder="Search projects..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full h-10 pl-10 bg-transparent text-foreground placeholder:text-foreground/50 outline-none"
+                            className="w-full h-10 pl-10 bg-transparent text-foreground placeholder:text-foreground/50 outline-none rounded-md border border-border"
                         />
                     </div>
-                    <p className="text-sm text-foreground/50">
-                        {totalCount} project{totalCount !== 1 ? 's' : ''}
-                    </p>
-                    <button
-                        onClick={() => router.push('/chat')} 
-                        className="flex items-center gap-2 text-foreground hover:text-foreground/70 transition-colors"
-                    >
-                        <Plus size={16} />
-                        New Project
-                    </button>
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <p className="text-sm text-foreground/50 hidden sm:block">
+                            {totalCount} project{totalCount !== 1 ? 's' : ''}
+                        </p>
+                        <button
+                            onClick={() => router.push('/chat')} 
+                            className="flex items-center gap-2 text-foreground hover:text-foreground/70 transition-colors px-4 py-2 rounded-md border border-border w-full sm:w-auto justify-center"
+                        >
+                            <Plus size={16} />
+                            New Project
+                        </button>
+                    </div>
                 </div>
 
-                <div className="overflow-y-auto h-[calc(100vh-7.5rem)] rounded-md border border-border bg-background">
+                <div className="overflow-x-auto overflow-y-auto h-[calc(100vh-8.5rem)] rounded-md border border-border bg-background">
                     <Table>
                         <TableHeader>
                             <TableRow className="border-border hover:bg-muted/50">
-                                <TableHead className="w-[300px]">Name</TableHead>
-                                <TableHead className="w-[250px]">App</TableHead>
-                                <TableHead className="w-[150px]">Files</TableHead>
-                                <TableHead className="w-[150px]">Last Updated</TableHead>
-                                <TableHead className="w-[100px]">Actions</TableHead>
+                                <TableHead className="min-w-[200px] sm:w-[300px]">Name</TableHead>
+                                <TableHead className="min-w-[180px] sm:w-[250px]">App</TableHead>
+                                <TableHead className="min-w-[100px] sm:w-[150px]">Files</TableHead>
+                                <TableHead className="min-w-[120px] sm:w-[150px]">Last Updated</TableHead>
+                                <TableHead className="min-w-[100px] sm:w-[100px]">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -302,13 +304,13 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
                                     className="group cursor-pointer border-border hover:bg-muted/50"
                                     onClick={() => router.push(`/projects/${project.id}`)}
                                 >
-                                    <TableCell className="font-medium">
+                                    <TableCell className="font-medium truncate">
                                         {project.name || 'Untitled Project'}
                                     </TableCell>
                                     <TableCell>
                                         {project.app_name ? (
                                             <div className="space-y-1.5">
-                                                <div className="font-medium text-sm">{project.app_name}</div>
+                                                <div className="font-medium text-sm truncate">{project.app_name}</div>
                                                 <Badge variant="secondary" size="sm">
                                                     {project.versions.length} version{project.versions.length !== 1 ? 's' : ''}
                                                 </Badge>
@@ -326,7 +328,7 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
                                             <span className="text-muted-foreground">No files</span>
                                         )}
                                     </TableCell>
-                                    <TableCell className="text-muted-foreground">
+                                    <TableCell className="text-muted-foreground whitespace-nowrap">
                                         {new Date(project.updated_at).toLocaleDateString()}
                                     </TableCell>
                                     <TableCell>
@@ -355,7 +357,7 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
                                                         <span className="sr-only">Delete Project</span>
                                                     </Button>
                                                 </AlertDialogTrigger>
-                                                <AlertDialogContent className="max-w-[400px]">
+                                                <AlertDialogContent className="max-w-[400px] mx-2">
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle className="text-xl font-semibold text-foreground">
                                                             Delete Project
@@ -364,8 +366,8 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
                                                             Are you sure you want to delete this project? This action cannot be undone and will permanently delete all associated data.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
-                                                    <AlertDialogFooter className="mt-4 gap-2">
-                                                        <AlertDialogCancel className="border bg-background text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                                                    <AlertDialogFooter className="mt-4 gap-2 flex-col sm:flex-row">
+                                                        <AlertDialogCancel className="border bg-background text-foreground hover:bg-accent hover:text-accent-foreground transition-colors w-full sm:w-auto">
                                                             Cancel
                                                         </AlertDialogCancel>
                                                         <AlertDialogAction
@@ -392,7 +394,7 @@ function ProjectsContent({ onChatDeleted }: { onChatDeleted: () => void }) {
                                                                     alert('Failed to delete project. Please try again.')
                                                                 }
                                                             }}
-                                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 transition-colors"
+                                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 transition-colors w-full sm:w-auto"
                                                         >
                                                             Delete Project
                                                         </AlertDialogAction>

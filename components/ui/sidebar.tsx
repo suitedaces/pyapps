@@ -2,14 +2,14 @@
 
 import { Slot } from '@radix-ui/react-slot'
 import { VariantProps, cva } from 'class-variance-authority'
-import { PanelLeft } from 'lucide-react'
+import { Menu, PanelLeft, X } from 'lucide-react'
 import * as React from 'react'
 
 import { useIsMobile } from '@/components/hooks/use-mobile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetTitle, SheetClose, SheetTrigger } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
     Tooltip,
@@ -18,11 +18,13 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Logo } from '@/components/core/Logo'
 
 const SIDEBAR_COOKIE_NAME = 'sidebar:state'
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = '16rem'
-const SIDEBAR_WIDTH_MOBILE = '18rem'
+const SIDEBAR_WIDTH_MOBILE = '85vw'
 const SIDEBAR_WIDTH_ICON = '4rem'
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b'
 
@@ -203,27 +205,17 @@ const Sidebar = React.forwardRef<
 
         if (isMobile) {
             return (
-                <Sheet
-                    open={openMobile}
-                    onOpenChange={setOpenMobile}
-                    {...props}
-                >
-                    <SheetContent
-                        data-sidebar="sidebar"
-                        data-mobile="true"
-                        className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-                        style={
-                            {
-                                '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
-                            } as React.CSSProperties
-                        }
-                        side={side}
-                    >
-                        <div className="flex h-full w-full flex-col">
-                            {children}
-                        </div>
-                    </SheetContent>
-                </Sheet>
+                <div className="flex z-50">
+                    <MobileSidebar>
+                        <SidebarProvider>
+                            <Sidebar variant="sidebar" collapsible="none">
+                                <SidebarContent>
+                                    {children}
+                                </SidebarContent>
+                            </Sidebar>
+                        </SidebarProvider>
+                    </MobileSidebar>
+                </div>
             )
         }
 
@@ -772,6 +764,35 @@ const SidebarMenuSubButton = React.forwardRef<
 })
 SidebarMenuSubButton.displayName = 'SidebarMenuSubButton'
 
+const MobileSidebar = ({ children }: { children: React.ReactNode }) => {
+    const [openMobile, setOpenMobile] = React.useState(false)
+
+    return (
+        <SidebarProvider defaultOpen={true} open={openMobile} onOpenChange={setOpenMobile}>
+            <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+                <SheetTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="fixed left-4 top-3 z-[98] md:hidden"
+                        aria-label="Open Menu"
+                    >
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </Button>
+                </SheetTrigger>
+                <SheetContent
+                    side="left"
+                    className="p-0 w-[85vw] max-w-[400px] bg-sidebar text-sidebar-foreground"
+                >
+                    <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                    {children}
+                </SheetContent>
+            </Sheet>
+        </SidebarProvider>
+    )
+}
+
 export {
     Sidebar,
     SidebarContent,
@@ -797,4 +818,5 @@ export {
     SidebarSeparator,
     SidebarTrigger,
     useSidebar,
+    MobileSidebar,
 }
