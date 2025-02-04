@@ -34,7 +34,6 @@ interface ChatbarProps {
 
 const MIN_HEIGHT = 54
 const MAX_HEIGHT = 111
-const HEIGHT_THRESHOLD = 75
 
 export default function Chatbar({
     value,
@@ -266,7 +265,7 @@ export default function Chatbar({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (isLoading || isUploading) return
+        if (isLoading || isUploading || (!value.trim() && !file)) return
 
         setIsSubmitted(true)
         setIsAnimating(true)
@@ -364,19 +363,19 @@ export default function Chatbar({
 
     return (
         <motion.div
-            className="p-4 w-full bg-background dark:bg-dark-app"
-            style={{
-                bottom: isInChatPage ? 0 : '35vh',
-                position: isInChatPage ? 'absolute' : 'relative'
-            }}
+            className="w-full bg-background dark:bg-dark-app"
+            initial={false}
             animate={{
-                bottom: isInChatPage ? 0 : isSubmitted ? 0 : '35vh',
+                opacity: isSubmitted ? 0.8 : 1
             }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
         >
             <form
                 onSubmit={handleSubmit}
-                className="flex relative flex-col gap-2 w-full pb-1"
+                className={cn(
+                    "flex flex-col gap-2 w-full p-3",
+                    isRightPanelOpen && "p-2"
+                )}
             >
                 <div className="relative flex items-center w-full">
                     {isUploading && uploadProgress < 100 && (
@@ -423,22 +422,12 @@ export default function Chatbar({
                             isUploading && 'opacity-90'
                         )}
                         style={{
-                            minHeight: isInChatPage
-                                ? '54px'
-                                : isAnimating
-                                  ? '54px'
-                                  : `${MIN_HEIGHT}px`,
-                            maxHeight: isInChatPage
-                                ? '54px'
-                                : isAnimating
-                                  ? '54px'
-                                  : `${MAX_HEIGHT}px`,
+                            minHeight: `${MIN_HEIGHT}px`,
+                            maxHeight: `${MAX_HEIGHT}px`,
                             height: `${textareaHeight}px`,
                             transition: 'all 0.3s ease-in-out',
                         }}
                         disabled={isLoading || isUploading || !!file}
-                        onFocus={() => checkAndUpdateHeight()}
-                        onBlur={() => checkAndUpdateHeight()}
                     />
 
                     <div className="absolute bottom-2 right-2">
@@ -486,7 +475,8 @@ export default function Chatbar({
                             className="flex gap-2"
                             initial={false}
                             animate={{
-                                x: (!isInChatPage && isAnimating) ? 'calc(100vw - 200px)' : 0
+                                x: (!isInChatPage && isAnimating) ? 'calc(100vw - 200px)' : 0,
+                                opacity: isSubmitted ? 0 : 1
                             }}
                             transition={{
                                 duration: 0.3,
@@ -529,7 +519,10 @@ export default function Chatbar({
 
             {/* Quick suggestions */}
             {!isInChatPage && (
-                <div className="flex items-center gap-2 pt-2 px-4 pb-3">
+                <div className={cn(
+                    "flex items-center gap-2 px-3 pb-2",
+                    isRightPanelOpen && "px-2 pb-1 gap-1"
+                )}>
                     <Button
                         variant="ghost"
                         size="icon"

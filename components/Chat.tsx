@@ -123,15 +123,15 @@ function Chat({
             <div className="flex-1 min-h-0 relative z-20">
                 <ScrollArea className={cn(
                     "h-full",
-                    !isRightPanelOpen && "max-w-[800px] m-auto"
+                    !isRightPanelOpen && "max-w-[1000px] m-auto"
                 )}>
                     <div className={cn(
-                        "p-4 space-y-4",
-                        isInChatPage ? "pb-[120px]" : "pb-4"
+                        "p-3 space-y-3",
+                        isInChatPage ? "pb-[120px]" : "pb-4",
+                        isRightPanelOpen && "p-2 sm:p-3 space-y-2"
                     )}>
                         {Array.isArray(messages) &&
                             messages.map((message, index) => {
-                                // Determine if this is the first message in a group of assistant messages
                                 const prevMessage = index > 0 ? messages[index - 1] : null;
                                 const showAvatar = message.role === 'assistant' && 
                                     (!prevMessage || prevMessage.role === 'user' || prevMessage.role === 'system');
@@ -158,10 +158,8 @@ function Chat({
 
             {/* Chatbar */}
             <div className={cn(
-                "bg-white dark:bg-dark-app w-full z-30",
-                isInChatPage ? "fixed bottom-0" : "relative",
-                isRightPanelOpen && isInChatPage && "w-[39%]",
-                !isRightPanelOpen && isInChatPage && "left-1/2 -translate-x-1/2 max-w-[800px]"
+                "w-full max-w-[1000px] mx-auto bg-white dark:bg-dark-app z-30",
+                isRightPanelOpen && "w-full max-w-none"
             )}>
                 <Chatbar
                     value={input}
