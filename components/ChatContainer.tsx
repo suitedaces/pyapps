@@ -356,7 +356,7 @@ export default function ChatContainer({
             fileId?: string
         ) => {
             e.preventDefault()
-            setHasFirstMessage(true)
+                    setHasFirstMessage(true)
 
             // Validate message content
             if (file && fileId) {
@@ -705,66 +705,121 @@ export default function ChatContainer({
                         ref={resizableGroupRef}
                     >
                         <ResizablePanel defaultSize={40} minSize={30}>
-                            <div className={cn(
-                                'w-full h-full flex flex-col overflow-hidden',
-                                hasFirstMessage || isInChatPage ? 'h-[calc(100vh-4rem)]' : 'h-screen',
-                                'px-0 sm:px-2'
-                            )}>
-                                {!isInChatPage && chatState.status === 'initial' && (
-                                    <div className="absolute inset-0 flex flex-col items-center">
-                                        <div className="flex flex-col items-center mt-[10vh] sm:mt-[15vh] mb-8 sm:mb-32">
-                                            <div className="z-10 transform scale-[1.25] sm:scale-[1.5] md:scale-[1.75] lg:scale-[2.75]">
-                                                <Logo inverted />
-                                            </div>
-                                            <TypingText
-                                                className="text-black dark:text-dark-text font-extrabold text-2xl sm:text-2xl md:text-4xl lg:text-5xl tracking-tight mb-8 sm:mb-12 md:mb-24 px-4 text-center relative z-20"
-                                                text="Turn data into interactive apps, in seconds."
-                                                speed={35}
-                                                show={true}
-                                            />
-                                            {!hasFirstMessage && (
+                            <div className="h-full w-full flex flex-col">
+                                {!isInChatPage && chatState.status === 'initial' ? (
+                                    // Landing page layout
+                                    <div className="flex flex-col h-full">
+                                        {/* Main content area - takes available space */}
+                                        <div className="flex-1 flex flex-col items-center overflow-y-auto">
+                                            {/* Fixed spacing from top */}
+                                            <div className="h-[15vh]" />
+                                            
+                                            {/* Content container - maintains consistent width */}
+                                            <div className={cn(
+                                                "w-full max-w-[1000px] mx-auto px-3 flex flex-col items-center",
+                                                rightPanel.isVisible && "max-w-none"
+                                            )}>
+                                                {/* Logo */}
                                                 <div className={cn(
-                                                    "w-full max-w-[700px] relative z-30 pointer-events-auto overflow-hidden px-4 sm:px-8",
-                                                    "mt-6 sm:mt-12 md:mt-20 lg:mt-40"
+                                                    "transform mb-16 sm:mb-20 md:mb-24 relative z-30",
+                                                    rightPanel.isVisible 
+                                                        ? "scale-100 sm:scale-125 md:scale-150" 
+                                                        : "scale-[1.25] sm:scale-[1.5] md:scale-[1.75] lg:scale-[2.75]"
                                                 )}>
-                                                    <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
+                                                    <Logo inverted />
                                                 </div>
-                                            )}
+                                                
+                                                {/* Typing Text */}
+                                                <div className={cn(
+                                                    "w-full mb-8 sm:mb-10 md:mb-12 relative z-30",
+                                                    rightPanel.isVisible && "mb-4 sm:mb-6 md:mb-8"
+                                                )}>
+                                                    <TypingText
+                                                        className={cn(
+                                                            "text-black dark:text-dark-text font-extrabold tracking-tight text-center py-3 sm:py-4 md:py-5",
+                                                            rightPanel.isVisible 
+                                                                ? "text-xl sm:text-2xl md:text-3xl" 
+                                                                : "text-2xl sm:text-2xl md:text-4xl lg:text-5xl"
+                                                        )}
+                                                        text="Turn data into interactive apps, in seconds."
+                                                        speed={35}
+                                                        show={true}
+                                                    />
+                                                </div>
+
+                                                {/* App Carousel */}
+                                                {!hasFirstMessage && (
+                                                    <div className={cn(
+                                                        "w-full relative z-30 mb-0",
+                                                        rightPanel.isVisible && "scale-90"
+                                                    )}>
+                                                        <AppCarousel onAppSelect={(app) => handleAppSelect(app)} />
+                                                    </div>
+                                                )}
+
+                                                {/* Chat section moved up */}
+                                                <div className="w-full relative z-30">
+                                                    <Chat
+                                                        messages={isNavigating ? [] : messages}
+                                                        isLoading={chatLoading || isNavigating}
+                                                        input={input}
+                                                        onInputChange={handleInputChange}
+                                                        onSubmit={handleSubmit}
+                                                        onAppend={async (message: string) => {
+                                                            const userMessage = {
+                                                                id: Date.now().toString(),
+                                                                role: 'user' as const,
+                                                                content: message,
+                                                                createdAt: new Date()
+                                                            }
+                                                            await append(userMessage)
+                                                        }}
+                                                        errorState={errorState}
+                                                        onErrorDismiss={() => setErrorState(null)}
+                                                        onUpdateStreamlit={updateStreamlitApp}
+                                                        onCodeClick={handleCodeViewToggle}
+                                                        isInChatPage={isInChatPage || hasFirstMessage}
+                                                        onTogglePanel={toggleRightContent}
+                                                        chatId={currentChatId}
+                                                        selectedFileIds={persistedFileIds}
+                                                        onFileSelect={handleFileSelection}
+                                                        isRightPanelOpen={rightPanel.isVisible}
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
+                                ) : (
+                                    // Regular chat view
+                                    <div className="h-full">
+                                        <Chat
+                                            messages={isNavigating ? [] : messages}
+                                            isLoading={chatLoading || isNavigating}
+                                            input={input}
+                                            onInputChange={handleInputChange}
+                                            onSubmit={handleSubmit}
+                                            onAppend={async (message: string) => {
+                                                const userMessage = {
+                                                    id: Date.now().toString(),
+                                                    role: 'user' as const,
+                                                    content: message,
+                                                    createdAt: new Date()
+                                                }
+                                                await append(userMessage)
+                                            }}
+                                            errorState={errorState}
+                                            onErrorDismiss={() => setErrorState(null)}
+                                            onUpdateStreamlit={updateStreamlitApp}
+                                            onCodeClick={handleCodeViewToggle}
+                                            isInChatPage={isInChatPage || hasFirstMessage}
+                                            onTogglePanel={toggleRightContent}
+                                            chatId={currentChatId}
+                                            selectedFileIds={persistedFileIds}
+                                            onFileSelect={handleFileSelection}
+                                            isRightPanelOpen={rightPanel.isVisible}
+                                        />
+                                    </div>
                                 )}
-                                <div className={cn(
-                                    "flex-1 min-h-0 w-full overflow-hidden",
-                                    !isInChatPage && !hasFirstMessage ? "h-full" : "",
-                                    !rightPanel.isVisible && "max-w-[800px] mx-auto"
-                                )}>
-                                    <Chat
-                                        messages={isNavigating ? [] : messages}
-                                        isLoading={chatLoading || isNavigating}
-                                        input={input}
-                                        onInputChange={handleInputChange}
-                                        onSubmit={handleSubmit}
-                                        onAppend={async (message: string) => {
-                                            const userMessage = {
-                                                id: Date.now().toString(),
-                                                role: 'user' as const,
-                                                content: message,
-                                                createdAt: new Date()
-                                            }
-                                            await append(userMessage)
-                                        }}
-                                        errorState={errorState}
-                                        onErrorDismiss={() => setErrorState(null)}
-                                        onUpdateStreamlit={updateStreamlitApp}
-                                        onCodeClick={handleCodeViewToggle}
-                                        isInChatPage={isInChatPage || hasFirstMessage}
-                                        onTogglePanel={toggleRightContent}
-                                        chatId={currentChatId}
-                                        selectedFileIds={persistedFileIds}
-                                        onFileSelect={handleFileSelection}
-                                        isRightPanelOpen={rightPanel.isVisible}
-                                    />
-                                </div>
                             </div>
                         </ResizablePanel>
 
