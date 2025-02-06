@@ -5,7 +5,7 @@ const SuggestionsSchema = z.object({
     keyMetrics: z
         .array(z.string().min(1).trim())
         .min(1, 'At least one metric is required')
-        .max(3)
+        .max(5)
         .describe("Key metrics to calculate from numeric and categorical columns. Focus on aggregations, trends, and distributions. Example: ['Average sales by category', 'Monthly growth rate', 'Distribution of ratings']. These are metrics you believe the user would like to know the answer to."),
     keyQuestions: z
         .array(z.string().min(1).trim())

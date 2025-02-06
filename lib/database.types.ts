@@ -385,20 +385,87 @@ export interface Database {
                     full_name: string | null
                     avatar_url: string | null
                     created_at: string
+                    stripe_customer_id: string | null
+                    subscription_tier: 'free' | 'pro' | null
+                    subscription_status: 'active' | 'canceled' | 'past_due' | 'trialing' | null
+                    current_period_end: string | null
+                    is_in_trial: boolean
+                    trial_end: string | null
                 }
                 Insert: {
                     id: string
                     full_name?: string | null
                     avatar_url?: string | null
                     created_at?: string
+                    stripe_customer_id?: string | null
+                    subscription_tier?: 'free' | 'pro' | null
+                    subscription_status?: 'active' | 'canceled' | 'past_due' | 'trialing' | null
+                    current_period_end?: string | null
+                    is_in_trial?: boolean
+                    trial_end?: string | null
                 }
                 Update: {
                     id?: string
                     full_name?: string | null
                     avatar_url?: string | null
                     created_at?: string
+                    stripe_customer_id?: string | null
+                    subscription_tier?: 'free' | 'pro' | null
+                    subscription_status?: 'active' | 'canceled' | 'past_due' | 'trialing' | null
+                    current_period_end?: string | null
+                    is_in_trial?: boolean
+                    trial_end?: string | null
                 }
                 Relationships: []
+            }
+            subscriptions: {
+                Row: {
+                    id: string
+                    user_id: string
+                    stripe_subscription_id: string
+                    stripe_price_id: string
+                    status: 'active' | 'canceled' | 'past_due' | 'trialing'
+                    current_period_start: string
+                    current_period_end: string
+                    created_at: string
+                    canceled_at: string | null
+                    is_trialing: boolean
+                    trial_end: string | null
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    stripe_subscription_id: string
+                    stripe_price_id: string
+                    status: 'active' | 'canceled' | 'past_due' | 'trialing'
+                    current_period_start: string
+                    current_period_end: string
+                    created_at?: string
+                    canceled_at?: string | null
+                    is_trialing?: boolean
+                    trial_end?: string | null
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    stripe_subscription_id?: string
+                    stripe_price_id?: string
+                    status?: 'active' | 'canceled' | 'past_due' | 'trialing'
+                    current_period_start?: string
+                    current_period_end?: string
+                    created_at?: string
+                    canceled_at?: string | null
+                    is_trialing?: boolean
+                    trial_end?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: 'subscriptions_user_id_fkey'
+                        columns: ['user_id']
+                        referencedRelation: 'users'
+                        referencedColumns: ['id']
+                    }
+                ]
             }
         }
         Views: {

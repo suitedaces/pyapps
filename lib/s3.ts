@@ -89,23 +89,37 @@ export const getS3Key = (userId: string, fileName: string): string => {
 
 export async function setupS3Mount(sandbox: Sandbox, userId: string) {
     // Ensure directory exists
-    await sandbox.process.start('sudo mkdir -p /app/s3')
+    try {
+        await sandbox.process.start('sudo mkdir -p /app/s3')
+    } catch (error) {
+        console.error('🚨 Error in running mkdir in sandbox:', error)
+    }
 
     // Write credentials file
-    await sandbox.process.start(`echo "${process.env.AWS_ACCESS_KEY_ID}:${process.env.AWS_SECRET_ACCESS_KEY}" | sudo tee /etc/passwd-s3fs > /dev/null && sudo chmod 600 /etc/passwd-s3fs`)
+    try {
+        await sandbox.process.start(`echo "${process.env.AWS_ACCESS_KEY_ID}:${process.env.AWS_SECRET_ACCESS_KEY}" | sudo tee /etc/passwd-s3fs > /dev/null && sudo chmod 600 /etc/passwd-s3fs`)
+    } catch (error) {
+        console.error('🚨 Error in writing credentials file in sandbox:', error)
+    }
+
+
 
     // Mount S3 with debug output
-    await sandbox.process.start(`sudo s3fs "pyapps:/${userId}" /app/s3 \
-            -o passwd_file=/etc/passwd-s3fs \
-            -o url="https://s3.amazonaws.com" \
-            -o endpoint=${process.env.AWS_REGION} \
-            -o allow_other \
+    try {
+        await sandbox.process.start(`sudo s3fs "pyapps:/${userId}" /app/s3 \
+                -o passwd_file=/etc/passwd-s3fs \
+                -o url="https://s3.amazonaws.com" \
+                -o endpoint=${process.env.AWS_REGION} \
+                -o allow_other \
             -o umask=0000 \
             -o dbglevel=info \
             -o use_path_request_style \
             -o default_acl=private \
             -o use_cache=/tmp`)
-        
+    } catch (error) {
+        console.error('🚨 Error in mounting S3 in sandbox:', error)
+    }
+
     // Verify mount
     // const verifyMount = await (await sandbox.commands.run('df -h | grep s3fs || echo "not mounted"', {background: true})).wait()
 

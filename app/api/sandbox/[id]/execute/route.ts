@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { setupS3Mount } from '@/lib/s3'
 
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 async function listUserSandboxes(userId: string): Promise<Sandbox[]> {
     try {
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await sandbox.process.start({
             cmd: 'streamlit run /app/app.py',
             onStdout: (data: string) => console.log('Streamlit stdout:', data),
-            onStderr: (data: string) => console.error('Streamlit stderr:', data)
+            onStderr: (data: string) => console.error('Streamlit stderr:', data),
         } as any)
 
         const url = sandbox.getHostname(8501)
