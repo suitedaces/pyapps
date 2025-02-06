@@ -345,6 +345,22 @@ function isMessageWithToolInvocations(msg: Message): msg is MessageWithToolInvoc
     );
 }
 
+// Helper function to check if a message is empty
+function isEmptyMessage(msg: Message): boolean {
+    if (typeof msg.content === 'string') {
+        return !msg.content.trim();
+    }
+    if (Array.isArray(msg.content)) {
+        return msg.content.every(part => {
+            if (part.type === 'text') {
+                return !part.text.trim();
+            }
+            return false; // Tool calls are never considered empty
+        });
+    }
+    return false;
+}
+
 // Update validation function to match Vercel AI SDK format
 function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; updatedMessages: Message[] } {
     const updatedMessages: Message[] = [];
@@ -352,14 +368,24 @@ function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; u
     for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
         
+        // Skip empty assistant messages
+        if (msg.role === 'assistant' && isEmptyMessage(msg)) {
+            continue;
+        }
+        
         if (msg.role === 'assistant') {
             // Convert toolInvocations format to proper format
             if (isMessageWithToolInvocations(msg)) {
+                // Skip if the message is empty and has no tool invocations
+                if (isEmptyMessage(msg) && !msg.toolInvocations.length) {
+                    continue;
+                }
+
                 // Create assistant message with text and tool calls
                 const assistantMessage: CoreAssistantMessage = {
                     role: 'assistant',
                     content: [
-                        { type: 'text', text: msg.content },
+                        { type: 'text', text: msg.content || '' },
                         ...msg.toolInvocations.map(invocation => ({
                             type: 'tool-call' as const,
                             toolCallId: invocation.toolCallId,
@@ -387,6 +413,12 @@ function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; u
             // Handle array content
             if (Array.isArray(msg.content)) {
                 const toolCalls = msg.content.filter(isToolCall);
+                const textParts = msg.content.filter((part): part is TextPart => part.type === 'text');
+                
+                // Skip if message is empty and has no tool calls
+                if (!toolCalls.length && textParts.every(part => !part.text.trim())) {
+                    continue;
+                }
                 
                 // If there are tool calls, look for corresponding results
                 if (toolCalls.length > 0) {
@@ -412,15 +444,17 @@ function validateToolCallsAndResults(messages: Message[]): { isValid: boolean; u
                         updatedMessages.push(toolMessage);
                     }
                 } else {
-                    // No tool calls, just add the message
+                    // No tool calls, just add the message if it's not empty
                     updatedMessages.push(msg);
                 }
             } else {
-                // Handle string content
-                updatedMessages.push({
-                    role: 'assistant',
-                    content: [{ type: 'text', text: msg.content || '👍' }]
-                });
+                // Only add string content messages if they're not empty
+                if (msg.content?.trim()) {
+                    updatedMessages.push({
+                        role: 'assistant',
+                        content: [{ type: 'text', text: msg.content }]
+                    });
+                }
             }
         } else if (msg.role === 'user' || msg.role === 'system') {
             // Pass through user and system messages
