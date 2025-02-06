@@ -8,7 +8,7 @@ const streamlitToolSchema = z.object({
     code: z
         .string()
         .describe(
-            'Complete, runnable Streamlit app code including all necessary imports. If the user has data, code should use the path "/app/s3/data/<filenamewithextension>" to read the data.'
+            'Complete, runnable Streamlit app code including all necessary imports. If the user has data, code should use the path "/app/s3/data/<filenamewithextension>" to read the data. DO NOT write any placeholders for code. You are to write the complete file.'
         ),
     requiredLibraries: z
         .array(z.string())
